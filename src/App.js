@@ -260,7 +260,7 @@ export default function App() {
     catFilter === "All" || i.category === catFilter
   );
 
-  const counts = { closet: itemsDb.rows.length, outfits: outfitsDb.rows.length, wishlist: wishlistDb.rows.length };
+
 
   return (
     <div style={{ minHeight: "100vh", background: "#f8f7f4", paddingBottom: 90 }}>

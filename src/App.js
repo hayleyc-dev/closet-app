@@ -6,22 +6,50 @@ const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-const CATEGORIES = ["All", "Tops", "Bottoms", "Dresses", "Outerwear", "Shoes", "Bags", "Accessories", "Other"];
-const COLORS = ["Black", "White", "Grey", "Beige", "Brown", "Navy", "Blue", "Green", "Red", "Pink", "Purple", "Yellow", "Orange", "Multicolor"];
-const SEASONS = ["Spring", "Summer", "Fall", "Winter", "All Season"];
+const CATEGORIES = ["All", "Accessories", "Activewear", "Bags", "Denim", "Dresses", "Intimates", "Jewelry", "Knits", "Loungewear", "Outerwear", "Shoes", "Shorts + Skirts", "Sleepwear", "Socks + Tights", "Sweaters", "Swim", "Tops", "Trousers"];
+const COLORS = ["Black", "Blue", "Brown", "Clear", "Cream", "Gold", "Green", "Grey", "Orange", "Pink", "Purple", "Red", "Silver", "Tan", "White", "Yellow"];
+const SIZES = ["XS", "S", "M", "L", "XL", "00/24", "0/25", "2/26", "4/27", "6/28", "OS", "34B", "S Tall", "XS Long", "S/M", "7", "9"];
+const SEASONS = ["Spring", "Summer", "Fall", "Winter", "All Season", "Holiday", "Disney"];
+const OCCASIONS = ["WFH", "Disney", "Universal", "Date Night", "Travel", "Sport", "Weekend", "Occasion"];
+
+const OCCASION_COLORS = {
+  "WFH":        { bg: "#f0faf4", color: "#3aaa6e" },
+  "Disney":     { bg: "#fff0f5", color: "#e05588" },
+  "Universal":  { bg: "#fff8f0", color: "#e07e30" },
+  "Date Night": { bg: "#fdf4ff", color: "#a855f7" },
+  "Travel":     { bg: "#f0fbff", color: "#2bafd4" },
+  "Sport":      { bg: "#f0f4ff", color: "#5b7fe6" },
+  "Weekend":    { bg: "#fafaf0", color: "#9aaa30" },
+  "Occasion":   { bg: "#f5f0ff", color: "#7c6fe0" },
+};
 
 const uid = () => Math.random().toString(36).slice(2);
 
+// SVG hanger icon
+const HangerIcon = ({ size = 20, color = "currentColor", opacity = 1 }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.8"
+    strokeLinecap="round" strokeLinejoin="round" style={{ opacity, flexShrink: 0 }}>
+    <path d="M12 4a2 2 0 0 1 2 2c0 1.5-2 2.5-2 4" />
+    <path d="M3 18l9-6 9 6" />
+    <path d="M2 18h20" />
+    <circle cx="12" cy="4" r="1" fill={color} stroke="none" />
+  </svg>
+);
+
 const globalStyles = `
-  @import url('https://fonts.googleapis.com/css2?family=Nunito:wght@300;400;500;600;700&display=swap');
+  @import url('https://fonts.googleapis.com/css2?family=Nunito:wght@300;400;500;600;700;800&display=swap');
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body { background: #f8f7f4; color: #1a1a1a; font-family: 'Nunito', sans-serif; }
   ::-webkit-scrollbar { width: 4px; }
   ::-webkit-scrollbar-thumb { background: #e0dbd0; border-radius: 4px; }
   @keyframes fadeUp { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
   @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+  @keyframes slideLeft { from { opacity: 0; transform: translateX(40px); } to { opacity: 1; transform: translateX(0); } }
+  @keyframes slideRight { from { opacity: 0; transform: translateX(-40px); } to { opacity: 1; transform: translateX(0); } }
   .fade-up { animation: fadeUp 0.3s ease forwards; }
   .fade-in { animation: fadeIn 0.2s ease forwards; }
+  .slide-enter-left { animation: slideLeft 0.25s ease forwards; }
+  .slide-enter-right { animation: slideRight 0.25s ease forwards; }
   .card { transition: transform 0.2s, box-shadow 0.2s; }
   .card:hover { transform: translateY(-3px); box-shadow: 0 12px 32px rgba(0,0,0,0.08) !important; }
   .pill { transition: all 0.18s; cursor: pointer; }
@@ -29,40 +57,99 @@ const globalStyles = `
   .btn-primary { transition: all 0.15s; }
   .btn-primary:hover { transform: translateY(-1px); box-shadow: 0 6px 20px rgba(0,0,0,0.12); }
   input:focus, select:focus, textarea:focus { outline: none; border-color: #c8b99a !important; }
+  .builder-overlay { position: fixed; inset: 0; z-index: 300; background: #f5f5f2; display: flex; flex-direction: column; }
+  .builder-panels { display: flex; flex: 1; overflow: hidden; }
+  .builder-left { width: 280px; flex-shrink: 0; background: #fff; border-right: 1.5px solid #e8e4dc; padding: 28px 22px; display: flex; flex-direction: column; overflow-y: auto; }
+  .builder-canvas { flex: 1; position: relative; overflow: hidden; background: #e8e4dc; display: flex; align-items: center; justify-content: center; }
+  .outfit-board { position: relative; background: #fff; box-shadow: 0 8px 40px rgba(0,0,0,0.15); border-radius: 4px; overflow: hidden; flex-shrink: 0; }
+  .builder-right { width: 320px; flex-shrink: 0; background: #fff; border-left: 1.5px solid #e8e4dc; display: flex; flex-direction: column; overflow: hidden; }
+  .canvas-item { position: absolute; cursor: grab; user-select: none; }
+  .canvas-item:active { cursor: grabbing; }
+  .product-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; padding: 12px; overflow-y: auto; }
+  .product-thumb { border-radius: 10px; overflow: hidden; cursor: pointer; border: 2px solid transparent; background: #f5f5f2; aspect-ratio: 1; display: flex; align-items: center; justify-content: center; transition: border-color 0.15s; position: relative; }
+  .product-thumb.selected { border-color: #2d6a3f; }
+  .product-thumb img { width: 100%; height: 100%; object-fit: cover; }
+  .product-thumb .check { position: absolute; bottom: 6px; right: 6px; width: 22px; height: 22px; border-radius: 50%; background: #2d6a3f; display: flex; align-items: center; justify-content: center; color: #fff; font-size: 12px; font-weight: 700; }
+  .selected-strip { display: flex; gap: 8px; padding: 10px 12px; overflow-x: auto; scrollbar-width: none; align-items: center; }
+  .selected-strip::-webkit-scrollbar { display: none; }
+  .selected-thumb { width: 58px; height: 58px; border-radius: 10px; overflow: hidden; flex-shrink: 0; border: 2px solid #2d6a3f; background: #f5f5f2; display: flex; align-items: center; justify-content: center; cursor: pointer; }
+  .selected-thumb img { width: 100%; height: 100%; object-fit: cover; }
+  .builder-search { border: 1.5px solid #e8e4dc; border-radius: 20px; padding: 7px 14px; font-family: 'Nunito', sans-serif; font-size: 13px; width: 100%; background: #fafaf8; color: #1a1a1a; }
+  .builder-search:focus { outline: none; border-color: #2d6a3f; }
+  .builder-topbar { height: 52px; background: #fff; border-bottom: 1.5px solid #e8e4dc; display: flex; align-items: center; justify-content: space-between; padding: 0 22px; flex-shrink: 0; }
+  .lookbook-overlay { position: fixed; inset: 0; z-index: 400; background: #f8f7f4; display: flex; flex-direction: column; }
+  .lookbook-topbar { height: 56px; background: #fff; border-bottom: 1.5px solid #f0ece4; display: flex; align-items: center; justify-content: space-between; padding: 0 24px; flex-shrink: 0; }
+  .outfit-popup-canvas { position: relative; width: 100%; background: #fff; border-radius: 16px; border: 1.5px solid #f0ece4; overflow: hidden; }
+  .filter-row { display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; padding-bottom: 2px; }
+  .filter-row::-webkit-scrollbar { display: none; }
+  .closet-layout { display: flex; gap: 0; align-items: flex-start; }
+  .closet-sidebar { width: 170px; flex-shrink: 0; background: #fff; border-radius: 16px; border: 1.5px solid #f0ece4; padding: 16px 14px; position: sticky; top: 80px; margin-right: 16px; }
+  .closet-main { flex: 1; min-width: 0; }
+  .sidebar-section { margin-bottom: 18px; }
+  .sidebar-label { font-size: 10px; font-weight: 700; color: #aaa; text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 8px; }
+  .sidebar-btn { display: block; width: 100%; text-align: left; padding: 6px 10px; border-radius: 8px; border: none; cursor: pointer; font-family: "Nunito", sans-serif; font-size: 12px; font-weight: 600; background: transparent; color: #666; transition: all 0.15s; }
+  .sidebar-btn:hover { background: #f5f3ef; }
+  .sidebar-btn.active { background: #1a1a1a; color: #fff; font-weight: 700; }
+  .closet-search { width: 100%; padding: 9px 14px 9px 36px; border: 1.5px solid #e8e4dc; border-radius: 12px; font-family: "Nunito", sans-serif; font-size: 13px; background: #fafaf8; color: #1a1a1a; }
+  .closet-search:focus { outline: none; border-color: #c8b99a; }
+  .app-layout { display: flex; gap: 0; align-items: flex-start; padding: 24px 32px; }
+  .app-left-sidebar { width: 170px; flex-shrink: 0; margin-right: 20px; }
+  .app-main { flex: 1; min-width: 0; }
+  .app-right-panel { width: 240px; flex-shrink: 0; margin-left: 20px; display: flex; flex-direction: column; gap: 12px; position: sticky; top: 80px; }
+  .right-card { background: #fff; border-radius: 16px; border: 1.5px solid #f0ece4; padding: 18px 16px; }
+  .right-card-title { font-size: 10px; font-weight: 700; color: #aaa; text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 12px; }
+  .item-card { background: #fff; border-radius: 16px; overflow: hidden; border: 1.5px solid #f0ece4; box-shadow: 0 2px 8px rgba(0,0,0,0.04); cursor: pointer; transition: transform 0.18s, box-shadow 0.18s; }
+  .item-card:hover { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(0,0,0,0.09); }
+  .item-card-img { width: 100%; aspect-ratio: 3/4; object-fit: cover; display: block; background: #f5f3ef; }
+  .item-detail-overlay { position: fixed; inset: 0; z-index: 500; background: rgba(0,0,0,0.45); display: flex; align-items: center; justify-content: center; padding: 20px; backdrop-filter: blur(6px); }
+  .stats-bar { display: flex; gap: 0; border-radius: 16px; overflow: hidden; height: 10px; }
 `;
 
+// ── Supabase hook ────────────────────────────────────────────────────────────
 function useSupabaseTable(table) {
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
+  const parseRows = (data) => data.map(r => {
+    if (r.data && typeof r.data === "object") return { ...r.data, id: r.id };
+    const { id, created_at, ...rest } = r;
+    return { ...rest, id };
+  }).filter(r => r.id);
+  const fetchRows = async (setter) => {
+    let { data, error } = await supabase.from(table).select("*").order("created_at");
+    if (error) ({ data, error } = await supabase.from(table).select("*"));
+    if (!error && data) setter(parseRows(data));
+    else if (error) console.error("[" + table + "] fetch:", error.message);
+  };
   useEffect(() => {
-    async function load() {
-      const { data, error } = await supabase.from(table).select("*").order("created_at");
-      if (!error) setRows(data.map(r => ({ ...r.data, id: r.id })));
-      setLoading(false);
-    }
-    load();
+    fetchRows(setRows).then(() => setLoading(false));
   }, [table]);
   const add = async (item) => {
     const { error } = await supabase.from(table).insert({ id: item.id, data: item });
     if (!error) setRows(r => [...r, item]);
+    else console.error("[" + table + "] add:", error.message);
   };
   const update = async (item) => {
     const { error } = await supabase.from(table).update({ data: item }).eq("id", item.id);
     if (!error) setRows(r => r.map(i => i.id === item.id ? item : i));
+    else console.error("[" + table + "] update:", error.message);
   };
   const remove = async (id) => {
     const { error } = await supabase.from(table).delete().eq("id", id);
     if (!error) setRows(r => r.filter(i => i.id !== id));
+    else console.error("[" + table + "] remove:", error.message);
   };
-  return { rows, loading, add, update, remove };
+  const refresh = async () => {
+    setLoading(true);
+    await fetchRows(setRows);
+    setLoading(false);
+  };
+  return { rows, loading, add, update, remove, refresh };
 }
 
+// ── Shared UI ────────────────────────────────────────────────────────────────
 const inputStyle = {
-  width: "100%", padding: "11px 14px",
-  border: "1.5px solid #e8e2d8", borderRadius: 12,
-  background: "#fff", color: "#1a1a1a",
-  fontFamily: "'Nunito', sans-serif", fontSize: 14,
-  transition: "border-color 0.2s"
+  width: "100%", padding: "11px 14px", border: "1.5px solid #e8e2d8", borderRadius: 12,
+  background: "#fff", color: "#1a1a1a", fontFamily: "'Nunito', sans-serif", fontSize: 14, transition: "border-color 0.2s"
 };
 
 const Input = ({ label, ...props }) => (
@@ -87,21 +174,15 @@ const Modal = ({ open, onClose, title, children }) => {
   return (
     <div className="fade-in" onClick={onClose} style={{
       position: "fixed", inset: 0, background: "rgba(0,0,0,0.3)", zIndex: 200,
-      display: "flex", alignItems: "center", justifyContent: "center", padding: 16,
-      backdropFilter: "blur(4px)"
+      display: "flex", alignItems: "center", justifyContent: "center", padding: 16, backdropFilter: "blur(4px)"
     }}>
       <div className="fade-up" onClick={e => e.stopPropagation()} style={{
         background: "#fff", borderRadius: 24, padding: "28px 24px", width: "100%",
-        maxWidth: 480, maxHeight: "88vh", overflowY: "auto",
-        boxShadow: "0 24px 80px rgba(0,0,0,0.15)"
+        maxWidth: 520, maxHeight: "90vh", overflowY: "auto", boxShadow: "0 24px 80px rgba(0,0,0,0.15)"
       }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 22 }}>
           <h2 style={{ fontSize: 18, fontWeight: 700, color: "#1a1a1a" }}>{title}</h2>
-          <button onClick={onClose} style={{
-            width: 32, height: 32, borderRadius: "50%", background: "#f5f3ef",
-            border: "none", cursor: "pointer", fontSize: 16, color: "#999",
-            display: "flex", alignItems: "center", justifyContent: "center"
-          }}>×</button>
+          <button onClick={onClose} style={{ width: 32, height: 32, borderRadius: "50%", border: "none", background: "#f5f3ef", cursor: "pointer", fontSize: 16, color: "#888", display: "flex", alignItems: "center", justifyContent: "center" }}>✕</button>
         </div>
         {children}
       </div>
@@ -109,187 +190,2172 @@ const Modal = ({ open, onClose, title, children }) => {
   );
 };
 
-const BLANK = { name: "", category: "", color: "", season: "", brand: "", notes: "", image: "", price: "" };
+const BLANK = { name: "", brand: "", category: "", color: "", colors: [], size: "", season: "", seasons: [], price: "", spent: "", notes: "", image: "", purchaseDate: "", wornCount: 0, link: "" };
+const BLANK_WISH = { name: "", brand: "", price: "", image: "", link: "" };
 
-function ItemForm({ initial = BLANK, onSave, onCancel }) {
-  const [form, setForm] = useState(initial);
-  const imgRef = useRef();
-  const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
-  const handleImg = e => {
-    const file = e.target.files[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = ev => set("image", ev.target.result);
-    reader.readAsDataURL(file);
+// ── Shared image helpers ─────────────────────────────────────────────────────
+
+// Canvas-based background removal: floods from corners to find background colour,
+// then makes near-matching pixels transparent using a tolerance walk.
+function removeBgCanvas(dataUrl) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => {
+      const canvas = document.createElement("canvas");
+      canvas.width = img.width;
+      canvas.height = img.height;
+      const ctx = canvas.getContext("2d");
+      ctx.drawImage(img, 0, 0);
+      const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      const data = imageData.data;
+      const w = canvas.width, h = canvas.height;
+
+      // Sample background colour from the 4 corners
+      const corners = [[0,0],[w-1,0],[0,h-1],[w-1,h-1]];
+      let rSum=0, gSum=0, bSum=0;
+      corners.forEach(([x,y]) => {
+        const i = (y*w+x)*4;
+        rSum+=data[i]; gSum+=data[i+1]; bSum+=data[i+2];
+      });
+      const bgR=rSum/4, bgG=gSum/4, bgB=bSum/4;
+
+      // Flood-fill from all 4 corners with tolerance
+      const tolerance = 38;
+      const visited = new Uint8Array(w * h);
+
+      const colorMatch = (i) => {
+        const dr = data[i]-bgR, dg = data[i+1]-bgG, db = data[i+2]-bgB;
+        return Math.sqrt(dr*dr+dg*dg+db*db) < tolerance;
+      };
+
+      const queue = [];
+      corners.forEach(([x,y]) => {
+        const idx = y*w+x;
+        if (!visited[idx] && colorMatch(idx*4)) { visited[idx]=1; queue.push(idx); }
+      });
+
+      while (queue.length) {
+        const idx = queue.pop();
+        data[idx*4+3] = 0; // make transparent
+        const x = idx % w, y = Math.floor(idx / w);
+        [[1,0],[-1,0],[0,1],[0,-1]].forEach(([dx,dy]) => {
+          const nx=x+dx, ny=y+dy;
+          if (nx<0||nx>=w||ny<0||ny>=h) return;
+          const ni = ny*w+nx;
+          if (!visited[ni] && colorMatch(ni*4)) { visited[ni]=1; queue.push(ni); }
+        });
+      }
+
+      ctx.putImageData(imageData, 0, 0);
+      resolve(canvas.toDataURL("image/png"));
+    };
+    img.onerror = reject;
+    img.src = dataUrl;
+  });
+}
+
+// Fetch an external image via CORS proxy and return base64 data URL
+async function fetchImageAsDataUrl(url) {
+  const proxies = [
+    `https://corsproxy.io/?${encodeURIComponent(url)}`,
+    `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,
+  ];
+  for (const proxy of proxies) {
+    try {
+      const res = await fetch(proxy);
+      if (!res.ok) continue;
+      const blob = await res.blob();
+      if (!blob.type.startsWith("image/")) continue;
+      return await new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = e => resolve(e.target.result);
+        reader.onerror = reject;
+        reader.readAsDataURL(blob);
+      });
+    } catch { continue; }
+  }
+  throw new Error("Could not fetch image — try downloading it and uploading directly.");
+}
+
+
+// Auto-crop: finds the bounding box of non-transparent / non-background pixels and crops to it
+function autoCropCanvas(dataUrl, padding = 12) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => {
+      const c = document.createElement("canvas");
+      c.width = img.width; c.height = img.height;
+      const ctx = c.getContext("2d");
+      ctx.drawImage(img, 0, 0);
+      const { data, width, height } = ctx.getImageData(0, 0, c.width, c.height);
+
+      // Sample bg from corners (same as removeBg)
+      const corners = [[0,0],[width-1,0],[0,height-1],[width-1,height-1]];
+      let rS=0, gS=0, bS=0;
+      corners.forEach(([x,y]) => { const i=(y*width+x)*4; rS+=data[i]; gS+=data[i+1]; bS+=data[i+2]; });
+      const bgR=rS/4, bgG=gS/4, bgB=bS/4, tol=40;
+
+      const isBg = (i) => {
+        if (data[i+3] < 20) return true; // transparent
+        const dr=data[i]-bgR, dg=data[i+1]-bgG, db=data[i+2]-bgB;
+        return Math.sqrt(dr*dr+dg*dg+db*db) < tol;
+      };
+
+      let minX=width, maxX=0, minY=height, maxY=0;
+      for (let y=0; y<height; y++) for (let x=0; x<width; x++) {
+        if (!isBg((y*width+x)*4)) {
+          if (x<minX) minX=x; if (x>maxX) maxX=x;
+          if (y<minY) minY=y; if (y>maxY) maxY=y;
+        }
+      }
+      if (maxX <= minX || maxY <= minY) { resolve(dataUrl); return; }
+
+      minX = Math.max(0, minX-padding); minY = Math.max(0, minY-padding);
+      maxX = Math.min(width-1, maxX+padding); maxY = Math.min(height-1, maxY+padding);
+
+      const cw = maxX-minX, ch = maxY-minY;
+      const out = document.createElement("canvas");
+      out.width = cw; out.height = ch;
+      out.getContext("2d").drawImage(c, minX, minY, cw, ch, 0, 0, cw, ch);
+      resolve(out.toDataURL("image/png"));
+    };
+    img.onerror = reject;
+    img.src = dataUrl;
+  });
+}
+
+// ── Mask Editor: paint to erase or restore pixels after BG removal ───────────
+// Keeps the original image separately; erase brush makes alpha=0, restore brush paints original back.
+function MaskEditor({ current, original, onDone, onCancel }) {
+  const canvasRef = useRef(null);
+  const [tool, setTool] = useState("erase");   // "erase" | "restore"
+  const [brushSize, setBrushSize] = useState(24);
+  const [painting, setPainting] = useState(false);
+  const lastPos = useRef(null);
+  // We keep two ImageData objects in refs so we don't re-render on every stroke
+  const currentDataRef = useRef(null);
+  const originalDataRef = useRef(null);
+  const scaleRef = useRef({ x: 1, y: 1 });
+
+  // Load both images onto hidden canvases to get pixel data
+  useEffect(() => {
+    const load = (src) => new Promise((res, rej) => {
+      const img = new Image(); img.onload = () => res(img); img.onerror = rej; img.src = src;
+    });
+    Promise.all([load(current), load(original)]).then(([cur, orig]) => {
+      const w = cur.width, h = cur.height;
+      // current (possibly already has transparency)
+      const c1 = document.createElement("canvas"); c1.width=w; c1.height=h;
+      c1.getContext("2d").drawImage(cur,0,0);
+      currentDataRef.current = c1.getContext("2d").getImageData(0,0,w,h);
+      // original (full colour, no transparency)
+      const c2 = document.createElement("canvas"); c2.width=w; c2.height=h;
+      c2.getContext("2d").drawImage(orig,0,0);
+      originalDataRef.current = c2.getContext("2d").getImageData(0,0,w,h);
+      // Draw current state to visible canvas — use image's natural dimensions
+      // CSS (maxWidth/maxHeight) will scale it visually without stretching
+      const canvas = canvasRef.current;
+      if (!canvas) return;
+      canvas.width = w;
+      canvas.height = h;
+      scaleRef.current = { x: 1, y: 1 }; // actual pixel coords handled via getBoundingClientRect in paintAt
+      const ctx = canvas.getContext("2d");
+      ctx.clearRect(0,0,w,h);
+      const tmp = document.createElement("canvas"); tmp.width=w; tmp.height=h;
+      tmp.getContext("2d").putImageData(currentDataRef.current,0,0);
+      ctx.drawImage(tmp, 0, 0);
+    });
+  }, []);  // eslint-disable-line
+
+  const getCanvasPos = (e) => {
+    const canvas = canvasRef.current;
+    const rect = canvas.getBoundingClientRect();
+    const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+    const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+    return { x: clientX - rect.left, y: clientY - rect.top };
   };
+
+  const paintAt = (x, y) => {
+    const cur = currentDataRef.current;
+    const orig = originalDataRef.current;
+    if (!cur || !orig) return;
+    const canvas = canvasRef.current;
+    const rect = canvas.getBoundingClientRect();
+    const scaleX = cur.width / rect.width;
+    const scaleY = cur.height / rect.height;
+    const px = x * scaleX, py = y * scaleY;
+    const r = (brushSize / 2) * scaleX;
+    const data = cur.data, odata = orig.data;
+    const w = cur.width;
+
+    const minX = Math.max(0, Math.floor(px-r)), maxX = Math.min(w-1, Math.ceil(px+r));
+    const minY = Math.max(0, Math.floor(py-r)), maxY = Math.min(cur.height-1, Math.ceil(py+r));
+    for (let iy=minY; iy<=maxY; iy++) for (let ix=minX; ix<=maxX; ix++) {
+      const dist = Math.sqrt((ix-px)**2+(iy-py)**2);
+      if (dist > r) continue;
+      // soft edge: full opacity at center, fades at edge
+      const strength = Math.max(0, 1 - (dist/r)**2);
+      const idx = (iy*w+ix)*4;
+      if (tool === "erase") {
+        data[idx+3] = Math.max(0, data[idx+3] - Math.round(strength * 255));
+      } else {
+        // restore: blend original alpha back in
+        const newA = Math.min(255, data[idx+3] + Math.round(strength * odata[idx+3]));
+        const t = strength;
+        data[idx]   = Math.round(data[idx]*(1-t)   + odata[idx]*t);
+        data[idx+1] = Math.round(data[idx+1]*(1-t) + odata[idx+1]*t);
+        data[idx+2] = Math.round(data[idx+2]*(1-t) + odata[idx+2]*t);
+        data[idx+3] = newA;
+      }
+    }
+    // Redraw canvas from updated pixel data
+    const ctx = canvas.getContext("2d");
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    const tmp = document.createElement("canvas"); tmp.width=cur.width; tmp.height=cur.height;
+    tmp.getContext("2d").putImageData(cur,0,0);
+    ctx.drawImage(tmp, 0, 0);
+  };
+
+  const paintLine = (from, to) => {
+    const dist = Math.sqrt((to.x-from.x)**2+(to.y-from.y)**2);
+    const steps = Math.max(1, Math.ceil(dist / 4));
+    for (let i=0; i<=steps; i++) {
+      const t = i/steps;
+      paintAt(from.x*(1-t)+to.x*t, from.y*(1-t)+to.y*t);
+    }
+  };
+
+  const onDown = (e) => { e.preventDefault(); setPainting(true); const p=getCanvasPos(e); lastPos.current=p; paintAt(p.x,p.y); };
+  const onMove = (e) => { e.preventDefault(); if (!painting) return; const p=getCanvasPos(e); paintLine(lastPos.current,p); lastPos.current=p; };
+  const onUp   = (e) => { e.preventDefault(); setPainting(false); lastPos.current=null; };
+
+  const applyEdit = () => {
+    const cur = currentDataRef.current;
+    if (!cur) return;
+    const out = document.createElement("canvas");
+    out.width=cur.width; out.height=cur.height;
+    out.getContext("2d").putImageData(cur,0,0);
+    onDone(out.toDataURL("image/png"));
+  };
+
+  return (
+    <div style={{ position:"fixed", inset:0, zIndex:700, background:"rgba(0,0,0,0.85)", display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", padding:16 }}>
+      <div style={{ background:"#fff", borderRadius:20, overflow:"hidden", width:"100%", maxWidth:580, boxShadow:"0 30px 80px rgba(0,0,0,0.5)", display:"flex", flexDirection:"column" }}>
+
+        {/* Header */}
+        <div style={{ padding:"14px 18px", borderBottom:"1px solid #f0ece4", display:"flex", alignItems:"center", gap:12, flexWrap:"wrap" }}>
+          <span style={{ fontSize:14, fontWeight:700, color:"#1a1a1a", marginRight:"auto" }}>Edit Mask</span>
+
+          {/* Tool toggle */}
+          <div style={{ display:"flex", background:"#f5f3ef", borderRadius:9, padding:3, gap:0 }}>
+            {[["erase","✂ Erase"],["restore","↩ Restore"]].map(([id,lbl]) => (
+              <button key={id} onClick={() => setTool(id)} style={{
+                padding:"6px 14px", borderRadius:7, border:"none", cursor:"pointer",
+                background: tool===id ? "#1a1a1a" : "transparent",
+                color: tool===id ? "#fff" : "#aaa",
+                fontFamily:"'Nunito',sans-serif", fontSize:12, fontWeight:700, transition:"all 0.12s"
+              }}>{lbl}</button>
+            ))}
+          </div>
+
+          {/* Brush size */}
+          <div style={{ display:"flex", alignItems:"center", gap:8 }}>
+            <span style={{ fontSize:11, fontWeight:700, color:"#bbb", textTransform:"uppercase" }}>Brush</span>
+            <input type="range" min={6} max={80} value={brushSize} onChange={e=>setBrushSize(+e.target.value)} style={{ width:80, accentColor:"#1a1a1a" }} />
+            <span style={{ fontSize:11, color:"#aaa", minWidth:20 }}>{brushSize}</span>
+          </div>
+        </div>
+
+        {/* Canvas — no forced height so image keeps its natural aspect ratio */}
+        <div style={{ position:"relative", background:"repeating-conic-gradient(#e8e4dc 0% 25%,#fff 0% 50%) 0 0/20px 20px", display:"flex", alignItems:"center", justifyContent:"center" }}>
+          <canvas
+            ref={canvasRef}
+            style={{ display:"block", maxWidth:"100%", maxHeight:"58vh", cursor: tool==="erase" ? "cell" : "crosshair", touchAction:"none" }}
+            onMouseDown={onDown} onMouseMove={onMove} onMouseUp={onUp} onMouseLeave={onUp}
+            onTouchStart={onDown} onTouchMove={onMove} onTouchEnd={onUp}
+          />
+          {/* Brush cursor hint */}
+          <div style={{ position:"absolute", bottom:10, left:10, fontSize:11, color:"rgba(255,255,255,0.7)", background:"rgba(0,0,0,0.4)", borderRadius:6, padding:"3px 8px", fontFamily:"'Nunito',sans-serif", fontWeight:600 }}>
+            {tool==="erase" ? "Paint to erase" : "Paint to restore"}
+          </div>
+        </div>
+
+        {/* Footer */}
+        <div style={{ padding:"14px 18px", display:"flex", gap:10, justifyContent:"flex-end", borderTop:"1px solid #f0ece4" }}>
+          <button onClick={onCancel} style={{ padding:"9px 18px", background:"none", border:"none", cursor:"pointer", color:"#aaa", fontFamily:"'Nunito',sans-serif", fontSize:13, fontWeight:600 }}>Cancel</button>
+          <button onClick={applyEdit} style={{ padding:"9px 22px", background:"#1a1a1a", border:"none", borderRadius:12, cursor:"pointer", fontFamily:"'Nunito',sans-serif", fontSize:13, fontWeight:700, color:"#fff" }}>Apply</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Manual crop tool: drag a rectangle over the image
+function CropTool({ src, onDone, onCancel }) {
+  const containerRef = useRef(null);
+  const [drag, setDrag] = useState(null);   // {x,y} start
+  const [box, setBox] = useState(null);     // {x,y,w,h} in % of container
+  const [applying, setApplying] = useState(false);
+
+  const toPercent = (e) => {
+    const r = containerRef.current.getBoundingClientRect();
+    return {
+      x: Math.max(0, Math.min(1, (e.clientX - r.left) / r.width)),
+      y: Math.max(0, Math.min(1, (e.clientY - r.top) / r.height)),
+    };
+  };
+
+  const onMouseDown = (e) => {
+    e.preventDefault();
+    const p = toPercent(e);
+    setDrag(p);
+    setBox({ x: p.x, y: p.y, w: 0, h: 0 });
+  };
+
+  const onMouseMove = (e) => {
+    if (!drag) return;
+    const p = toPercent(e);
+    setBox({
+      x: Math.min(drag.x, p.x), y: Math.min(drag.y, p.y),
+      w: Math.abs(p.x - drag.x), h: Math.abs(p.y - drag.y),
+    });
+  };
+
+  const onMouseUp = () => setDrag(null);
+
+  const applyCrop = async () => {
+    if (!box || box.w < 0.02 || box.h < 0.02) return;
+    setApplying(true);
+    const img = new Image();
+    img.onload = () => {
+      const iw = img.width, ih = img.height;
+      const sx = Math.round(box.x * iw), sy = Math.round(box.y * ih);
+      const sw = Math.round(box.w * iw), sh = Math.round(box.h * ih);
+      const out = document.createElement("canvas");
+      out.width = sw; out.height = sh;
+      out.getContext("2d").drawImage(img, sx, sy, sw, sh, 0, 0, sw, sh);
+      onDone(out.toDataURL("image/png"));
+      setApplying(false);
+    };
+    img.src = src;
+  };
+
+  return (
+    <div style={{ position: "fixed", inset: 0, zIndex: 600, background: "rgba(0,0,0,0.75)", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: 24 }}>
+      <div style={{ background: "#fff", borderRadius: 20, overflow: "hidden", maxWidth: 560, width: "100%", boxShadow: "0 30px 80px rgba(0,0,0,0.4)" }}>
+        <div style={{ padding: "14px 18px", borderBottom: "1px solid #f0ece4", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <span style={{ fontSize: 14, fontWeight: 700, color: "#1a1a1a" }}>Crop Image</span>
+          <span style={{ fontSize: 12, color: "#aaa" }}>Click and drag to select crop area</span>
+        </div>
+        <div
+          ref={containerRef}
+          onMouseDown={onMouseDown} onMouseMove={onMouseMove} onMouseUp={onMouseUp}
+          style={{ position: "relative", cursor: "crosshair", userSelect: "none", background: "repeating-conic-gradient(#e0dbd0 0% 25%, #fff 0% 50%) 0 0 / 16px 16px" }}
+        >
+          <img src={src} alt="crop" style={{ display: "block", width: "100%", maxHeight: "60vh", objectFit: "contain", pointerEvents: "none" }} />
+          {box && box.w > 0 && (
+            <>
+              {/* Dark overlay outside selection */}
+              <div style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,0.45)", pointerEvents: "none" }} />
+              {/* Clear selection window */}
+              <div style={{
+                position: "absolute", pointerEvents: "none",
+                left: `${box.x*100}%`, top: `${box.y*100}%`,
+                width: `${box.w*100}%`, height: `${box.h*100}%`,
+                boxSizing: "border-box",
+                boxShadow: "0 0 0 9999px rgba(0,0,0,0.45)",
+                border: "2px solid #fff",
+                background: "transparent",
+              }} />
+            </>
+          )}
+        </div>
+        <div style={{ padding: "14px 18px", display: "flex", gap: 10, justifyContent: "flex-end" }}>
+          <button onClick={onCancel} style={{ padding: "9px 18px", background: "none", border: "none", cursor: "pointer", color: "#aaa", fontFamily: "'Nunito', sans-serif", fontSize: 13, fontWeight: 600 }}>Cancel</button>
+          <button onClick={applyCrop} disabled={!box || box.w < 0.02 || applying} style={{
+            padding: "9px 20px", background: (!box || box.w < 0.02) ? "#f5f3ef" : "#1a1a1a",
+            border: "none", borderRadius: 12, cursor: "pointer",
+            fontFamily: "'Nunito', sans-serif", fontSize: 13, fontWeight: 700,
+            color: (!box || box.w < 0.02) ? "#bbb" : "#fff"
+          }}>{applying ? "Applying…" : "Apply Crop"}</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ImageUploadField({ value, onChange }) {
+  const [tab, setTab] = useState("upload"); // "upload" | "url"
+  const [urlInput, setUrlInput] = useState("");
+  const [fetching, setFetching] = useState(false);
+  const [removing, setRemoving] = useState(false);
+  const [autoCropping, setAutoCropping] = useState(false);
+  const [fetchError, setFetchError] = useState("");
+  const [showCropTool, setShowCropTool] = useState(false);
+  const [showMaskEditor, setShowMaskEditor] = useState(false);
+  // Keep original (pre-removal) image so restore brush has something to paint back
+  const [originalSrc, setOriginalSrc] = useState(null);
+
+  // Whenever a brand-new image is set (not a bg-removal result), save it as original
+  const handleNewImage = (dataUrl) => {
+    setOriginalSrc(dataUrl);
+    onChange(dataUrl);
+  };
+
+  const handleFetchUrl = async () => {
+    const url = urlInput.trim();
+    if (!url) return;
+    setFetching(true);
+    setFetchError("");
+    try {
+      const dataUrl = await fetchImageAsDataUrl(url);
+      handleNewImage(dataUrl);
+      setUrlInput("");
+    } catch (e) {
+      setFetchError(e.message || "Failed to load image.");
+    } finally {
+      setFetching(false);
+    }
+  };
+
+  const handleRemoveBg = async () => {
+    if (!value) return;
+    setRemoving(true);
+    try {
+      const result = await removeBgCanvas(value);
+      // Don't reset originalSrc — keep the pre-removal version for restore brush
+      onChange(result);
+    } catch {
+      alert("Background removal failed — try a cleaner image.");
+    } finally {
+      setRemoving(false);
+    }
+  };
+
+  const handleAutoCrop = async () => {
+    if (!value) return;
+    setAutoCropping(true);
+    try {
+      const result = await autoCropCanvas(value);
+      onChange(result);
+    } catch {
+      alert("Auto-crop failed.");
+    } finally {
+      setAutoCropping(false);
+    }
+  };
+
+  return (
+    <div style={{ marginBottom: 14 }}>
+      {showCropTool && (
+        <CropTool src={value} onDone={dataUrl => { onChange(dataUrl); setShowCropTool(false); }} onCancel={() => setShowCropTool(false)} />
+      )}
+      {showMaskEditor && (
+        <MaskEditor
+          current={value}
+          original={originalSrc || value}
+          onDone={dataUrl => { onChange(dataUrl); setShowMaskEditor(false); }}
+          onCancel={() => setShowMaskEditor(false)}
+        />
+      )}
+
+      <label style={{ display: "block", fontSize: 11, fontWeight: 600, color: "#999", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 8 }}>Photo</label>
+
+      {/* Tab switcher */}
+      <div style={{ display: "flex", background: "#f5f3ef", borderRadius: 10, padding: 3, marginBottom: 10 }}>
+        {[["upload","📷 Upload"],["url","🔗 From URL"]].map(([id, lbl]) => (
+          <button key={id} onClick={() => setTab(id)} style={{
+            flex: 1, padding: "6px 0", borderRadius: 8, border: "none", cursor: "pointer",
+            background: tab === id ? "#fff" : "transparent",
+            fontFamily: "'Nunito', sans-serif", fontSize: 12, fontWeight: 700,
+            color: tab === id ? "#1a1a1a" : "#aaa",
+            boxShadow: tab === id ? "0 1px 4px rgba(0,0,0,0.08)" : "none",
+            transition: "all 0.15s"
+          }}>{lbl}</button>
+        ))}
+      </div>
+
+      {/* Upload tab */}
+      {tab === "upload" && (
+        <label style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 14px", border: "1.5px dashed #e0dbd0", borderRadius: 12, cursor: "pointer", background: "#fafaf8" }}>
+          <span style={{ fontSize: 16 }}>📷</span>
+          <span style={{ fontSize: 13, color: "#888", fontWeight: 600 }}>{value ? "Change photo" : "Choose file…"}</span>
+          <input type="file" accept="image/*" style={{ display: "none" }} onChange={e => {
+            const file = e.target.files?.[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = ev => handleNewImage(ev.target.result);
+            reader.readAsDataURL(file);
+          }} />
+        </label>
+      )}
+
+      {/* URL tab */}
+      {tab === "url" && (
+        <div>
+          <div style={{ display: "flex", gap: 8 }}>
+            <input
+              style={{ ...inputStyle, flex: 1, fontSize: 12 }}
+              value={urlInput}
+              onChange={e => { setUrlInput(e.target.value); setFetchError(""); }}
+              placeholder="https://…/image.jpg"
+              onKeyDown={e => e.key === "Enter" && handleFetchUrl()}
+            />
+            <button onClick={handleFetchUrl} disabled={fetching} style={{
+              padding: "0 14px", background: fetching ? "#f5f3ef" : "#1a1a1a",
+              border: "none", borderRadius: 10, cursor: fetching ? "default" : "pointer",
+              fontSize: 12, fontWeight: 700, color: fetching ? "#aaa" : "#fff",
+              fontFamily: "'Nunito', sans-serif", flexShrink: 0, whiteSpace: "nowrap"
+            }}>{fetching ? "Loading…" : "Fetch"}</button>
+          </div>
+          {fetchError && <div style={{ marginTop: 6, fontSize: 11, color: "#e05555", fontWeight: 600 }}>{fetchError}</div>}
+          <div style={{ marginTop: 6, fontSize: 11, color: "#bbb" }}>Paste a direct image URL (ending in .jpg, .png, etc.)</div>
+        </div>
+      )}
+
+      {/* Preview + actions */}
+      {value && (
+        <div style={{ marginTop: 10 }}>
+          <div style={{ position: "relative", borderRadius: 12, overflow: "hidden", height: 180, background: "repeating-conic-gradient(#e8e4dc 0% 25%, #fff 0% 50%) 0 0 / 16px 16px", display: "flex", alignItems: "center", justifyContent: "center" }}>
+            <img src={value} alt="preview" style={{ maxWidth: "100%", maxHeight: "100%", objectFit: "contain", display: "block" }} />
+            <button onClick={() => { onChange(""); setUrlInput(""); }} style={{
+              position: "absolute", top: 7, right: 7, width: 26, height: 26, borderRadius: "50%",
+              background: "rgba(0,0,0,0.55)", border: "none", color: "#fff", cursor: "pointer",
+              fontSize: 13, display: "flex", alignItems: "center", justifyContent: "center"
+            }}>✕</button>
+          </div>
+
+          {/* Action buttons — 2x2 grid */}
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6, marginTop: 8 }}>
+            <button onClick={handleRemoveBg} disabled={removing || autoCropping} style={{
+              padding: "9px 4px", background: "#1a1a1a", border: "none", borderRadius: 10,
+              cursor: removing ? "default" : "pointer", fontFamily: "'Nunito', sans-serif",
+              display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
+              fontSize: 12, fontWeight: 700, color: "#fff", opacity: removing || autoCropping ? 0.5 : 1
+            }}>
+              <span>✂</span><span>{removing ? "Working…" : "Remove BG"}</span>
+            </button>
+            <button onClick={() => setShowMaskEditor(true)} disabled={removing || autoCropping} style={{
+              padding: "9px 4px", background: "#f0ece4", border: "none", borderRadius: 10,
+              cursor: "pointer", fontFamily: "'Nunito', sans-serif",
+              display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
+              fontSize: 12, fontWeight: 700, color: "#444", opacity: removing || autoCropping ? 0.5 : 1
+            }}>
+              <span>🖌</span><span>Edit Mask</span>
+            </button>
+            <button onClick={() => setShowCropTool(true)} disabled={removing || autoCropping} style={{
+              padding: "9px 4px", background: "#f5f3ef", border: "none", borderRadius: 10,
+              cursor: "pointer", fontFamily: "'Nunito', sans-serif",
+              display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
+              fontSize: 12, fontWeight: 700, color: "#444", opacity: removing || autoCropping ? 0.5 : 1
+            }}>
+              <span>⊡</span><span>Crop</span>
+            </button>
+            <button onClick={handleAutoCrop} disabled={removing || autoCropping} style={{
+              padding: "9px 4px", background: "#f5f3ef", border: "none", borderRadius: 10,
+              cursor: autoCropping ? "default" : "pointer", fontFamily: "'Nunito', sans-serif",
+              display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
+              fontSize: 12, fontWeight: 700, color: "#444", opacity: removing || autoCropping ? 0.5 : 1
+            }}>
+              <span>⊹</span><span>{autoCropping ? "Working…" : "Auto-Crop"}</span>
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Multi-select pill helper ─────────────────────────────────────────────────
+function MultiPills({ label, options, selected, onChange }) {
+  const toggle = (v) => onChange(selected.includes(v) ? selected.filter(x => x !== v) : [...selected, v]);
+  return (
+    <div style={{ marginBottom: 14 }}>
+      <label style={{ display: "block", fontSize: 11, fontWeight: 600, color: "#999", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 8 }}>{label}</label>
+      <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+        {options.map(o => (
+          <button key={o} onClick={() => toggle(o)} style={{
+            padding: "5px 12px", borderRadius: 20, border: "1.5px solid",
+            borderColor: selected.includes(o) ? "#1a1a1a" : "#e8e4dc",
+            background: selected.includes(o) ? "#1a1a1a" : "#fafaf8",
+            color: selected.includes(o) ? "#fff" : "#888",
+            fontSize: 12, fontWeight: 600, cursor: "pointer",
+            fontFamily: "'Nunito', sans-serif", transition: "all 0.12s"
+          }}>{o}</button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ── Drafts stored in localStorage ────────────────────────────────────────────
+const DRAFTS_KEY = "wardrobe_drafts_v1";
+function loadDrafts() { try { return JSON.parse(localStorage.getItem(DRAFTS_KEY) || "[]"); } catch { return []; } }
+function saveDrafts(d) { try { localStorage.setItem(DRAFTS_KEY, JSON.stringify(d)); } catch {} }
+
+// ── Add Item Modal ────────────────────────────────────────────────────────────
+// Unified form with Closet/Wishlist toggle at top + draft folder
+function AddItemModal({ onSave, onSaveWish, onCancel, initial, editMode }) {
+  const isWishInitial = !!(initial?.link);
+  const [dest, setDest] = useState(isWishInitial ? "wishlist" : "closet"); // "closet" | "wishlist"
+  const [form, setForm] = useState({
+    ...BLANK,
+    colors: [], seasons: [], spent: "",
+    ...initial,
+    colors: initial?.colors || (initial?.color ? [initial.color] : []),
+    seasons: initial?.seasons || (initial?.season ? [initial.season] : []),
+  });
+  const [showDrafts, setShowDrafts] = useState(false);
+  const [drafts, setDrafts] = useState(loadDrafts);
+  const set = k => e => setForm(f => ({ ...f, [k]: e.target.value }));
+
+  const refreshDrafts = () => setDrafts(loadDrafts());
+
+  const saveDraft = () => {
+    const d = loadDrafts();
+    const draft = { ...form, dest, _draftId: Date.now(), _draftLabel: form.name || `Draft ${d.length + 1}`, _savedAt: new Date().toLocaleString() };
+    saveDrafts([draft, ...d.filter(x => x._draftId !== draft._draftId)]);
+    refreshDrafts();
+    onCancel();
+  };
+
+  const loadDraft = (draft) => {
+    const { dest: dDest, _draftId, _draftLabel, _savedAt, ...rest } = draft;
+    setForm({ ...BLANK, colors: [], seasons: [], spent: "", ...rest });
+    setDest(dDest || "closet");
+    setShowDrafts(false);
+  };
+
+  const deleteDraft = (id) => {
+    const updated = loadDrafts().filter(d => d._draftId !== id);
+    saveDrafts(updated);
+    refreshDrafts();
+  };
+
+  const handleSave = () => {
+    const out = { ...form, color: (form.colors||[])[0] || "", season: (form.seasons||[])[0] || "" };
+    if (dest === "wishlist") onSaveWish(out);
+    else onSave(out);
+  };
+
+  // ── Drafts panel ──
+  if (showDrafts) return (
+    <div>
+      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 20 }}>
+        <button onClick={() => setShowDrafts(false)} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 20, color: "#aaa", padding: 0, display: "flex" }}>←</button>
+        <span style={{ fontSize: 16, fontWeight: 700, color: "#1a1a1a" }}>Drafts</span>
+        <span style={{ fontSize: 12, color: "#bbb", marginLeft: "auto" }}>{drafts.length} saved</span>
+      </div>
+      {drafts.length === 0 ? (
+        <div style={{ textAlign: "center", padding: "40px 0", color: "#ccc" }}>
+          <div style={{ fontSize: 32, marginBottom: 8 }}>📁</div>
+          <div style={{ fontSize: 13, fontWeight: 600 }}>No drafts yet</div>
+        </div>
+      ) : (
+        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+          {drafts.map(d => (
+            <div key={d._draftId} style={{ display: "flex", alignItems: "center", gap: 10, padding: "12px 14px", background: "#fafaf8", borderRadius: 14, border: "1.5px solid #f0ece4" }}>
+              {d.image && <img src={d.image} alt="" style={{ width: 40, height: 40, borderRadius: 8, objectFit: "cover", flexShrink: 0 }} />}
+              {!d.image && <div style={{ width: 40, height: 40, borderRadius: 8, background: "#f0ece4", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16 }}>📷</div>}
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 13, fontWeight: 700, color: "#1a1a1a", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{d._draftLabel}</div>
+                <div style={{ fontSize: 11, color: "#aaa" }}>{d._savedAt} · {d.dest === "wishlist" ? "Wishlist" : "Closet"}</div>
+              </div>
+              <button onClick={() => loadDraft(d)} style={{ padding: "5px 12px", background: "#1a1a1a", border: "none", borderRadius: 8, cursor: "pointer", fontSize: 11, fontWeight: 700, color: "#fff", fontFamily: "'Nunito', sans-serif", flexShrink: 0 }}>Load</button>
+              <button onClick={() => deleteDraft(d._draftId)} style={{ padding: "5px 10px", background: "#fef2f2", border: "none", borderRadius: 8, cursor: "pointer", fontSize: 11, fontWeight: 700, color: "#e05555", fontFamily: "'Nunito', sans-serif", flexShrink: 0 }}>✕</button>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+
+  // ── Main form ──
   return (
     <div>
-      <div style={{ display: "flex", gap: 16, marginBottom: 20 }}>
-        <div onClick={() => imgRef.current.click()} style={{
-          width: 90, height: 110, borderRadius: 16, flexShrink: 0,
-          border: `2px dashed ${form.image ? "transparent" : "#e0dbd0"}`,
-          background: form.image ? `url(${form.image}) center/cover` : "#faf9f6",
-          cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
-          overflow: "hidden", fontSize: 26, color: "#ccc"
+      {/* Closet / Wishlist toggle + draft button — rendered INSIDE modal by AddItemModal */}
+      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 20 }}>
+        {/* Toggle */}
+        <div style={{ display: "flex", background: "#f5f3ef", borderRadius: 12, padding: 3, flex: 1 }}>
+          {[["closet","👗 My Closet"],["wishlist","♡ Wishlist"]].map(([id, lbl]) => (
+            <button key={id} onClick={() => setDest(id)} style={{
+              flex: 1, padding: "8px 0", borderRadius: 10, border: "none", cursor: "pointer",
+              background: dest === id ? "#1a1a1a" : "transparent",
+              color: dest === id ? "#fff" : "#aaa",
+              fontFamily: "'Nunito', sans-serif", fontSize: 13, fontWeight: 700,
+              transition: "all 0.15s"
+            }}>{lbl}</button>
+          ))}
+        </div>
+        {/* Draft folder button */}
+        <button onClick={() => { refreshDrafts(); setShowDrafts(true); }} style={{
+          width: 38, height: 38, borderRadius: 10, background: "#f5f3ef", border: "none",
+          cursor: "pointer", fontSize: 18, display: "flex", alignItems: "center", justifyContent: "center",
+          flexShrink: 0, position: "relative"
         }}>
-          {!form.image && "+"}
-        </div>
-        <div style={{ flex: 1 }}>
-          <Input label="Name" value={form.name} onChange={e => set("name", e.target.value)} placeholder="e.g. Linen blazer" />
-          <Input label="Brand" value={form.brand} onChange={e => set("brand", e.target.value)} placeholder="optional" />
-        </div>
+          📁
+          {drafts.length > 0 && <span style={{ position: "absolute", top: 4, right: 4, width: 14, height: 14, borderRadius: "50%", background: "#e05588", color: "#fff", fontSize: 9, fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center" }}>{drafts.length}</span>}
+        </button>
       </div>
-      <input ref={imgRef} type="file" accept="image/*" style={{ display: "none" }} onChange={handleImg} />
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0 12px" }}>
-        <SelectField label="Category" options={CATEGORIES.filter(c => c !== "All")} value={form.category} onChange={e => set("category", e.target.value)} />
-        <SelectField label="Color" options={COLORS} value={form.color} onChange={e => set("color", e.target.value)} />
-        <SelectField label="Season" options={SEASONS} value={form.season} onChange={e => set("season", e.target.value)} />
-        <Input label="Price" value={form.price} onChange={e => set("price", e.target.value)} placeholder="$" />
+
+      {/* Photo */}
+      <ImageUploadField value={form.image} onChange={v => setForm(f => ({ ...f, image: v }))} />
+
+      {/* Wishlist-only: product link */}
+      {dest === "wishlist" && (
+        <div style={{ marginBottom: 14 }}>
+          <label style={{ display: "block", fontSize: 11, fontWeight: 600, color: "#999", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 6 }}>Product Link</label>
+          <input style={{ ...inputStyle, width: "100%" }} value={form.link || ""} onChange={e => setForm(f => ({ ...f, link: e.target.value }))} placeholder="https://zara.com/..." />
+        </div>
+      )}
+
+      {/* Core fields */}
+      <Input label="Name" value={form.name} onChange={set("name")} placeholder="e.g. White linen shirt" />
+      <Input label="Brand" value={form.brand} onChange={set("brand")} placeholder="e.g. Zara" />
+
+      <div style={{ display: "flex", gap: 10 }}>
+        <div style={{ flex: 1 }}><SelectField label="Category" options={CATEGORIES.slice(1)} value={form.category} onChange={set("category")} /></div>
+        <div style={{ flex: 1 }}><SelectField label="Size" options={SIZES} value={form.size} onChange={set("size")} /></div>
       </div>
-      <Input label="Notes" value={form.notes} onChange={e => set("notes", e.target.value)} placeholder="fabric, fit, occasions…" />
-      <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 6 }}>
-        <button onClick={onCancel} style={{ padding: "10px 18px", background: "none", border: "none", cursor: "pointer", color: "#aaa", fontFamily: "'Nunito', sans-serif", fontSize: 14, fontWeight: 600 }}>Cancel</button>
-        <button className="btn-primary" onClick={() => form.name && onSave(form)} style={{
-          padding: "10px 22px", background: "#1a1a1a", color: "#fff", border: "none",
-          borderRadius: 12, cursor: "pointer", fontFamily: "'Nunito', sans-serif",
-          fontSize: 14, fontWeight: 700
-        }}>Save</button>
+
+      {/* Multi-select Color + Season */}
+      <MultiPills label="Color" options={COLORS} selected={form.colors || []} onChange={v => setForm(f => ({ ...f, colors: v }))} />
+      <MultiPills label="Season" options={SEASONS} selected={form.seasons || []} onChange={v => setForm(f => ({ ...f, seasons: v }))} />
+
+      {/* Price + Spent */}
+      <div style={{ display: "flex", gap: 10 }}>
+        <div style={{ flex: 1 }}><Input label="Original Price ($)" value={form.price} onChange={set("price")} placeholder="e.g. 89" /></div>
+        <div style={{ flex: 1 }}><Input label="Spent ($)" value={form.spent || ""} onChange={set("spent")} placeholder="e.g. 55" /></div>
+      </div>
+
+      {/* Purchase date — closet only */}
+      {dest === "closet" && (
+        <div style={{ marginBottom: 14 }}>
+          <label style={{ display: "block", fontSize: 11, fontWeight: 600, color: "#999", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 6 }}>Purchase Date</label>
+          <input type="date" value={form.purchaseDate || ""} onChange={set("purchaseDate")} style={{ ...inputStyle, width: "100%" }} />
+        </div>
+      )}
+
+      {/* Notes */}
+      <div style={{ marginBottom: 18 }}>
+        <label style={{ display: "block", fontSize: 11, fontWeight: 600, color: "#999", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 6 }}>Notes</label>
+        <textarea style={{ ...inputStyle, resize: "vertical", minHeight: 56 }} value={form.notes || ""} onChange={set("notes")} placeholder="Care instructions, fit notes…" />
+      </div>
+
+      {/* Actions */}
+      <div style={{ display: "flex", gap: 8 }}>
+        <button onClick={saveDraft} style={{
+          padding: "10px 14px", background: "#f5f3ef", border: "none", borderRadius: 12,
+          cursor: "pointer", fontSize: 13, fontWeight: 700, color: "#888",
+          fontFamily: "'Nunito', sans-serif"
+        }}>Save Draft</button>
+        <button onClick={onCancel} style={{
+          padding: "10px 14px", background: "none", border: "none",
+          cursor: "pointer", color: "#bbb", fontFamily: "'Nunito', sans-serif", fontSize: 13, fontWeight: 600
+        }}>Cancel</button>
+        <button className="btn-primary" onClick={handleSave} style={{
+          flex: 1, padding: "10px 0", background: "#1a1a1a", color: "#fff",
+          border: "none", borderRadius: 12, cursor: "pointer",
+          fontFamily: "'Nunito', sans-serif", fontSize: 14, fontWeight: 700
+        }}>{dest === "wishlist" ? "Save to Wishlist" : (editMode ? "Save Changes" : "Add to Closet")}</button>
       </div>
     </div>
   );
 }
 
-function ItemCard({ item, onEdit, onDelete, selectable, selected, onSelect }) {
+// Clean minimal card: photo dominant (3:4), name + brand + chips below
+function ItemCard({ item, onClick, onEdit }) {
   return (
-    <div className="card" onClick={selectable ? () => onSelect(item.id) : undefined} style={{
-      background: "#fff", borderRadius: 18, overflow: "hidden",
-      border: selected ? "2px solid #1a1a1a" : "1.5px solid #f0ece4",
-      cursor: selectable ? "pointer" : "default",
-      boxShadow: "0 2px 12px rgba(0,0,0,0.04)",
-      position: "relative"
-    }}>
-      <div style={{
-        height: selectable ? 90 : 200,
-        background: item.image ? `url(${item.image}) center/cover` : "#f5f3ef",
-        display: "flex", alignItems: "center", justifyContent: "center",
-      }}>
-        {!item.image && <span style={{ fontSize: 32, opacity: 0.2 }}>👗</span>}
-        {selected && (
-          <div style={{
-            position: "absolute", top: 10, right: 10,
-            width: 24, height: 24, borderRadius: "50%",
-            background: "#1a1a1a", display: "flex", alignItems: "center",
-            justifyContent: "center", color: "#fff", fontSize: 12, fontWeight: 700
-          }}>✓</div>
-        )}
+    <div className="item-card" onClick={onClick} style={{ position: "relative", cursor: "pointer", overflow: "hidden", borderRadius: 16 }}>
+      <div style={{ width: "100%", aspectRatio: "1/1", background: "#f5f3ef", overflow: "hidden", display: "flex", alignItems: "center", justifyContent: "center", position: "relative" }}>
+        {item.image
+          ? <img src={item.image} alt={item.name} style={{ width: "100%", height: "100%", objectFit: "contain", display: "block", padding: 6 }} />
+          : <HangerIcon size={36} color="#ddd" />
+        }
+        <button
+          onClick={e => { e.stopPropagation(); onEdit && onEdit(); }}
+          style={{
+            position: "absolute", bottom: 7, right: 7,
+            width: 28, height: 28, borderRadius: "50%",
+            background: "rgba(255,255,255,0.92)", border: "none",
+            cursor: "pointer", fontSize: 13, color: "#555",
+            display: "flex", alignItems: "center", justifyContent: "center",
+            backdropFilter: "blur(4px)", boxShadow: "0 1px 4px rgba(0,0,0,0.1)"
+          }}
+        >&#9998;</button>
       </div>
-      {!selectable && (
-        <div style={{ padding: "12px 14px 14px" }}>
-          <div style={{ fontSize: 14, fontWeight: 700, color: "#1a1a1a", marginBottom: 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{item.name}</div>
-          {item.brand && <div style={{ fontSize: 12, color: "#aaa", marginBottom: 10 }}>{item.brand}</div>}
-          <div style={{ display: "flex", gap: 5, flexWrap: "wrap", marginBottom: 12 }}>
-            {item.category && (
-              <span style={{ background: "#f5f3ef", color: "#888", borderRadius: 20, padding: "3px 10px", fontSize: 11, fontWeight: 600 }}>{item.category}</span>
-            )}
-            {item.price && (
-              <span style={{ background: "#f5f3ef", color: "#888", borderRadius: 20, padding: "3px 10px", fontSize: 11, fontWeight: 600 }}>{item.price}</span>
-            )}
+    </div>
+  );
+}
+
+// ── Item Detail Popup ────────────────────────────────────────────────────────
+function ItemDetailPopup({ item, onClose, onEdit, onDelete, onWorn, onCreateOutfit, outfits, lookbooks }) {
+  const priceNum = parseFloat((item.price || "").replace(/[^0-9.]/g, "")) || 0;
+  const spentNum = parseFloat((item.spent || "").replace(/[^0-9.]/g, "")) || 0;
+  const worn = item.wornCount || 0;
+  const cpw = worn > 0 && (spentNum || priceNum) > 0 ? ((spentNum || priceNum) / worn).toFixed(2) : null;
+  const featuredOutfits = (outfits || []).filter(o => (o.layers || o.itemIds || []).includes(item.id));
+  const featuredOutfitIds = new Set(featuredOutfits.map(o => o.id));
+  const featuredLookbookCount = (lookbooks || []).filter(lb => (lb.outfitIds || []).some(oid => featuredOutfitIds.has(oid))).length;
+
+  const chip = (label, bg = "#f5f3ef", color = "#666") => (
+    <span style={{ background: bg, color, borderRadius: 20, padding: "4px 12px", fontSize: 12, fontWeight: 700 }}>{label}</span>
+  );
+
+  return (
+    <div className="item-detail-overlay fade-in" onClick={onClose}>
+      <div className="fade-up" onClick={e => e.stopPropagation()} style={{
+        background: "#fff", borderRadius: 24, width: "100%", maxWidth: 860,
+        maxHeight: "90vh", overflow: "hidden", boxShadow: "0 30px 80px rgba(0,0,0,0.2)",
+        display: "flex", flexDirection: "row"
+      }}>
+
+        {/* ── LEFT: image + info ── */}
+        <div style={{ width: 320, flexShrink: 0, display: "flex", flexDirection: "column", overflowY: "auto" }}>
+          {/* Image */}
+          <div style={{ width: "100%", aspectRatio: "3/4", background: "#f5f3ef", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", position: "relative" }}>
+            {item.image
+              ? <img src={item.image} alt={item.name} style={{ width: "100%", height: "100%", objectFit: "contain", display: "block", padding: 8 }} />
+              : <HangerIcon size={56} color="#ddd" />
+            }
+
           </div>
-          <div style={{ display: "flex", gap: 6 }}>
-            <button onClick={() => onEdit(item)} style={{
-              flex: 1, padding: "7px 0", background: "#f5f3ef", border: "none",
-              borderRadius: 10, cursor: "pointer", fontSize: 12, fontWeight: 600,
-              color: "#666", fontFamily: "'Nunito', sans-serif"
-            }}>Edit</button>
-            <button onClick={() => onDelete(item.id)} style={{
-              flex: 1, padding: "7px 0", background: "#fef2f2", border: "none",
-              borderRadius: 10, cursor: "pointer", fontSize: 12, fontWeight: 600,
-              color: "#e05555", fontFamily: "'Nunito', sans-serif"
-            }}>Remove</button>
+
+          {/* Info */}
+          <div style={{ padding: "18px 20px 22px", flex: 1 }}>
+            <h2 style={{ fontSize: 18, fontWeight: 800, color: "#1a1a1a", letterSpacing: "-0.01em", marginBottom: 2 }}>{item.name}</h2>
+            {item.brand && <div style={{ fontSize: 13, color: "#aaa", marginBottom: 12 }}>{item.brand}</div>}
+
+            {/* Tags */}
+            <div style={{ display: "flex", gap: 5, flexWrap: "wrap", marginBottom: 14 }}>
+              {item.category && chip(item.category)}
+              {item.size && chip(item.size)}
+              {(item.colors?.length ? item.colors : item.color ? [item.color] : []).map(c => chip(c))}
+              {(item.seasons?.length ? item.seasons : item.season ? [item.season] : []).map(s => chip(s, "#f0fbff", "#2bafd4"))}
+            </div>
+
+            {/* Stats */}
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 14 }}>
+              {[
+                { label: "Price", value: priceNum > 0 ? `$${priceNum.toFixed(0)}` : "—" },
+                { label: "Spent", value: spentNum > 0 ? `$${spentNum.toFixed(0)}` : "—" },
+                { label: "Worn", value: worn > 0 ? `${worn}×` : "—" },
+                { label: "Cost/wear", value: cpw ? `$${cpw}` : "—" },
+                { label: "Outfits", value: featuredOutfits.length },
+                { label: "Lookbooks", value: featuredLookbookCount },
+              ].map(s => (
+                <div key={s.label} style={{ background: "#fafaf8", borderRadius: 10, padding: "10px 12px", textAlign: "center" }}>
+                  <div style={{ fontSize: 15, fontWeight: 800, color: "#1a1a1a" }}>{s.value}</div>
+                  <div style={{ fontSize: 10, color: "#aaa", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.06em", marginTop: 1 }}>{s.label}</div>
+                </div>
+              ))}
+            </div>
+
+            <button onClick={onWorn} style={{
+              width: "100%", padding: "10px", marginBottom: 10,
+              background: "#f0faf4", border: "1.5px solid #b6e8c8", borderRadius: 12,
+              cursor: "pointer", fontSize: 13, fontWeight: 700, color: "#2d6a3f",
+              fontFamily: "'Nunito', sans-serif"
+            }}>👗 Mark as Worn{worn > 0 ? ` (${worn}×)` : ""}</button>
+
+            {item.purchaseDate && (
+              <div style={{ fontSize: 11, color: "#bbb", marginBottom: 10, textAlign: "center" }}>
+                Purchased {new Date(item.purchaseDate + "T00:00:00").toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}
+              </div>
+            )}
+            {item.link && (
+              <a href={item.link} target="_blank" rel="noreferrer" style={{ display: "block", fontSize: 12, color: "#2bafd4", fontWeight: 700, textAlign: "center", marginBottom: 10, textDecoration: "none" }}>🔗 View Product</a>
+            )}
+            {item.notes && (
+              <div style={{ background: "#fafaf8", borderRadius: 10, padding: "10px 12px", fontSize: 12, color: "#555", lineHeight: 1.6 }}>{item.notes}</div>
+            )}
           </div>
         </div>
+
+        {/* ── RIGHT: outfits grid ── */}
+        <div style={{ flex: 1, borderLeft: "1px solid #f0ece4", display: "flex", flexDirection: "column", minWidth: 0 }}>
+          {/* Header */}
+          <div style={{ padding: "14px 18px", display: "flex", alignItems: "center", justifyContent: "space-between", borderBottom: "1px solid #f0ece4", flexShrink: 0, gap: 10, flexWrap: "wrap" }}>
+            <div>
+              <div style={{ fontSize: 15, fontWeight: 800, color: "#1a1a1a" }}>Featured In</div>
+              <div style={{ fontSize: 11, color: "#bbb", marginTop: 1 }}>{featuredOutfits.length} outfit{featuredOutfits.length !== 1 ? "s" : ""}</div>
+            </div>
+            <div style={{ display: "flex", gap: 7, alignItems: "center" }}>
+              {/* Worn badge */}
+              {worn > 0 && (
+                <div style={{ padding: "6px 12px", background: "#f0faf4", borderRadius: 10, fontSize: 12, fontWeight: 700, color: "#2d6a3f" }}>👗 {worn}×</div>
+              )}
+              {/* Edit */}
+              <button onClick={onEdit} title="Edit" style={{ width: 34, height: 34, borderRadius: "50%", background: "#f5f3ef", border: "none", cursor: "pointer", fontSize: 15, color: "#444", display: "flex", alignItems: "center", justifyContent: "center" }}>✎</button>
+              {/* Delete */}
+              <button onClick={onDelete} title="Delete" style={{ width: 34, height: 34, borderRadius: "50%", background: "#fef2f2", border: "none", cursor: "pointer", fontSize: 15, color: "#e05555", display: "flex", alignItems: "center", justifyContent: "center" }}>🗑</button>
+              {/* Create Outfit */}
+              <button onClick={onCreateOutfit} style={{
+                padding: "8px 14px", background: "#1a1a1a", border: "none", borderRadius: 12,
+                cursor: "pointer", fontSize: 12, fontWeight: 700, color: "#fff",
+                fontFamily: "'Nunito', sans-serif", display: "flex", alignItems: "center", gap: 6
+              }}><span>✦</span> Create Outfit</button>
+              {/* Close */}
+              <button onClick={onClose} style={{ width: 34, height: 34, borderRadius: "50%", background: "#f5f3ef", border: "none", cursor: "pointer", fontSize: 15, color: "#888", display: "flex", alignItems: "center", justifyContent: "center" }}>✕</button>
+            </div>
+          </div>
+
+          {/* Outfit grid */}
+          <div style={{ flex: 1, overflowY: "auto", padding: 16 }}>
+            {featuredOutfits.length === 0 ? (
+              <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", height: "100%", color: "#ccc", gap: 10, paddingTop: 40 }}>
+                <div style={{ fontSize: 40 }}>✦</div>
+                <div style={{ fontSize: 13, fontWeight: 600 }}>Not in any outfits yet</div>
+                <div style={{ fontSize: 12 }}>Click Create Outfit to style it</div>
+              </div>
+            ) : (
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(140px, 1fr))", gap: 10 }}>
+                {featuredOutfits.map(outfit => (
+                  <div key={outfit.id} style={{ borderRadius: 14, overflow: "hidden", background: "#f5f3ef", aspectRatio: "3/4", display: "flex", alignItems: "center", justifyContent: "center", position: "relative" }}>
+                    {outfit.previewImage
+                      ? <img src={outfit.previewImage} alt={outfit.name} style={{ width: "100%", height: "100%", objectFit: "contain" }} />
+                      : <HangerIcon size={28} color="#ddd" />
+                    }
+                    <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, background: "linear-gradient(transparent, rgba(0,0,0,0.55))", padding: "18px 8px 8px" }}>
+                      <div style={{ fontSize: 11, fontWeight: 700, color: "#fff", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{outfit.name}</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+
+      </div>
+    </div>
+  );
+}
+
+// ── Closet Stats Panel ───────────────────────────────────────────────────────
+const CAT_COLORS = {
+  Accessories: "#e07e30", Activewear: "#3aaa6e", Bags: "#a855f7", Denim: "#6366f1",
+  Dresses: "#e05588", Intimates: "#f59e42", Jewelry: "#f0c040", Knits: "#c084fc",
+  Loungewear: "#94a3b8", Outerwear: "#2bafd4", Shoes: "#10b981", "Shorts + Skirts": "#fb7185",
+  Sleepwear: "#818cf8", "Socks + Tights": "#a78bfa", Sweaters: "#f97316",
+  Swim: "#06b6d4", Tops: "#f59e42", Trousers: "#64748b",
+};
+
+function ClosetStats({ items }) {
+  const [open, setOpen] = useState(false);
+  if (items.length === 0) return null;
+  const totalValue = items.reduce((s, i) => s + (parseFloat((i.price || "").replace(/[^0-9.]/g, "")) || 0), 0);
+  const neverWorn = items.filter(i => !(i.wornCount || 0)).length;
+  const byCategory = CATEGORIES.slice(1).map(cat => ({ cat, count: items.filter(i => i.category === cat).length })).filter(c => c.count > 0);
+  const maxCat = Math.max(...byCategory.map(c => c.count), 1);
+  const mostWorn = [...items].filter(i => (i.wornCount || 0) > 0).sort((a, b) => (b.wornCount || 0) - (a.wornCount || 0)).slice(0, 3);
+  const withCPW = items
+    .filter(i => (i.wornCount || 0) > 0 && parseFloat((i.price || "").replace(/[^0-9.]/g, "")) > 0)
+    .map(i => ({ ...i, cpw: parseFloat((i.price || "").replace(/[^0-9.]/g, "")) / i.wornCount }))
+    .sort((a, b) => a.cpw - b.cpw).slice(0, 3);
+  return (
+    <div style={{ marginBottom: 24 }}>
+      <button onClick={() => setOpen(o => !o)} style={{
+        width: "100%", display: "flex", justifyContent: "space-between", alignItems: "center",
+        padding: "14px 18px", background: "#fff", border: "1.5px solid #f0ece4",
+        borderRadius: open ? "16px 16px 0 0" : 16, cursor: "pointer",
+        fontFamily: "'Nunito', sans-serif",
+      }}>
+        <div style={{ display: "flex", gap: 24, alignItems: "center" }}>
+          {[
+            { val: `$${totalValue.toFixed(0)}`, lbl: "Wardrobe Value" },
+            { val: items.length, lbl: "Items" },
+            { val: neverWorn, lbl: "Unworn", color: neverWorn > 0 ? "#e07e30" : "#3aaa6e" },
+          ].map(s => (
+            <div key={s.lbl}>
+              <div style={{ fontSize: 17, fontWeight: 800, color: s.color || "#1a1a1a" }}>{s.val}</div>
+              <div style={{ fontSize: 10, color: "#aaa", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em" }}>{s.lbl}</div>
+            </div>
+          ))}
+        </div>
+        <span style={{ fontSize: 20, color: "#bbb", display: "inline-block", transform: open ? "rotate(90deg)" : "rotate(270deg)", transition: "transform 0.2s" }}>‹</span>
+      </button>
+      {open && (
+        <div className="fade-up" style={{ background: "#fff", border: "1.5px solid #f0ece4", borderTop: "none", borderRadius: "0 0 16px 16px", padding: "20px 18px", display: "flex", flexDirection: "column", gap: 22 }}>
+          <div>
+            <div style={{ fontSize: 11, fontWeight: 700, color: "#aaa", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 12 }}>By Category</div>
+            {byCategory.map(({ cat, count }) => (
+              <div key={cat} style={{ marginBottom: 8 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
+                  <span style={{ fontSize: 12, fontWeight: 700, color: "#555" }}>{cat}</span>
+                  <span style={{ fontSize: 12, color: "#aaa", fontWeight: 600 }}>{count}</span>
+                </div>
+                <div style={{ height: 7, background: "#f0ece4", borderRadius: 4, overflow: "hidden" }}>
+                  <div style={{ height: "100%", width: `${(count / maxCat) * 100}%`, background: CAT_COLORS[cat] || "#ccc", borderRadius: 4 }} />
+                </div>
+              </div>
+            ))}
+          </div>
+          {mostWorn.length > 0 && (
+            <div>
+              <div style={{ fontSize: 11, fontWeight: 700, color: "#aaa", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 10 }}>Most Worn</div>
+              {mostWorn.map(item => (
+                <div key={item.id} style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
+                  <div style={{ width: 40, height: 40, borderRadius: 10, overflow: "hidden", background: item.image ? "transparent" : "#f5f3ef", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                    {item.image ? <img src={item.image} style={{ width: "100%", height: "100%", objectFit: "cover" }} alt="" /> : <HangerIcon size={16} color="#ccc" />}
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 12, fontWeight: 700, color: "#1a1a1a", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{item.name}</div>
+                    <div style={{ fontSize: 11, color: "#aaa" }}>{item.brand || item.category || ""}</div>
+                  </div>
+                  <div style={{ fontSize: 13, fontWeight: 800, color: "#3aaa6e", flexShrink: 0 }}>{item.wornCount}x</div>
+                </div>
+              ))}
+            </div>
+          )}
+          {withCPW.length > 0 && (
+            <div>
+              <div style={{ fontSize: 11, fontWeight: 700, color: "#aaa", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 10 }}>Best Value (Cost / Wear)</div>
+              {withCPW.map(item => (
+                <div key={item.id} style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
+                  <div style={{ width: 40, height: 40, borderRadius: 10, overflow: "hidden", background: item.image ? "transparent" : "#f5f3ef", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                    {item.image ? <img src={item.image} style={{ width: "100%", height: "100%", objectFit: "cover" }} alt="" /> : <HangerIcon size={16} color="#ccc" />}
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 12, fontWeight: 700, color: "#1a1a1a", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{item.name}</div>
+                    <div style={{ fontSize: 11, color: "#aaa" }}>${parseFloat((item.price||"").replace(/[^0-9.]/g,"")).toFixed(0)} · {item.wornCount}x worn</div>
+                  </div>
+                  <div style={{ fontSize: 13, fontWeight: 800, color: "#6366f1", flexShrink: 0 }}>${item.cpw.toFixed(2)}</div>
+                </div>
+              ))}
+            </div>
+          )}
+          {neverWorn > 0 && (
+            <div style={{ background: "#fff8f0", borderRadius: 12, padding: "12px 14px" }}>
+              <span style={{ fontSize: 13, color: "#e07e30", fontWeight: 700 }}>💡 {neverWorn} item{neverWorn > 1 ? "s" : ""} never worn</span>
+              <span style={{ fontSize: 12, color: "#aaa", marginLeft: 6 }}>— try styling them in an outfit!</span>
+            </div>
+          )}
+        </div>
       )}
-      {selectable && (
-        <div style={{ padding: "8px 10px" }}>
-          <div style={{ fontSize: 12, fontWeight: 600, color: "#1a1a1a", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{item.name}</div>
+    </div>
+  );
+}
+function OccasionPill({ tag, selected, onClick, small }) {
+  const style = OCCASION_COLORS[tag] || { bg: "#f5f3ef", color: "#888" };
+  return (
+    <button onClick={onClick} style={{
+      padding: small ? "3px 10px" : "6px 14px", borderRadius: 20,
+      border: selected ? `1.5px solid ${style.color}` : "1.5px solid transparent",
+      background: selected ? style.bg : "#f5f3ef", color: selected ? style.color : "#aaa",
+      fontSize: small ? 11 : 12, fontWeight: 700, cursor: "pointer",
+      fontFamily: "'Nunito', sans-serif", transition: "all 0.15s", whiteSpace: "nowrap", flexShrink: 0,
+    }}>{tag}</button>
+  );
+}
+
+// ── Outfit Detail Popup ──────────────────────────────────────────────────────
+function OutfitDetailPopup({ outfit, allItems, lookbooks, onClose, onEdit, onDelete, onMarkWorn, onDuplicate, onAddToLookbook, onGoToLookbook, onItemClick }) {
+  const [addingToLb, setAddingToLb] = useState(false);
+  const [selectedLb, setSelectedLb] = useState("");
+  const [exported, setExported] = useState(false);
+  const [rightTab, setRightTab] = useState("pieces");
+  const [wornFlash, setWornFlash] = useState(false);
+
+  const handleMarkWorn = () => {
+    onMarkWorn();
+    setWornFlash(true);
+    setTimeout(() => setWornFlash(false), 1800);
+  };
+
+  const exportPreview = () => {
+    if (!outfit.previewImage) return;
+    const a = document.createElement("a");
+    a.href = outfit.previewImage;
+    a.download = (outfit.name || "outfit").replace(/\s+/g, "_") + ".jpg";
+    a.click();
+    setExported(true);
+    setTimeout(() => setExported(false), 2000);
+  };
+
+  const outfitItems = (outfit.layers || outfit.itemIds || []).map(id => allItems.find(i => i.id === id)).filter(Boolean);
+  const memberLookbooks = lookbooks.filter(lb => (lb.outfitIds || []).includes(outfit.id));
+  const nonMemberLookbooks = lookbooks.filter(lb => !(lb.outfitIds || []).includes(outfit.id));
+  const totalValue = outfitItems.reduce((sum, item) => sum + (parseFloat((item.price || "").replace(/[^0-9.]/g, "")) || 0), 0);
+  const totalSpent = outfitItems.reduce((sum, item) => sum + (parseFloat((item.spent || "").replace(/[^0-9.]/g, "")) || 0), 0);
+
+  return (
+    <div className="item-detail-overlay fade-in" onClick={onClose}>
+      <div className="fade-up" onClick={e => e.stopPropagation()} style={{
+        background: "#fff", borderRadius: 24, width: "100%", maxWidth: 860,
+        maxHeight: "90vh", overflow: "hidden", boxShadow: "0 30px 80px rgba(0,0,0,0.2)",
+        display: "flex", flexDirection: "row"
+      }}>
+
+        {/* ── LEFT: preview + info ── */}
+        <div style={{ width: 320, flexShrink: 0, display: "flex", flexDirection: "column", overflowY: "auto" }}>
+          {/* Preview image */}
+          <div style={{ width: "100%", aspectRatio: "4/5", background: "#f5f3ef", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden" }}>
+            {outfit.previewImage
+              ? <img src={outfit.previewImage} alt={outfit.name} style={{ width: "100%", height: "100%", objectFit: "contain" }} />
+              : <HangerIcon size={56} color="#ddd" />
+            }
+          </div>
+
+          {/* Info */}
+          <div style={{ padding: "18px 20px 22px", flex: 1 }}>
+            <h2 style={{ fontSize: 18, fontWeight: 800, color: "#1a1a1a", letterSpacing: "-0.01em", marginBottom: 2 }}>{outfit.name}</h2>
+
+            {/* Season + occasion tags */}
+            {((outfit.seasons || []).length > 0 || (outfit.tags || []).length > 0) && (
+              <div style={{ display: "flex", gap: 5, flexWrap: "wrap", marginBottom: 12, marginTop: 8 }}>
+                {(outfit.seasons || []).map(s => <span key={s} style={{ background: "#f0fbff", color: "#2bafd4", borderRadius: 20, padding: "3px 10px", fontSize: 11, fontWeight: 700 }}>{s}</span>)}
+                {(outfit.tags || []).map(tag => <OccasionPill key={tag} tag={tag} selected small />)}
+              </div>
+            )}
+
+            {/* Stats 2×2 */}
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 14 }}>
+              {[
+                { label: "Pieces", value: outfitItems.length },
+                { label: "Lookbooks", value: memberLookbooks.length },
+                { label: "Total Value", value: totalValue > 0 ? `$${totalValue.toFixed(0)}` : "—" },
+                { label: "Total Spent", value: totalSpent > 0 ? `$${totalSpent.toFixed(0)}` : "—" },
+              ].map(s => (
+                <div key={s.label} style={{ background: "#fafaf8", borderRadius: 10, padding: "10px 12px", textAlign: "center" }}>
+                  <div style={{ fontSize: 15, fontWeight: 800, color: "#1a1a1a" }}>{s.value}</div>
+                  <div style={{ fontSize: 10, color: "#aaa", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.06em", marginTop: 1 }}>{s.label}</div>
+                </div>
+              ))}
+            </div>
+
+            {/* Notes */}
+            {outfit.notes && (
+              <div style={{ background: "#fafaf8", borderRadius: 10, padding: "10px 12px", fontSize: 12, color: "#555", lineHeight: 1.6, marginBottom: 12 }}>{outfit.notes}</div>
+            )}
+
+            {/* In lookbooks */}
+            {memberLookbooks.length > 0 && (
+              <div style={{ marginBottom: 12 }}>
+                <div style={{ fontSize: 10, fontWeight: 700, color: "#bbb", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 6 }}>In Lookbooks</div>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 5 }}>
+                  {memberLookbooks.map(lb => (
+                    <button key={lb.id} onClick={() => onGoToLookbook(lb)} style={{
+                      padding: "4px 12px", borderRadius: 20, background: "#f5f0ff", border: "1.5px solid #c4b0f0",
+                      color: "#7c6fe0", fontSize: 11, fontWeight: 700, cursor: "pointer", fontFamily: "'Nunito', sans-serif"
+                    }}>▤ {lb.name} →</button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Add to lookbook */}
+            {nonMemberLookbooks.length > 0 && (
+              addingToLb ? (
+                <div style={{ display: "flex", gap: 8 }}>
+                  <select value={selectedLb} onChange={e => setSelectedLb(e.target.value)}
+                    style={{ flex: 1, padding: "8px 10px", border: "1.5px solid #e8e4dc", borderRadius: 10, fontFamily: "'Nunito', sans-serif", fontSize: 12 }}>
+                    <option value="">Choose lookbook…</option>
+                    {nonMemberLookbooks.map(lb => <option key={lb.id} value={lb.id}>{lb.name}</option>)}
+                  </select>
+                  <button onClick={() => { if (selectedLb) { onAddToLookbook(outfit.id, selectedLb); setAddingToLb(false); setSelectedLb(""); } }} style={{ padding: "8px 12px", background: "#2d6a3f", color: "#fff", border: "none", borderRadius: 10, cursor: "pointer", fontFamily: "'Nunito', sans-serif", fontSize: 12, fontWeight: 700 }}>Add</button>
+                  <button onClick={() => setAddingToLb(false)} style={{ padding: "8px 10px", background: "#f5f3ef", border: "none", borderRadius: 10, cursor: "pointer", color: "#aaa", fontFamily: "'Nunito', sans-serif", fontSize: 12 }}>✕</button>
+                </div>
+              ) : (
+                <button onClick={() => setAddingToLb(true)} style={{ padding: "8px 14px", background: "#f5f3ef", border: "none", borderRadius: 12, cursor: "pointer", fontSize: 12, fontWeight: 700, color: "#666", fontFamily: "'Nunito', sans-serif" }}>+ Add to Lookbook</button>
+              )
+            )}
+          </div>
+        </div>
+
+        {/* ── RIGHT: tabbed pieces / lookbooks ── */}
+        <div style={{ flex: 1, borderLeft: "1px solid #f0ece4", display: "flex", flexDirection: "column", minWidth: 0 }}>
+          {/* Header */}
+          <div style={{ padding: "12px 16px", display: "flex", alignItems: "center", justifyContent: "space-between", borderBottom: "1px solid #f0ece4", flexShrink: 0, gap: 8, flexWrap: "wrap" }}>
+            {/* Tab toggle */}
+            <div style={{ display: "flex", background: "#f5f3ef", borderRadius: 10, padding: 3, gap: 2 }}>
+              {[["pieces", `Pieces (${outfitItems.length})`], ["lookbooks", `Lookbooks (${memberLookbooks.length})`]].map(([v, lbl]) => (
+                <button key={v} onClick={() => setRightTab(v)} style={{
+                  padding: "6px 14px", border: "none", borderRadius: 8, cursor: "pointer",
+                  background: rightTab === v ? "#fff" : "transparent",
+                  color: rightTab === v ? "#1a1a1a" : "#aaa",
+                  fontFamily: "'Nunito', sans-serif", fontSize: 12, fontWeight: 700,
+                  boxShadow: rightTab === v ? "0 1px 4px rgba(0,0,0,0.08)" : "none", transition: "all 0.15s"
+                }}>{lbl}</button>
+              ))}
+            </div>
+            {/* Action buttons */}
+            <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+              <button onClick={handleMarkWorn} style={{ padding: "6px 12px", borderRadius: 10, background: wornFlash ? "#2d6a3f" : "#f0faf4", border: "1.5px solid #b6e8c8", cursor: "pointer", fontSize: 12, fontWeight: 700, color: wornFlash ? "#fff" : "#2d6a3f", fontFamily: "'Nunito', sans-serif", transition: "all 0.2s" }}>👗 {wornFlash ? "Marked!" : "Worn"}</button>
+              <button onClick={onDuplicate} style={{ padding: "6px 12px", borderRadius: 10, background: "#f5f3ef", border: "none", cursor: "pointer", fontSize: 12, fontWeight: 700, color: "#666", fontFamily: "'Nunito', sans-serif" }}>⧉ Copy</button>
+              {outfit.previewImage && <button onClick={exportPreview} style={{ padding: "6px 12px", borderRadius: 10, background: exported ? "#f0faf4" : "#f5f3ef", border: "none", cursor: "pointer", fontSize: 12, fontWeight: 700, color: exported ? "#2d6a3f" : "#666", fontFamily: "'Nunito', sans-serif" }}>{exported ? "✓ Saved" : "⬇ Export"}</button>}
+              <button onClick={onEdit} style={{ width: 32, height: 32, borderRadius: "50%", background: "#f5f3ef", border: "none", cursor: "pointer", fontSize: 14, color: "#444", display: "flex", alignItems: "center", justifyContent: "center" }}>✎</button>
+              <button onClick={onDelete} style={{ width: 32, height: 32, borderRadius: "50%", background: "#fef2f2", border: "none", cursor: "pointer", fontSize: 14, color: "#e05555", display: "flex", alignItems: "center", justifyContent: "center" }}>🗑</button>
+              <button onClick={onClose} style={{ width: 32, height: 32, borderRadius: "50%", background: "#f5f3ef", border: "none", cursor: "pointer", fontSize: 14, color: "#888", display: "flex", alignItems: "center", justifyContent: "center" }}>✕</button>
+            </div>
+          </div>
+
+          {/* Content */}
+          <div style={{ flex: 1, overflowY: "auto", padding: 16 }}>
+            {rightTab === "pieces" && (
+              outfitItems.length === 0 ? (
+                <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", height: "100%", color: "#ccc", gap: 10, paddingTop: 40 }}>
+                  <HangerIcon size={36} color="#ddd" />
+                  <div style={{ fontSize: 13, fontWeight: 600 }}>No items found</div>
+                </div>
+              ) : (
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(120px, 1fr))", gap: 10 }}>
+                  {outfitItems.map(item => (
+                    <div key={item.id} onClick={() => onItemClick && onItemClick(item)} style={{ borderRadius: 14, overflow: "hidden", background: "#f5f3ef", cursor: "pointer", border: "1.5px solid transparent", transition: "border-color 0.15s" }}
+                      onMouseEnter={e => e.currentTarget.style.borderColor = "#d0c8bc"}
+                      onMouseLeave={e => e.currentTarget.style.borderColor = "transparent"}
+                    >
+                      <div style={{ aspectRatio: "1/1", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                        {item.image ? <img src={item.image} alt={item.name} style={{ width: "100%", height: "100%", objectFit: "contain", padding: 6 }} /> : <HangerIcon size={24} color="#ddd" />}
+                      </div>
+                      <div style={{ padding: "6px 8px 8px" }}>
+                        <div style={{ fontSize: 11, fontWeight: 700, color: "#1a1a1a", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{item.name}</div>
+                        {item.brand && <div style={{ fontSize: 10, color: "#aaa", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{item.brand}</div>}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )
+            )}
+            {rightTab === "lookbooks" && (
+              memberLookbooks.length === 0 ? (
+                <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", height: "100%", color: "#ccc", gap: 10, paddingTop: 40 }}>
+                  <div style={{ fontSize: 32 }}>▤</div>
+                  <div style={{ fontSize: 13, fontWeight: 600 }}>Not in any lookbooks</div>
+                  {nonMemberLookbooks.length > 0 && (
+                    addingToLb ? (
+                      <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
+                        <select value={selectedLb} onChange={e => setSelectedLb(e.target.value)} style={{ padding: "8px 10px", border: "1.5px solid #e8e4dc", borderRadius: 10, fontFamily: "'Nunito', sans-serif", fontSize: 12 }}>
+                          <option value="">Choose lookbook…</option>
+                          {nonMemberLookbooks.map(lb => <option key={lb.id} value={lb.id}>{lb.name}</option>)}
+                        </select>
+                        <button onClick={() => { if (selectedLb) { onAddToLookbook(outfit.id, selectedLb); setAddingToLb(false); setSelectedLb(""); } }} style={{ padding: "8px 12px", background: "#2d6a3f", color: "#fff", border: "none", borderRadius: 10, cursor: "pointer", fontFamily: "'Nunito', sans-serif", fontSize: 12, fontWeight: 700 }}>Add</button>
+                        <button onClick={() => setAddingToLb(false)} style={{ padding: "8px 10px", background: "#f5f3ef", border: "none", borderRadius: 10, cursor: "pointer", color: "#aaa", fontFamily: "'Nunito', sans-serif", fontSize: 12 }}>✕</button>
+                      </div>
+                    ) : (
+                      <button onClick={() => setAddingToLb(true)} style={{ padding: "8px 18px", background: "#f5f3ef", border: "none", borderRadius: 12, cursor: "pointer", fontSize: 12, fontWeight: 700, color: "#666", fontFamily: "'Nunito', sans-serif" }}>+ Add to Lookbook</button>
+                    )
+                  )}
+                </div>
+              ) : (
+                <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                  {memberLookbooks.map(lb => (
+                    <button key={lb.id} onClick={() => onGoToLookbook(lb)} style={{
+                      display: "flex", alignItems: "center", gap: 12, padding: "12px 14px",
+                      background: "#f5f0ff", border: "1.5px solid #c4b0f0", borderRadius: 14,
+                      cursor: "pointer", fontFamily: "'Nunito', sans-serif", textAlign: "left", width: "100%"
+                    }}>
+                      <div style={{ fontSize: 20 }}>▤</div>
+                      <div style={{ flex: 1 }}>
+                        <div style={{ fontSize: 13, fontWeight: 700, color: "#1a1a1a" }}>{lb.name}</div>
+                        <div style={{ fontSize: 11, color: "#7c6fe0" }}>{(lb.outfitIds || []).length} outfit{(lb.outfitIds || []).length !== 1 ? "s" : ""} · tap to open →</div>
+                      </div>
+                    </button>
+                  ))}
+                  {nonMemberLookbooks.length > 0 && (
+                    addingToLb ? (
+                      <div style={{ display: "flex", gap: 8, marginTop: 4 }}>
+                        <select value={selectedLb} onChange={e => setSelectedLb(e.target.value)} style={{ flex: 1, padding: "8px 10px", border: "1.5px solid #e8e4dc", borderRadius: 10, fontFamily: "'Nunito', sans-serif", fontSize: 12 }}>
+                          <option value="">Choose lookbook…</option>
+                          {nonMemberLookbooks.map(lb => <option key={lb.id} value={lb.id}>{lb.name}</option>)}
+                        </select>
+                        <button onClick={() => { if (selectedLb) { onAddToLookbook(outfit.id, selectedLb); setAddingToLb(false); setSelectedLb(""); } }} style={{ padding: "8px 12px", background: "#2d6a3f", color: "#fff", border: "none", borderRadius: 10, cursor: "pointer", fontFamily: "'Nunito', sans-serif", fontSize: 12, fontWeight: 700 }}>Add</button>
+                        <button onClick={() => setAddingToLb(false)} style={{ padding: "8px 10px", background: "#f5f3ef", border: "none", borderRadius: 10, cursor: "pointer", color: "#aaa", fontFamily: "'Nunito', sans-serif", fontSize: 12 }}>✕</button>
+                      </div>
+                    ) : (
+                      <button onClick={() => setAddingToLb(true)} style={{ padding: "8px 14px", background: "#f5f3ef", border: "none", borderRadius: 12, cursor: "pointer", fontSize: 12, fontWeight: 700, color: "#666", fontFamily: "'Nunito', sans-serif" }}>+ Add to Lookbook</button>
+                    )
+                  )}
+                </div>
+              )
+            )}
+          </div>
+        </div>
+
+      </div>
+    </div>
+  );
+}
+
+// ── Lookbook Viewer ──────────────────────────────────────────────────────────
+function LookbookViewer({ lookbook, outfits, allItems, onClose, onUpdate }) {
+  const [view, setView] = useState("slide");
+  const [idx, setIdx] = useState(0);
+  const [slideDir, setSlideDir] = useState("left");
+  const [notes, setNotes] = useState(lookbook.notes || "");
+  const [lbName, setLbName] = useState(lookbook.name);
+  const [editingName, setEditingName] = useState(false);
+  const [lookIds, setLookIds] = useState(lookbook.outfitIds || []);
+  const [lookMeta, setLookMeta] = useState(lookbook.lookMeta || {}); // { [outfitId]: { day, occasion, date } }
+  const [reordering, setReordering] = useState(false);
+
+  const looks = lookIds.map(id => outfits.find(o => o.id === id)).filter(Boolean);
+
+  const go = (dir) => {
+    setSlideDir(dir === 1 ? "left" : "right");
+    setIdx(i => Math.max(0, Math.min(looks.length - 1, i + dir)));
+  };
+
+  const moveLook = (from, to) => {
+    const next = [...lookIds];
+    const [moved] = next.splice(from, 1);
+    next.splice(to, 0, moved);
+    setLookIds(next);
+  };
+
+  const updateMeta = (outfitId, field, value) => {
+    setLookMeta(m => ({ ...m, [outfitId]: { ...(m[outfitId] || {}), [field]: value } }));
+  };
+
+  const save = () => onUpdate({ ...lookbook, name: lbName, notes, outfitIds: lookIds, lookMeta });
+
+  const currentLook = looks[idx];
+  const canvasItems = currentLook
+    ? (currentLook.layers || currentLook.itemIds || []).map(id => {
+        const item = allItems.find(i => i.id === id);
+        const pos = currentLook.positions?.[id];
+        return item && pos ? { item, pos } : null;
+      }).filter(Boolean)
+    : [];
+
+  const btnBase = { border: "none", cursor: "pointer", fontFamily: "'Nunito', sans-serif", fontWeight: 700, borderRadius: 10, transition: "all 0.15s" };
+  const DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
+
+  return (
+    <div className="lookbook-overlay">
+      <style>{globalStyles}</style>
+      <div className="lookbook-topbar">
+        <button onClick={() => { save(); onClose(); }} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 20, color: "#888", display: "flex", alignItems: "center", gap: 6 }}>
+          <span style={{ fontSize: 18 }}>←</span>
+        </button>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          {editingName
+            ? <input autoFocus value={lbName} onChange={e => setLbName(e.target.value)} onBlur={() => { setEditingName(false); save(); }}
+                style={{ fontSize: 16, fontWeight: 700, border: "none", borderBottom: "2px solid #1a1a1a", outline: "none", fontFamily: "'Nunito', sans-serif", background: "transparent", textAlign: "center", minWidth: 120 }} />
+            : <span onClick={() => setEditingName(true)} style={{ fontSize: 16, fontWeight: 700, color: "#1a1a1a", cursor: "pointer" }}>{lbName}</span>
+          }
+          <span style={{ fontSize: 12, color: "#aaa" }}>{looks.length} look{looks.length !== 1 ? "s" : ""}</span>
+        </div>
+        <div style={{ display: "flex", background: "#f5f3ef", borderRadius: 10, padding: 3, gap: 2 }}>
+          {[{ id: "slide", icon: "⊡" }, { id: "grid", icon: "⊞" }].map(v => (
+            <button key={v.id} onClick={() => setView(v.id)} style={{
+              ...btnBase, padding: "5px 12px", borderRadius: 8, fontSize: 16,
+              background: view === v.id ? "#fff" : "transparent",
+              color: view === v.id ? "#1a1a1a" : "#aaa",
+              boxShadow: view === v.id ? "0 1px 4px rgba(0,0,0,0.1)" : "none"
+            }}>{v.icon}</button>
+          ))}
+        </div>
+      </div>
+
+      <div style={{ display: "flex", flex: 1, overflow: "hidden" }}>
+        {/* Main */}
+        <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
+          {looks.length === 0 ? (
+            <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", color: "#ccc" }}>
+              <div style={{ fontSize: 36, marginBottom: 10 }}>▤</div>
+              <div style={{ fontSize: 14, fontWeight: 600 }}>No looks in this lookbook yet</div>
+            </div>
+          ) : view === "slide" ? (
+            <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
+              <div style={{ textAlign: "center", padding: "14px 0 6px", fontSize: 13, fontWeight: 700, color: "#888" }}>
+                {currentLook?.name || `Look ${idx + 1}`} · {idx + 1} / {looks.length}
+              </div>
+              {/* Canvas preview */}
+              <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", padding: "8px 24px 0", overflow: "hidden" }}>
+                <div className={`slide-enter-${slideDir}`} key={idx} style={{ position: "relative", width: "100%", maxWidth: 480, height: 380, background: "#fff", borderRadius: 20, border: "1.5px solid #f0ece4", overflow: "hidden", boxShadow: "0 4px 24px rgba(0,0,0,0.06)" }}>
+                  {canvasItems.map(({ item, pos }, i) => (
+                    <div key={item.id} style={{ position: "absolute", left: pos.x, top: pos.y, width: pos.w, zIndex: i + 1, pointerEvents: "none" }}>
+                      {item.image
+                        ? <img src={item.image} alt={item.name} style={{ width: pos.w, height: pos.h, objectFit: "contain", display: "block" }} />
+                        : <div style={{ width: pos.w, height: pos.h, background: "#f0ece4", borderRadius: 8, display: "flex", alignItems: "center", justifyContent: "center" }}><HangerIcon size={28} color="#ccc" /></div>
+                      }
+                    </div>
+                  ))}
+                  {canvasItems.length === 0 && (
+                    <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", color: "#ccc", fontSize: 13, fontWeight: 600 }}>No canvas preview</div>
+                  )}
+                </div>
+              </div>
+
+              {/* Per-look meta fields */}
+              {currentLook && (
+                <div style={{ padding: "12px 24px 8px", display: "flex", gap: 8, flexWrap: "wrap" }}>
+                  <select value={lookMeta[currentLook.id]?.day || ""} onChange={e => updateMeta(currentLook.id, "day", e.target.value)} onBlur={save}
+                    style={{ flex: "1 1 130px", padding: "7px 10px", border: "1.5px solid #e8e4dc", borderRadius: 10, fontFamily: "'Nunito', sans-serif", fontSize: 12, color: "#1a1a1a", background: "#fff" }}>
+                    <option value="">Day of week…</option>
+                    {DAYS.map(d => <option key={d} value={d}>{d}</option>)}
+                  </select>
+                  <input type="text" value={lookMeta[currentLook.id]?.occasion || ""} onChange={e => updateMeta(currentLook.id, "occasion", e.target.value)} onBlur={save}
+                    placeholder="Occasion (e.g. Wedding)"
+                    style={{ flex: "2 1 160px", padding: "7px 10px", border: "1.5px solid #e8e4dc", borderRadius: 10, fontFamily: "'Nunito', sans-serif", fontSize: 12, color: "#1a1a1a", background: "#fff" }} />
+                  <input type="date" value={lookMeta[currentLook.id]?.date || ""} onChange={e => updateMeta(currentLook.id, "date", e.target.value)} onBlur={save}
+                    style={{ flex: "1 1 140px", padding: "7px 10px", border: "1.5px solid #e8e4dc", borderRadius: 10, fontFamily: "'Nunito', sans-serif", fontSize: 12, color: "#1a1a1a", background: "#fff" }} />
+                </div>
+              )}
+
+              {/* Nav arrows */}
+              <div style={{ display: "flex", justifyContent: "center", gap: 16, padding: "8px 0 16px" }}>
+                <button onClick={() => go(-1)} disabled={idx === 0} style={{ ...btnBase, width: 40, height: 40, borderRadius: "50%", background: idx === 0 ? "#f0ece4" : "#1a1a1a", color: idx === 0 ? "#ccc" : "#fff", fontSize: 18, cursor: idx === 0 ? "default" : "pointer" }}>←</button>
+                <button onClick={() => go(1)} disabled={idx === looks.length - 1} style={{ ...btnBase, width: 40, height: 40, borderRadius: "50%", background: idx === looks.length - 1 ? "#f0ece4" : "#1a1a1a", color: idx === looks.length - 1 ? "#ccc" : "#fff", fontSize: 18, cursor: idx === looks.length - 1 ? "default" : "pointer" }}>→</button>
+              </div>
+            </div>
+          ) : (
+            /* Grid */
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: 16, padding: 24, overflowY: "auto", flex: 1 }}>
+              {looks.map((look, i) => {
+                const items = (look.layers || look.itemIds || []).map(id => allItems.find(x => x.id === id)).filter(Boolean);
+                const meta = lookMeta[look.id] || {};
+                return (
+                  <div key={look.id} onClick={() => { setIdx(i); setView("slide"); }} style={{ cursor: "pointer", background: "#fff", borderRadius: 16, overflow: "hidden", border: "1.5px solid #f0ece4", boxShadow: "0 2px 12px rgba(0,0,0,0.04)" }}>
+                    <div style={{ display: "grid", gridTemplateColumns: items.length >= 2 ? "1fr 1fr" : "1fr", height: 140 }}>
+                      {items.slice(0, 4).map(item => (
+                        <div key={item.id} style={{ background: item.image ? `url(${item.image}) center/cover no-repeat` : "#f5f3ef", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                          {!item.image && <HangerIcon size={20} color="#ccc" />}
+                        </div>
+                      ))}
+                    </div>
+                    <div style={{ padding: "10px 12px 12px" }}>
+                      <div style={{ fontSize: 13, fontWeight: 700, color: "#1a1a1a" }}>{look.name || `Look ${i + 1}`}</div>
+                      {(meta.day || meta.date || meta.occasion) && (
+                        <div style={{ fontSize: 11, color: "#aaa", marginTop: 3 }}>
+                          {[meta.day, meta.occasion, meta.date].filter(Boolean).join(" · ")}
+                        </div>
+                      )}
+                      <div style={{ fontSize: 11, color: "#ccc", marginTop: 2 }}>{items.length} piece{items.length !== 1 ? "s" : ""}</div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
+        {/* Right sidebar */}
+        <div style={{ width: 260, background: "#fff", borderLeft: "1.5px solid #f0ece4", padding: "20px 18px", display: "flex", flexDirection: "column", gap: 20, overflowY: "auto", flexShrink: 0 }}>
+          {/* Lookbook date range */}
+          {(lookbook.dateStart || lookbook.dateEnd) && (
+            <div style={{ background: "#f5f3ef", borderRadius: 12, padding: "10px 12px" }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: "#aaa", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 4 }}>Date Range</div>
+              <div style={{ fontSize: 13, color: "#555", fontWeight: 600 }}>
+                {lookbook.dateStart || "—"} → {lookbook.dateEnd || "—"}
+              </div>
+            </div>
+          )}
+
+          <div>
+            <div style={{ fontSize: 11, fontWeight: 700, color: "#aaa", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 8 }}>Styling Notes</div>
+            <textarea value={notes} onChange={e => setNotes(e.target.value)} onBlur={save}
+              placeholder="Add notes about this lookbook…"
+              style={{ ...inputStyle, minHeight: 100, resize: "vertical", fontSize: 13 }} />
+          </div>
+          <div>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: "#aaa", textTransform: "uppercase", letterSpacing: "0.08em" }}>Looks</div>
+              <button onClick={() => { setReordering(r => !r); if (reordering) save(); }} style={{ fontSize: 11, fontWeight: 700, color: reordering ? "#2d6a3f" : "#888", background: "none", border: "none", cursor: "pointer", fontFamily: "'Nunito', sans-serif" }}>
+                {reordering ? "Done" : "Reorder"}
+              </button>
+            </div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+              {looks.map((look, i) => {
+                const meta = lookMeta[look.id] || {};
+                return (
+                  <div key={look.id} onClick={() => { setIdx(i); setView("slide"); }} style={{
+                    display: "flex", alignItems: "center", gap: 8, padding: "8px 10px",
+                    background: idx === i ? "#f0faf4" : "#fafaf8", borderRadius: 10,
+                    border: idx === i ? "1.5px solid #3aaa6e" : "1.5px solid #f0ece4", cursor: "pointer"
+                  }}>
+                    {reordering && (
+                      <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+                        <button onClick={e => { e.stopPropagation(); if (i > 0) moveLook(i, i - 1); }} disabled={i === 0}
+                          style={{ background: "none", border: "none", cursor: i === 0 ? "default" : "pointer", color: i === 0 ? "#ccc" : "#888", fontSize: 10, padding: 0, lineHeight: 1 }}>▲</button>
+                        <button onClick={e => { e.stopPropagation(); if (i < looks.length - 1) moveLook(i, i + 1); }} disabled={i === looks.length - 1}
+                          style={{ background: "none", border: "none", cursor: i === looks.length - 1 ? "default" : "pointer", color: i === looks.length - 1 ? "#ccc" : "#888", fontSize: 10, padding: 0, lineHeight: 1 }}>▼</button>
+                      </div>
+                    )}
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: 12, fontWeight: 700, color: "#1a1a1a", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{look.name || `Look ${i + 1}`}</div>
+                      {(meta.day || meta.occasion) && <div style={{ fontSize: 10, color: "#aaa", marginTop: 1 }}>{[meta.day, meta.occasion].filter(Boolean).join(" · ")}</div>}
+                    </div>
+                    <div style={{ fontSize: 10, color: "#aaa", fontWeight: 600, flexShrink: 0 }}>{i + 1}</div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── BoardSizer — measures available space and renders a 4:5 white board ──────
+function BoardSizer({ boardRef: _ignored, children }) {
+  const containerRef = useRef(null);
+  const [dims, setDims] = useState({ w: 0, h: 0 });
+
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    const measure = () => {
+      const availW = el.offsetWidth - 48;
+      const availH = el.offsetHeight - 48;
+      // 4:5 ratio
+      let w = Math.min(availW, availH * 0.8);
+      let h = w * 1.25;
+      if (h > availH) { h = availH; w = h * 0.8; }
+      setDims({ w: Math.floor(w), h: Math.floor(h) });
+    };
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
+  return (
+    <div ref={containerRef} style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>
+      {dims.w > 0 && children(dims.w, dims.h)}
+    </div>
+  );
+}
+
+// ── Outfit Builder ───────────────────────────────────────────────────────────
+function OutfitBuilder({ itemsDb, wishlistDb, onSave, onClose, initial, seedItem }) {
+  const [name, setName] = useState(initial?.name || "");
+  const [notes, setNotes] = useState(initial?.notes || "");
+  const [tags, setTags] = useState(initial?.tags || []);
+  const [seasons, setSeasons] = useState(initial?.seasons || []);
+  const [layers, setLayers] = useState(() => {
+    const base = initial?.layers || initial?.itemIds || [];
+    if (seedItem?.id && !base.includes(seedItem.id)) return [...base, seedItem.id];
+    return base;
+  });
+  const [activeId, setActiveId] = useState(null);
+  const [search, setSearch] = useState("");
+  const [panelTab, setPanelTab] = useState("closet");
+  const [filterCat, setFilterCat] = useState("All");
+  const [filterColor, setFilterColor] = useState("");
+  const [filterSeason, setFilterSeason] = useState("");
+  const [showFilters, setShowFilters] = useState(false);
+  const [positions, setPositions] = useState(() => {
+    const pos = {};
+    (initial?.layers || initial?.itemIds || []).forEach((id, i) => {
+      pos[id] = initial?.positions?.[id] || { x: 80 + (i % 3) * 160, y: 60 + Math.floor(i / 3) * 180, w: 140, h: 160 };
+    });
+    if (seedItem?.id && !pos[seedItem.id]) {
+      pos[seedItem.id] = { x: 80, y: 60, w: 160, h: 200 };
+    }
+    return pos;
+  });
+  const [itemPopup, setItemPopup] = useState(null);
+  const [lockedIds, setLockedIds] = useState(new Set());
+  const [canUndo, setCanUndo] = useState(false);
+  const [canRedo, setCanRedo] = useState(false);
+  const history = useRef([]);
+  const historyIdx = useRef(-1);
+  const dragging = useRef(null);
+  const resizing = useRef(null);
+  const canvasRef = useRef(null);
+  const boardRef = useRef(null);
+
+  const pushHistory = (newLayers, newPositions) => {
+    const snap = { layers: newLayers, positions: newPositions };
+    const next = history.current.slice(0, historyIdx.current + 1);
+    next.push(snap);
+    history.current = next;
+    historyIdx.current = next.length - 1;
+    setCanUndo(historyIdx.current > 0);
+    setCanRedo(false);
+  };
+  const undo = () => {
+    if (historyIdx.current <= 0) return;
+    historyIdx.current--;
+    const snap = history.current[historyIdx.current];
+    setLayers(snap.layers); setPositions(snap.positions);
+    setCanUndo(historyIdx.current > 0); setCanRedo(true);
+  };
+  const redo = () => {
+    if (historyIdx.current >= history.current.length - 1) return;
+    historyIdx.current++;
+    const snap = history.current[historyIdx.current];
+    setLayers(snap.layers); setPositions(snap.positions);
+    setCanUndo(true); setCanRedo(historyIdx.current < history.current.length - 1);
+  };
+
+  // Auto-save draft
+  useEffect(() => {
+    if (!name && layers.length === 0) return;
+    try { localStorage.setItem("wardrobe_builder_draft", JSON.stringify({ name, notes, tags, seasons, layers, positions, savedAt: Date.now() })); } catch(e) {}
+  }, [name, notes, tags, seasons, layers, positions]);
+
+  // Restore draft on mount if no initial
+  useEffect(() => {
+    if (initial) return;
+    try {
+      const raw = localStorage.getItem("wardrobe_builder_draft");
+      if (!raw) return;
+      const d = JSON.parse(raw);
+      if (d.name && (Date.now() - d.savedAt) < 7 * 24 * 60 * 60 * 1000) {
+        setName(d.name); setNotes(d.notes || ""); setTags(d.tags || []);
+        setSeasons(d.seasons || []); setLayers(d.layers || []); setPositions(d.positions || {});
+      }
+    } catch(e) {}
+  }, []);
+
+  // Escape key to close
+  useEffect(() => {
+    const handler = (e) => { if (e.key === "Escape") onClose(); };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [onClose]);
+
+  const activeDb = panelTab === "closet" ? itemsDb : wishlistDb;
+  const allItems = [...itemsDb.rows, ...wishlistDb.rows];
+  const activeFilterCount = (filterCat !== "All" ? 1 : 0) + (filterColor ? 1 : 0) + (filterSeason ? 1 : 0);
+
+  const panelItems = activeDb.rows.filter(i => {
+    const matchSearch = i.name.toLowerCase().includes(search.toLowerCase()) || (i.brand || "").toLowerCase().includes(search.toLowerCase());
+    const matchCat = filterCat === "All" || i.category === filterCat;
+    const matchColor = !filterColor || i.color === filterColor;
+    const matchSeason = !filterSeason || i.season === filterSeason;
+    return matchSearch && matchCat && matchColor && matchSeason;
+  });
+
+  const toggleItem = (id) => {
+    if (layers.includes(id)) {
+      if (lockedIds.has(id)) return; // can't remove locked items
+      const newLayers = layers.filter(x => x !== id);
+      const newPos = { ...positions }; delete newPos[id];
+      setLayers(newLayers); setPositions(newPos);
+      pushHistory(newLayers, newPos);
+      if (activeId === id) setActiveId(null);
+    } else {
+      const board = boardRef.current;
+      const cw = board?.offsetWidth || 400;
+      const ch = board?.offsetHeight || 500;
+      const newPos = { ...positions, [id]: { x: 40 + Math.random() * (cw - 200), y: 30 + Math.random() * (ch - 200), w: 140, h: 160 } };
+      const newLayers = [...layers, id];
+      setLayers(newLayers); setPositions(newPos);
+      pushHistory(newLayers, newPos);
+      setActiveId(id);
+    }
+  };
+
+  const toggleLock = (id) => setLockedIds(prev => { const next = new Set(prev); next.has(id) ? next.delete(id) : next.add(id); return next; });
+
+  const moveLayerUp = (id) => setLayers(ls => { const i = ls.indexOf(id); if (i === ls.length - 1) return ls; const n = [...ls]; [n[i], n[i + 1]] = [n[i + 1], n[i]]; pushHistory(n, positions); return n; });
+  const moveLayerDown = (id) => setLayers(ls => { const i = ls.indexOf(id); if (i === 0) return ls; const n = [...ls]; [n[i], n[i - 1]] = [n[i - 1], n[i]]; pushHistory(n, positions); return n; });
+  const bringToFront = (id) => setLayers(ls => [...ls.filter(x => x !== id), id]);
+
+  const onMouseDown = (e, id) => {
+    e.preventDefault(); e.stopPropagation();
+    setActiveId(id);
+    if (lockedIds.has(id)) return; // locked — select only, no drag
+    bringToFront(id);
+    const board = boardRef.current;
+    const rect = board.getBoundingClientRect();
+    const startX = e.clientX - rect.left - positions[id].x;
+    const startY = e.clientY - rect.top - positions[id].y;
+    dragging.current = { id, startX, startY };
+    const onMove = (ev) => {
+      if (!dragging.current) return;
+      const r = board.getBoundingClientRect();
+      setPositions(p => ({ ...p, [dragging.current.id]: { ...p[dragging.current.id], x: ev.clientX - r.left - dragging.current.startX, y: ev.clientY - r.top - dragging.current.startY } }));
+    };
+    const onUp = () => {
+      if (dragging.current) pushHistory(layers, positions);
+      dragging.current = null; window.removeEventListener("mousemove", onMove); window.removeEventListener("mouseup", onUp);
+    };
+    window.addEventListener("mousemove", onMove);
+    window.addEventListener("mouseup", onUp);
+  };
+
+  const onResizeMouseDown = (e, id) => {
+    e.preventDefault(); e.stopPropagation();
+    const { startX, startY, startW, startH } = { startX: e.clientX, startY: e.clientY, startW: positions[id].w, startH: positions[id].h };
+    resizing.current = { id, startX, startY, startW, startH };
+    const onMove = (ev) => {
+      if (!resizing.current) return;
+      const r = resizing.current;
+      setPositions(p => ({ ...p, [r.id]: { ...p[r.id], w: Math.max(60, r.startW + ev.clientX - r.startX), h: Math.max(60, r.startH + ev.clientY - r.startY) } }));
+    };
+    const onUp = () => { resizing.current = null; window.removeEventListener("mousemove", onMove); window.removeEventListener("mouseup", onUp); };
+    window.addEventListener("mousemove", onMove);
+    window.addEventListener("mouseup", onUp);
+  };
+
+  const handlePopupSave = async (form) => {
+    if (itemPopup?.mode === "add") await activeDb.add({ ...form, id: uid() });
+    else if (itemPopup?.mode === "edit") await activeDb.update({ ...form, id: itemPopup.item.id });
+    setItemPopup(null);
+  };
+
+
+  const capturePreview = () => {
+    return new Promise((resolve) => {
+      const board = boardRef.current;
+      if (!board) return resolve(null);
+      const { offsetWidth: W, offsetHeight: H } = board;
+      const canvas = document.createElement("canvas");
+      canvas.width = W * 2; canvas.height = H * 2; // 2x for retina
+      const ctx = canvas.getContext("2d");
+      ctx.scale(2, 2);
+      ctx.fillStyle = "#fff";
+      ctx.fillRect(0, 0, W, H);
+
+      const itemsToDraw = layers.map(id => {
+        const item = allItems.find(i => i.id === id);
+        const pos = positions[id];
+        return item && pos ? { item, pos } : null;
+      }).filter(Boolean);
+
+      if (itemsToDraw.length === 0) return resolve(canvas.toDataURL("image/jpeg", 0.85));
+
+      let loaded = 0;
+      const imgs = [];
+      itemsToDraw.forEach(({ item, pos }, idx) => {
+        if (!item.image) { loaded++; if (loaded === itemsToDraw.length) finish(); return; }
+        const img = new Image();
+        img.crossOrigin = "anonymous";
+        img.onload = () => { imgs[idx] = { img, pos }; loaded++; if (loaded === itemsToDraw.length) finish(); };
+        img.onerror = () => { loaded++; if (loaded === itemsToDraw.length) finish(); };
+        img.src = item.image;
+      });
+
+      function finish() {
+        imgs.forEach(entry => { if (entry) ctx.drawImage(entry.img, entry.pos.x, entry.pos.y, entry.pos.w, entry.pos.h); });
+        resolve(canvas.toDataURL("image/jpeg", 0.85));
+      }
+    });
+  };
+
+  const handleSave = async () => {
+    if (!name || layers.length === 0) return;
+    const previewImage = await capturePreview();
+    try { localStorage.removeItem("wardrobe_builder_draft"); } catch(e) {}
+    onSave({ name, notes, tags, seasons, itemIds: layers, layers, positions, previewImage });
+  };
+
+  const btnBase = { border: "none", cursor: "pointer", fontFamily: "'Nunito', sans-serif", fontWeight: 700, borderRadius: 10, transition: "all 0.15s" };
+  const labelStyle = { display: "block", fontSize: 11, fontWeight: 700, color: "#888", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 6 };
+  const fieldStyle = { width: "100%", padding: "8px 12px", border: "1.5px solid #e8e4dc", borderRadius: 10, fontFamily: "'Nunito', sans-serif", fontSize: 13, color: "#1a1a1a", background: "#fff" };
+
+  return (
+    <div className="builder-overlay">
+      <style>{globalStyles}</style>
+      <div className="builder-topbar">
+        <button onClick={onClose} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 22, color: "#888", lineHeight: 1, padding: 0 }}>✕</button>
+        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+          <button onClick={undo} disabled={!canUndo} title="Undo" style={{ ...btnBase, padding: "6px 10px", background: canUndo ? "#f5f3ef" : "transparent", color: canUndo ? "#444" : "#ccc", fontSize: 13, cursor: canUndo ? "pointer" : "default" }}>↩</button>
+          <button onClick={redo} disabled={!canRedo} title="Redo" style={{ ...btnBase, padding: "6px 10px", background: canRedo ? "#f5f3ef" : "transparent", color: canRedo ? "#444" : "#ccc", fontSize: 13, cursor: canRedo ? "pointer" : "default" }}>↪</button>
+          <span style={{ fontWeight: 700, fontSize: 15, color: "#1a1a1a", marginLeft: 4 }}>Build a Look</span>
+        </div>
+        <button onClick={handleSave} disabled={!name || layers.length === 0} style={{
+          ...btnBase, padding: "8px 20px", fontSize: 13,
+          background: (!name || layers.length === 0) ? "#ccc" : "#2d6a3f",
+          color: "#fff", cursor: (!name || layers.length === 0) ? "not-allowed" : "pointer"
+        }}>Save Look</button>
+      </div>
+
+      <div className="builder-panels">
+        {/* LEFT */}
+        <div className="builder-left">
+          <div style={{ fontSize: 16, fontWeight: 700, color: "#1a1a1a", marginBottom: 20, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            Look Details
+            <button onClick={onClose} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 18, color: "#aaa" }}>✕</button>
+          </div>
+          <div style={{ marginBottom: 14 }}>
+            <label style={labelStyle}>Look Name</label>
+            <input value={name} onChange={e => setName(e.target.value)} placeholder="e.g. Casual Sunday" style={fieldStyle} />
+          </div>
+          <div style={{ marginBottom: 18 }}>
+            <label style={labelStyle}>Styling Notes</label>
+            <textarea value={notes} onChange={e => setNotes(e.target.value)} placeholder="Type your notes here" style={{ ...fieldStyle, minHeight: 100, resize: "vertical" }} />
+          </div>
+          <div style={{ marginBottom: 18 }}>
+            <label style={labelStyle}>Season</label>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+              {["Spring", "Summer", "Fall", "Winter"].map(s => (
+                <button key={s} onClick={() => setSeasons(ss => ss.includes(s) ? ss.filter(x => x !== s) : [...ss, s])} style={{
+                  ...btnBase, padding: "5px 12px", borderRadius: 16, fontSize: 12,
+                  border: seasons.includes(s) ? "1.5px solid #2bafd4" : "1.5px solid #e8e4dc",
+                  background: seasons.includes(s) ? "#f0fbff" : "#fafaf8",
+                  color: seasons.includes(s) ? "#2bafd4" : "#aaa"
+                }}>{s}</button>
+              ))}
+            </div>
+          </div>
+          <div>
+            <label style={labelStyle}>Occasion</label>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+              {OCCASIONS.map(tag => {
+                const oc = OCCASION_COLORS[tag] || { bg: "#f5f3ef", color: "#888" };
+                const sel = tags.includes(tag);
+                return (
+                  <button key={tag} onClick={() => setTags(ts => ts.includes(tag) ? ts.filter(x => x !== tag) : [...ts, tag])} style={{
+                    ...btnBase, padding: "5px 12px", borderRadius: 16, fontSize: 12,
+                    border: sel ? `1.5px solid ${oc.color}` : "1.5px solid #e8e4dc",
+                    background: sel ? oc.bg : "#fafaf8", color: sel ? oc.color : "#aaa"
+                  }}>{tag}</button>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+
+        {/* CANVAS — centered white 4:5 board */}
+        <div className="builder-canvas" ref={canvasRef} onClick={() => setActiveId(null)}>
+          <BoardSizer boardRef={boardRef}>
+            {(boardW, boardH) => (
+              <div
+                ref={boardRef}
+                className="outfit-board"
+                style={{ width: boardW, height: boardH }}
+                onClick={e => e.stopPropagation()}
+              >
+                {layers.length === 0 && (
+                  <div style={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", color: "#ccc", pointerEvents: "none" }}>
+                    <div style={{ fontSize: 32, marginBottom: 8 }}>✦</div>
+                    <div style={{ fontSize: 13, fontWeight: 600 }}>Select items to build your look</div>
+                  </div>
+                )}
+                {layers.map((id, zIndex) => {
+                  const item = allItems.find(i => i.id === id);
+                  if (!item || !positions[id]) return null;
+                  const { x, y, w, h } = positions[id];
+                  const isActive = activeId === id;
+                  const isTop = zIndex === layers.length - 1;
+                  const isBottom = zIndex === 0;
+                  return (
+                    <div key={id} className="canvas-item" style={{ left: x, top: y, width: w, zIndex: zIndex + 1 }}
+                      onMouseDown={e => onMouseDown(e, id)} onClick={e => e.stopPropagation()}>
+                      <div style={{ position: "relative", display: "inline-block" }}>
+                        {item.image
+                          ? <img src={item.image} alt={item.name} style={{ width: w, height: h, objectFit: "contain", borderRadius: 4, display: "block", pointerEvents: "none", outline: isActive ? (lockedIds.has(id) ? "2px solid #f0c040" : "2px solid #2d6a3f") : "none", outlineOffset: 2 }} />
+                          : <div style={{ width: w, height: h, background: "#f0ece4", borderRadius: 4, display: "flex", alignItems: "center", justifyContent: "center", outline: isActive ? "2px solid #2d6a3f" : "none" }}><HangerIcon size={32} color="#ccc" /></div>
+                        }
+                        {lockedIds.has(id) && <div style={{ position: "absolute", top: 4, left: 4, fontSize: 12, background: "rgba(0,0,0,0.5)", borderRadius: 6, padding: "1px 4px", pointerEvents: "none" }}>🔒</div>}
+                        {isActive && (
+                          <div onMouseDown={e => onResizeMouseDown(e, id)} style={{
+                            position: "absolute", bottom: -6, right: -6, width: 16, height: 16, borderRadius: "50%",
+                            background: "#2d6a3f", border: "2px solid #fff", cursor: "nwse-resize", zIndex: 10, boxShadow: "0 2px 6px rgba(0,0,0,0.3)"
+                          }} />
+                        )}
+                      </div>
+                      {isActive && (
+                        <div onClick={e => e.stopPropagation()} style={{
+                          position: "absolute", top: -40, left: "50%", transform: "translateX(-50%)",
+                          display: "flex", gap: 1, background: "#1a1a1a", borderRadius: 20, padding: "4px 6px",
+                          boxShadow: "0 4px 16px rgba(0,0,0,0.3)", whiteSpace: "nowrap", zIndex: 9999
+                        }}>
+                          {!lockedIds.has(id) && [{ label: "↑ Forward", action: () => moveLayerUp(id), disabled: isTop }, { label: "↓ Back", action: () => moveLayerDown(id), disabled: isBottom }].map(btn => (
+                            <button key={btn.label} onClick={btn.action} disabled={btn.disabled} style={{
+                              background: "none", border: "none", color: btn.disabled ? "#555" : "#fff",
+                              cursor: btn.disabled ? "default" : "pointer", padding: "3px 9px",
+                              fontSize: 12, fontFamily: "'Nunito', sans-serif", fontWeight: 700, borderRadius: 14
+                            }}>{btn.label}</button>
+                          ))}
+                          <div style={{ width: 1, background: "#333", margin: "3px 1px" }} />
+                          <button onClick={() => toggleLock(id)} title={lockedIds.has(id) ? "Unlock" : "Lock"} style={{ background: "none", border: "none", color: lockedIds.has(id) ? "#f0c040" : "#aaa", cursor: "pointer", padding: "3px 8px", fontSize: 13, borderRadius: 14 }}>{lockedIds.has(id) ? "🔒" : "🔓"}</button>
+                          {!lockedIds.has(id) && <><div style={{ width: 1, background: "#333", margin: "3px 1px" }} /><button onClick={() => toggleItem(id)} style={{ background: "none", border: "none", color: "#ff6b6b", cursor: "pointer", padding: "3px 8px", fontSize: 13, borderRadius: 14 }}>✕</button></>}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </BoardSizer>
+        </div>
+
+        {/* RIGHT PANEL */}
+        <div className="builder-right">
+          {layers.length > 0 && (
+            <div style={{ borderBottom: "1.5px solid #e8e4dc", flexShrink: 0 }}>
+              <div style={{ padding: "8px 12px 4px", fontSize: 11, fontWeight: 700, color: "#888", textTransform: "uppercase", letterSpacing: "0.08em" }}>Selected</div>
+              <div className="selected-strip">
+                {layers.map(id => {
+                  const item = allItems.find(i => i.id === id);
+                  if (!item) return null;
+                  return (
+                    <div key={id} className="selected-thumb" onClick={() => toggleItem(id)} title="Click to remove">
+                      {item.image ? <img src={item.image} alt={item.name} /> : <HangerIcon size={18} color="#ccc" />}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          <div style={{ padding: "10px 12px 8px", borderBottom: "1.5px solid #e8e4dc", flexShrink: 0 }}>
+            {/* Tab toggle */}
+            <div style={{ display: "flex", background: "#f5f3ef", borderRadius: 10, padding: 3, gap: 2, marginBottom: 8 }}>
+              {[{ id: "closet", label: "👗 Closet" }, { id: "wishlist", label: "♡ Wishlist" }].map(t => (
+                <button key={t.id} onClick={() => setPanelTab(t.id)} style={{
+                  flex: 1, padding: "6px 0", border: "none", borderRadius: 8,
+                  background: panelTab === t.id ? "#fff" : "transparent",
+                  color: panelTab === t.id ? "#1a1a1a" : "#aaa",
+                  fontFamily: "'Nunito', sans-serif", fontSize: 12, fontWeight: 700, cursor: "pointer",
+                  boxShadow: panelTab === t.id ? "0 1px 4px rgba(0,0,0,0.1)" : "none", transition: "all 0.15s"
+                }}>{t.label}</button>
+              ))}
+            </div>
+
+            {/* Search */}
+            <input className="builder-search" value={search} onChange={e => setSearch(e.target.value)} placeholder="Search…" style={{ marginBottom: 8 }} />
+
+            {/* Filter toggle button */}
+            <button onClick={() => setShowFilters(f => !f)} style={{
+              ...btnBase, width: "100%", padding: "6px", marginBottom: showFilters ? 8 : 0,
+              background: activeFilterCount > 0 ? "#f0faf4" : "#f5f3ef",
+              color: activeFilterCount > 0 ? "#2d6a3f" : "#888", fontSize: 12
+            }}>
+              {activeFilterCount > 0 ? `✓ ${activeFilterCount} filter${activeFilterCount > 1 ? "s" : ""} active` : "⊟ Filters"}
+            </button>
+
+            {showFilters && (
+              <div style={{ display: "flex", flexDirection: "column", gap: 6, marginBottom: 8 }}>
+                <select value={filterCat} onChange={e => setFilterCat(e.target.value)} style={{ ...fieldStyle }}>
+                  {CATEGORIES.map(c => <option key={c} value={c}>{c === "All" ? "All Categories" : c}</option>)}
+                </select>
+                <select value={filterColor} onChange={e => setFilterColor(e.target.value)} style={{ ...fieldStyle }}>
+                  <option value="">All Colors</option>
+                  {COLORS.map(c => <option key={c} value={c}>{c}</option>)}
+                </select>
+                <select value={filterSeason} onChange={e => setFilterSeason(e.target.value)} style={{ ...fieldStyle }}>
+                  <option value="">All Seasons</option>
+                  {SEASONS.map(s => <option key={s} value={s}>{s}</option>)}
+                </select>
+                {activeFilterCount > 0 && (
+                  <button onClick={() => { setFilterCat("All"); setFilterColor(""); setFilterSeason(""); }} style={{ ...btnBase, padding: "5px", background: "#fef2f2", color: "#e05555", fontSize: 11 }}>Clear filters</button>
+                )}
+              </div>
+            )}
+
+            <div style={{ display: "flex", gap: 6, marginTop: 10 }}>
+              <button onClick={() => setItemPopup({ mode: "add" })} style={{ ...btnBase, flex: 1, padding: "7px 0", background: "#2d6a3f", color: "#fff", fontSize: 12 }}>+ Add</button>
+              <button onClick={() => activeDb.refresh()} style={{ ...btnBase, flex: 1, padding: "7px 0", background: "#f5f3ef", color: "#555", fontSize: 12 }}>↻ Fetch</button>
+            </div>
+          </div>
+
+          {/* Grid */}
+          <div className="product-grid" style={{ flex: 1, alignContent: "start" }}>
+            {activeDb.loading && <div style={{ gridColumn: "span 2", textAlign: "center", padding: "40px 0", color: "#ccc", fontSize: 13 }}>Loading…</div>}
+            {!activeDb.loading && panelItems.length === 0 && (
+              <div style={{ gridColumn: "span 2", textAlign: "center", padding: "40px 0", color: "#ccc", fontSize: 13 }}>
+                {search || activeFilterCount > 0 ? "No items match" : `Your ${panelTab} is empty`}
+              </div>
+            )}
+            {panelItems.map(item => {
+              const sel = layers.includes(item.id);
+              return (
+                <div key={item.id} style={{ position: "relative" }}>
+                  <div className={`product-thumb${sel ? " selected" : ""}`} onClick={() => toggleItem(item.id)}>
+                    {item.image && <img src={item.image} alt={item.name} />}
+                    {!item.image && <HangerIcon size={28} color="#ccc" />}
+                    {sel && <div className="check">✓</div>}
+                  </div>
+                  <button onClick={e => { e.stopPropagation(); setItemPopup({ mode: "edit", item }); }} title="Edit" style={{
+                    position: "absolute", top: 5, right: 5, width: 22, height: 22, borderRadius: "50%",
+                    background: "rgba(255,255,255,0.92)", border: "none", cursor: "pointer",
+                    fontSize: 13, display: "flex", alignItems: "center", justifyContent: "center",
+                    boxShadow: "0 1px 4px rgba(0,0,0,0.15)", color: "#555", fontWeight: 700, zIndex: 2
+                  }}>⋯</button>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+
+      {/* Item popup */}
+      {itemPopup && (
+        <div onClick={() => setItemPopup(null)} style={{
+          position: "absolute", inset: 0, background: "rgba(0,0,0,0.35)", zIndex: 500,
+          display: "flex", alignItems: "center", justifyContent: "center", padding: 24, backdropFilter: "blur(3px)"
+        }}>
+          <div onClick={e => e.stopPropagation()} style={{
+            background: "#fff", borderRadius: 20, padding: "24px 22px",
+            width: "100%", maxWidth: 420, maxHeight: "85vh", overflowY: "auto", boxShadow: "0 20px 60px rgba(0,0,0,0.2)"
+          }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
+              <h3 style={{ fontSize: 16, fontWeight: 700, color: "#1a1a1a" }}>{itemPopup.mode === "add" ? `Add to ${panelTab}` : "Edit item"}</h3>
+              <button onClick={() => setItemPopup(null)} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 18, color: "#aaa" }}>✕</button>
+            </div>
+            <AddItemModal
+              initial={itemPopup.mode === "edit" ? itemPopup.item : BLANK}
+              editMode={itemPopup.mode === "edit" ? "manual" : null}
+              onSave={handlePopupSave}
+              onSaveWish={handlePopupSave}
+              onCancel={() => setItemPopup(null)}
+            />
+          </div>
         </div>
       )}
     </div>
   );
 }
 
+// ── Nav + App ────────────────────────────────────────────────────────────────
 const NAV_ITEMS = [
-  { id: "closet", icon: "👗", label: "Closet" },
-  { id: "outfits", icon: "✦", label: "Outfits" },
-  { id: "wishlist", icon: "♡", label: "Wishlist" },
+  { id: "closet", label: "Closet" },
+  { id: "outfits", label: "Outfits" },
+  { id: "lookbooks", label: "Lookbooks" },
+  { id: "wishlist", label: "Wishlist" },
 ];
 
 export default function App() {
   const itemsDb = useSupabaseTable("items");
   const wishlistDb = useSupabaseTable("wishlist");
   const outfitsDb = useSupabaseTable("outfits");
+  const lookbooksDb = useSupabaseTable("lookbooks");
 
   const [tab, setTab] = useState("closet");
   const [modal, setModal] = useState(null);
   const [catFilter, setCatFilter] = useState("All");
   const [editItem, setEditItem] = useState(null);
-  const [outfitName, setOutfitName] = useState("");
-  const [outfitSelected, setOutfitSelected] = useState([]);
-  const [outfitModal, setOutfitModal] = useState(false);
+  const [outfitBuilder, setOutfitBuilder] = useState(false);
+  const [editingOutfit, setEditingOutfit] = useState(null);
+  const [outfitSeedItem, setOutfitSeedItem] = useState(null);
+  const [outfitTagFilter, setOutfitTagFilter] = useState("All");
+  const [outfitSeasonFilter, setOutfitSeasonFilter] = useState("All");
+  const [outfitSearch, setOutfitSearch] = useState("");
+  const [outfitSort, setOutfitSort] = useState("default");
+  const [outfitPopup, setOutfitPopup] = useState(null); // outfit object
+  const [itemDetail, setItemDetail] = useState(null); // closet item detail popup
+  const [closetSort, setClosetSort] = useState("default"); // default | az | price | worn | newest
+  const [closetSeasonFilter, setClosetSeasonFilter] = useState("All");
+  const [closetSearch, setClosetSearch] = useState("");
+  const [activeLookbook, setActiveLookbook] = useState(null);
+  const [lookbookModal, setLookbookModal] = useState(false);
+  const [newLbName, setNewLbName] = useState("");
+  const [newLbNotes, setNewLbNotes] = useState("");
+  const [newLbCover, setNewLbCover] = useState(""); // base64 data URL
+  const [newLbDateStart, setNewLbDateStart] = useState("");
+  const [newLbDateEnd, setNewLbDateEnd] = useState("");
+  const [newLbSelected, setNewLbSelected] = useState([]);
 
   const closeModal = () => { setModal(null); setEditItem(null); };
 
-  const saveItem = async (form, db) => {
-    if (editItem) await db.update({ ...form, id: editItem.id });
-    else await db.add({ ...form, id: uid() });
+  const saveItem = async (form) => {
+    if (editItem) await itemsDb.update({ ...form, id: editItem.id });
+    else await itemsDb.add({ ...form, id: uid() });
     closeModal();
   };
 
-  const moveToCloset = async (wish) => {
-    await itemsDb.add({ ...wish });
-    await wishlistDb.remove(wish.id);
+  const saveWishItem = async (form) => {
+    if (editItem) await wishlistDb.update({ ...form, id: editItem.id });
+    else await wishlistDb.add({ ...form, id: uid() });
+    closeModal();
   };
 
-  const saveOutfit = async () => {
-    if (!outfitName || outfitSelected.length === 0) return;
-    await outfitsDb.add({ id: uid(), name: outfitName, itemIds: outfitSelected });
-    setOutfitName(""); setOutfitSelected([]); setOutfitModal(false);
+  const moveToCloset = async (wish) => { await itemsDb.add({ ...wish }); await wishlistDb.remove(wish.id); };
+
+  const openNewOutfit = () => { setEditingOutfit(null); setOutfitSeedItem(null); setOutfitBuilder(true); };
+  const duplicateOutfit = async (outfit) => {
+    const copy = { ...outfit, id: uid(), name: outfit.name + " (copy)" };
+    await outfitsDb.add(copy);
+  };
+  const openEditOutfit = (outfit) => { setEditingOutfit(outfit); setOutfitBuilder(true); };
+
+  const saveOutfit = async (data) => {
+    if (editingOutfit) await outfitsDb.update({ ...data, id: editingOutfit.id });
+    else await outfitsDb.add({ ...data, id: uid() });
+    setOutfitBuilder(false); setEditingOutfit(null);
   };
 
-  const filteredItems = itemsDb.rows.filter(i =>
-    catFilter === "All" || i.category === catFilter
-  );
+  const createLookbook = async () => {
+    if (!newLbName.trim()) return;
+    const newLb = {
+      id: uid(),
+      name: newLbName.trim(),
+      notes: newLbNotes,
+      coverImage: newLbCover,
+      dateStart: newLbDateStart,
+      dateEnd: newLbDateEnd,
+      outfitIds: newLbSelected,
+      lookMeta: {},
+    };
+    setLookbookModal(false);
+    setNewLbName(""); setNewLbNotes(""); setNewLbCover("");
+    setNewLbDateStart(""); setNewLbDateEnd(""); setNewLbSelected([]);
+    // Try wrapped {id, data} schema first, fall back to flat insert
+    let { error } = await supabase.from("lookbooks").insert({ id: newLb.id, data: newLb });
+    if (error) {
+      console.warn("[lookbooks] wrapped insert failed, trying flat:", error.message);
+      ({ error } = await supabase.from("lookbooks").insert(newLb));
+    }
+    if (error) console.error("[lookbooks] create failed:", error.message, error.details, error.hint);
+    await lookbooksDb.refresh();
+  };
 
+  const addOutfitToLookbook = async (outfitId, lookbookId) => {
+    const lb = lookbooksDb.rows.find(l => l.id === lookbookId);
+    if (!lb) return;
+    const updated = { ...lb, outfitIds: [...(lb.outfitIds || []), outfitId] };
+    await lookbooksDb.update(updated);
+  };
 
+  const updateLookbook = async (lb) => {
+    await lookbooksDb.update(lb);
+  };
+
+  const markOutfitWorn = async (outfit) => {
+    const ids = outfit.layers || outfit.itemIds || [];
+    for (const id of ids) {
+      const item = itemsDb.rows.find(i => i.id === id);
+      if (item) await itemsDb.update({ ...item, wornCount: (item.wornCount || 0) + 1 });
+    }
+  };
+
+  const markWorn = async (item) => {
+    const updated = { ...item, wornCount: (item.wornCount || 0) + 1 };
+    await itemsDb.update(updated);
+    if (itemDetail?.id === item.id) setItemDetail(updated);
+  };
+
+  const filteredItems = (() => {
+    const q = closetSearch.trim().toLowerCase();
+    let rows = itemsDb.rows.filter(i => {
+      const matchCat = catFilter === "All" || i.category === catFilter;
+      const matchSearch = !q || i.name.toLowerCase().includes(q) || (i.brand||"").toLowerCase().includes(q) || (i.color||"").toLowerCase().includes(q) || (i.category||"").toLowerCase().includes(q);
+      const matchSeason = closetSeasonFilter === "All" || (i.seasons || []).includes(closetSeasonFilter) || i.season === closetSeasonFilter;
+      return matchCat && matchSearch && matchSeason;
+    });
+    if (closetSort === "az") rows = [...rows].sort((a, b) => a.name.localeCompare(b.name));
+    else if (closetSort === "price") rows = [...rows].sort((a, b) => (parseFloat((b.price||"").replace(/[^0-9.]/g,""))||0) - (parseFloat((a.price||"").replace(/[^0-9.]/g,""))||0));
+    else if (closetSort === "worn") rows = [...rows].sort((a, b) => (b.wornCount||0) - (a.wornCount||0));
+    else if (closetSort === "newest") rows = [...rows].sort((a, b) => (b.purchaseDate||"").localeCompare(a.purchaseDate||""));
+    return rows;
+  })();
+  const filteredOutfits = (() => {
+    const q = outfitSearch.trim().toLowerCase();
+    let rows = outfitsDb.rows.filter(o => {
+      const matchTag = outfitTagFilter === "All" || (o.tags || []).includes(outfitTagFilter);
+      const matchSeason = outfitSeasonFilter === "All" || (o.seasons || []).includes(outfitSeasonFilter);
+      const matchSearch = !q || (o.name || "").toLowerCase().includes(q);
+      return matchTag && matchSeason && matchSearch;
+    });
+    if (outfitSort === "az") rows = [...rows].sort((a, b) => (a.name || "").localeCompare(b.name || ""));
+    else if (outfitSort === "newest") rows = [...rows].sort((a, b) => (b.id || "").localeCompare(a.id || ""));
+    else if (outfitSort === "pieces") rows = [...rows].sort((a, b) => ((b.layers || b.itemIds || []).length) - ((a.layers || a.itemIds || []).length));
+    return rows;
+  })();
+  const allItems = [...itemsDb.rows, ...wishlistDb.rows];
 
   return (
     <div style={{ minHeight: "100vh", background: "#f8f7f4", paddingBottom: 90 }}>
       <style>{globalStyles}</style>
 
       {/* Header */}
-      <div style={{
-        background: "#fff", padding: "20px 24px 0",
-        boxShadow: "0 1px 0 #f0ece4",
-        position: "sticky", top: 0, zIndex: 50
-      }}>
-        <div style={{ maxWidth: 680, margin: "0 auto" }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 18 }}>
-            <div>
-              <h1 style={{ fontSize: 24, fontWeight: 800, color: "#1a1a1a", letterSpacing: "-0.02em" }}>My Wardrobe</h1>
-              <div style={{ display: "flex", gap: 16, marginTop: 4 }}>
-                {[
-                  { label: "Items", val: itemsDb.rows.length },
-                  { label: "Outfits", val: outfitsDb.rows.length },
-                  { label: "Wishlist", val: wishlistDb.rows.length },
-                ].map(s => (
-                  <div key={s.label} style={{ textAlign: "center" }}>
-                    <div style={{ fontSize: 15, fontWeight: 800, color: "#1a1a1a" }}>{s.val}</div>
-                    <div style={{ fontSize: 11, color: "#aaa", fontWeight: 600 }}>{s.label}</div>
-                  </div>
-                ))}
-              </div>
-            </div>
-            <button className="btn-primary" onClick={() => { setEditItem(null); setModal(tab === "wishlist" ? "wish" : "item"); }} style={{
+      <div style={{ background: "#fff", padding: "20px 24px 0", boxShadow: "0 1px 0 #f0ece4", position: "sticky", top: 0, zIndex: 50 }}>
+        <div style={{ maxWidth: "100%", margin: "0 auto", padding: "0 32px" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 18 }}>
+            <h1 style={{ fontSize: 24, fontWeight: 800, color: "#1a1a1a", letterSpacing: "-0.02em" }}>My Wardrobe</h1>
+            <button className="btn-primary" onClick={() => {
+              if (tab === "outfits") openNewOutfit();
+              else if (tab === "lookbooks") setLookbookModal(true);
+              else { setEditItem(null); setModal("item"); }
+            }} style={{
               width: 44, height: 44, borderRadius: "50%", background: "#1a1a1a",
               border: "none", cursor: "pointer", fontSize: 22, color: "#fff",
               display: "flex", alignItems: "center", justifyContent: "center",
@@ -297,98 +2363,225 @@ export default function App() {
             }}>+</button>
           </div>
 
-          {/* Category pills — only show on closet tab */}
-          {tab === "closet" && (
-            <div style={{ display: "flex", gap: 8, overflowX: "auto", paddingBottom: 14, scrollbarWidth: "none" }}>
-              {CATEGORIES.map(cat => (
-                <button key={cat} className="pill" onClick={() => setCatFilter(cat)} style={{
-                  padding: "7px 16px", borderRadius: 20, border: "none", cursor: "pointer",
-                  background: catFilter === cat ? "#1a1a1a" : "#f5f3ef",
-                  color: catFilter === cat ? "#fff" : "#888",
-                  fontSize: 13, fontWeight: 700, whiteSpace: "nowrap",
-                  fontFamily: "'Nunito', sans-serif",
-                  flexShrink: 0
-                }}>{cat}</button>
-              ))}
-            </div>
-          )}
-          {tab !== "closet" && <div style={{ height: 14 }} />}
+          {tab === "closet" && <div style={{ height: 14 }} />}
+
+          {(tab === "wishlist" || tab === "lookbooks") && <div style={{ height: 14 }} />}
+
+          {/* Nav tabs */}
+          <div style={{ display: "flex", borderTop: "1px solid #f0ece4" }}>
+            {NAV_ITEMS.map(n => (
+              <button key={n.id} onClick={() => setTab(n.id)} style={{
+                flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 3,
+                background: "none", border: "none", cursor: "pointer", fontFamily: "'Nunito', sans-serif", padding: "10px 8px"
+              }}>
+                <span style={{ display: "flex", alignItems: "center", justifyContent: "center", height: 20 }}>
+                  {n.id === "closet" && <HangerIcon size={18} color={tab === n.id ? "#1a1a1a" : "#bbb"} />}
+                  {n.id === "outfits" && <span style={{ fontSize: 16, lineHeight: 1, color: tab === n.id ? "#1a1a1a" : "#bbb" }}>✦</span>}
+                  {n.id === "lookbooks" && <span style={{ fontSize: 16, lineHeight: 1, color: tab === n.id ? "#1a1a1a" : "#bbb" }}>▤</span>}
+                  {n.id === "wishlist" && <span style={{ fontSize: 16, lineHeight: 1, color: tab === n.id ? "#1a1a1a" : "#bbb" }}>♡</span>}
+                </span>
+                <span style={{ fontSize: 11, fontWeight: 700, color: tab === n.id ? "#1a1a1a" : "#bbb", letterSpacing: "0.02em" }}>{n.label}</span>
+                {tab === n.id && <div style={{ width: 4, height: 4, borderRadius: "50%", background: "#1a1a1a" }} />}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
 
-      {/* Content */}
-      <div style={{ maxWidth: 680, margin: "0 auto", padding: "24px 20px" }}>
-        {itemsDb.loading ? (
-          <div style={{ textAlign: "center", padding: "80px 0", color: "#ccc", fontSize: 13, fontWeight: 600 }}>Loading…</div>
-        ) : (
-          <>
-            {/* CLOSET */}
-            {tab === "closet" && (
+      {/* Content — 3-column layout */}
+      <div className="app-layout">
+
+        {/* ── LEFT SIDEBAR (closet + outfits) ── */}
+        {(tab === "closet" || tab === "outfits") && (
+          <div className="app-left-sidebar">
+            <div className="closet-sidebar" style={{ position: "sticky", top: 80 }}>
+              {tab === "closet" && (<>
+                <div className="sidebar-section">
+                  <div style={{ position: "relative" }}>
+                    <span style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)", fontSize: 13, color: "#bbb", pointerEvents: "none" }}>🔍</span>
+                    <input className="closet-search" value={closetSearch} onChange={e => setClosetSearch(e.target.value)} placeholder="Search…" />
+                  </div>
+                </div>
+                <div className="sidebar-section">
+                  <div className="sidebar-label">Category</div>
+                  {CATEGORIES.map(cat => (
+                    <button key={cat} className={"sidebar-btn" + (catFilter === cat ? " active" : "")} onClick={() => setCatFilter(cat)}>{cat}</button>
+                  ))}
+                </div>
+              </>)}
+              {tab === "outfits" && (<>
+                <div className="sidebar-section">
+                  <div style={{ position: "relative" }}>
+                    <span style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)", fontSize: 13, color: "#bbb", pointerEvents: "none" }}>🔍</span>
+                    <input className="closet-search" value={outfitSearch} onChange={e => setOutfitSearch(e.target.value)} placeholder="Search outfits…" />
+                  </div>
+                </div>
+                <div className="sidebar-section">
+                  <div className="sidebar-label">Season</div>
+                  {["All", ...SEASONS].map(s => (
+                    <button key={s} className={"sidebar-btn" + (outfitSeasonFilter === s ? " active" : "")} onClick={() => setOutfitSeasonFilter(s)}>{s}</button>
+                  ))}
+                </div>
+                <div className="sidebar-section">
+                  <div className="sidebar-label">Occasion</div>
+                  {["All", ...OCCASIONS].map(tag => (
+                    <button key={tag} className={"sidebar-btn" + (outfitTagFilter === tag ? " active" : "")} onClick={() => setOutfitTagFilter(tag)}>{tag}</button>
+                  ))}
+                </div>
+              </>)}
+            </div>
+          </div>
+        )}
+
+        {/* ── MAIN CONTENT ── */}
+        <div className="app-main">
+          {itemsDb.loading ? (
+            <div style={{ textAlign: "center", padding: "80px 0", color: "#ccc", fontSize: 13, fontWeight: 600 }}>Loading…</div>
+          ) : (
+            <>
+              {/* CLOSET */}
+              {tab === "closet" && (
+                <div className="fade-up">
+                  {filteredItems.length === 0 ? (
+                    <div style={{ textAlign: "center", padding: "60px 0" }}>
+                      <HangerIcon size={40} color="#ddd" />
+                      <div style={{ fontSize: 14, fontWeight: 700, color: "#ccc", marginTop: 12 }}>
+                        {closetSearch ? `No results for "${closetSearch}"` : catFilter !== "All" ? `No ${catFilter} yet` : "Nothing here yet"}
+                      </div>
+                      {!closetSearch && catFilter === "All" && <div style={{ fontSize: 12, color: "#ddd", marginTop: 4 }}>Tap + to add your first piece</div>}
+                    </div>
+                  ) : (
+                    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(148px, 1fr))", gap: 12 }}>
+                      {filteredItems.map((item, i) => (
+                        <div key={item.id} className="fade-up" style={{ animationDelay: `${i * 0.02}s`, opacity: 0 }}>
+                          <ItemCard item={item} onClick={() => setItemDetail(item)} onEdit={() => { setEditItem(item); setModal("item"); }} />
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+
+            {/* OUTFITS */}
+            {tab === "outfits" && (
               <div className="fade-up">
-                {filteredItems.length === 0 ? (
-                  <div style={{ textAlign: "center", padding: "80px 0" }}>
-                    <div style={{ fontSize: 40, marginBottom: 12 }}>👗</div>
-                    <div style={{ fontSize: 15, fontWeight: 700, color: "#ccc" }}>Nothing here yet</div>
-                    <div style={{ fontSize: 13, color: "#ddd", marginTop: 4 }}>Tap + to add your first piece</div>
+
+                {filteredOutfits.length === 0 ? (
+                  <div style={{ textAlign: "center", padding: "60px 0" }}>
+                    <div style={{ fontSize: 36, marginBottom: 12 }}>✦</div>
+                    <div style={{ fontSize: 15, fontWeight: 700, color: "#ccc" }}>{outfitTagFilter === "All" && outfitSeasonFilter === "All" ? "No outfits yet" : "No outfits match these filters"}</div>
                   </div>
                 ) : (
-                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(155px, 1fr))", gap: 14 }}>
-                    {filteredItems.map((item, i) => (
-                      <div key={item.id} className="fade-up" style={{ animationDelay: `${i * 0.04}s`, opacity: 0 }}>
-                        <ItemCard item={item} onEdit={i => { setEditItem(i); setModal("item"); }} onDelete={itemsDb.remove} />
-                      </div>
-                    ))}
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: 16 }}>
+                    {filteredOutfits.map((outfit, i) => {
+                      const outfitItems = (outfit.layers || outfit.itemIds || []).map(id => allItems.find(x => x.id === id)).filter(Boolean);
+                      const tags = outfit.tags || [];
+                      const outfitSeasons = outfit.seasons || [];
+                      return (
+                        <div key={outfit.id} className="card fade-up" onClick={() => setOutfitPopup(outfit)} style={{
+                          background: "#fff", borderRadius: 20, border: "1.5px solid #f0ece4", overflow: "hidden",
+                          boxShadow: "0 2px 12px rgba(0,0,0,0.04)", animationDelay: `${i * 0.05}s`, opacity: 0, cursor: "pointer", position: "relative"
+                        }}>
+                          {/* Lookbook badge */}
+                          {(() => { const lbCount = lookbooksDb.rows.filter(lb => (lb.outfitIds || []).includes(outfit.id)).length; return lbCount > 0 ? <div style={{ position: "absolute", top: 8, left: 8, zIndex: 2, background: "rgba(124,111,224,0.92)", color: "#fff", borderRadius: 20, padding: "2px 8px", fontSize: 10, fontWeight: 700, backdropFilter: "blur(4px)" }}>▤ {lbCount}</div> : null; })()}
+                          {/* Preview: use saved previewImage if available, else item collage */}
+                          {outfit.previewImage ? (
+                            <div style={{ aspectRatio: "4/5", background: `url(${outfit.previewImage}) center/contain no-repeat #f5f3ef`, position: "relative" }}>
+                              <button onClick={e => { e.stopPropagation(); duplicateOutfit(outfit); }} title="Duplicate" style={{ position: "absolute", top: 8, right: 8, width: 28, height: 28, borderRadius: "50%", background: "rgba(255,255,255,0.9)", border: "none", cursor: "pointer", fontSize: 13, display: "flex", alignItems: "center", justifyContent: "center", backdropFilter: "blur(4px)", boxShadow: "0 1px 4px rgba(0,0,0,0.1)" }}>⧉</button>
+            </div>
+                          ) : (
+                            <div style={{
+                              display: "grid",
+                              gridTemplateColumns: outfitItems.length === 1 ? "1fr" : outfitItems.length === 2 ? "1fr 1fr" : "2fr 1fr",
+                              gridTemplateRows: outfitItems.length >= 3 ? "1fr 1fr" : "1fr",
+                              aspectRatio: "4/5",
+                            }}>
+                              {outfitItems.slice(0, 1).map(item => (
+                                <div key={item.id} style={{ gridRow: outfitItems.length >= 3 ? "1 / 3" : "1", background: item.image ? `url(${item.image}) center/cover no-repeat` : "#f8f6f2", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                                  {!item.image && <HangerIcon size={24} color="#ccc" />}
+                                </div>
+                              ))}
+                              {outfitItems.slice(1, 4).map(item => (
+                                <div key={item.id} style={{ background: item.image ? `url(${item.image}) center/cover no-repeat` : "#f5f3ef", display: "flex", alignItems: "center", justifyContent: "center", borderLeft: "2px solid #fff", borderBottom: "2px solid #fff" }}>
+                                  {!item.image && <HangerIcon size={14} color="#ccc" />}
+                                </div>
+                              ))}
+                              {outfitItems.length > 4 && (
+                                <div style={{ background: "#f0ece4", display: "flex", alignItems: "center", justifyContent: "center", borderLeft: "2px solid #fff", borderBottom: "2px solid #fff", fontSize: 12, fontWeight: 700, color: "#aaa" }}>+{outfitItems.length - 3}</div>
+                              )}
+                            </div>
+                          )}
+                          {/* Name overlay at bottom */}
+                          <div style={{ padding: "10px 12px 12px" }}>
+                            <div style={{ fontSize: 13, fontWeight: 700, color: "#1a1a1a", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{outfit.name}</div>
+                          </div>
+                        </div>
+                      );
+                    })}
                   </div>
                 )}
               </div>
             )}
 
-            {/* OUTFITS */}
-            {tab === "outfits" && (
+            {/* LOOKBOOKS */}
+            {tab === "lookbooks" && (
               <div className="fade-up">
-                <button className="btn-primary" onClick={() => { setOutfitSelected([]); setOutfitName(""); setOutfitModal(true); }} style={{
+                <button className="btn-primary" onClick={() => setLookbookModal(true)} style={{
                   width: "100%", padding: "14px", background: "#1a1a1a", color: "#fff",
                   border: "none", borderRadius: 16, cursor: "pointer",
-                  fontFamily: "'Nunito', sans-serif", fontSize: 15, fontWeight: 700,
-                  marginBottom: 24
-                }}>+ Build New Outfit</button>
-
-                {outfitsDb.rows.length === 0 ? (
+                  fontFamily: "'Nunito', sans-serif", fontSize: 15, fontWeight: 700, marginBottom: 24
+                }}>+ Create New Lookbook</button>
+                {lookbooksDb.rows.length === 0 ? (
                   <div style={{ textAlign: "center", padding: "60px 0" }}>
-                    <div style={{ fontSize: 40, marginBottom: 12 }}>✦</div>
-                    <div style={{ fontSize: 15, fontWeight: 700, color: "#ccc" }}>No outfits yet</div>
+                    <div style={{ fontSize: 36, marginBottom: 12 }}>▤</div>
+                    <div style={{ fontSize: 15, fontWeight: 700, color: "#ccc" }}>No lookbooks yet</div>
+                    <div style={{ fontSize: 13, color: "#ddd", marginTop: 4 }}>Group your outfits into a lookbook</div>
                   </div>
                 ) : (
-                  <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-                    {outfitsDb.rows.map((outfit, i) => {
-                      const outfitItems = outfit.itemIds.map(id => itemsDb.rows.find(x => x.id === id)).filter(Boolean);
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: 16 }}>
+                    {lookbooksDb.rows.map((lb, i) => {
+                      const lbOutfits = (lb.outfitIds || []).map(id => outfitsDb.rows.find(o => o.id === id)).filter(Boolean);
+                      const previewItems = lbOutfits.slice(0, 4).flatMap(o =>
+                        (o.layers || o.itemIds || []).slice(0, 1).map(id => allItems.find(x => x.id === id)).filter(Boolean)
+                      );
                       return (
-                        <div key={outfit.id} className="card fade-up" style={{
-                          background: "#fff", borderRadius: 20,
-                          border: "1.5px solid #f0ece4", overflow: "hidden",
-                          boxShadow: "0 2px 12px rgba(0,0,0,0.04)",
+                        <div key={lb.id} className="card fade-up" onClick={() => setActiveLookbook(lb)} style={{
+                          background: "#fff", borderRadius: 20, border: "1.5px solid #f0ece4", overflow: "hidden",
+                          boxShadow: "0 2px 12px rgba(0,0,0,0.04)", cursor: "pointer",
                           animationDelay: `${i * 0.06}s`, opacity: 0
                         }}>
-                          <div style={{ display: "grid", gridTemplateColumns: `repeat(${Math.min(outfitItems.length, 4)}, 1fr)`, height: 120 }}>
-                            {outfitItems.slice(0, 4).map(item => (
-                              <div key={item.id} style={{
-                                background: item.image ? `url(${item.image}) center/cover` : "#f8f6f2",
-                                display: "flex", alignItems: "center", justifyContent: "center",
-                              }}>
-                                {!item.image && <span style={{ opacity: 0.2, fontSize: 22 }}>👗</span>}
-                              </div>
-                            ))}
-                          </div>
-                          <div style={{ padding: "14px 16px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                            <div>
-                              <div style={{ fontSize: 15, fontWeight: 700, color: "#1a1a1a" }}>{outfit.name}</div>
-                              <div style={{ fontSize: 12, color: "#aaa", marginTop: 2 }}>{outfitItems.length} piece{outfitItems.length !== 1 ? "s" : ""}</div>
+                          {/* Cover: use cover image if set, else 2x2 grid */}
+                          {lb.coverImage ? (
+                            <div style={{ height: 150, background: `url(${lb.coverImage}) center/cover no-repeat` }} />
+                          ) : (
+                            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", height: 150 }}>
+                              {[0, 1, 2, 3].map(idx => {
+                                const item = previewItems[idx];
+                                return (
+                                  <div key={idx} style={{
+                                    background: item?.image ? `url(${item.image}) center/cover no-repeat` : "#f5f3ef",
+                                    display: "flex", alignItems: "center", justifyContent: "center",
+                                    borderRight: idx % 2 === 0 ? "1.5px solid #fff" : "none",
+                                    borderBottom: idx < 2 ? "1.5px solid #fff" : "none",
+                                  }}>
+                                    {!item?.image && <HangerIcon size={18} color="#ddd" />}
+                                  </div>
+                                );
+                              })}
                             </div>
-                            <button onClick={() => outfitsDb.remove(outfit.id)} style={{
-                              padding: "7px 14px", background: "#fef2f2", border: "none",
-                              borderRadius: 10, cursor: "pointer", fontSize: 12, fontWeight: 700,
-                              color: "#e05555", fontFamily: "'Nunito', sans-serif"
-                            }}>Remove</button>
+                          )}
+                          <div style={{ padding: "12px 14px 14px" }}>
+                            <div style={{ fontSize: 15, fontWeight: 700, color: "#1a1a1a" }}>{lb.name}</div>
+                            <div style={{ fontSize: 12, color: "#aaa", marginTop: 2 }}>{lbOutfits.length} look{lbOutfits.length !== 1 ? "s" : ""}</div>
+                            {(lb.dateStart || lb.dateEnd) && (
+                              <div style={{ fontSize: 11, color: "#aaa", marginTop: 3 }}>
+                                {lb.dateStart || "—"} → {lb.dateEnd || "—"}
+                              </div>
+                            )}
+                            <div style={{ display: "flex", gap: 6, marginTop: 10 }}>
+                              <button onClick={e => { e.stopPropagation(); setActiveLookbook(lb); }} style={{ flex: 1, padding: "7px", background: "#f5f3ef", border: "none", borderRadius: 10, cursor: "pointer", fontSize: 12, fontWeight: 700, color: "#666", fontFamily: "'Nunito', sans-serif" }}>Open</button>
+                              <button onClick={e => { e.stopPropagation(); lookbooksDb.remove(lb.id); }} style={{ flex: 1, padding: "7px", background: "#fef2f2", border: "none", borderRadius: 10, cursor: "pointer", fontSize: 12, fontWeight: 700, color: "#e05555", fontFamily: "'Nunito', sans-serif" }}>Remove</button>
+                            </div>
                           </div>
                         </div>
                       );
@@ -405,42 +2598,26 @@ export default function App() {
                   <div style={{ textAlign: "center", padding: "80px 0" }}>
                     <div style={{ fontSize: 40, marginBottom: 12 }}>♡</div>
                     <div style={{ fontSize: 15, fontWeight: 700, color: "#ccc" }}>Your wishlist is empty</div>
-                    <div style={{ fontSize: 13, color: "#ddd", marginTop: 4 }}>Tap + to add pieces you're dreaming of</div>
+                    <div style={{ fontSize: 13, color: "#ddd", marginTop: 4 }}>Tap + to save items you want</div>
                   </div>
                 ) : (
-                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(155px, 1fr))", gap: 14 }}>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
                     {wishlistDb.rows.map((item, i) => (
-                      <div key={item.id} className="fade-up" style={{ animationDelay: `${i * 0.04}s`, opacity: 0 }}>
-                        <div className="card" style={{ background: "#fff", borderRadius: 18, overflow: "hidden", border: "1.5px solid #f0ece4", boxShadow: "0 2px 12px rgba(0,0,0,0.04)" }}>
-                          <div style={{
-                            height: 200, background: item.image ? `url(${item.image}) center/cover` : "#f5f3ef",
-                            display: "flex", alignItems: "center", justifyContent: "center"
-                          }}>
-                            {!item.image && <span style={{ fontSize: 32, opacity: 0.2 }}>🛍️</span>}
-                          </div>
-                          <div style={{ padding: "12px 14px 14px" }}>
-                            <div style={{ fontSize: 14, fontWeight: 700, color: "#1a1a1a", marginBottom: 2 }}>{item.name}</div>
-                            {item.brand && <div style={{ fontSize: 12, color: "#aaa", marginBottom: 8 }}>{item.brand}</div>}
-                            {item.price && <div style={{ fontSize: 13, fontWeight: 700, color: "#888", marginBottom: 10 }}>{item.price}</div>}
-                            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                              <button onClick={() => moveToCloset(item)} className="btn-primary" style={{
-                                padding: "8px", background: "#1a1a1a", color: "#fff", border: "none",
-                                borderRadius: 10, cursor: "pointer", fontSize: 12, fontWeight: 700,
-                                fontFamily: "'Nunito', sans-serif"
-                              }}>→ Move to Closet</button>
-                              <div style={{ display: "flex", gap: 6 }}>
-                                <button onClick={() => { setEditItem(item); setModal("wish"); }} style={{
-                                  flex: 1, padding: "7px", background: "#f5f3ef", border: "none",
-                                  borderRadius: 10, cursor: "pointer", fontSize: 12, fontWeight: 600,
-                                  color: "#666", fontFamily: "'Nunito', sans-serif"
-                                }}>Edit</button>
-                                <button onClick={() => wishlistDb.remove(item.id)} style={{
-                                  flex: 1, padding: "7px", background: "#fef2f2", border: "none",
-                                  borderRadius: 10, cursor: "pointer", fontSize: 12, fontWeight: 600,
-                                  color: "#e05555", fontFamily: "'Nunito', sans-serif"
-                                }}>Remove</button>
-                              </div>
-                            </div>
+                      <div key={item.id} className="card fade-up" style={{
+                        background: "#fff", borderRadius: 20, overflow: "hidden", border: "1.5px solid #f0ece4",
+                        boxShadow: "0 2px 12px rgba(0,0,0,0.04)", animationDelay: `${i * 0.05}s`, opacity: 0, display: "flex"
+                      }}>
+                        <div style={{ width: 100, flexShrink: 0, background: item.image ? `url(${item.image}) center/cover no-repeat` : "#f8f6f2", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                          {!item.image && <span style={{ opacity: 0.2, fontSize: 28 }}>♡</span>}
+                        </div>
+                        <div style={{ padding: "14px 16px", flex: 1 }}>
+                          <div style={{ fontSize: 14, fontWeight: 700, color: "#1a1a1a" }}>{item.name}</div>
+                          {item.brand && <div style={{ fontSize: 12, color: "#aaa", marginTop: 2 }}>{item.brand}</div>}
+                          {item.price && <div style={{ fontSize: 13, fontWeight: 700, color: "#888", marginTop: 6 }}>{item.price}</div>}
+                          <button onClick={() => moveToCloset(item)} style={{ marginTop: 10, padding: "7px 14px", background: "#f0faf4", border: "none", borderRadius: 10, cursor: "pointer", fontSize: 12, fontWeight: 700, color: "#3aaa6e", fontFamily: "'Nunito', sans-serif" }}>→ Move to Closet</button>
+                          <div style={{ display: "flex", gap: 6, marginTop: 6 }}>
+                            <button onClick={() => { setEditItem(item); setModal("item"); }} style={{ flex: 1, padding: "7px", background: "#f5f3ef", border: "none", borderRadius: 10, cursor: "pointer", fontSize: 12, fontWeight: 600, color: "#666", fontFamily: "'Nunito', sans-serif" }}>Edit</button>
+                            <button onClick={() => wishlistDb.remove(item.id)} style={{ flex: 1, padding: "7px", background: "#fef2f2", border: "none", borderRadius: 10, cursor: "pointer", fontSize: 12, fontWeight: 600, color: "#e05555", fontFamily: "'Nunito', sans-serif" }}>Remove</button>
                           </div>
                         </div>
                       </div>
@@ -449,63 +2626,277 @@ export default function App() {
                 )}
               </div>
             )}
-          </>
-        )}
-      </div>
+            </>
+          )}
+        </div>
 
-      {/* Bottom Nav */}
-      <div style={{
-        position: "fixed", bottom: 0, left: 0, right: 0,
-        background: "#fff", borderTop: "1px solid #f0ece4",
-        display: "flex", justifyContent: "space-around",
-        padding: "10px 0 20px",
-        boxShadow: "0 -4px 20px rgba(0,0,0,0.06)"
-      }}>
-        {NAV_ITEMS.map(n => (
-          <button key={n.id} onClick={() => setTab(n.id)} style={{
-            display: "flex", flexDirection: "column", alignItems: "center", gap: 3,
-            background: "none", border: "none", cursor: "pointer",
-            fontFamily: "'Nunito', sans-serif", padding: "4px 20px"
-          }}>
-            <span style={{ fontSize: 20, opacity: tab === n.id ? 1 : 0.35 }}>{n.icon}</span>
-            <span style={{ fontSize: 11, fontWeight: 700, color: tab === n.id ? "#1a1a1a" : "#bbb", letterSpacing: "0.02em" }}>{n.label}</span>
-            {tab === n.id && <div style={{ width: 4, height: 4, borderRadius: "50%", background: "#1a1a1a" }} />}
-          </button>
-        ))}
+        {/* ── RIGHT PANEL (always visible) ── */}
+        <div className="app-right-panel">
+
+          {/* Sort (closet or outfits) */}
+          {(tab === "closet" || tab === "outfits") && (
+            <div className="right-card">
+              <div className="right-card-title">Sort By</div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+                {tab === "closet" && [["default","Default"],["az","A – Z"],["price","Price ↓"],["worn","Most Worn"],["newest","Newest"]].map(([val, lbl]) => (
+                  <button key={val} className={"sidebar-btn" + (closetSort === val ? " active" : "")} onClick={() => setClosetSort(val)}>{lbl}</button>
+                ))}
+                {tab === "outfits" && [["default","Default"],["az","A – Z"],["newest","Newest"],["pieces","Most Pieces"]].map(([val, lbl]) => (
+                  <button key={val} className={"sidebar-btn" + (outfitSort === val ? " active" : "")} onClick={() => setOutfitSort(val)}>{lbl}</button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {tab === "outfits" && outfitsDb.rows.length > 0 && (() => {
+            const outfits = outfitsDb.rows;
+            const allPieces = [...itemsDb.rows, ...wishlistDb.rows];
+            const itemUsage = {};
+            outfits.forEach(o => (o.layers || o.itemIds || []).forEach(id => { itemUsage[id] = (itemUsage[id] || 0) + 1; }));
+            const mostUsedId = Object.entries(itemUsage).sort((a,b) => b[1]-a[1])[0]?.[0];
+            const mostUsedItem = mostUsedId ? allPieces.find(i => i.id === mostUsedId) : null;
+            const totalValue = outfits.reduce((sum, o) => sum + (o.layers || o.itemIds || []).reduce((s, id) => { const it = allPieces.find(i => i.id === id); return s + (parseFloat((it?.price || "").replace(/[^0-9.]/g,""))||0); }, 0), 0);
+            return (
+              <div className="right-card">
+                <div className="right-card-title">Outfit Stats</div>
+                <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                  {[
+                    { lbl: "Total Outfits", val: outfits.length },
+                    { lbl: "Total Value", val: `$${totalValue.toFixed(0)}` },
+                  ].map(s => (
+                    <div key={s.lbl} style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                      <span style={{ fontSize: 12, color: "#999", fontWeight: 600 }}>{s.lbl}</span>
+                      <span style={{ fontSize: 15, fontWeight: 800, color: "#1a1a1a" }}>{s.val}</span>
+                    </div>
+                  ))}
+                  {mostUsedItem && (
+                    <div style={{ borderTop: "1px solid #f0ece4", paddingTop: 10 }}>
+                      <div style={{ fontSize: 10, fontWeight: 700, color: "#aaa", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 8 }}>Most Featured</div>
+                      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                        <div style={{ width: 36, height: 36, borderRadius: 8, overflow: "hidden", background: "#f5f3ef", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                          {mostUsedItem.image ? <img src={mostUsedItem.image} style={{ width: "100%", height: "100%", objectFit: "contain" }} alt="" /> : <HangerIcon size={14} color="#ccc" />}
+                        </div>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ fontSize: 12, fontWeight: 700, color: "#1a1a1a", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{mostUsedItem.name}</div>
+                          <div style={{ fontSize: 11, color: "#aaa" }}>{itemUsage[mostUsedId]}× outfits</div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            );
+          })()}
+
+          {tab === "closet" && (
+            <div className="right-card">
+              <div className="right-card-title">Season</div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+                {["All", ...SEASONS].map(s => (
+                  <button key={s} className={"sidebar-btn" + (closetSeasonFilter === s ? " active" : "")} onClick={() => setClosetSeasonFilter(s)}>{s}</button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Wardrobe stats card */}
+          {itemsDb.rows.length > 0 && (() => {
+            const items = itemsDb.rows;
+            const totalValue = items.reduce((s, i) => s + (parseFloat((i.price || "").replace(/[^0-9.]/g, "")) || 0), 0);
+            const avgValue = totalValue / items.length;
+            const neverWorn = items.filter(i => !(i.wornCount || 0)).length;
+            const mostWorn = [...items].filter(i => (i.wornCount||0) > 0).sort((a,b) => (b.wornCount||0)-(a.wornCount||0))[0];
+            return (
+              <div className="right-card">
+                <div className="right-card-title">Wardrobe Stats</div>
+                <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+                  {[
+                    { lbl: "Total Value", val: `$${totalValue.toFixed(0)}` },
+                    { lbl: "Avg. Item Value", val: `$${avgValue.toFixed(0)}` },
+                    { lbl: "Items Unworn", val: neverWorn, color: neverWorn > 0 ? "#e07e30" : "#3aaa6e" },
+                  ].map(s => (
+                    <div key={s.lbl} style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                      <span style={{ fontSize: 12, color: "#999", fontWeight: 600 }}>{s.lbl}</span>
+                      <span style={{ fontSize: 15, fontWeight: 800, color: s.color || "#1a1a1a" }}>{s.val}</span>
+                    </div>
+                  ))}
+                  {mostWorn && (
+                    <div style={{ borderTop: "1px solid #f0ece4", paddingTop: 12 }}>
+                      <div style={{ fontSize: 10, fontWeight: 700, color: "#aaa", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 8 }}>Most Worn</div>
+                      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                        <div style={{ width: 36, height: 36, borderRadius: 8, overflow: "hidden", background: mostWorn.image ? "transparent" : "#f5f3ef", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                          {mostWorn.image ? <img src={mostWorn.image} style={{ width: "100%", height: "100%", objectFit: "cover" }} alt="" /> : <HangerIcon size={14} color="#ccc" />}
+                        </div>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ fontSize: 12, fontWeight: 700, color: "#1a1a1a", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{mostWorn.name}</div>
+                          <div style={{ fontSize: 11, color: "#aaa" }}>{mostWorn.wornCount}x worn</div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            );
+          })()}
+
+          {/* Category breakdown */}
+          {itemsDb.rows.length > 0 && (() => {
+            const byCat = CATEGORIES.slice(1).map(cat => ({ cat, count: itemsDb.rows.filter(i => i.category === cat).length })).filter(c => c.count > 0);
+            const maxC = Math.max(...byCat.map(c => c.count), 1);
+            return (
+              <div className="right-card">
+                <div className="right-card-title">By Category</div>
+                <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                  {byCat.map(({ cat, count }) => (
+                    <div key={cat}>
+                      <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 3 }}>
+                        <span style={{ fontSize: 11, fontWeight: 600, color: "#666" }}>{cat}</span>
+                        <span style={{ fontSize: 11, color: "#aaa", fontWeight: 600 }}>{count}</span>
+                      </div>
+                      <div style={{ height: 5, background: "#f0ece4", borderRadius: 3, overflow: "hidden" }}>
+                        <div style={{ height: "100%", width: `${(count / maxC) * 100}%`, background: CAT_COLORS[cat] || "#ccc", borderRadius: 3 }} />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            );
+          })()}
+
+
+
+        </div>
       </div>
 
       {/* Modals */}
-      <Modal open={modal === "item"} onClose={closeModal} title={editItem ? "Edit piece" : "Add to closet"}>
-        <ItemForm initial={editItem || BLANK} onSave={f => saveItem(f, itemsDb)} onCancel={closeModal} />
-      </Modal>
-      <Modal open={modal === "wish"} onClose={closeModal} title={editItem ? "Edit wishlist item" : "Add to wishlist"}>
-        <ItemForm initial={editItem || BLANK} onSave={f => saveItem(f, wishlistDb)} onCancel={closeModal} />
+      <Modal open={modal === "item"} onClose={closeModal} title="">
+        <AddItemModal
+          initial={editItem || BLANK}
+          editMode={editItem ? "manual" : null}
+          onSave={saveItem}
+          onSaveWish={saveWishItem}
+          onCancel={closeModal}
+        />
       </Modal>
 
-      <Modal open={outfitModal} onClose={() => setOutfitModal(false)} title="Build an outfit">
-        <Input label="Outfit name" value={outfitName} onChange={e => setOutfitName(e.target.value)} placeholder="e.g. Casual Sunday" />
-        <div style={{ fontSize: 11, fontWeight: 700, color: "#aaa", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 12 }}>
-          Select pieces — {outfitSelected.length} selected
+      {/* Create Lookbook Modal */}
+      <Modal open={lookbookModal} onClose={() => setLookbookModal(false)} title="Create Lookbook">
+        <Input label="Lookbook Name *" value={newLbName} onChange={e => setNewLbName(e.target.value)} placeholder="e.g. Summer Vacation" />
+        <div style={{ marginBottom: 14 }}>
+          <label style={{ display: "block", fontSize: 11, fontWeight: 600, color: "#999", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 6 }}>Cover Image (optional)</label>
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            <label style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 14px", border: "1.5px dashed #e0dbd0", borderRadius: 12, cursor: "pointer", background: "#fafaf8" }}>
+              <span style={{ fontSize: 18 }}>📷</span>
+              <span style={{ fontSize: 13, color: "#888", fontWeight: 600 }}>{newLbCover ? "Change cover image" : "Upload cover image"}</span>
+              <input type="file" accept="image/*" style={{ display: "none" }} onChange={e => {
+                const file = e.target.files?.[0];
+                if (!file) return;
+                const reader = new FileReader();
+                reader.onload = ev => setNewLbCover(ev.target.result);
+                reader.readAsDataURL(file);
+              }} />
+            </label>
+            {newLbCover && (
+              <div style={{ position: "relative", borderRadius: 12, overflow: "hidden", height: 100 }}>
+                <img src={newLbCover} alt="cover preview" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                <button onClick={() => setNewLbCover("")} style={{ position: "absolute", top: 6, right: 6, width: 24, height: 24, borderRadius: "50%", background: "rgba(0,0,0,0.5)", border: "none", color: "#fff", cursor: "pointer", fontSize: 12, display: "flex", alignItems: "center", justifyContent: "center" }}>✕</button>
+              </div>
+            )}
+          </div>
         </div>
-        {itemsDb.rows.length === 0 ? (
-          <div style={{ color: "#ccc", fontSize: 14, textAlign: "center", padding: "20px 0" }}>Add pieces to your closet first</div>
-        ) : (
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(100px, 1fr))", gap: 10, marginBottom: 20 }}>
-            {itemsDb.rows.map(item => (
-              <ItemCard key={item.id} item={item} selectable
-                selected={outfitSelected.includes(item.id)}
-                onSelect={id => setOutfitSelected(s => s.includes(id) ? s.filter(x => x !== id) : [...s, id])} />
-            ))}
+        <div style={{ marginBottom: 14 }}>
+          <label style={{ display: "block", fontSize: 11, fontWeight: 600, color: "#999", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 6 }}>Notes</label>
+          <textarea style={{ ...inputStyle, resize: "vertical", minHeight: 70 }} value={newLbNotes} onChange={e => setNewLbNotes(e.target.value)} placeholder="Styling notes…" />
+        </div>
+        <div style={{ display: "flex", gap: 10, marginBottom: 14 }}>
+          <div style={{ flex: 1 }}>
+            <label style={{ display: "block", fontSize: 11, fontWeight: 600, color: "#999", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 6 }}>Start Date</label>
+            <input type="date" value={newLbDateStart} onChange={e => setNewLbDateStart(e.target.value)} style={inputStyle} />
+          </div>
+          <div style={{ flex: 1 }}>
+            <label style={{ display: "block", fontSize: 11, fontWeight: 600, color: "#999", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 6 }}>End Date</label>
+            <input type="date" value={newLbDateEnd} onChange={e => setNewLbDateEnd(e.target.value)} style={inputStyle} />
+          </div>
+        </div>
+        {outfitsDb.rows.length > 0 && (
+          <div style={{ marginBottom: 18 }}>
+            <label style={{ display: "block", fontSize: 11, fontWeight: 600, color: "#999", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 10 }}>Add Looks (optional)</label>
+            <div style={{ display: "flex", flexDirection: "column", gap: 6, maxHeight: 200, overflowY: "auto" }}>
+              {outfitsDb.rows.map(o => {
+                const sel = newLbSelected.includes(o.id);
+                return (
+                  <div key={o.id} onClick={() => setNewLbSelected(s => sel ? s.filter(x => x !== o.id) : [...s, o.id])} style={{
+                    display: "flex", alignItems: "center", gap: 10, padding: "10px 12px",
+                    borderRadius: 12, border: sel ? "1.5px solid #2d6a3f" : "1.5px solid #f0ece4",
+                    background: sel ? "#f0faf4" : "#fafaf8", cursor: "pointer"
+                  }}>
+                    <div style={{ width: 20, height: 20, borderRadius: "50%", border: "2px solid", borderColor: sel ? "#2d6a3f" : "#ccc", background: sel ? "#2d6a3f" : "transparent", display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontSize: 11, flexShrink: 0 }}>{sel ? "✓" : ""}</div>
+                    <div style={{ fontSize: 13, fontWeight: 700, color: "#1a1a1a" }}>{o.name}</div>
+                  </div>
+                );
+              })}
+            </div>
           </div>
         )}
         <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
-          <button onClick={() => setOutfitModal(false)} style={{ padding: "10px 18px", background: "none", border: "none", cursor: "pointer", color: "#aaa", fontFamily: "'Nunito', sans-serif", fontSize: 14, fontWeight: 600 }}>Cancel</button>
-          <button className="btn-primary" onClick={saveOutfit} style={{
-            padding: "10px 22px", background: "#1a1a1a", color: "#fff", border: "none",
-            borderRadius: 12, cursor: "pointer", fontFamily: "'Nunito', sans-serif", fontSize: 14, fontWeight: 700
-          }}>Save outfit</button>
+          <button onClick={() => setLookbookModal(false)} style={{ padding: "10px 18px", background: "none", border: "none", cursor: "pointer", color: "#aaa", fontFamily: "'Nunito', sans-serif", fontSize: 14, fontWeight: 600 }}>Cancel</button>
+          <button className="btn-primary" onClick={createLookbook} style={{ padding: "10px 22px", background: "#1a1a1a", color: "#fff", border: "none", borderRadius: 12, cursor: "pointer", fontFamily: "'Nunito', sans-serif", fontSize: 14, fontWeight: 700 }}>Create</button>
         </div>
       </Modal>
+
+      {/* Item Detail Popup */}
+      {itemDetail && (
+        <ItemDetailPopup
+          item={itemDetail}
+          onClose={() => setItemDetail(null)}
+          onEdit={() => { setEditItem(itemDetail); setModal("item"); setItemDetail(null); }}
+          onDelete={() => { itemsDb.remove(itemDetail.id); setItemDetail(null); }}
+          onWorn={() => markWorn(itemDetail)}
+          onCreateOutfit={() => { setEditingOutfit(null); setOutfitSeedItem(itemDetail); setOutfitBuilder(true); setItemDetail(null); }}
+          outfits={outfitsDb.rows}
+          lookbooks={lookbooksDb.rows}
+        />
+      )}
+
+      {/* Outfit Detail Popup */}
+      {outfitPopup && (
+        <OutfitDetailPopup
+          outfit={outfitPopup}
+          allItems={allItems}
+          lookbooks={lookbooksDb.rows}
+          onClose={() => setOutfitPopup(null)}
+          onEdit={() => { openEditOutfit(outfitPopup); setOutfitPopup(null); }}
+          onDelete={() => { outfitsDb.remove(outfitPopup.id); setOutfitPopup(null); }}
+          onMarkWorn={() => markOutfitWorn(outfitPopup)}
+          onDuplicate={() => { duplicateOutfit(outfitPopup); setOutfitPopup(null); }}
+          onAddToLookbook={addOutfitToLookbook}
+          onGoToLookbook={(lb) => { setOutfitPopup(null); setActiveLookbook(lb); }}
+          onItemClick={(item) => { setOutfitPopup(null); setItemDetail(item); }}
+        />
+      )}
+
+      {/* Outfit Builder */}
+      {outfitBuilder && (
+        <OutfitBuilder
+          itemsDb={itemsDb}
+          wishlistDb={wishlistDb}
+          initial={editingOutfit}
+          seedItem={outfitSeedItem}
+          onSave={saveOutfit}
+          onClose={() => { setOutfitBuilder(false); setEditingOutfit(null); setOutfitSeedItem(null); }}
+        />
+      )}
+
+      {/* Lookbook Viewer */}
+      {activeLookbook && (
+        <LookbookViewer
+          lookbook={activeLookbook}
+          outfits={outfitsDb.rows}
+          allItems={allItems}
+          onClose={() => setActiveLookbook(null)}
+          onUpdate={updateLookbook}
+        />
+      )}
     </div>
   );
 }

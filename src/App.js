@@ -31,6 +31,7 @@ const SvgShop     = ({size=14,color="currentColor"}) => <Ico size={size} color={
 const SvgCalendar = ({size=14,color="currentColor"}) => <Ico size={size} color={color}><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></Ico>;
 const SvgLuggage  = ({size=14,color="currentColor"}) => <Ico size={size} color={color}><rect x="4" y="7" width="16" height="14" rx="2"/><path d="M16 7V5a2 2 0 00-2-2h-4a2 2 0 00-2 2v2"/><line x1="12" y1="12" x2="12" y2="16"/><line x1="10" y1="14" x2="14" y2="14"/></Ico>;
 const SvgLock     = ({size=14,color="currentColor"}) => <Ico size={size} color={color}><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></Ico>;
+const SvgGear     = ({size=16,color="currentColor"}) => <Ico size={size} color={color}><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></Ico>;
 const SvgUnlock   = ({size=14,color="currentColor"}) => <Ico size={size} color={color}><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 019.9-1"/></Ico>;
 const SvgPushPin  = ({size=16,color="currentColor"}) => <Ico size={size} color={color}><line x1="12" y1="17" x2="12" y2="22"/><path d="M5 17h14"/><path d="M15 5h1a2 2 0 012 2v1a2 2 0 01-2 2H8a2 2 0 01-2-2V7a2 2 0 012-2h1"/><rect x="9" y="2" width="6" height="4" rx="1"/></Ico>;
 const SvgPalette  = ({size=16,color="currentColor"}) => <Ico size={size} color={color}><path d="M12 2a10 10 0 100 20 4 4 0 004-4c0-1.1-.9-2-2-2h-1a1 1 0 010-2h1a2 2 0 002-2 10 10 0 00-4-10z"/><circle cx="8.5" cy="9" r="1.5" fill={color} stroke="none"/><circle cx="12" cy="6" r="1.5" fill={color} stroke="none"/><circle cx="15.5" cy="9" r="1.5" fill={color} stroke="none"/></Ico>;
@@ -3359,8 +3360,10 @@ function MoodboardInfoPanel({ activeIdx, setActiveIdx }) {
   });
 
   // Poll localStorage for changes from Moodboard component
+  const suppressPoll = useRef(false);
   useEffect(() => {
     const interval = setInterval(() => {
+      if (suppressPoll.current) return;
       try {
         const parsed = JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]");
         setData(parsed);
@@ -3370,8 +3373,10 @@ function MoodboardInfoPanel({ activeIdx, setActiveIdx }) {
   }, []);
 
   const save = (updated) => {
+    suppressPoll.current = true;
     try { localStorage.setItem(STORAGE_KEY, JSON.stringify(updated)); } catch {}
     setData(updated);
+    setTimeout(() => { suppressPoll.current = false; }, 800);
   };
 
   const board = data[activeIdx] || null;
@@ -3433,9 +3438,9 @@ function MoodboardInfoPanel({ activeIdx, setActiveIdx }) {
       <div className="right-card-title">Color Palette</div>
 
       {/* Color swatches row */}
-      <div style={{ display: "flex", gap: 3, flexWrap: "wrap", marginBottom: 12 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 52px)", rowGap: 6, columnGap: 6, marginBottom: 12 }}>
         {palette.map((color, idx) => (
-          <div key={idx} style={{ position: "relative" }}>
+          <div key={idx} style={{ position: "relative", width: 52, height: 52, lineHeight: 0, flexShrink: 0 }}>
             <div
               onClick={() => setEditingColorIdx(editingColorIdx === idx ? null : idx)}
               style={{
@@ -3443,20 +3448,17 @@ function MoodboardInfoPanel({ activeIdx, setActiveIdx }) {
                 background: color,
                 border: editingColorIdx === idx ? "2px solid #1a1a1a" : "2px solid transparent",
                 boxShadow: "0 1px 4px rgba(0,0,0,0.12)",
-                cursor: "pointer", flexShrink: 0,
+                cursor: "pointer",
                 outline: "1.5px solid rgba(0,0,0,0.08)",
                 outlineOffset: 1,
               }}
             />
-            <button onClick={() => removeColor(idx)} style={{
-              position: "absolute", top: -6, right: -6,
+            <button onClick={() => removeColor(idx)} className="palette-del-btn" style={{
+              position: "absolute", top: 4, right: 4,
               width: 16, height: 16, borderRadius: "50%",
-              background: "#1a1a1a", border: "none", cursor: "pointer",
+              background: "rgba(0,0,0,0.55)", border: "none", cursor: "pointer",
               display: "flex", alignItems: "center", justifyContent: "center",
-              opacity: 0, transition: "opacity 0.15s",
-            }}
-              className="palette-del-btn"
-            style={{ top: -7, right: -7, width: 18, height: 18 }}>
+            }}>
               <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
             </button>
           </div>
@@ -3760,10 +3762,10 @@ function Moodboard({ closetItems = [], activeIdx, setActiveIdx }) {
       {/* Toolbar */}
       <div style={{ display: "flex", gap: 8, marginBottom: 10, flexWrap: "wrap", alignItems: "center" }}>
         <input ref={fileRef} type="file" accept="image/*" multiple style={{ display: "none" }} onChange={e => { importImages(e.target.files); e.target.value = ""; }} />
-        <button onClick={() => fileRef.current.click()} style={{ padding: "8px 16px", background: "#1a1a1a", color: "#fff", border: "none", borderRadius: 10, cursor: "pointer", fontFamily: "'DM Sans', sans-serif", fontSize: 12, fontWeight: 700 }}><SvgCamera size={13} color="#fff" style={{marginRight:6}} />Import Images</button>
-        <button onClick={addTextNote} style={{ padding: "8px 16px", background: "#fff9e6", border: "1.5px solid #f0e0a0", borderRadius: 10, cursor: "pointer", fontFamily: "'DM Sans', sans-serif", fontSize: 12, fontWeight: 700, color: "#7a6000" }}><SvgEdit size={13} color="#7a6000" style={{marginRight:6}} />Add Text</button>
-        <button onClick={() => setShowUrlImport(u => !u)} style={{ padding: "8px 14px", background: showUrlImport ? "#f0f4ff" : "#f5f3ef", border: showUrlImport ? "1.5px solid #a0b4f0" : "none", borderRadius: 10, cursor: "pointer", fontFamily: "'DM Sans', sans-serif", fontSize: 12, fontWeight: 700, color: showUrlImport ? "#3a5fe0" : "#666" }}><SvgLink size={13} color="currentColor" style={{marginRight:6}} />URL</button>
-        <button onClick={() => setShowClosetPicker(p => !p)} style={{ padding: "8px 14px", background: showClosetPicker ? "#f0faf4" : "#f5f3ef", border: showClosetPicker ? "1.5px solid #b6e8c8" : "none", borderRadius: 10, cursor: "pointer", fontFamily: "'DM Sans', sans-serif", fontSize: 12, fontWeight: 700, color: showClosetPicker ? "#2d6a3f" : "#666" }}><SvgHanger size={13} color="currentColor" style={{marginRight:6}} />From Closet</button>
+        <button onClick={() => fileRef.current.click()} style={{ padding: "8px 16px", background: "#1a1a1a", color: "#fff", border: "none", borderRadius: 10, cursor: "pointer", fontFamily: "'DM Sans', sans-serif", fontSize: 12, fontWeight: 700, display: "flex", alignItems: "center", gap: 8 }}><SvgCamera size={13} color="#fff" />Import Images</button>
+        <button onClick={addTextNote} style={{ padding: "8px 16px", background: "#fff9e6", border: "1.5px solid #f0e0a0", borderRadius: 10, cursor: "pointer", fontFamily: "'DM Sans', sans-serif", fontSize: 12, fontWeight: 700, color: "#7a6000", display: "flex", alignItems: "center", gap: 8 }}><SvgEdit size={13} color="#7a6000" />Add Text</button>
+        <button onClick={() => setShowUrlImport(u => !u)} style={{ padding: "8px 14px", background: showUrlImport ? "#f0f4ff" : "#f5f3ef", border: showUrlImport ? "1.5px solid #a0b4f0" : "none", borderRadius: 10, cursor: "pointer", fontFamily: "'DM Sans', sans-serif", fontSize: 12, fontWeight: 700, color: showUrlImport ? "#3a5fe0" : "#666", display: "flex", alignItems: "center", gap: 8 }}><SvgLink size={13} color="currentColor" />URL</button>
+        <button onClick={() => setShowClosetPicker(p => !p)} style={{ padding: "8px 14px", background: showClosetPicker ? "#f0faf4" : "#f5f3ef", border: showClosetPicker ? "1.5px solid #b6e8c8" : "none", borderRadius: 10, cursor: "pointer", fontFamily: "'DM Sans', sans-serif", fontSize: 12, fontWeight: 700, color: showClosetPicker ? "#2d6a3f" : "#666", display: "flex", alignItems: "center", gap: 8 }}><SvgHanger size={13} color="currentColor" />From Closet</button>
         {/* BG colors */}
         <div style={{ display: "flex", gap: 5, alignItems: "center", marginLeft: 4 }}>
           <span style={{ fontSize: 11, color: "#aaa", fontWeight: 600 }}>BG:</span>
@@ -3771,7 +3773,7 @@ function Moodboard({ closetItems = [], activeIdx, setActiveIdx }) {
             <div key={c} onClick={() => setBoardBg(c)} style={{ width: 20, height: 20, borderRadius: "50%", background: c, border: (board?.bg || "#fff") === c ? "2px solid #2d6a3f" : "1.5px solid #ddd", cursor: "pointer", flexShrink: 0 }} />
           ))}
         </div>
-        <button onClick={exportCanvas} style={{ padding: "8px 14px", background: "#f5f2ed", border: "none", borderRadius: 10, cursor: "pointer", fontFamily: "'DM Sans', sans-serif", fontSize: 12, fontWeight: 700, color: "#666", marginLeft: "auto" }}><SvgDownload size={13} color="#666" style={{marginRight:6}} />Export JPG</button>
+        <button onClick={exportCanvas} style={{ padding: "8px 14px", background: "#f5f2ed", border: "none", borderRadius: 10, cursor: "pointer", fontFamily: "'DM Sans', sans-serif", fontSize: 12, fontWeight: 700, color: "#666", marginLeft: "auto", display: "flex", alignItems: "center", gap: 8 }}><SvgDownload size={13} color="#666" />Export JPG</button>
       </div>
 
       {/* URL import bar */}
@@ -3946,6 +3948,184 @@ function Moodboard({ closetItems = [], activeIdx, setActiveIdx }) {
 }
 
 // ── Nav + App ────────────────────────────────────────────────────────────────
+
+// ─── THEMES ────────────────────────────────────────────────────────────────
+const THEMES = [
+  { id: "parchment", label: "Parchment", bg: "#f7f5f2", card: "#fff", nav: "#fff", navActive: "#1a1a1a", accent: "#1a1a1a", border: "#ece8e0", text: "#1a1a1a", sub: "#888" },
+  { id: "slate",     label: "Slate",     bg: "#1e2228", card: "#262b33", nav: "#1a1e25", navActive: "#5b8cf7", accent: "#5b8cf7", border: "#2e343e", text: "#e8ecf0", sub: "#7a8494" },
+  { id: "sage",      label: "Sage",      bg: "#f0f4f0", card: "#fff", nav: "#fff", navActive: "#3d6b4f", accent: "#3d6b4f", border: "#d4e4d8", text: "#1e3028", sub: "#6a9278" },
+  { id: "blush",     label: "Blush",     bg: "#fdf5f5", card: "#fff", nav: "#fff", navActive: "#b05070", accent: "#b05070", border: "#f0d8de", text: "#2a1218", sub: "#b08090" },
+  { id: "sand",      label: "Sand",      bg: "#f5f0e8", card: "#fdf9f3", nav: "#fdf9f3", navActive: "#8b6914", accent: "#8b6914", border: "#e0d4bc", text: "#2a2010", sub: "#9a8a6a" },
+  { id: "midnight",  label: "Midnight",  bg: "#0d0f14", card: "#161820", nav: "#12141a", navActive: "#c9a96e", accent: "#c9a96e", border: "#222530", text: "#e8e4d8", sub: "#6a6a7a" },
+];
+
+const THEME_KEY = "wardrobe_theme_v1";
+const getTheme = () => { try { const id = localStorage.getItem(THEME_KEY); return THEMES.find(t => t.id === id) || THEMES[0]; } catch { return THEMES[0]; } };
+
+function SettingsTab({ itemsDb, activeTheme, setActiveTheme }) {
+  const [themeId, setThemeId] = useState(() => { try { return localStorage.getItem(THEME_KEY) || "parchment"; } catch { return "parchment"; } });
+  const [wornItems, setWornItems] = useState(() => itemsDb.rows.filter(i => (i.wornCount || 0) > 0).sort((a,b) => (b.wornCount||0)-(a.wornCount||0)));
+  const [search, setSearch] = useState("");
+  const [editingId, setEditingId] = useState(null);
+  const [editVal, setEditVal] = useState("");
+  const [confirmReset, setConfirmReset] = useState(false);
+  const [saved, setSaved] = useState(null);
+
+  // Sync wornItems when itemsDb changes
+  useEffect(() => {
+    setWornItems(itemsDb.rows.filter(i => (i.wornCount || 0) >= 0).sort((a,b) => (b.wornCount||0)-(a.wornCount||0)));
+  }, [itemsDb.rows]);
+
+  const applyTheme = (id) => {
+    setThemeId(id);
+    try { localStorage.setItem(THEME_KEY, id); } catch {}
+    const t = THEMES.find(th => th.id === id) || THEMES[0];
+    if (setActiveTheme) setActiveTheme(t);
+  };
+
+  const saveWorn = (item, val) => {
+    const count = Math.max(0, parseInt(val) || 0);
+    itemsDb.update({ ...item, wornCount: count });
+    setEditingId(null);
+    setSaved(item.id);
+    setTimeout(() => setSaved(null), 1500);
+  };
+
+  const resetAllWorn = () => {
+    itemsDb.rows.forEach(item => { if ((item.wornCount||0) > 0) itemsDb.update({ ...item, wornCount: 0 }); });
+    setConfirmReset(false);
+    setSaved("all");
+    setTimeout(() => setSaved(null), 2000);
+  };
+
+  const filtered = wornItems.filter(i => !search || (i.name||"").toLowerCase().includes(search.toLowerCase()) || (i.brand||"").toLowerCase().includes(search.toLowerCase()));
+  const allItems = search ? itemsDb.rows.filter(i => (i.name||"").toLowerCase().includes(search.toLowerCase()) || (i.brand||"").toLowerCase().includes(search.toLowerCase())) : wornItems;
+
+  const labelStyle = { display: "block", fontSize: 10, fontWeight: 700, color: "#aaa", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 8 };
+  const cardStyle = { background: "#fff", borderRadius: 16, padding: "20px 22px", border: "1px solid #ece8e0", marginBottom: 16 };
+
+  return (
+    <div style={{ maxWidth: 700, margin: "0 auto", padding: "8px 0 40px" }}>
+
+      {/* ── COLOR THEME ── */}
+      <div style={cardStyle}>
+        <label style={labelStyle}>App Theme</label>
+        <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+          {THEMES.map(t => (
+            <button key={t.id} onClick={() => applyTheme(t.id)} style={{
+              display: "flex", flexDirection: "column", alignItems: "center", gap: 7,
+              background: "none", border: "none", cursor: "pointer", padding: 0,
+            }}>
+              {/* Mini app preview */}
+              <div style={{
+                width: 64, height: 64, borderRadius: 14, overflow: "hidden",
+                border: themeId === t.id ? "2.5px solid #1a1a1a" : "2px solid #e0dbd2",
+                boxShadow: themeId === t.id ? "0 4px 16px rgba(0,0,0,0.14)" : "0 1px 4px rgba(0,0,0,0.06)",
+                display: "flex", position: "relative",
+              }}>
+                {/* Nav strip */}
+                <div style={{ width: 14, background: t.nav, borderRight: `1px solid ${t.border}`, flexShrink: 0, display: "flex", flexDirection: "column", alignItems: "center", paddingTop: 8, gap: 5 }}>
+                  <div style={{ width: 8, height: 8, borderRadius: 3, background: t.navActive }} />
+                  {[1,2,3].map(x => <div key={x} style={{ width: 6, height: 4, borderRadius: 2, background: t.border }} />)}
+                </div>
+                {/* Content */}
+                <div style={{ flex: 1, background: t.bg, padding: "6px 5px", display: "flex", flexDirection: "column", gap: 4 }}>
+                  <div style={{ height: 6, borderRadius: 3, background: t.card, border: `1px solid ${t.border}` }} />
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 3 }}>
+                    {[1,2,3,4].map(x => <div key={x} style={{ height: 16, borderRadius: 4, background: t.card, border: `1px solid ${t.border}` }} />)}
+                  </div>
+                </div>
+              </div>
+              <span style={{
+                fontSize: 10, fontWeight: themeId === t.id ? 700 : 500,
+                color: themeId === t.id ? "#1a1a1a" : "#888",
+                fontFamily: "'DM Sans', sans-serif",
+              }}>{t.label}</span>
+            </button>
+          ))}
+        </div>
+        <div style={{ marginTop: 12, fontSize: 11, color: "#bbb" }}>Theme changes reload the app to apply styles.</div>
+      </div>
+
+      {/* ── WEAR COUNTS ── */}
+      <div style={cardStyle}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
+          <label style={{ ...labelStyle, marginBottom: 0 }}>Wear Counts</label>
+          <button onClick={() => setConfirmReset(true)} style={{
+            padding: "5px 12px", borderRadius: 20, border: "1px solid #ffd0d0",
+            background: "#fff8f8", color: "#e05555", fontSize: 11, fontWeight: 700,
+            cursor: "pointer", fontFamily: "'DM Sans', sans-serif", display: "flex", alignItems: "center", gap: 5,
+          }}>
+            <SvgArrowUp size={11} color="#e05555" />Reset All to 0
+          </button>
+        </div>
+
+        {/* Search */}
+        <div style={{ position: "relative", marginBottom: 14 }}>
+          <SvgSearch size={13} color="#bbb" style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)" }} />
+          <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search items…"
+            style={{ width: "100%", padding: "8px 12px 8px 34px", border: "1px solid #e0dbd2", borderRadius: 100, fontFamily: "'DM Sans', sans-serif", fontSize: 12, outline: "none", background: "#fafaf8", boxSizing: "border-box" }} />
+        </div>
+
+        {saved === "all" && <div style={{ background: "#f0faf4", border: "1px solid #b6e8c8", borderRadius: 10, padding: "8px 14px", marginBottom: 12, fontSize: 12, color: "#2d6a3f", fontWeight: 600 }}>✓ All wear counts reset to 0</div>}
+
+        <div style={{ display: "flex", flexDirection: "column", gap: 6, maxHeight: 420, overflowY: "auto" }}>
+          {(search ? itemsDb.rows.filter(i => (i.name||"").toLowerCase().includes(search.toLowerCase()) || (i.brand||"").toLowerCase().includes(search.toLowerCase())) : wornItems).map(item => (
+            <div key={item.id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "8px 10px", borderRadius: 12, background: saved === item.id ? "#f0faf4" : "#fafaf8", border: `1px solid ${saved === item.id ? "#b6e8c8" : "#ece8e0"}`, transition: "all 0.2s" }}>
+              {/* Thumbnail */}
+              <div style={{ width: 40, height: 40, borderRadius: 8, overflow: "hidden", background: "#f5f2ed", flexShrink: 0 }}>
+                {item.image ? <img src={item.image} alt="" style={{ width: "100%", height: "100%", objectFit: "contain" }} /> : <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center" }}><SvgHanger size={16} color="#ccc" /></div>}
+              </div>
+              {/* Name */}
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 13, fontWeight: 600, color: "#1a1a1a", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{item.name || "Unnamed"}</div>
+                <div style={{ fontSize: 11, color: "#aaa" }}>{item.brand || item.category || ""}</div>
+              </div>
+              {/* Wear count editor */}
+              {editingId === item.id ? (
+                <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                  <input type="number" min="0" value={editVal} onChange={e => setEditVal(e.target.value)}
+                    autoFocus onKeyDown={e => { if (e.key === "Enter") saveWorn(item, editVal); if (e.key === "Escape") setEditingId(null); }}
+                    style={{ width: 56, padding: "4px 8px", border: "1.5px solid #1a1a1a", borderRadius: 8, fontFamily: "'DM Sans', sans-serif", fontSize: 13, fontWeight: 700, textAlign: "center", outline: "none" }} />
+                  <button onClick={() => saveWorn(item, editVal)} style={{ padding: "4px 10px", borderRadius: 8, background: "#1a1a1a", border: "none", color: "#fff", fontSize: 11, fontWeight: 700, cursor: "pointer" }}>Save</button>
+                  <button onClick={() => setEditingId(null)} style={{ padding: "4px 8px", borderRadius: 8, background: "#f0f0f0", border: "none", color: "#888", fontSize: 11, cursor: "pointer" }}>✕</button>
+                </div>
+              ) : (
+                <button onClick={() => { setEditingId(item.id); setEditVal(String(item.wornCount || 0)); }} style={{
+                  display: "flex", alignItems: "center", gap: 6, padding: "5px 12px",
+                  borderRadius: 20, border: "1px solid #e0dbd2", background: "#fff",
+                  cursor: "pointer", fontFamily: "'DM Sans', sans-serif",
+                }}>
+                  <span style={{ fontSize: 14, fontWeight: 800, color: "#1a1a1a" }}>{item.wornCount || 0}</span>
+                  <span style={{ fontSize: 10, color: "#aaa", fontWeight: 600 }}>worn</span>
+                  <SvgEdit size={11} color="#bbb" />
+                </button>
+              )}
+            </div>
+          ))}
+          {(search ? itemsDb.rows.filter(i => (i.name||"").toLowerCase().includes(search.toLowerCase()) || (i.brand||"").toLowerCase().includes(search.toLowerCase())) : wornItems).length === 0 && (
+            <div style={{ textAlign: "center", color: "#ccc", fontSize: 12, padding: "20px 0" }}>{search ? "No items match your search" : "No items with wear counts yet"}</div>
+          )}
+        </div>
+      </div>
+
+      {/* Reset confirmation modal */}
+      {confirmReset && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 500 }}>
+          <div style={{ background: "#fff", borderRadius: 20, padding: "28px 32px", maxWidth: 360, width: "90%", textAlign: "center" }}>
+            <div style={{ fontSize: 16, fontWeight: 800, marginBottom: 8 }}>Reset all wear counts?</div>
+            <div style={{ fontSize: 13, color: "#888", marginBottom: 24, lineHeight: 1.5 }}>This will set every item's wear count back to 0. This cannot be undone.</div>
+            <div style={{ display: "flex", gap: 10 }}>
+              <button onClick={() => setConfirmReset(false)} style={{ flex: 1, padding: "10px", borderRadius: 12, border: "1px solid #e0dbd2", background: "#fafaf8", cursor: "pointer", fontWeight: 600, fontFamily: "'DM Sans', sans-serif" }}>Cancel</button>
+              <button onClick={resetAllWorn} style={{ flex: 1, padding: "10px", borderRadius: 12, border: "none", background: "#e05555", color: "#fff", cursor: "pointer", fontWeight: 700, fontFamily: "'DM Sans', sans-serif" }}>Reset All</button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 const NAV_ITEMS = [
   { id: "closet", label: "Closet" },
   { id: "outfits", label: "Outfits" },
@@ -3954,9 +4134,11 @@ const NAV_ITEMS = [
   { id: "moodboard", label: "Moodboard" },
   { id: "seller", label: "Seller" },
   { id: "wishlist", label: "Wishlist" },
+  { id: "settings", label: "Settings" },
 ];
 
 export default function App() {
+  const [activeTheme, setActiveTheme] = useState(() => getTheme());
   const itemsDb = useSupabaseTable("items");
   const wishlistDb = useSupabaseTable("wishlist");
   const outfitsDb = useSupabaseTable("outfits");
@@ -4132,6 +4314,7 @@ export default function App() {
     moodboard: (active) => <SvgPushPin size={18} color={active ? "#fff" : "#888"} />,
     seller: (active) => <SvgTag size={18} color={active ? "#fff" : "#888"} />,
     wishlist: (active) => <SvgHeart size={18} color={active ? "#fff" : "#888"} />,
+    settings: (active) => <SvgGear size={18} color={active ? "#fff" : "#888"} />,
   };
 
   const PAGE_TITLES = {
@@ -4142,15 +4325,16 @@ export default function App() {
     moodboard: ["Moodboard", "Inspire yourself"],
     seller: ["Seller Dashboard", "What's for sale"],
     wishlist: ["Wishlist", "Want it"],
+    settings: ["Settings", "Customize your wardrobe"],
   };
 
   return (
-    <div style={{ background: "#f7f5f2", minHeight: "100vh" }}>
+    <div style={{ background: activeTheme.bg, minHeight: "100vh", color: activeTheme.text }}>
       <style>{globalStyles}</style>
 
       {/* ── Vertical nav sidebar ── */}
-      <nav className="app-nav-sidebar">
-        <div className="app-nav-logo">
+      <nav className="app-nav-sidebar" style={{ background: activeTheme.nav, borderRightColor: activeTheme.border }}>
+        <div className="app-nav-logo" style={{ background: activeTheme.navActive }}>
           <span style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 22, fontWeight: 300, fontStyle: "italic", color: "#fff", lineHeight: 1 }}>W</span>
         </div>
         {NAV_ITEMS.map(n => {
@@ -4512,6 +4696,9 @@ className="pill-select" style={{}}>
             {/* MOODBOARD */}
             {tab === "moodboard" && <Moodboard closetItems={itemsDb.rows.filter(i => !i.forSale)} activeIdx={moodboardActiveIdx} setActiveIdx={setMoodboardActiveIdx} />}
 
+            {/* SETTINGS */}
+            {tab === "settings" && <SettingsTab itemsDb={itemsDb} activeTheme={activeTheme} setActiveTheme={setActiveTheme} />}
+
             {/* WISHLIST */}
             {tab === "wishlist" && <WishlistTab
               wishlistDb={wishlistDb}
@@ -4581,7 +4768,7 @@ className="pill-select" style={{}}>
           {/* Season filter moved to top toolbar for closet */}
 
           {/* Wardrobe stats card */}
-          {tab !== "wishlist" && tab !== "lookbooks" && tab !== "moodboard" && itemsDb.rows.length > 0 && (() => {
+          {tab !== "wishlist" && tab !== "lookbooks" && tab !== "moodboard" && tab !== "settings" && itemsDb.rows.length > 0 && (() => {
             const items = itemsDb.rows;
             const totalValue = items.reduce((s, i) => s + (parseFloat((i.price || "").replace(/[^0-9.]/g, "")) || 0), 0);
             const avgValue = totalValue / items.length;
@@ -4621,7 +4808,7 @@ className="pill-select" style={{}}>
           })()}
 
           {/* Category breakdown */}
-          {tab !== "wishlist" && tab !== "lookbooks" && tab !== "moodboard" && itemsDb.rows.length > 0 && (() => {
+          {tab !== "wishlist" && tab !== "lookbooks" && tab !== "moodboard" && tab !== "settings" && itemsDb.rows.length > 0 && (() => {
             const byCat = CATEGORIES.slice(1).map(cat => ({ cat, count: itemsDb.rows.filter(i => i.category === cat).length })).filter(c => c.count > 0);
             const maxC = Math.max(...byCat.map(c => c.count), 1);
             return (

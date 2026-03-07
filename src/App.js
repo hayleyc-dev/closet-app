@@ -148,36 +148,39 @@ const globalStyles = `
   /* ── Vertical nav sidebar ── */
   .app-shell { display: flex; min-height: 100vh; }
   .app-nav-sidebar {
-    width: 76px; flex-shrink: 0; background: #fff;
+    width: 120px; flex-shrink: 0; background: #fff;
     border-right: 1px solid #ece8e0;
-    display: flex; flex-direction: column; align-items: center;
-    padding: 22px 0 18px; position: fixed; top: 0; left: 0; height: 100vh; z-index: 100;
+    display: flex; flex-direction: column; align-items: stretch;
+    padding: 20px 0 16px; position: fixed; top: 0; left: 0; height: 100vh; z-index: 100;
   }
   .app-nav-logo {
     width: 36px; height: 36px; background: #1a1a1a; border-radius: 10px;
     display: flex; align-items: center; justify-content: center;
-    margin-bottom: 28px; flex-shrink: 0;
+    margin: 0 16px 24px; flex-shrink: 0;
   }
   .nav-icon-btn {
-    width: 100%; height: 52px; border-radius: 0; border: none; cursor: pointer;
+    width: 100%; min-height: 72px; border-radius: 0; border: none; cursor: pointer;
     display: flex; flex-direction: column; align-items: center; justify-content: center;
-    gap: 3px; transition: all 0.15s; background: transparent;
-    font-family: 'DM Sans', sans-serif; margin-bottom: 0; position: relative;
+    padding: 12px 8px; gap: 6px;
+    transition: background 0.12s; background: transparent;
+    font-family: 'DM Sans', sans-serif; position: relative;
   }
   .nav-icon-btn:hover { background: #f7f5f2; }
   .nav-icon-btn.active { background: #1a1a1a; }
-  .nav-icon-btn::after {
-    content: ''; position: absolute; left: -1px; top: 50%; transform: translateY(-50%);
-    width: 3px; height: 0; background: #1a1a1a; border-radius: 0 3px 3px 0;
-    transition: height 0.15s;
-  }
-  .nav-icon-btn.active::after { height: 0; }
-  .nav-icon-btn .nav-label { font-size: 9px; font-weight: 600; letter-spacing: 0.02em; color: #c0b8b0; text-transform: uppercase; line-height: 1; }
-  .nav-icon-btn.active .nav-label { color: rgba(255,255,255,0.6); }
+  .nav-icon-btn .nav-icon-wrap { width: 44px; height: 44px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+  .nav-icon-btn .nav-label { font-size: 11px; font-weight: 600; letter-spacing: 0.07em; color: #c5bdb3; text-transform: uppercase; line-height: 1; text-align: center; }
+  .nav-icon-btn.active .nav-label { color: rgba(255,255,255,0.5); }
+  .nav-icon-btn.active .nav-icon-wrap svg { opacity: 1; }
+  /* Density modes */
+  .density-compact .item-card { padding: 8px !important; }
+  .density-compact .app-main-area { padding: 20px 20px !important; }
+  .density-spacious .app-main-area { padding: 52px 48px !important; }
+  .density-compact .page-hero { margin-bottom: 16px !important; }
+  .density-spacious .page-hero { margin-bottom: 40px !important; }
   .nav-icon-btn-bottom { margin-top: auto; }
   .pill-select { padding: 7px 44px 7px 14px !important; border-radius: 100px; border: 1px solid #e0dbd2; font-family: 'DM Sans', sans-serif; font-size: 12px; font-weight: 600; background: #fff; color: #444; cursor: pointer; appearance: none; -webkit-appearance: none; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%23888' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 14px center; }
 
-  .app-body { margin-left: 76px; flex: 1; display: flex; min-height: 100vh; }
+  .app-body { margin-left: 120px; flex: 1; display: flex; min-height: 100vh; }
   .app-main-area { flex: 1; min-width: 0; padding: 36px 32px; }
   .app-right-rail { width: 272px; flex-shrink: 0; padding: 32px 18px 32px 0; position: sticky; top: 0; height: 100vh; overflow-y: auto; display: flex; flex-direction: column; gap: 12px; }
 
@@ -1977,7 +1980,7 @@ function OutfitDetailPopup({ outfit, allItems, allOutfits, lookbooks, onClose, o
 }
 
 // ── Lookbook Viewer ──────────────────────────────────────────────────────────
-function LookbookViewer({ lookbook, outfits, allItems, onClose, onUpdate, onOpenOutfit, markOutfitWorn }) {
+function LookbookViewer({ lookbook, outfits, allItems, closetItems, onClose, onUpdate, onOpenOutfit, markOutfitWorn }) {
   const LB_TAGS = ["Travel","Work Week","Event","Disney","Sport","Weekend","Vacation"];
   const [view, setView] = useState("editorial"); // "editorial" | "grid"
   const [idx, setIdx] = useState(0);
@@ -2001,6 +2004,21 @@ function LookbookViewer({ lookbook, outfits, allItems, onClose, onUpdate, onOpen
   const [wxLoading, setWxLoading] = useState(false);
   const [coverImage, setCoverImage] = useState(lookbook.coverImage || "");
   const [wornToast, setWornToast] = useState("");
+  // Moodboard
+  const MOODBOARD_KEY = "wardrobe_moodboards_v1";
+  const [linkedMoodboardIdx, setLinkedMoodboardIdx] = useState(() => {
+    const v = lookbook.linkedMoodboardIdx;
+    return v !== undefined ? v : null;
+  });
+  const [moodboardView, setMoodboardView] = useState(false); // show moodboard tab in main area
+  const [moodboards, setMoodboards] = useState(() => {
+    try { return JSON.parse(localStorage.getItem("wardrobe_moodboards_v1") || "[]"); } catch { return []; }
+  });
+  // Trip details
+  const [tripDetails, setTripDetails] = useState(lookbook.tripDetails || {
+    hotel: "", hotelAddress: "", confirmationNo: "", activities: [], flights: "", carRental: "", notes: ""
+  });
+  const [newActivity, setNewActivity] = useState("");
 
   const looks = lookIds.map(id => outfits.find(o => o.id === id)).filter(Boolean);
   const availableToAdd = outfits.filter(o => !lookIds.includes(o.id));
@@ -2028,8 +2046,14 @@ function LookbookViewer({ lookbook, outfits, allItems, onClose, onUpdate, onOpen
 
   const save = (overrides = {}) => onUpdate({
     ...lookbook, name: lbName, notes, outfitIds: lookIds, lookMeta,
-    tags: lbTags, city: lbCity, coverImage, ...overrides
+    tags: lbTags, city: lbCity, coverImage, linkedMoodboardIdx, tripDetails, ...overrides
   });
+
+  const saveTripDetails = (patch) => {
+    const next = { ...tripDetails, ...patch };
+    setTripDetails(next);
+    onUpdate({ ...lookbook, name: lbName, notes, outfitIds: lookIds, lookMeta, tags: lbTags, city: lbCity, coverImage, linkedMoodboardIdx, tripDetails: next });
+  };
 
   const removeLook = (outfitId) => {
     const next = lookIds.filter(id => id !== outfitId);
@@ -2221,13 +2245,13 @@ function LookbookViewer({ lookbook, outfits, allItems, onClose, onUpdate, onOpen
         <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
           {/* View toggle */}
           <div style={{ display: "flex", background: "#f0ece4", borderRadius: 10, padding: 3, gap: 2 }}>
-            {[{ id: "editorial", icon: "\u2016\u2016" }, { id: "grid", icon: "\u22EF" }].map(v => (
+            {[{ id: "editorial", label: "Looks" }, { id: "grid", label: "Grid" }, { id: "moodboard", label: "Moodboard" }].map(v => (
               <button key={v.id} onClick={() => setView(v.id)} style={{
-                ...btnBase, padding: "6px 12px", fontSize: 13, borderRadius: 8,
+                ...btnBase, padding: "6px 12px", fontSize: 12, borderRadius: 8,
                 background: view === v.id ? "#fff" : "transparent",
                 color: view === v.id ? "#1a1a1a" : "#aaa",
                 boxShadow: view === v.id ? "0 1px 4px rgba(0,0,0,0.1)" : "none"
-              }}>{v.icon}</button>
+              }}>{v.label}</button>
             ))}
           </div>
           <button onClick={handleShare} style={{ ...btnBase, padding: "7px 14px", background: "#f5f3ef", color: "#555", fontSize: 12 }}>
@@ -2337,6 +2361,36 @@ function LookbookViewer({ lookbook, outfits, allItems, onClose, onUpdate, onOpen
                     <button onClick={() => onOpenOutfit && onOpenOutfit(currentLook)} style={{ ...btnBase, padding: "6px 12px", background: "#f5f2ed", color: "#666", fontSize: 12, border: "none" }}>Details</button>
                     <button onClick={() => removeLook(currentLook.id)} style={{ ...btnBase, padding: "6px 12px", background: "#fef2f2", color: "#e05555", fontSize: 12, border: "none" }}>Remove</button>
                   </div>
+                </div>
+              )}
+            </div>
+
+          ) : view === "moodboard" ? (
+            /* ── MOODBOARD VIEW ── */
+            <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden", background: "#faf9f6" }}>
+              {/* Moodboard selector */}
+              <div style={{ padding: "12px 20px 10px", borderBottom: "1px solid #e8e4dc", display: "flex", alignItems: "center", gap: 10, background: "#fff", flexShrink: 0 }}>
+                <div style={{ fontSize: 13, fontWeight: 700, color: "#1a1a1a", flexShrink: 0 }}>Linked Moodboard</div>
+                <select value={linkedMoodboardIdx !== null ? linkedMoodboardIdx : ""} onChange={e => {
+                  const val = e.target.value === "" ? null : Number(e.target.value);
+                  setLinkedMoodboardIdx(val);
+                  onUpdate({ ...lookbook, name: lbName, notes, outfitIds: lookIds, lookMeta, tags: lbTags, city: lbCity, coverImage, linkedMoodboardIdx: val, tripDetails });
+                }} className="pill-select" style={{ flex: 1, maxWidth: 280, padding: "6px 32px 6px 10px", borderRadius: 10, fontSize: 12, outline: "none" }}>
+                  <option value="">No moodboard linked…</option>
+                  {moodboards.map((mb, i) => <option key={mb.id || i} value={i}>{mb.name || ("Board " + (i + 1))}</option>)}
+                </select>
+                {moodboards.length === 0 && <div style={{ fontSize: 12, color: "#bbb" }}>Create moodboards in the Moodboard tab first</div>}
+              </div>
+              {/* Moodboard canvas — embedded editable */}
+              {linkedMoodboardIdx !== null && moodboards[linkedMoodboardIdx] ? (
+                <div style={{ flex: 1, overflow: "hidden", position: "relative" }}>
+                  <Moodboard closetItems={closetItems || []} activeIdx={linkedMoodboardIdx} setActiveIdx={setLinkedMoodboardIdx} />
+                </div>
+              ) : (
+                <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", color: "#ccc", gap: 10 }}>
+                  <SvgPushPin size={36} color="#ddd" />
+                  <div style={{ fontSize: 14, fontWeight: 700 }}>No moodboard linked yet</div>
+                  <div style={{ fontSize: 12, color: "#ccc" }}>Select a moodboard above to view and edit it here</div>
                 </div>
               )}
             </div>
@@ -2552,6 +2606,71 @@ function LookbookViewer({ lookbook, outfits, allItems, onClose, onUpdate, onOpen
               })}
             </div>
           </div>
+
+          {/* ── TRIP DETAILS ── */}
+          <div>
+            <div style={{ fontSize: 11, fontWeight: 700, color: "#aaa", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 10 }}>Trip Details</div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+              {/* Hotel */}
+              <div>
+                <div style={{ fontSize: 10, fontWeight: 700, color: "#bbb", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 4 }}>Hotel</div>
+                <input value={tripDetails.hotel || ""} onChange={e => setTripDetails(d => ({ ...d, hotel: e.target.value }))} onBlur={() => saveTripDetails({})}
+                  placeholder="Hotel name…"
+                  style={{ width: "100%", padding: "7px 10px", border: "1.5px solid #e8e4dc", borderRadius: 10, fontFamily: "'DM Sans', sans-serif", fontSize: 12, outline: "none", boxSizing: "border-box", marginBottom: 4 }} />
+                <input value={tripDetails.hotelAddress || ""} onChange={e => setTripDetails(d => ({ ...d, hotelAddress: e.target.value }))} onBlur={() => saveTripDetails({})}
+                  placeholder="Address…"
+                  style={{ width: "100%", padding: "7px 10px", border: "1.5px solid #e8e4dc", borderRadius: 10, fontFamily: "'DM Sans', sans-serif", fontSize: 12, outline: "none", boxSizing: "border-box", marginBottom: 4 }} />
+                <input value={tripDetails.confirmationNo || ""} onChange={e => setTripDetails(d => ({ ...d, confirmationNo: e.target.value }))} onBlur={() => saveTripDetails({})}
+                  placeholder="Confirmation #…"
+                  style={{ width: "100%", padding: "7px 10px", border: "1.5px solid #e8e4dc", borderRadius: 10, fontFamily: "'DM Sans', sans-serif", fontSize: 12, outline: "none", boxSizing: "border-box" }} />
+              </div>
+              {/* Flights */}
+              <div>
+                <div style={{ fontSize: 10, fontWeight: 700, color: "#bbb", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 4 }}>Flights</div>
+                <textarea value={tripDetails.flights || ""} onChange={e => setTripDetails(d => ({ ...d, flights: e.target.value }))} onBlur={() => saveTripDetails({})}
+                  placeholder="Flight numbers, times…"
+                  style={{ width: "100%", padding: "7px 10px", border: "1.5px solid #e8e4dc", borderRadius: 10, fontFamily: "'DM Sans', sans-serif", fontSize: 12, outline: "none", resize: "vertical", minHeight: 56, boxSizing: "border-box" }} />
+              </div>
+              {/* Car rental */}
+              <div>
+                <div style={{ fontSize: 10, fontWeight: 700, color: "#bbb", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 4 }}>Car Rental</div>
+                <input value={tripDetails.carRental || ""} onChange={e => setTripDetails(d => ({ ...d, carRental: e.target.value }))} onBlur={() => saveTripDetails({})}
+                  placeholder="Rental info…"
+                  style={{ width: "100%", padding: "7px 10px", border: "1.5px solid #e8e4dc", borderRadius: 10, fontFamily: "'DM Sans', sans-serif", fontSize: 12, outline: "none", boxSizing: "border-box" }} />
+              </div>
+              {/* Activities */}
+              <div>
+                <div style={{ fontSize: 10, fontWeight: 700, color: "#bbb", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 4 }}>Activities</div>
+                <div style={{ display: "flex", flexDirection: "column", gap: 4, marginBottom: 6 }}>
+                  {(tripDetails.activities || []).map((act, i) => (
+                    <div key={i} style={{ display: "flex", alignItems: "center", gap: 6, padding: "6px 10px", background: "#faf9f6", borderRadius: 8, border: "1px solid #e8e4dc" }}>
+                      <span style={{ flex: 1, fontSize: 12, color: "#444", fontWeight: 600 }}>{act}</span>
+                      <button onClick={() => { const next = (tripDetails.activities || []).filter((_, j) => j !== i); saveTripDetails({ activities: next }); }}
+                        style={{ background: "none", border: "none", cursor: "pointer", color: "#ccc", fontSize: 14, lineHeight: 1, padding: "0 2px", flexShrink: 0 }}
+                        onMouseEnter={e => e.currentTarget.style.color = "#e05555"}
+                        onMouseLeave={e => e.currentTarget.style.color = "#ccc"}>×</button>
+                    </div>
+                  ))}
+                </div>
+                <div style={{ display: "flex", gap: 6 }}>
+                  <input value={newActivity} onChange={e => setNewActivity(e.target.value)}
+                    onKeyDown={e => { if (e.key === "Enter" && newActivity.trim()) { saveTripDetails({ activities: [...(tripDetails.activities || []), newActivity.trim()] }); setNewActivity(""); } }}
+                    placeholder="Add activity…"
+                    style={{ flex: 1, padding: "6px 10px", border: "1.5px solid #e8e4dc", borderRadius: 10, fontFamily: "'DM Sans', sans-serif", fontSize: 12, outline: "none" }} />
+                  <button onClick={() => { if (newActivity.trim()) { saveTripDetails({ activities: [...(tripDetails.activities || []), newActivity.trim()] }); setNewActivity(""); } }}
+                    style={{ padding: "6px 10px", background: "#1a1a1a", color: "#fff", border: "none", borderRadius: 10, cursor: "pointer", fontSize: 13, fontWeight: 700, fontFamily: "'DM Sans', sans-serif", flexShrink: 0 }}>+</button>
+                </div>
+              </div>
+              {/* Extra notes */}
+              <div>
+                <div style={{ fontSize: 10, fontWeight: 700, color: "#bbb", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 4 }}>Other Notes</div>
+                <textarea value={tripDetails.notes || ""} onChange={e => setTripDetails(d => ({ ...d, notes: e.target.value }))} onBlur={() => saveTripDetails({})}
+                  placeholder="Reservations, dress codes, reminders…"
+                  style={{ width: "100%", padding: "7px 10px", border: "1.5px solid #e8e4dc", borderRadius: 10, fontFamily: "'DM Sans', sans-serif", fontSize: 12, outline: "none", resize: "vertical", minHeight: 64, boxSizing: "border-box" }} />
+              </div>
+            </div>
+          </div>
+
         </div>
       </div>
     </div>
@@ -3262,411 +3381,632 @@ function OutfitBuilder({ itemsDb, wishlistDb, onSave, onClose, initial, seedItem
 
 
 // ── Stats Tab ─────────────────────────────────────────────────────────────────
-function StatsTab({ itemsDb, outfitsDb, lookbooksDb, onViewItem }) {
+function StatsTab({ itemsDb, outfitsDb, lookbooksDb, wishlistDb, outfitCalendar, onViewItem }) {
   const items = itemsDb.rows.filter(i => !i.forSale);
+  const outfits = outfitsDb.rows || [];
+  const wishItems = (wishlistDb && wishlistDb.rows) || [];
   const now = new Date();
   const thisMonth = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,"0")}`;
-  const [statsView, setStatsView] = useState("profile"); // "profile" | "insights"
+  const [statsView, setStatsView] = useState("profile");
 
-  // Rewear suggestions
-  const unworn = items.filter(i => !(i.wornCount > 0)).slice(0, 20);
-  const rewear = items.filter(i => (i.wornCount || 0) > 0).sort((a,b) => (a.wornCount||0)-(b.wornCount||0)).slice(0, 12);
+  // ── helpers ──
+  const parsePrice = (p) => parseFloat((p||"").replace(/[^0-9.]/g,"")) || 0;
 
-  // Monthly recap
-  const addedThisMonth = items.filter(i => (i.purchaseDate || "").startsWith(thisMonth));
-  const totalSpentThisMonth = addedThisMonth.reduce((s,i) => s + (parseFloat((i.price||"").replace(/[^0-9.]/g,""))||0), 0);
+  // ── shared data ──
+  const totalValue = items.reduce((s,i) => s + parsePrice(i.price), 0);
+  const totalWears = items.reduce((s,i) => s + (i.wornCount||0), 0);
+  const unworn = items.filter(i => !(i.wornCount > 0));
+  const mostWorn = [...items].sort((a,b)=>(b.wornCount||0)-(a.wornCount||0)).slice(0,6);
+  const now2 = new Date();
 
-  // Color palette
-  const colorCounts = {};
-  items.forEach(i => {
-    const c = i.color || (i.colors && i.colors[0]);
-    if (c) colorCounts[c] = (colorCounts[c] || 0) + 1;
-  });
-  const colorEntries = Object.entries(colorCounts).sort((a,b) => b[1]-a[1]);
+  const COLOR_HEX = { Black:"#1a1a1a", White:"#f5f5f5", Grey:"#9a9a9a", Blue:"#4a7fd4", Navy:"#1e3a6e", Brown:"#7a5c3e", Tan:"#c4a882", Cream:"#f5eed8", Red:"#e05555", Pink:"#f0a0b0", Orange:"#e07e30", Yellow:"#f0c840", Green:"#4aaa6e", Purple:"#9a6fe0", Gold:"#d4a820", Silver:"#c0c0c0", Clear:"#e8f4ff" };
+  const SEASON_COLORS = { Spring:"#e8f5ee", Summer:"#fff8ee", Fall:"#fff2e8", Winter:"#eef0ff", "All Season":"#f5f3ef", Holiday:"#fff0f5", Disney:"#fff0fb" };
+  const SEASON_TEXT = { Spring:"#3aaa6e", Summer:"#a07000", Fall:"#c06020", Winter:"#4a5fe0", "All Season":"#888", Holiday:"#e05588", Disney:"#d040b0" };
+  const OCCASION_COLORS_LOCAL = { WFH:{bg:"#f0f4ff",color:"#3a5fe0"}, Disney:{bg:"#fff0fb",color:"#d040b0"}, Universal:{bg:"#fff4ee",color:"#e07030"}, "Date Night":{bg:"#fff0f5",color:"#e05588"}, Travel:{bg:"#f0faff",color:"#2090c0"}, Sport:{bg:"#f0fff4",color:"#2aaa5e"}, Weekend:{bg:"#faf5ee",color:"#a07030"}, Occasion:{bg:"#f8f0ff",color:"#8040d0"} };
 
-  // Duplicate detection: same category + similar name (first word match)
-  const duplicates = [];
-  const seen = {};
-  items.forEach(item => {
-    const key = `${item.category || ""}|${(item.name || "").split(" ")[0].toLowerCase()}`;
-    if (!seen[key]) seen[key] = [];
-    seen[key].push(item);
-  });
-  Object.values(seen).filter(g => g.length > 1).forEach(g => duplicates.push(g));
+  const topColors = (() => { const c={}; items.forEach(i=>{const col=i.color||(i.colors&&i.colors[0]); if(col)c[col]=(c[col]||0)+1;}); return Object.entries(c).sort((a,b)=>b[1]-a[1]).slice(0,8); })();
+  const topCategories = (() => { const c={}; items.forEach(i=>{if(i.category&&i.category!=="All")c[i.category]=(c[i.category]||0)+1;}); return Object.entries(c).sort((a,b)=>b[1]-a[1]); })();
+  const topBrands = (() => { const c={}; items.forEach(i=>{if(i.brand)c[i.brand]=(c[i.brand]||0)+1;}); return Object.entries(c).sort((a,b)=>b[1]-a[1]).slice(0,8); })();
+  const topSeasons = (() => { const c={}; items.forEach(i=>(i.seasons||[i.season]).filter(Boolean).forEach(s=>{c[s]=(c[s]||0)+1;})); return Object.entries(c).sort((a,b)=>b[1]-a[1]); })();
+  const topOccasions = (() => { const c={}; items.forEach(i=>(i.occasions||[i.occasion]).filter(Boolean).forEach(o=>{c[o]=(c[o]||0)+1;})); return Object.entries(c).sort((a,b)=>b[1]-a[1]); })();
 
-  // Monthly spend chart data (last 6 months)
+  // ── Style archetype ──
+  const ARCHETYPES = {
+    "WFH": { label: "The Professional", desc: "Your wardrobe leans work-ready — polished, functional, and put-together.", palette: ["#1a1a1a","#4a7fd4","#f5f5f5","#c4a882"] },
+    "Date Night": { label: "The Romantic", desc: "You dress with intention. Your closet is built for moments that matter.", palette: ["#f0a0b0","#e05588","#1a1a1a","#f5eed8"] },
+    "Weekend": { label: "The Casual Cool", desc: "Effortlessly stylish — your wardrobe is made for living life at ease.", palette: ["#c4a882","#7a5c3e","#f5f5f5","#4aaa6e"] },
+    "Sport": { label: "The Athlete", desc: "Performance meets style. You keep it active and functional.", palette: ["#4aaa6e","#1a1a1a","#4a7fd4","#f5f5f5"] },
+    "Disney": { label: "The Dreamer", desc: "Bold, fun, and full of personality — you dress for the magic.", palette: ["#d040b0","#f0c840","#4a7fd4","#e05555"] },
+    "Travel": { label: "The Adventurer", desc: "Versatile and ready for anything. Your wardrobe goes where you go.", palette: ["#2090c0","#c4a882","#4aaa6e","#1a1a1a"] },
+    "Occasion": { label: "The Elegante", desc: "You always dress for the occasion — polished and event-ready.", palette: ["#9a6fe0","#d4a820","#1a1a1a","#f5f5f5"] },
+    "Universal": { label: "The Trendsetter", desc: "Pop culture meets personal style. You always stand out.", palette: ["#e07e30","#4a7fd4","#e05555","#1a1a1a"] },
+  };
+  const archetype = topOccasions[0] ? (ARCHETYPES[topOccasions[0][0]] || { label: "The Individualist", desc: "Your style defies categories — uniquely and completely you.", palette: ["#1a1a1a","#9a9a9a","#c4a882","#f5f5f5"] }) : null;
+
+  // ── Cost per wear ──
+  const cpwItems = items
+    .filter(i => parsePrice(i.price) > 0 && (i.wornCount||0) > 0)
+    .map(i => ({ ...i, cpw: parsePrice(i.price) / (i.wornCount||1) }))
+    .sort((a,b) => a.cpw - b.cpw);
+  const worstCpw = items
+    .filter(i => parsePrice(i.price) > 0)
+    .map(i => ({ ...i, cpw: parsePrice(i.price) / Math.max(i.wornCount||0, 1) }))
+    .sort((a,b) => b.cpw - a.cpw)
+    .slice(0, 5);
+
+  // ── Outfit formula ──
+  const outfitFormula = (() => {
+    const pairCounts = {};
+    outfits.forEach(o => {
+      const pieces = o.items || o.pieces || [];
+      const cats = [...new Set(pieces.map(p => {
+        const item = items.find(i => i.id === (p.itemId||p.id||p));
+        return item?.category;
+      }).filter(Boolean))];
+      for (let a = 0; a < cats.length; a++) {
+        for (let b = a+1; b < cats.length; b++) {
+          const key = [cats[a],cats[b]].sort().join(" + ");
+          pairCounts[key] = (pairCounts[key]||0) + 1;
+        }
+      }
+    });
+    return Object.entries(pairCounts).sort((a,b)=>b[1]-a[1]).slice(0,5);
+  })();
+
+  // ── Wardrobe gaps ──
+  const ALL_CATS = ["Tops","Bottoms","Dresses","Outerwear","Shoes","Bags","Accessories","Activewear","Swimwear"];
+  const catCounts = {};
+  items.forEach(i => { if(i.category) catCounts[i.category] = (catCounts[i.category]||0)+1; });
+  const gaps = ALL_CATS.filter(c => !catCounts[c] || catCounts[c] < 2).map(c => ({ cat: c, count: catCounts[c]||0 }));
+
+  // ── Wear frequency (calendar heatmap — last 12 weeks) ──
+  const calData = (() => {
+    const cal = outfitCalendar || {};
+    const days = [];
+    for (let i = 83; i >= 0; i--) {
+      const d = new Date(now); d.setDate(d.getDate() - i);
+      const key = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
+      const count = (cal[key]||[]).length;
+      days.push({ key, date: d, count, month: d.getMonth(), day: d.getDay() });
+    }
+    return days;
+  })();
+  const maxCalCount = Math.max(...calData.map(d=>d.count), 1);
+
+  // ── Monthly spend ──
   const monthlyData = [];
   for (let m = 5; m >= 0; m--) {
     const d = new Date(now.getFullYear(), now.getMonth() - m, 1);
     const key = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}`;
     const label = d.toLocaleDateString("en-US", { month: "short" });
-    const spent = items.filter(i => (i.purchaseDate||"").startsWith(key))
-      .reduce((s,i) => s + (parseFloat((i.price||"").replace(/[^0-9.]/g,""))||0), 0);
+    const spent = items.filter(i => (i.purchaseDate||"").startsWith(key)).reduce((s,i) => s+parsePrice(i.price), 0);
     const added = items.filter(i => (i.purchaseDate||"").startsWith(key)).length;
     monthlyData.push({ key, label, spent, added });
   }
   const maxSpent = Math.max(...monthlyData.map(m => m.spent), 1);
 
-  // ── Style Profile data ──
-  const COLOR_HEX = { Black:"#1a1a1a", White:"#f5f5f5", Grey:"#9a9a9a", Blue:"#4a7fd4", Navy:"#1e3a6e", Brown:"#7a5c3e", Tan:"#c4a882", Cream:"#f5eed8", Red:"#e05555", Pink:"#f0a0b0", Orange:"#e07e30", Yellow:"#f0c840", Green:"#4aaa6e", Purple:"#9a6fe0", Gold:"#d4a820", Silver:"#c0c0c0", Clear:"#e8f4ff" };
+  // ── Wishlist vs closet overlap ──
+  const wishlistOverlap = wishItems.filter(wi => {
+    const wCat = wi.category || "";
+    const wName = (wi.name||"").toLowerCase().split(" ")[0];
+    return items.some(ci => ci.category === wCat && (ci.name||"").toLowerCase().includes(wName));
+  });
+  const wishlistTotalValue = wishItems.reduce((s,i) => s+parsePrice(i.price), 0);
 
-  const topColors = (() => {
-    const counts = {};
-    items.forEach(i => { const c = i.color || (i.colors&&i.colors[0]); if (c) counts[c] = (counts[c]||0) + 1; });
-    return Object.entries(counts).sort((a,b)=>b[1]-a[1]).slice(0,6);
+  // ── Closet health score ──
+  const healthScore = (() => {
+    if (items.length === 0) return 0;
+    const wearScore = Math.min((totalWears / items.length) * 20, 40); // max 40
+    const gapScore = Math.max(0, 30 - gaps.filter(g=>g.count===0).length * 5); // max 30
+    const cpwScore = cpwItems.length > 0 ? Math.min(cpwItems.length / items.length * 60, 30) : 0; // max 30
+    return Math.round(wearScore + gapScore + cpwScore);
   })();
 
-  const topCategories = (() => {
-    const counts = {};
-    items.forEach(i => { if (i.category && i.category !== "All") counts[i.category] = (counts[i.category]||0) + 1; });
-    return Object.entries(counts).sort((a,b)=>b[1]-a[1]).slice(0,5);
-  })();
+  const healthLabel = healthScore >= 80 ? ["Thriving","#3aaa6e"] : healthScore >= 60 ? ["Healthy","#2090c0"] : healthScore >= 40 ? ["Growing","#a07000"] : ["Needs Love","#e05555"];
 
-  const topBrands = (() => {
-    const counts = {};
-    items.forEach(i => { if (i.brand) counts[i.brand] = (counts[i.brand]||0) + 1; });
-    return Object.entries(counts).sort((a,b)=>b[1]-a[1]).slice(0,5);
-  })();
+  // ── UI helpers ──
+  const SI = ({ d }) => <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight:6, verticalAlign:"middle", display:"inline-block", flexShrink:0 }}>{d}</svg>;
 
-  const topSeasons = (() => {
-    const counts = {};
-    items.forEach(i => (i.seasons||[i.season]).filter(Boolean).forEach(s => { counts[s] = (counts[s]||0)+1; }));
-    return Object.entries(counts).sort((a,b)=>b[1]-a[1]);
-  })();
-
-  const topOccasions = (() => {
-    const counts = {};
-    items.forEach(i => (i.occasions||[i.occasion]).filter(Boolean).forEach(o => { counts[o] = (counts[o]||0)+1; }));
-    return Object.entries(counts).sort((a,b)=>b[1]-a[1]).slice(0,5);
-  })();
-
-  const totalValue = items.reduce((s,i) => s + (parseFloat((i.price||"").replace(/[^0-9.]/g,""))||0), 0);
-  const totalWears = items.reduce((s,i) => s + (i.wornCount||0), 0);
-  const mostWorn = [...items].sort((a,b)=>(b.wornCount||0)-(a.wornCount||0)).slice(0,5);
-  const mostValuable = [...items].sort((a,b)=>(parseFloat((b.price||"").replace(/[^0-9.]/g,""))||0)-(parseFloat((a.price||"").replace(/[^0-9.]/g,""))||0)).slice(0,3);
-
-  // Style archetype based on top occasion
-  const ARCHETYPES = {
-    "WFH": { label: "The Professional", desc: "Your wardrobe leans work-ready — polished, functional, and put-together." },
-    "Date Night": { label: "The Romantic", desc: "You dress with intention. Your closet is built for moments that matter." },
-    "Weekend": { label: "The Casual Cool", desc: "Effortlessly stylish — your wardrobe is made for living life at ease." },
-    "Sport": { label: "The Athlete", desc: "Performance meets style. You keep it active and functional." },
-    "Disney": { label: "The Dreamer", desc: "Bold, fun, and full of personality — you dress for the magic." },
-    "Travel": { label: "The Adventurer", desc: "Versatile and ready for anything. Your wardrobe goes where you go." },
-    "Occasion": { label: "The Elegante", desc: "You always dress for the occasion — polished and event-ready." },
-    "Universal": { label: "The Trendsetter", desc: "Pop culture meets personal style. You always stand out." },
-  };
-  const archetype = topOccasions[0] ? (ARCHETYPES[topOccasions[0][0]] || { label: "The Individualist", desc: "Your style defies categories — uniquely and completely you." }) : null;
-
-  const SEASON_COLORS = { Spring:"#e8f5ee", Summer:"#fff8ee", Fall:"#fff2e8", Winter:"#eef0ff", "All Season":"#f5f3ef", Holiday:"#fff0f5", Disney:"#fff0fb" };
-  const SEASON_TEXT = { Spring:"#3aaa6e", Summer:"#a07000", Fall:"#c06020", Winter:"#4a5fe0", "All Season":"#888", Holiday:"#e05588", Disney:"#d040b0" };
-  const CAT_ICONS = {}; // emoji removed
-
-  const maxCat = topCategories[0]?.[1] || 1;
-  const maxBrand = topBrands[0]?.[1] || 1;
-
-  const SI = ({ d }) => (
-    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: 6, verticalAlign: "middle", display: "inline-block", flexShrink: 0 }}>{d}</svg>
+  const Card = ({ children, style={} }) => (
+    <div style={{ background:"#fff", borderRadius:20, border:"1.5px solid #e8e4dc", padding:"20px 22px", ...style }}>{children}</div>
   );
-  const IC = {
-    palette: <SI d={<><circle cx="12" cy="12" r="10"/><circle cx="8" cy="9" r="1.5" fill="currentColor" stroke="none"/><circle cx="15" cy="9" r="1.5" fill="currentColor" stroke="none"/><circle cx="12" cy="15" r="1.5" fill="currentColor" stroke="none"/></>} />,
-    grid:    <SI d={<><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></>} />,
-    tag:     <SI d={<><path d="M20.59 13.41l-7.17 7.17a2 2 0 01-2.83 0L2 12V2h10l8.59 8.59a2 2 0 010 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></>} />,
-    sun:     <SI d={<><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></>} />,
-    star:    <SI d={<><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></>} />,
-    diamond: <SI d={<><path d="M6 3h12l4 6-10 13L2 9z"/><path d="M11 3L8 9l4 13 4-13-3-6"/><path d="M2 9h20"/></>} />,
-    recycle: <SI d={<><polyline points="1 4 1 10 7 10"/><polyline points="23 20 23 14 17 14"/><path d="M20.49 9A9 9 0 0 0 5.64 5.64L1 10m22 4l-4.64 4.36A9 9 0 0 1 3.51 15"/></>} />,
-    users:   <SI d={<><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></>} />,
-  };
-
-  const SECTION = ({ title, children }) => (
-    <div style={{ background: "#fff", borderRadius: 20, border: "1.5px solid #e8e4dc", padding: "20px 22px", marginBottom: 18 }}>
-      <div style={{ fontSize: 14, fontWeight: 800, color: "#1a1a1a", marginBottom: 16, letterSpacing: "-0.01em" }}>{title}</div>
-      {children}
+  const CardTitle = ({ icon, children }) => (
+    <div style={{ fontSize:13, fontWeight:800, color:"#1a1a1a", marginBottom:14, display:"flex", alignItems:"center", gap:6 }}>{icon}{children}</div>
+  );
+  const ItemRow = ({ item, sub, onClick }) => (
+    <div onClick={onClick} style={{ display:"flex", alignItems:"center", gap:10, cursor:"pointer", padding:"6px 0", borderBottom:"1px solid #f5f3ef" }}
+      onMouseEnter={e=>e.currentTarget.style.background="#faf9f6"}
+      onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
+      <div style={{ width:38, height:38, borderRadius:10, overflow:"hidden", background:"#f5f3ef", flexShrink:0, display:"flex", alignItems:"center", justifyContent:"center" }}>
+        {item.image ? <img src={item.image} alt="" style={{ width:"100%", height:"100%", objectFit:"contain" }} /> : <HangerIcon size={14} color="#ddd" />}
+      </div>
+      <div style={{ flex:1, minWidth:0 }}>
+        <div style={{ fontSize:12, fontWeight:700, color:"#1a1a1a", overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{item.name}</div>
+        <div style={{ fontSize:11, color:"#aaa" }}>{sub}</div>
+      </div>
     </div>
   );
 
+  const tabs = [["profile","✦ Profile"],["intelligence","◈ Intelligence"],["habits","◷ Habits"],["budget","$ Budget"]];
+
   return (
     <div className="fade-up">
-      {/* Tab toggle */}
-      <div style={{ display: "flex", gap: 24, marginBottom: 28, borderBottom: "1px solid #ece8e0", paddingBottom: 0 }}>
-        {[["profile","Style Profile"],["insights","Insights"]].map(([v,l]) => (
-          <button key={v} onClick={() => setStatsView(v)} style={{
-            padding: "0 0 14px", border: "none", background: "transparent", cursor: "pointer",
-            fontFamily: "'DM Sans', sans-serif", fontSize: 13, fontWeight: statsView === v ? 700 : 500,
-            color: statsView === v ? "#1a1a1a" : "#b0a898",
-            borderBottom: statsView === v ? "2px solid #1a1a1a" : "2px solid transparent",
-            marginBottom: -1, transition: "all 0.15s", letterSpacing: "0.01em"
+      {/* Tab nav */}
+      <div style={{ display:"flex", gap:4, marginBottom:28, background:"#f5f3ef", borderRadius:14, padding:4, width:"fit-content" }}>
+        {tabs.map(([v,l]) => (
+          <button key={v} onClick={()=>setStatsView(v)} style={{
+            padding:"8px 18px", border:"none", borderRadius:11, cursor:"pointer",
+            fontFamily:"'DM Sans', sans-serif", fontSize:12, fontWeight:700,
+            background: statsView===v ? "#fff" : "transparent",
+            color: statsView===v ? "#1a1a1a" : "#aaa",
+            boxShadow: statsView===v ? "0 1px 4px rgba(0,0,0,0.1)" : "none",
+            transition:"all 0.15s"
           }}>{l}</button>
         ))}
       </div>
 
-      {/* ── STYLE PROFILE ── */}
+      {items.length === 0 ? (
+        <div style={{ textAlign:"center", padding:"80px 0", color:"#ccc" }}>
+          <SvgSparkle size={40} color="#e8e4dc" />
+          <div style={{ fontSize:15, fontWeight:700, marginTop:16, color:"#bbb" }}>Add items to your closet to see your Style Profile</div>
+        </div>
+      ) : (<>
+
+      {/* ══════════════════ PROFILE ══════════════════ */}
       {statsView === "profile" && (
-        <div>
-          {items.length === 0 ? (
-            <div style={{ textAlign:"center", padding:"60px 0", color:"#ccc" }}>
-              <div style={{ marginBottom:12 }}><SvgSparkle size={36} color="#fff" /></div>
-              <div style={{ fontSize:14, fontWeight:700 }}>Add items to your closet to see your style profile</div>
+        <div style={{ display:"flex", flexDirection:"column", gap:16 }}>
+
+          {/* Archetype hero */}
+          {archetype && (
+            <div style={{ background:"linear-gradient(135deg,#1a1a1a 0%,#2a2a2a 100%)", borderRadius:24, padding:"30px 28px", color:"#fff", position:"relative", overflow:"hidden" }}>
+              <div style={{ position:"absolute", top:-20, right:-10, fontFamily:"'Cormorant Garamond',serif", fontSize:160, fontStyle:"italic", opacity:0.04, lineHeight:1, pointerEvents:"none", userSelect:"none" }}>✦</div>
+              <div style={{ fontSize:10, fontWeight:700, color:"rgba(255,255,255,0.4)", textTransform:"uppercase", letterSpacing:"0.12em", marginBottom:10 }}>Your Style Archetype</div>
+              <div style={{ fontFamily:"'Cormorant Garamond',serif", fontSize:40, fontWeight:300, fontStyle:"italic", letterSpacing:"-0.01em", lineHeight:1.1, marginBottom:10 }}>{archetype.label}</div>
+              <div style={{ fontSize:13, color:"rgba(255,255,255,0.65)", lineHeight:1.7, maxWidth:380, marginBottom:22 }}>{archetype.desc}</div>
+              {/* Archetype palette */}
+              <div style={{ display:"flex", gap:8, marginBottom:24 }}>
+                {(archetype.palette||[]).map((hex,i) => (
+                  <div key={i} style={{ width:28, height:28, borderRadius:"50%", background:hex, border:"2px solid rgba(255,255,255,0.15)", boxShadow:"0 2px 8px rgba(0,0,0,0.3)" }} />
+                ))}
+              </div>
+              <div style={{ display:"flex", gap:24, flexWrap:"wrap" }}>
+                {[{label:"Pieces",value:items.length},{label:"Total Value",value:`$${totalValue.toFixed(0)}`},{label:"Total Wears",value:totalWears},{label:"Avg CPW",value:cpwItems.length>0?`$${(cpwItems.reduce((s,i)=>s+i.cpw,0)/cpwItems.length).toFixed(1)}`:"—"}].map(s=>(
+                  <div key={s.label}>
+                    <div style={{ fontSize:22, fontWeight:800 }}>{s.value}</div>
+                    <div style={{ fontSize:10, fontWeight:700, color:"rgba(255,255,255,0.4)", textTransform:"uppercase", letterSpacing:"0.07em" }}>{s.label}</div>
+                  </div>
+                ))}
+              </div>
+              {/* Health score badge */}
+              <div style={{ position:"absolute", top:22, right:22, background:"rgba(255,255,255,0.08)", borderRadius:16, padding:"10px 16px", textAlign:"center", backdropFilter:"blur(8px)" }}>
+                <div style={{ fontSize:28, fontWeight:900, color:healthLabel[1] }}>{healthScore}</div>
+                <div style={{ fontSize:9, fontWeight:700, color:"rgba(255,255,255,0.45)", textTransform:"uppercase", letterSpacing:"0.08em" }}>{healthLabel[0]}</div>
+              </div>
             </div>
-          ) : (
-            <>
-              {/* Archetype hero */}
-              {archetype && (
-                <div style={{ background: "linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%)", borderRadius: 22, padding: "28px 26px", marginBottom: 16, color: "#fff", position: "relative", overflow: "hidden" }}>
-                  <div style={{ position: "absolute", top: -10, right: 10, fontSize: 80, opacity: 0.06, lineHeight: 1, fontFamily: "'Cormorant Garamond', serif", fontStyle: "italic", color: "#fff" }}>✦</div>
-                  <div style={{ fontSize: 11, fontWeight: 700, color: "rgba(255,255,255,0.5)", textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 8 }}>Your Style Archetype</div>
-                  <div style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 34, fontWeight: 300, fontStyle: "italic", letterSpacing: "-0.01em", marginBottom: 8 }}>{archetype.label}</div>
-                  <div style={{ fontSize: 13, color: "rgba(255,255,255,0.7)", lineHeight: 1.6, maxWidth: 340 }}>{archetype.desc}</div>
-                  <div style={{ display:"flex", gap:16, marginTop:20, flexWrap:"wrap" }}>
-                    {[
-                      { label: "Pieces", value: items.length },
-                      { label: "Total Value", value: `$${totalValue.toFixed(0)}` },
-                      { label: "Total Wears", value: totalWears },
-                    ].map(s => (
-                      <div key={s.label}>
-                        <div style={{ fontSize: 20, fontWeight: 800 }}>{s.value}</div>
-                        <div style={{ fontSize: 10, fontWeight: 700, color: "rgba(255,255,255,0.45)", textTransform: "uppercase", letterSpacing: "0.07em" }}>{s.label}</div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
+          )}
 
-              {/* Color DNA */}
-              {topColors.length > 0 && (
-                <div style={{ background: "#fff", borderRadius: 20, border: "1.5px solid #e8e4dc", padding: "20px 22px", marginBottom: 14 }}>
-                  <div style={{ fontSize: 13, fontWeight: 800, color: "#1a1a1a", marginBottom: 14 }}><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{marginRight:6,verticalAlign:"middle",display:"inline-block"}}><circle cx="12" cy="12" r="10"/><circle cx="8" cy="9" r="1.5" fill="currentColor" stroke="none"/><circle cx="15" cy="9" r="1.5" fill="currentColor" stroke="none"/><circle cx="12" cy="15" r="1.5" fill="currentColor" stroke="none"/></svg>Color DNA</div>
-                  <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-                    {topColors.map(([color, count], idx) => {
-                      const hex = COLOR_HEX[color] || "#ccc";
-                      const size = idx === 0 ? 56 : idx === 1 ? 48 : 40;
-                      return (
-                        <div key={color} style={{ display:"flex", flexDirection:"column", alignItems:"center", gap:5 }}>
-                          <div style={{ width:size, height:size, borderRadius:"50%", background:hex, border:(color==="White"||color==="Cream")?"1.5px solid #e0dbd0":"none", boxShadow:"0 3px 10px rgba(0,0,0,0.12)", transition:"transform 0.15s" }}
-                            onMouseEnter={e=>e.currentTarget.style.transform="scale(1.1)"}
-                            onMouseLeave={e=>e.currentTarget.style.transform="scale(1)"} />
-                          <div style={{ fontSize:10, fontWeight:700, color:"#555" }}>{color}</div>
-                          <div style={{ fontSize:10, color:"#bbb" }}>{count}</div>
-                        </div>
-                      );
-                    })}
+          {/* Color DNA */}
+          <Card>
+            <CardTitle icon={<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="8" cy="9" r="1.5" fill="currentColor" stroke="none"/><circle cx="15" cy="9" r="1.5" fill="currentColor" stroke="none"/><circle cx="12" cy="15" r="1.5" fill="currentColor" stroke="none"/></svg>}>Color DNA</CardTitle>
+            <div style={{ display:"flex", gap:10, flexWrap:"wrap", alignItems:"flex-end" }}>
+              {topColors.map(([color,count],i) => {
+                const hex = COLOR_HEX[color]||"#ccc";
+                const size = i===0?64:i===1?54:i===2?48:40;
+                const pct = Math.round((count/items.length)*100);
+                return (
+                  <div key={color} style={{ display:"flex", flexDirection:"column", alignItems:"center", gap:5 }}>
+                    <div style={{ width:size, height:size, borderRadius:"50%", background:hex, border:(color==="White"||color==="Cream")?"1.5px solid #e0dbd0":"none", boxShadow:"0 4px 14px rgba(0,0,0,0.12)", transition:"transform 0.15s" }}
+                      onMouseEnter={e=>e.currentTarget.style.transform="scale(1.08)"}
+                      onMouseLeave={e=>e.currentTarget.style.transform="scale(1)"} />
+                    <div style={{ fontSize:10, fontWeight:700, color:"#555" }}>{color}</div>
+                    <div style={{ fontSize:10, color:"#bbb" }}>{pct}%</div>
                   </div>
-                </div>
-              )}
+                );
+              })}
+            </div>
+          </Card>
 
-              {/* Two col: categories + brands */}
-              <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:12, marginBottom:14 }}>
-                {/* Top categories */}
-                <div style={{ background:"#fff", borderRadius:20, border:"1.5px solid #e8e4dc", padding:"18px 18px" }}>
-                  <div style={{ fontSize:13, fontWeight:800, color:"#1a1a1a", marginBottom:14 }}><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{marginRight:6,verticalAlign:"middle",display:"inline-block"}}><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>Categories</div>
-                  <div style={{ display:"flex", flexDirection:"column", gap:10 }}>
-                    {topCategories.slice(0,5).map(([cat, count]) => (
-                      <div key={cat}>
+          {/* Two col: Occasions + Seasons */}
+          <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:14 }}>
+            <Card>
+              <CardTitle icon={<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>}>Occasions</CardTitle>
+              {topOccasions.length === 0 ? <div style={{ fontSize:12, color:"#ccc" }}>None tagged yet</div> : (
+                <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
+                  {topOccasions.slice(0,6).map(([o,count]) => {
+                    const oc = OCCASION_COLORS_LOCAL[o]||{bg:"#f5f3ef",color:"#888"};
+                    const pct = Math.round((count/items.length)*100);
+                    return (
+                      <div key={o}>
                         <div style={{ display:"flex", justifyContent:"space-between", marginBottom:4 }}>
-                          <span style={{ fontSize:12, fontWeight:700, color:"#444" }}>{cat}</span>
+                          <span style={{ fontSize:11, fontWeight:700, color:oc.color, background:oc.bg, padding:"2px 8px", borderRadius:20 }}>{o}</span>
+                          <span style={{ fontSize:11, color:"#aaa", fontWeight:600 }}>{pct}%</span>
+                        </div>
+                        <div style={{ height:4, background:"#f0ece4", borderRadius:99 }}>
+                          <div style={{ height:"100%", width:`${pct}%`, background:oc.color, borderRadius:99, opacity:0.7 }} />
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </Card>
+            <Card>
+              <CardTitle icon={<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/></svg>}>Seasons</CardTitle>
+              <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
+                {topSeasons.map(([s,count]) => {
+                  const pct = Math.round((count/items.length)*100);
+                  return (
+                    <div key={s}>
+                      <div style={{ display:"flex", justifyContent:"space-between", marginBottom:4 }}>
+                        <span style={{ fontSize:11, fontWeight:700, color:SEASON_TEXT[s]||"#888", background:SEASON_COLORS[s]||"#f5f3ef", padding:"2px 8px", borderRadius:20 }}>{s}</span>
+                        <span style={{ fontSize:11, color:"#aaa", fontWeight:600 }}>{pct}%</span>
+                      </div>
+                      <div style={{ height:4, background:"#f0ece4", borderRadius:99 }}>
+                        <div style={{ height:"100%", width:`${pct}%`, background:SEASON_TEXT[s]||"#888", borderRadius:99, opacity:0.6 }} />
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </Card>
+          </div>
+
+          {/* Top categories + brands */}
+          <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:14 }}>
+            <Card>
+              <CardTitle icon={<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>}>Categories</CardTitle>
+              <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
+                {topCategories.slice(0,6).map(([cat,count]) => {
+                  const pct = Math.round((count/(topCategories[0]?.[1]||1))*100);
+                  return (
+                    <div key={cat}>
+                      <div style={{ display:"flex", justifyContent:"space-between", marginBottom:3 }}>
+                        <span style={{ fontSize:12, fontWeight:700, color:"#444" }}>{cat}</span>
+                        <span style={{ fontSize:11, color:"#aaa", fontWeight:600 }}>{count}</span>
+                      </div>
+                      <div style={{ height:4, background:"#f0ece4", borderRadius:99 }}>
+                        <div style={{ height:"100%", width:`${pct}%`, background:"#1a1a1a", borderRadius:99 }} />
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </Card>
+            <Card>
+              <CardTitle icon={<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20.59 13.41l-7.17 7.17a2 2 0 01-2.83 0L2 12V2h10l8.59 8.59a2 2 0 010 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg>}>Brands</CardTitle>
+              {topBrands.length===0 ? <div style={{ fontSize:12,color:"#ccc",paddingTop:8 }}>No brands tagged yet</div> : (
+                <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
+                  {topBrands.slice(0,6).map(([brand,count]) => {
+                    const pct = Math.round((count/(topBrands[0]?.[1]||1))*100);
+                    return (
+                      <div key={brand}>
+                        <div style={{ display:"flex", justifyContent:"space-between", marginBottom:3 }}>
+                          <span style={{ fontSize:12, fontWeight:700, color:"#444", overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap", maxWidth:110 }}>{brand}</span>
                           <span style={{ fontSize:11, color:"#aaa", fontWeight:600 }}>{count}</span>
                         </div>
-                        <div style={{ height:5, background:"#f0ece4", borderRadius:99, overflow:"hidden" }}>
-                          <div style={{ height:"100%", width:`${(count/maxCat)*100}%`, background:"#1a1a1a", borderRadius:99, transition:"width 0.4s" }} />
+                        <div style={{ height:4, background:"#f0ece4", borderRadius:99 }}>
+                          <div style={{ height:"100%", width:`${pct}%`, background:"#7c6fe0", borderRadius:99 }} />
                         </div>
                       </div>
-                    ))}
-                  </div>
+                    );
+                  })}
                 </div>
+              )}
+            </Card>
+          </div>
 
-                {/* Top brands */}
-                <div style={{ background:"#fff", borderRadius:20, border:"1.5px solid #e8e4dc", padding:"18px 18px" }}>
-                  <div style={{ fontSize:13, fontWeight:800, color:"#1a1a1a", marginBottom:14 }}><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{marginRight:6,verticalAlign:"middle",display:"inline-block"}}><path d="M20.59 13.41l-7.17 7.17a2 2 0 01-2.83 0L2 12V2h10l8.59 8.59a2 2 0 010 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg>Brands</div>
-                  {topBrands.length === 0 ? (
-                    <div style={{ fontSize:12, color:"#ccc", textAlign:"center", paddingTop:16 }}>No brands tagged yet</div>
-                  ) : (
-                    <div style={{ display:"flex", flexDirection:"column", gap:10 }}>
-                      {topBrands.map(([brand, count]) => (
-                        <div key={brand}>
-                          <div style={{ display:"flex", justifyContent:"space-between", marginBottom:4 }}>
-                            <span style={{ fontSize:12, fontWeight:700, color:"#444", overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap", maxWidth:90 }}>{brand}</span>
-                            <span style={{ fontSize:11, color:"#aaa", fontWeight:600 }}>{count}</span>
-                          </div>
-                          <div style={{ height:5, background:"#f0ece4", borderRadius:99, overflow:"hidden" }}>
-                            <div style={{ height:"100%", width:`${(count/maxBrand)*100}%`, background:"#7c6fe0", borderRadius:99, transition:"width 0.4s" }} />
-                          </div>
-                        </div>
-                      ))}
+          {/* Signature pieces */}
+          {mostWorn.filter(i=>i.wornCount>0).length > 0 && (
+            <Card>
+              <CardTitle icon={<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>}>Signature Pieces</CardTitle>
+              <div style={{ fontSize:12, color:"#bbb", marginBottom:12 }}>Your most-reached-for items</div>
+              <div style={{ display:"flex", gap:10, overflowX:"auto", paddingBottom:4 }}>
+                {mostWorn.filter(i=>i.wornCount>0).slice(0,6).map((item,idx) => (
+                  <div key={item.id} onClick={()=>onViewItem(item)} style={{ flexShrink:0, width:90, cursor:"pointer", textAlign:"center" }}>
+                    <div style={{ position:"relative" }}>
+                      <div style={{ width:90, height:90, borderRadius:16, overflow:"hidden", background:"#f5f3ef", border:"1.5px solid #e8e4dc", marginBottom:6 }}>
+                        {item.image ? <img src={item.image} alt="" style={{ width:"100%", height:"100%", objectFit:"contain" }} /> : <div style={{ display:"flex", alignItems:"center", justifyContent:"center", height:"100%" }}><HangerIcon size={20} color="#ddd" /></div>}
+                      </div>
+                      {idx===0 && <div style={{ position:"absolute", top:-6, right:-6, background:"#f0c840", borderRadius:"50%", width:20, height:20, display:"flex", alignItems:"center", justifyContent:"center", fontSize:10 }}>★</div>}
                     </div>
-                  )}
-                </div>
+                    <div style={{ fontSize:10, fontWeight:700, color:"#1a1a1a", overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{item.name}</div>
+                    <div style={{ fontSize:10, color:"#aaa" }}>{item.wornCount}× worn</div>
+                  </div>
+                ))}
               </div>
-
-              {/* Seasons + Occasions */}
-              <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:12, marginBottom:14 }}>
-                <div style={{ background:"#fff", borderRadius:20, border:"1.5px solid #e8e4dc", padding:"18px 18px" }}>
-                  <div style={{ fontSize:13, fontWeight:800, color:"#1a1a1a", marginBottom:12 }}><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{marginRight:6,verticalAlign:"middle",display:"inline-block"}}><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>Seasons</div>
-                  <div style={{ display:"flex", flexWrap:"wrap", gap:6 }}>
-                    {topSeasons.map(([s, count]) => (
-                      <div key={s} style={{ padding:"5px 11px", background:SEASON_COLORS[s]||"#f5f3ef", borderRadius:20, fontSize:11, fontWeight:700, color:SEASON_TEXT[s]||"#888" }}>{s} <span style={{ opacity:0.6 }}>·{count}</span></div>
-                    ))}
-                  </div>
-                </div>
-                <div style={{ background:"#fff", borderRadius:20, border:"1.5px solid #e8e4dc", padding:"18px 18px" }}>
-                  <div style={{ fontSize:13, fontWeight:800, color:"#1a1a1a", marginBottom:12 }}><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{marginRight:6,verticalAlign:"middle",display:"inline-block"}}><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>Occasions</div>
-                  <div style={{ display:"flex", flexWrap:"wrap", gap:6 }}>
-                    {topOccasions.length === 0 ? <div style={{ fontSize:12, color:"#ccc" }}>None tagged yet</div> : topOccasions.map(([o, count]) => (
-                      <div key={o} style={{ padding:"5px 11px", background: (OCCASION_COLORS[o]||{bg:"#f5f3ef"}).bg, borderRadius:20, fontSize:11, fontWeight:700, color:(OCCASION_COLORS[o]||{color:"#888"}).color }}>{o} <span style={{ opacity:0.6 }}>·{count}</span></div>
-                    ))}
-                  </div>
-                </div>
-              </div>
-
-              {/* Most worn + most valuable */}
-              <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:12, marginBottom:14 }}>
-                <div style={{ background:"#fff", borderRadius:20, border:"1.5px solid #e8e4dc", padding:"18px 18px" }}>
-                  <div style={{ fontSize:13, fontWeight:800, color:"#1a1a1a", marginBottom:12 }}><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{marginRight:6,verticalAlign:"middle",display:"inline-block"}}><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>Most Worn</div>
-                  <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
-                    {mostWorn.filter(i=>i.wornCount>0).slice(0,4).map((item,idx)=>(
-                      <div key={item.id} onClick={()=>onViewItem(item)} style={{ display:"flex", alignItems:"center", gap:8, cursor:"pointer" }}>
-                        <div style={{ fontSize:12, fontWeight:800, color:"#ddd", width:16, flexShrink:0 }}>#{idx+1}</div>
-                        <div style={{ width:32, height:32, borderRadius:8, overflow:"hidden", background:"#f5f3ef", flexShrink:0 }}>
-                          {item.image ? <img src={item.image} alt="" style={{ width:"100%", height:"100%", objectFit:"contain" }} /> : <HangerIcon size={14} color="#ddd" />}
-                        </div>
-                        <div style={{ flex:1, minWidth:0 }}>
-                          <div style={{ fontSize:11, fontWeight:700, color:"#1a1a1a", overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{item.name}</div>
-                          <div style={{ fontSize:10, color:"#aaa" }}>{item.wornCount}× worn</div>
-                        </div>
-                      </div>
-                    ))}
-                    {mostWorn.filter(i=>i.wornCount>0).length===0 && <div style={{ fontSize:12, color:"#ccc" }}>Start marking outfits as worn</div>}
-                  </div>
-                </div>
-                <div style={{ background:"#fff", borderRadius:20, border:"1.5px solid #e8e4dc", padding:"18px 18px" }}>
-                  <div style={{ fontSize:13, fontWeight:800, color:"#1a1a1a", marginBottom:12 }}><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{marginRight:6,verticalAlign:"middle",display:"inline-block"}}><path d="M6 3h12l4 6-10 13L2 9z"/><path d="M11 3L8 9l4 13 4-13-3-6"/><path d="M2 9h20"/></svg>Most Valuable</div>
-                  <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
-                    {mostValuable.filter(i=>parseFloat((i.price||"").replace(/[^0-9.]/g,""))).slice(0,4).map((item,idx)=>{
-                      const price = parseFloat((item.price||"").replace(/[^0-9.]/g,""));
-                      return (
-                        <div key={item.id} onClick={()=>onViewItem(item)} style={{ display:"flex", alignItems:"center", gap:8, cursor:"pointer" }}>
-                          <div style={{ fontSize:12, fontWeight:800, color:"#ddd", width:16, flexShrink:0 }}>#{idx+1}</div>
-                          <div style={{ width:32, height:32, borderRadius:8, overflow:"hidden", background:"#f5f3ef", flexShrink:0 }}>
-                            {item.image ? <img src={item.image} alt="" style={{ width:"100%", height:"100%", objectFit:"contain" }} /> : <HangerIcon size={14} color="#ddd" />}
-                          </div>
-                          <div style={{ flex:1, minWidth:0 }}>
-                            <div style={{ fontSize:11, fontWeight:700, color:"#1a1a1a", overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{item.name}</div>
-                            <div style={{ fontSize:10, color:"#aaa" }}>${price.toFixed(0)}</div>
-                          </div>
-                        </div>
-                      );
-                    })}
-                    {mostValuable.filter(i=>parseFloat((i.price||"").replace(/[^0-9.]/g,""))).length===0 && <div style={{ fontSize:12, color:"#ccc" }}>Add prices to your items</div>}
-                  </div>
-                </div>
-              </div>
-            </>
+            </Card>
           )}
         </div>
       )}
 
-      {/* ── INSIGHTS ── */}
-      {statsView === "insights" && (
-        <div>
-          {/* Monthly recap */}
-          <SECTION title={`${now.toLocaleDateString('en-US',{month:'long',year:'numeric'})} Recap`}>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(130px, 1fr))", gap: 10 }}>
-          {[
-            { label: "Items Added", value: addedThisMonth.length, color: "#2d6a3f", bg: "#f0faf4" },
-            { label: "Spent", value: totalSpentThisMonth > 0 ? `$${totalSpentThisMonth.toFixed(0)}` : "—", color: "#a07000", bg: "#fff8ee" },
-            { label: "Total Items", value: items.length, color: "#1a1a1a", bg: "#fafaf8" },
-            { label: "Never Worn", value: unworn.length, color: unworn.length > 10 ? "#e05555" : "#aaa", bg: "#fafaf8" },
-          ].map(s => (
-            <div key={s.label} style={{ background: s.bg, borderRadius: 14, padding: "12px 14px", textAlign: "center" }}>
-              <div style={{ fontSize: 22, fontWeight: 800, color: s.color }}>{s.value}</div>
-              <div style={{ fontSize: 10, fontWeight: 700, color: "#aaa", textTransform: "uppercase", letterSpacing: "0.07em", marginTop: 2 }}>{s.label}</div>
-            </div>
-          ))}
-        </div>
-        {/* Spend bar chart */}
-        <div style={{ marginTop: 18 }}>
-          <div style={{ fontSize: 11, fontWeight: 700, color: "#aaa", textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: 10 }}>Monthly Spend (last 6 months)</div>
-          <div style={{ display: "flex", alignItems: "flex-end", gap: 8, height: 80 }}>
-            {monthlyData.map(m => (
-              <div key={m.key} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 4 }}>
-                <div style={{ fontSize: 9, color: "#aaa", fontWeight: 600 }}>{m.spent > 0 ? `$${m.spent.toFixed(0)}` : ""}</div>
-                <div style={{ width: "100%", background: m.key === thisMonth ? "#2d6a3f" : "#e8f5ee", borderRadius: "4px 4px 0 0", height: `${Math.max(4, (m.spent / maxSpent) * 56)}px`, transition: "height 0.3s" }} />
-                <div style={{ fontSize: 10, color: "#aaa", fontWeight: 600 }}>{m.label}</div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </SECTION>
+      {/* ══════════════════ INTELLIGENCE ══════════════════ */}
+      {statsView === "intelligence" && (
+        <div style={{ display:"flex", flexDirection:"column", gap:16 }}>
 
-      {/* Color palette */}
-      {colorEntries.length > 0 && (
-        <SECTION title={<span style={{display:"inline-flex",alignItems:"center"}}>{IC.palette}Color Palette</span>}>
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-            {colorEntries.map(([color, count]) => (
-              <div key={color} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 4, minWidth: 48 }}>
-                <div style={{ width: 40, height: 40, borderRadius: "50%", background: COLOR_HEX[color] || "#ccc", border: color === "White" || color === "Cream" ? "1.5px solid #e0dbd0" : "none", boxShadow: "0 2px 8px rgba(0,0,0,0.1)" }} />
-                <div style={{ fontSize: 10, fontWeight: 700, color: "#666", textAlign: "center" }}>{color}</div>
-                <div style={{ fontSize: 10, color: "#aaa" }}>{count}</div>
-              </div>
-            ))}
-          </div>
-        </SECTION>
-      )}
+          {/* Cost per wear — best */}
+          <Card>
+            <CardTitle icon={<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg>}>Best Cost Per Wear</CardTitle>
+            <div style={{ fontSize:12, color:"#bbb", marginBottom:12 }}>Your best investments — price ÷ wears</div>
+            {cpwItems.length===0 ? <div style={{ fontSize:12, color:"#ccc" }}>Add prices and start marking outfits worn to see this</div> : (
+              cpwItems.slice(0,5).map(item => (
+                <ItemRow key={item.id} item={item} sub={`$${item.cpw.toFixed(2)}/wear · ${item.wornCount}× worn · $${parsePrice(item.price).toFixed(0)}`} onClick={()=>onViewItem(item)} />
+              ))
+            )}
+          </Card>
 
-      {/* Rewear suggestions */}
-      {(unworn.length > 0 || rewear.length > 0) && (
-        <SECTION title={<span style={{display:"inline-flex",alignItems:"center"}}>{IC.recycle}Rewear Suggestions</span>}>
-          <div style={{ fontSize: 12, color: "#aaa", marginBottom: 12 }}>Items you haven't worn yet or worn the least</div>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(100px, 1fr))", gap: 10 }}>
-            {[...unworn, ...rewear].slice(0,16).map(item => (
-              <div key={item.id} onClick={() => onViewItem(item)} style={{ cursor: "pointer", borderRadius: 12, overflow: "hidden", background: "#f5f2ed", border: "1.5px solid #e8e4dc" }}
-                onMouseEnter={e => e.currentTarget.style.borderColor="#2d6a3f"}
-                onMouseLeave={e => e.currentTarget.style.borderColor="#f0ece4"}>
-                <div style={{ aspectRatio: "1/1", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                  {item.image ? <img src={item.image} alt={item.name} style={{ width:"100%", height:"100%", objectFit:"contain", padding: 4 }} /> : <HangerIcon size={20} color="#ddd" />}
-                </div>
-                <div style={{ padding: "4px 6px 6px" }}>
-                  <div style={{ fontSize: 10, fontWeight: 700, color: "#1a1a1a", overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{item.name}</div>
-                  <div style={{ fontSize: 10, color: "#aaa" }}>{item.wornCount || 0}× worn</div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </SECTION>
-      )}
+          {/* Cost per wear — worst */}
+          <Card>
+            <CardTitle icon={<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>}>Worst Cost Per Wear</CardTitle>
+            <div style={{ fontSize:12, color:"#bbb", marginBottom:12 }}>Items that need more love to justify their price</div>
+            {worstCpw.length===0 ? <div style={{ fontSize:12, color:"#ccc" }}>Add prices to items to see this</div> : (
+              worstCpw.map(item => (
+                <ItemRow key={item.id} item={item} sub={`$${item.cpw.toFixed(2)}/wear · ${item.wornCount||0}× worn · $${parsePrice(item.price).toFixed(0)}`} onClick={()=>onViewItem(item)} />
+              ))
+            )}
+          </Card>
 
-      {/* Duplicate detection */}
-      {duplicates.length > 0 && (
-        <SECTION title={<span style={{display:"inline-flex",alignItems:"center"}}>{IC.users}Possible Duplicates</span>}>
-          <div style={{ fontSize: 12, color: "#aaa", marginBottom: 12 }}>Items in the same category with similar names</div>
-          <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-            {duplicates.slice(0, 6).map((group, gi) => (
-              <div key={gi} style={{ background: "#faf9f6", borderRadius: 12, padding: "12px 14px" }}>
-                <div style={{ fontSize: 11, fontWeight: 700, color: "#aaa", marginBottom: 8, textTransform: "uppercase" }}>{group[0].category || "Item"}</div>
-                <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-                  {group.map(item => (
-                    <div key={item.id} onClick={() => onViewItem(item)} style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer", padding: "6px 10px", background: "#fff", borderRadius: 10, border: "1.5px solid #e8e4dc" }}
-                      onMouseEnter={e => e.currentTarget.style.borderColor="#d0c8bc"}
-                      onMouseLeave={e => e.currentTarget.style.borderColor="#f0ece4"}>
-                      {item.image && <img src={item.image} alt="" style={{ width: 28, height: 28, borderRadius: 6, objectFit: "contain", background: "#f5f2ed" }} />}
-                      <div>
-                        <div style={{ fontSize: 12, fontWeight: 700, color: "#1a1a1a" }}>{item.name}</div>
-                        {item.price && <div style={{ fontSize: 11, color: "#aaa" }}>{item.price}</div>}
-                      </div>
+          {/* Outfit formula */}
+          <Card>
+            <CardTitle icon={<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 3H5a2 2 0 00-2 2v4m6-6h10a2 2 0 012 2v4M9 3v18m0 0h10a2 2 0 002-2V9M9 21H5a2 2 0 01-2-2V9m0 0h18"/></svg>}>Your Outfit Formula</CardTitle>
+            <div style={{ fontSize:12, color:"#bbb", marginBottom:12 }}>Category combinations that appear together most in your outfits</div>
+            {outfitFormula.length===0 ? <div style={{ fontSize:12, color:"#ccc" }}>Build more outfits to discover your formula</div> : (
+              <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
+                {outfitFormula.map(([pair,count],i) => (
+                  <div key={pair} style={{ display:"flex", alignItems:"center", gap:10 }}>
+                    <div style={{ width:22, height:22, borderRadius:6, background:"#f5f3ef", display:"flex", alignItems:"center", justifyContent:"center", fontSize:10, fontWeight:800, color:"#aaa", flexShrink:0 }}>{i+1}</div>
+                    <div style={{ flex:1, fontSize:12, fontWeight:700, color:"#1a1a1a" }}>{pair}</div>
+                    <div style={{ fontSize:11, color:"#aaa", fontWeight:600 }}>{count}×</div>
+                    <div style={{ width:60, height:4, background:"#f0ece4", borderRadius:99 }}>
+                      <div style={{ height:"100%", width:`${(count/(outfitFormula[0]?.[1]||1))*100}%`, background:"#1a1a1a", borderRadius:99 }} />
                     </div>
-                  ))}
+                  </div>
+                ))}
+              </div>
+            )}
+          </Card>
+
+          {/* Wardrobe gaps */}
+          <Card>
+            <CardTitle icon={<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>}>Wardrobe Gaps</CardTitle>
+            <div style={{ fontSize:12, color:"#bbb", marginBottom:12 }}>Categories with fewer than 2 items</div>
+            {gaps.length===0 ? (
+              <div style={{ display:"flex", alignItems:"center", gap:8, color:"#3aaa6e", fontSize:13, fontWeight:700 }}>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                Your wardrobe is well-rounded!
+              </div>
+            ) : (
+              <div style={{ display:"flex", flexWrap:"wrap", gap:8 }}>
+                {gaps.map(({cat,count}) => (
+                  <div key={cat} style={{ padding:"6px 12px", borderRadius:20, background: count===0?"#fff0f0":"#fff8ee", border:`1px solid ${count===0?"#ffc5c5":"#f5c842"}`, fontSize:11, fontWeight:700, color: count===0?"#e05555":"#a07000" }}>
+                    {cat} {count===0 ? "· none" : `· only ${count}`}
+                  </div>
+                ))}
+              </div>
+            )}
+          </Card>
+
+          {/* Never worn */}
+          {unworn.length > 0 && (
+            <Card>
+              <CardTitle icon={<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0112 20c-7 0-11-8-11-8a18.45 18.45 0 015.06-5.94"/><path d="M9.9 4.24A9.12 9.12 0 0112 4c7 0 11 8 11 8a18.5 18.5 0 01-2.16 3.19"/><line x1="1" y1="1" x2="23" y2="23"/></svg>}>Never Worn <span style={{ fontSize:11, fontWeight:600, color:"#e05555", marginLeft:6 }}>{unworn.length} items</span></CardTitle>
+              <div style={{ fontSize:12, color:"#bbb", marginBottom:12 }}>Wear them or list them for sale</div>
+              <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill,minmax(80px,1fr))", gap:10 }}>
+                {unworn.slice(0,12).map(item => (
+                  <div key={item.id} onClick={()=>onViewItem(item)} style={{ cursor:"pointer", borderRadius:12, overflow:"hidden", background:"#faf9f6", border:"1.5px solid #e8e4dc" }}
+                    onMouseEnter={e=>e.currentTarget.style.borderColor="#e05555"}
+                    onMouseLeave={e=>e.currentTarget.style.borderColor="#e8e4dc"}>
+                    <div style={{ aspectRatio:"1/1", display:"flex", alignItems:"center", justifyContent:"center", padding:4 }}>
+                      {item.image ? <img src={item.image} alt="" style={{ width:"100%", height:"100%", objectFit:"contain" }} /> : <HangerIcon size={16} color="#ddd" />}
+                    </div>
+                    <div style={{ padding:"3px 6px 5px", fontSize:9, fontWeight:700, color:"#888", overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{item.name}</div>
+                  </div>
+                ))}
+              </div>
+            </Card>
+          )}
+        </div>
+      )}
+
+      {/* ══════════════════ HABITS ══════════════════ */}
+      {statsView === "habits" && (
+        <div style={{ display:"flex", flexDirection:"column", gap:16 }}>
+
+          {/* Wear frequency heatmap */}
+          <Card>
+            <CardTitle icon={<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>}>Outfit Frequency <span style={{ fontSize:11, fontWeight:500, color:"#bbb", marginLeft:6 }}>last 12 weeks</span></CardTitle>
+            <div style={{ overflowX:"auto" }}>
+              <div style={{ display:"grid", gridTemplateColumns:"repeat(12, 1fr)", gap:3, minWidth:320 }}>
+                {Array.from({length:12},(_,week) => (
+                  <div key={week} style={{ display:"flex", flexDirection:"column", gap:3 }}>
+                    {Array.from({length:7},(_,day) => {
+                      const dIdx = week*7+day;
+                      const d = calData[dIdx];
+                      if (!d) return <div key={day} style={{ width:"100%", aspectRatio:"1/1" }} />;
+                      const intensity = d.count===0?0:Math.max(0.15, d.count/maxCalCount);
+                      return (
+                        <div key={day} title={`${d.key}: ${d.count} outfit${d.count!==1?"s":""}`}
+                          style={{ width:"100%", aspectRatio:"1/1", borderRadius:3, background: d.count===0?"#f0ece4":`rgba(26,26,26,${intensity})`, cursor: d.count>0?"pointer":"default", transition:"transform 0.1s" }}
+                          onMouseEnter={e=>{if(d.count>0)e.currentTarget.style.transform="scale(1.3)";}}
+                          onMouseLeave={e=>e.currentTarget.style.transform="scale(1)"} />
+                      );
+                    })}
+                  </div>
+                ))}
+              </div>
+            </div>
+            <div style={{ display:"flex", alignItems:"center", gap:6, marginTop:10, fontSize:10, color:"#bbb" }}>
+              <span>Less</span>
+              {[0,0.15,0.4,0.7,1].map(v=>(
+                <div key={v} style={{ width:12, height:12, borderRadius:3, background:v===0?"#f0ece4":`rgba(26,26,26,${v})` }} />
+              ))}
+              <span>More</span>
+            </div>
+          </Card>
+
+          {/* Monthly stats */}
+          <Card>
+            <CardTitle icon={<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>}>Monthly Activity</CardTitle>
+            <div style={{ display:"flex", flexDirection:"column", gap:14 }}>
+              {monthlyData.map(m => (
+                <div key={m.key} style={{ display:"flex", alignItems:"center", gap:12 }}>
+                  <div style={{ width:30, fontSize:11, fontWeight:700, color:"#888", flexShrink:0 }}>{m.label}</div>
+                  <div style={{ flex:1 }}>
+                    <div style={{ height:8, background:"#f0ece4", borderRadius:99, overflow:"hidden" }}>
+                      <div style={{ height:"100%", width:`${(m.spent/maxSpent)*100}%`, background:"linear-gradient(90deg,#1a1a1a,#555)", borderRadius:99, transition:"width 0.5s" }} />
+                    </div>
+                  </div>
+                  <div style={{ width:52, textAlign:"right", fontSize:11, fontWeight:700, color:m.spent>0?"#1a1a1a":"#ddd" }}>{m.spent>0?`$${m.spent.toFixed(0)}`:"—"}</div>
+                  <div style={{ width:42, textAlign:"right", fontSize:11, color:"#aaa" }}>{m.added} item{m.added!==1?"s":""}</div>
                 </div>
+              ))}
+            </div>
+          </Card>
+
+          {/* Most active season */}
+          <Card>
+            <CardTitle icon={<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 8h1a4 4 0 010 8h-1"/><path d="M2 8h16v9a4 4 0 01-4 4H6a4 4 0 01-4-4V8z"/><line x1="6" y1="1" x2="6" y2="4"/><line x1="10" y1="1" x2="10" y2="4"/><line x1="14" y1="1" x2="14" y2="4"/></svg>}>Season Breakdown</CardTitle>
+            <div style={{ display:"flex", gap:8, flexWrap:"wrap" }}>
+              {topSeasons.map(([s,count]) => {
+                const pct = Math.round((count/items.length)*100);
+                return (
+                  <div key={s} style={{ background:SEASON_COLORS[s]||"#f5f3ef", borderRadius:14, padding:"12px 16px", textAlign:"center", minWidth:80 }}>
+                    <div style={{ fontSize:18, fontWeight:800, color:SEASON_TEXT[s]||"#888" }}>{pct}%</div>
+                    <div style={{ fontSize:10, fontWeight:700, color:SEASON_TEXT[s]||"#888", opacity:0.8, marginTop:2 }}>{s}</div>
+                    <div style={{ fontSize:10, color:SEASON_TEXT[s]||"#888", opacity:0.5 }}>{count} items</div>
+                  </div>
+                );
+              })}
+            </div>
+          </Card>
+
+          {/* Getting dressed score */}
+          <Card>
+            <CardTitle icon={<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>}>Wardrobe Health Score</CardTitle>
+            <div style={{ display:"flex", alignItems:"center", gap:20, marginBottom:16 }}>
+              <div style={{ position:"relative", width:80, height:80, flexShrink:0 }}>
+                <svg width="80" height="80" viewBox="0 0 80 80">
+                  <circle cx="40" cy="40" r="32" fill="none" stroke="#f0ece4" strokeWidth="8" />
+                  <circle cx="40" cy="40" r="32" fill="none" stroke={healthLabel[1]} strokeWidth="8"
+                    strokeDasharray={`${2*Math.PI*32*healthScore/100} ${2*Math.PI*32*(1-healthScore/100)}`}
+                    strokeDashoffset={2*Math.PI*32*0.25}
+                    strokeLinecap="round" />
+                </svg>
+                <div style={{ position:"absolute", inset:0, display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center" }}>
+                  <div style={{ fontSize:18, fontWeight:900, color:healthLabel[1], lineHeight:1 }}>{healthScore}</div>
+                  <div style={{ fontSize:8, fontWeight:700, color:"#bbb", textTransform:"uppercase" }}>/100</div>
+                </div>
+              </div>
+              <div>
+                <div style={{ fontSize:16, fontWeight:800, color:healthLabel[1], marginBottom:4 }}>{healthLabel[0]}</div>
+                <div style={{ fontSize:12, color:"#888", lineHeight:1.6 }}>Based on wear frequency,<br/>category balance, and cost per wear</div>
+              </div>
+            </div>
+            <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
+              {[
+                { label:"Wear Frequency", score:Math.min(Math.round((totalWears/Math.max(items.length,1))*20),40), max:40, color:"#3aaa6e" },
+                { label:"Category Balance", score:Math.max(0,30-gaps.filter(g=>g.count===0).length*5), max:30, color:"#2090c0" },
+                { label:"Cost Per Wear", score:cpwItems.length>0?Math.min(Math.round(cpwItems.length/items.length*60),30):0, max:30, color:"#9a6fe0" },
+              ].map(s=>(
+                <div key={s.label}>
+                  <div style={{ display:"flex", justifyContent:"space-between", marginBottom:4 }}>
+                    <span style={{ fontSize:11, fontWeight:700, color:"#888" }}>{s.label}</span>
+                    <span style={{ fontSize:11, color:s.color, fontWeight:700 }}>{s.score}/{s.max}</span>
+                  </div>
+                  <div style={{ height:5, background:"#f0ece4", borderRadius:99 }}>
+                    <div style={{ height:"100%", width:`${(s.score/s.max)*100}%`, background:s.color, borderRadius:99 }} />
+                  </div>
+                </div>
+              ))}
+            </div>
+          </Card>
+        </div>
+      )}
+
+      {/* ══════════════════ BUDGET ══════════════════ */}
+      {statsView === "budget" && (
+        <div style={{ display:"flex", flexDirection:"column", gap:16 }}>
+
+          {/* Summary stats */}
+          <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill,minmax(140px,1fr))", gap:12 }}>
+            {[
+              { label:"Closet Value", value:`$${totalValue.toFixed(0)}`, color:"#1a1a1a", bg:"#fafaf8" },
+              { label:"Avg Item Price", value: items.filter(i=>parsePrice(i.price)>0).length>0?`$${(totalValue/items.filter(i=>parsePrice(i.price)>0).length).toFixed(0)}`:"—", color:"#2090c0", bg:"#f0f8ff" },
+              { label:"Wishlist Value", value:wishlistTotalValue>0?`$${wishlistTotalValue.toFixed(0)}`:"—", color:"#9a6fe0", bg:"#f8f0ff" },
+              { label:"Added This Month", value:items.filter(i=>(i.purchaseDate||"").startsWith(thisMonth)).length, color:"#3aaa6e", bg:"#f0faf4" },
+            ].map(s=>(
+              <div key={s.label} style={{ background:s.bg, borderRadius:16, padding:"16px 18px", textAlign:"center", border:"1.5px solid #e8e4dc" }}>
+                <div style={{ fontSize:24, fontWeight:900, color:s.color, lineHeight:1 }}>{s.value}</div>
+                <div style={{ fontSize:10, fontWeight:700, color:"#aaa", textTransform:"uppercase", letterSpacing:"0.07em", marginTop:6 }}>{s.label}</div>
               </div>
             ))}
           </div>
-        </SECTION>
-      )}
+
+          {/* Spend bar chart */}
+          <Card>
+            <CardTitle icon={<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>}>Spending — Last 6 Months</CardTitle>
+            <div style={{ display:"flex", alignItems:"flex-end", gap:8, height:100, marginBottom:8 }}>
+              {monthlyData.map(m => (
+                <div key={m.key} style={{ flex:1, display:"flex", flexDirection:"column", alignItems:"center", gap:4 }}>
+                  <div style={{ fontSize:9, fontWeight:700, color:"#888" }}>{m.spent>0?`$${m.spent.toFixed(0)}`:" "}</div>
+                  <div style={{ width:"100%", background: m.key===thisMonth?"#1a1a1a":"#e0dbd2", borderRadius:"4px 4px 0 0", height:`${Math.max((m.spent/maxSpent)*72, m.spent>0?4:0)}px`, minHeight:m.spent>0?4:0, transition:"height 0.4s" }} />
+                </div>
+              ))}
+            </div>
+            <div style={{ display:"flex", gap:8 }}>
+              {monthlyData.map(m=>(
+                <div key={m.key} style={{ flex:1, textAlign:"center", fontSize:10, fontWeight:600, color: m.key===thisMonth?"#1a1a1a":"#bbb" }}>{m.label}</div>
+              ))}
+            </div>
+          </Card>
+
+          {/* Most valuable items */}
+          <Card>
+            <CardTitle icon={<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M6 3h12l4 6-10 13L2 9z"/><path d="M11 3L8 9l4 13 4-13-3-6"/><path d="M2 9h20"/></svg>}>Most Valuable Items</CardTitle>
+            {[...items].sort((a,b)=>parsePrice(b.price)-parsePrice(a.price)).filter(i=>parsePrice(i.price)>0).slice(0,6).map(item=>(
+              <ItemRow key={item.id} item={item} sub={`$${parsePrice(item.price).toFixed(0)} · $${(parsePrice(item.price)/Math.max(item.wornCount||0,1)).toFixed(2)}/wear`} onClick={()=>onViewItem(item)} />
+            ))}
+          </Card>
+
+          {/* Wishlist intelligence */}
+          <Card>
+            <CardTitle icon={<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20.84 4.61a5.5 5.5 0 00-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 00-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 000-7.78z"/></svg>}>Wishlist Intelligence</CardTitle>
+            <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap:10, marginBottom:14 }}>
+              {[
+                { label:"Wishlist Items", value:wishItems.length, color:"#9a6fe0" },
+                { label:"Total Value", value:wishlistTotalValue>0?`$${wishlistTotalValue.toFixed(0)}`:"—", color:"#9a6fe0" },
+                { label:"Closet Overlap", value:wishlistOverlap.length, color:wishlistOverlap.length>0?"#e05555":"#3aaa6e" },
+              ].map(s=>(
+                <div key={s.label} style={{ background:"#faf9f6", borderRadius:12, padding:"10px 12px", textAlign:"center" }}>
+                  <div style={{ fontSize:20, fontWeight:800, color:s.color }}>{s.value}</div>
+                  <div style={{ fontSize:9, fontWeight:700, color:"#bbb", textTransform:"uppercase", letterSpacing:"0.06em", marginTop:3 }}>{s.label}</div>
+                </div>
+              ))}
+            </div>
+            {wishlistOverlap.length > 0 && (
+              <div>
+                <div style={{ fontSize:11, fontWeight:700, color:"#e05555", marginBottom:8 }}>⚠ You may already own versions of these:</div>
+                {wishlistOverlap.slice(0,4).map(wi=>(
+                  <div key={wi.id} style={{ display:"flex", alignItems:"center", gap:8, padding:"6px 0", borderBottom:"1px solid #f5f3ef" }}>
+                    <div style={{ width:32, height:32, borderRadius:8, overflow:"hidden", background:"#f5f3ef", flexShrink:0 }}>
+                      {wi.image?<img src={wi.image} alt="" style={{ width:"100%", height:"100%", objectFit:"contain" }}/>:<HangerIcon size={12} color="#ddd"/>}
+                    </div>
+                    <div style={{ flex:1, minWidth:0 }}>
+                      <div style={{ fontSize:12, fontWeight:700, color:"#1a1a1a", overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{wi.name}</div>
+                      <div style={{ fontSize:11, color:"#e05555" }}>{wi.category} · already in closet</div>
+                    </div>
+                    {wi.price && <div style={{ fontSize:12, fontWeight:700, color:"#9a6fe0" }}>{wi.price}</div>}
+                  </div>
+                ))}
+              </div>
+            )}
+          </Card>
         </div>
       )}
+
+      </>)}
     </div>
   );
 }
-
 
 // ── Wishlist Tab ──────────────────────────────────────────────────────────────
 function WishlistTab({ wishlistDb, wishlistsDb, saveWishlistsMeta, activeWishlistId, setActiveWishlistId, wlSort, setWlSort, wlSortCat, setWlSortCat, moveToCloset, onEdit, onItemClick }) {
@@ -4692,8 +5032,21 @@ const THEMES = [
 const THEME_KEY = "wardrobe_theme_v1";
 const getTheme = () => { try { const id = localStorage.getItem(THEME_KEY); return THEMES.find(t => t.id === id) || THEMES[0]; } catch { return THEMES[0]; } };
 
-function SettingsTab({ itemsDb, activeTheme, setActiveTheme }) {
+function SettingsTab({
+  itemsDb, activeTheme, setActiveTheme,
+  showNavLabels, setShowNavLabels,
+  density, setDensity,
+  closetSort, setClosetSort,
+  closetSeasonFilter, setClosetSeasonFilter,
+  customCategories, setCustomCategories,
+  customOccasions, setCustomOccasions,
+  customSeasons, setCustomSeasons,
+  lastSynced, allItemsForExport
+}) {
+  const [settingsTab, setSettingsTab] = useState("appearance");
   const [themeId, setThemeId] = useState(() => { try { return localStorage.getItem(THEME_KEY) || "parchment"; } catch { return "parchment"; } });
+
+  // Wear counts
   const [wornItems, setWornItems] = useState(() => itemsDb.rows.filter(i => (i.wornCount || 0) > 0).sort((a,b) => (b.wornCount||0)-(a.wornCount||0)));
   const [search, setSearch] = useState("");
   const [editingId, setEditingId] = useState(null);
@@ -4701,7 +5054,15 @@ function SettingsTab({ itemsDb, activeTheme, setActiveTheme }) {
   const [confirmReset, setConfirmReset] = useState(false);
   const [saved, setSaved] = useState(null);
 
-  // Sync wornItems when itemsDb changes
+  // Custom lists editing
+  const [newCatInput, setNewCatInput] = useState("");
+  const [newOccInput, setNewOccInput] = useState("");
+  const [newSeaInput, setNewSeaInput] = useState("");
+
+  // Data & sync
+  const [importMsg, setImportMsg] = useState(null);
+  const importRef = useRef(null);
+
   useEffect(() => {
     setWornItems(itemsDb.rows.filter(i => (i.wornCount || 0) >= 0).sort((a,b) => (b.wornCount||0)-(a.wornCount||0)));
   }, [itemsDb.rows]);
@@ -4728,126 +5089,431 @@ function SettingsTab({ itemsDb, activeTheme, setActiveTheme }) {
     setTimeout(() => setSaved(null), 2000);
   };
 
-  const filtered = wornItems.filter(i => !search || (i.name||"").toLowerCase().includes(search.toLowerCase()) || (i.brand||"").toLowerCase().includes(search.toLowerCase()));
-  const allItems = search ? itemsDb.rows.filter(i => (i.name||"").toLowerCase().includes(search.toLowerCase()) || (i.brand||"").toLowerCase().includes(search.toLowerCase())) : wornItems;
+  // ── Export CSV ──
+  const exportCSV = () => {
+    const rows = allItemsForExport || itemsDb.rows;
+    const headers = ["id","name","brand","category","color","price","season","occasions","wornCount","purchaseDate","notes","link"];
+    const lines = [headers.join(",")];
+    rows.forEach(item => {
+      const row = headers.map(h => {
+        let val = item[h] || "";
+        if (Array.isArray(val)) val = val.join(";");
+        val = String(val).replace(/"/g, '""');
+        if (val.includes(",") || val.includes('"') || val.includes("\n")) val = `"${val}"`;
+        return val;
+      });
+      lines.push(row.join(","));
+    });
+    const blob = new Blob([lines.join("\n")], { type: "text/csv" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a"); a.href = url; a.download = "wardrobe_closet.csv"; a.click();
+    URL.revokeObjectURL(url);
+  };
 
-  const labelStyle = { display: "block", fontSize: 10, fontWeight: 700, color: "#aaa", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 8 };
-  const cardStyle = { background: "#fff", borderRadius: 16, padding: "20px 22px", border: "1px solid #ece8e0", marginBottom: 16 };
+  // ── Export JSON ──
+  const exportJSON = () => {
+    const rows = allItemsForExport || itemsDb.rows;
+    const blob = new Blob([JSON.stringify(rows, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a"); a.href = url; a.download = "wardrobe_closet.json"; a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  // ── Import CSV ──
+  const importCSV = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      try {
+        const text = ev.target.result;
+        const lines = text.split("\n").filter(Boolean);
+        const headers = lines[0].split(",").map(h => h.trim().replace(/^"|"$/g, ""));
+        let imported = 0;
+        lines.slice(1).forEach(line => {
+          const vals = line.match(/(".*?"|[^,]+|(?<=,)(?=,))/g) || [];
+          const obj = {};
+          headers.forEach((h, i) => {
+            let v = (vals[i] || "").trim().replace(/^"|"$/g, "").replace(/""/g, '"');
+            obj[h] = v;
+          });
+          if (obj.name) { itemsDb.add(obj); imported++; }
+        });
+        setImportMsg(`✓ Imported ${imported} items`);
+        setTimeout(() => setImportMsg(null), 3000);
+      } catch(err) {
+        setImportMsg("✗ Import failed — check CSV format");
+        setTimeout(() => setImportMsg(null), 3000);
+      }
+    };
+    reader.readAsText(file);
+    e.target.value = "";
+  };
+
+  const fmtSynced = (ts) => {
+    if (!ts) return "Never";
+    const d = new Date(ts);
+    const now = new Date();
+    const diff = Math.floor((now - d) / 1000);
+    if (diff < 60) return "Just now";
+    if (diff < 3600) return `${Math.floor(diff/60)}m ago`;
+    if (diff < 86400) return `${Math.floor(diff/3600)}h ago`;
+    return d.toLocaleDateString("en-US", { month:"short", day:"numeric", hour:"2-digit", minute:"2-digit" });
+  };
+
+  const Card = ({ children, style={} }) => (
+    <div style={{ background:"#fff", borderRadius:16, border:"1px solid #ece8e0", padding:"20px 22px", marginBottom:16, ...style }}>{children}</div>
+  );
+  const SectionLabel = ({ children }) => (
+    <div style={{ fontSize:10, fontWeight:700, color:"#aaa", textTransform:"uppercase", letterSpacing:"0.08em", marginBottom:12 }}>{children}</div>
+  );
+  const Toggle = ({ value, onChange, label, sub }) => (
+    <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", padding:"10px 0", borderBottom:"1px solid #f5f3ef" }}>
+      <div>
+        <div style={{ fontSize:13, fontWeight:600, color:"#1a1a1a" }}>{label}</div>
+        {sub && <div style={{ fontSize:11, color:"#aaa", marginTop:2 }}>{sub}</div>}
+      </div>
+      <button onClick={() => onChange(!value)} style={{
+        width:44, height:24, borderRadius:12, border:"none", cursor:"pointer",
+        background: value ? "#1a1a1a" : "#e0dbd2",
+        position:"relative", transition:"background 0.2s", flexShrink:0
+      }}>
+        <div style={{
+          position:"absolute", top:3, left: value?20:3,
+          width:18, height:18, borderRadius:"50%", background:"#fff",
+          transition:"left 0.2s", boxShadow:"0 1px 4px rgba(0,0,0,0.2)"
+        }} />
+      </button>
+    </div>
+  );
+
+  const TABS = [["appearance","Appearance"],["preferences","Closet Prefs"],["data","Data & Sync"],["wears","Wear Counts"]];
 
   return (
-    <div style={{ maxWidth: 700, margin: "0 auto", padding: "8px 0 40px" }}>
+    <div style={{ maxWidth:720, margin:"0 auto", padding:"4px 0 40px" }}>
 
-      {/* ── COLOR THEME ── */}
-      <div style={cardStyle}>
-        <label style={labelStyle}>App Theme</label>
-        <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-          {THEMES.map(t => (
-            <button key={t.id} onClick={() => applyTheme(t.id)} style={{
-              display: "flex", flexDirection: "column", alignItems: "center", gap: 7,
-              background: "none", border: "none", cursor: "pointer", padding: 0,
-            }}>
-              {/* Mini app preview */}
-              <div style={{
-                width: 64, height: 64, borderRadius: 14, overflow: "hidden",
-                border: themeId === t.id ? "2.5px solid #1a1a1a" : "2px solid #e0dbd2",
-                boxShadow: themeId === t.id ? "0 4px 16px rgba(0,0,0,0.14)" : "0 1px 4px rgba(0,0,0,0.06)",
-                display: "flex", position: "relative",
+      {/* Tab nav */}
+      <div style={{ display:"flex", gap:4, marginBottom:24, background:"#f5f3ef", borderRadius:14, padding:4, width:"fit-content" }}>
+        {TABS.map(([v,l]) => (
+          <button key={v} onClick={()=>setSettingsTab(v)} style={{
+            padding:"7px 16px", border:"none", borderRadius:11, cursor:"pointer",
+            fontFamily:"'DM Sans',sans-serif", fontSize:12, fontWeight:700,
+            background: settingsTab===v?"#fff":"transparent",
+            color: settingsTab===v?"#1a1a1a":"#aaa",
+            boxShadow: settingsTab===v?"0 1px 4px rgba(0,0,0,0.1)":"none",
+            transition:"all 0.15s"
+          }}>{l}</button>
+        ))}
+      </div>
+
+      {/* ════════════ APPEARANCE ════════════ */}
+      {settingsTab === "appearance" && (<>
+
+        {/* Theme */}
+        <Card>
+          <SectionLabel>App Theme</SectionLabel>
+          <div style={{ display:"flex", gap:12, flexWrap:"wrap" }}>
+            {THEMES.map(t => (
+              <button key={t.id} onClick={() => applyTheme(t.id)} style={{
+                display:"flex", flexDirection:"column", alignItems:"center", gap:8,
+                background:"none", border:"none", cursor:"pointer", padding:0
               }}>
-                {/* Nav strip */}
-                <div style={{ width: 14, background: t.nav, borderRight: `1px solid ${t.border}`, flexShrink: 0, display: "flex", flexDirection: "column", alignItems: "center", paddingTop: 8, gap: 5 }}>
-                  <div style={{ width: 8, height: 8, borderRadius: 3, background: t.navActive }} />
-                  {[1,2,3].map(x => <div key={x} style={{ width: 6, height: 4, borderRadius: 2, background: t.border }} />)}
-                </div>
-                {/* Content */}
-                <div style={{ flex: 1, background: t.bg, padding: "6px 5px", display: "flex", flexDirection: "column", gap: 4 }}>
-                  <div style={{ height: 6, borderRadius: 3, background: t.card, border: `1px solid ${t.border}` }} />
-                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 3 }}>
-                    {[1,2,3,4].map(x => <div key={x} style={{ height: 16, borderRadius: 4, background: t.card, border: `1px solid ${t.border}` }} />)}
-                  </div>
-                </div>
-              </div>
-              <span style={{
-                fontSize: 10, fontWeight: themeId === t.id ? 700 : 500,
-                color: themeId === t.id ? "#1a1a1a" : "#888",
-                fontFamily: "'DM Sans', sans-serif",
-              }}>{t.label}</span>
-            </button>
-          ))}
-        </div>
-        <div style={{ marginTop: 12, fontSize: 11, color: "#bbb" }}>Theme changes reload the app to apply styles.</div>
-      </div>
-
-      {/* ── WEAR COUNTS ── */}
-      <div style={cardStyle}>
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
-          <label style={{ ...labelStyle, marginBottom: 0 }}>Wear Counts</label>
-          <button onClick={() => setConfirmReset(true)} style={{
-            padding: "5px 12px", borderRadius: 20, border: "1px solid #ffd0d0",
-            background: "#fff8f8", color: "#e05555", fontSize: 11, fontWeight: 700,
-            cursor: "pointer", fontFamily: "'DM Sans', sans-serif", display: "flex", alignItems: "center", gap: 5,
-          }}>
-            <SvgArrowUp size={11} color="#e05555" />Reset All to 0
-          </button>
-        </div>
-
-        {/* Search */}
-        <div style={{ position: "relative", marginBottom: 14 }}>
-          <SvgSearch size={13} color="#bbb" style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)" }} />
-          <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search items…"
-            style={{ width: "100%", padding: "8px 12px 8px 34px", border: "1px solid #e0dbd2", borderRadius: 100, fontFamily: "'DM Sans', sans-serif", fontSize: 12, outline: "none", background: "#fafaf8", boxSizing: "border-box" }} />
-        </div>
-
-        {saved === "all" && <div style={{ background: "#f0faf4", border: "1px solid #b6e8c8", borderRadius: 10, padding: "8px 14px", marginBottom: 12, fontSize: 12, color: "#2d6a3f", fontWeight: 600 }}>✓ All wear counts reset to 0</div>}
-
-        <div style={{ display: "flex", flexDirection: "column", gap: 6, maxHeight: 420, overflowY: "auto" }}>
-          {(search ? itemsDb.rows.filter(i => (i.name||"").toLowerCase().includes(search.toLowerCase()) || (i.brand||"").toLowerCase().includes(search.toLowerCase())) : wornItems).map(item => (
-            <div key={item.id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "8px 10px", borderRadius: 12, background: saved === item.id ? "#f0faf4" : "#fafaf8", border: `1px solid ${saved === item.id ? "#b6e8c8" : "#ece8e0"}`, transition: "all 0.2s" }}>
-              {/* Thumbnail */}
-              <div style={{ width: 40, height: 40, borderRadius: 8, overflow: "hidden", background: "#f5f2ed", flexShrink: 0 }}>
-                {item.image ? <img src={item.image} alt="" style={{ width: "100%", height: "100%", objectFit: "contain" }} /> : <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center" }}><SvgHanger size={16} color="#ccc" /></div>}
-              </div>
-              {/* Name */}
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: 13, fontWeight: 600, color: "#1a1a1a", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{item.name || "Unnamed"}</div>
-                <div style={{ fontSize: 11, color: "#aaa" }}>{item.brand || item.category || ""}</div>
-              </div>
-              {/* Wear count editor */}
-              {editingId === item.id ? (
-                <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                  <input type="number" min="0" value={editVal} onChange={e => setEditVal(e.target.value)}
-                    autoFocus onKeyDown={e => { if (e.key === "Enter") saveWorn(item, editVal); if (e.key === "Escape") setEditingId(null); }}
-                    style={{ width: 56, padding: "4px 8px", border: "1.5px solid #1a1a1a", borderRadius: 8, fontFamily: "'DM Sans', sans-serif", fontSize: 13, fontWeight: 700, textAlign: "center", outline: "none" }} />
-                  <button onClick={() => saveWorn(item, editVal)} style={{ padding: "4px 10px", borderRadius: 8, background: "#1a1a1a", border: "none", color: "#fff", fontSize: 11, fontWeight: 700, cursor: "pointer" }}>Save</button>
-                  <button onClick={() => setEditingId(null)} style={{ padding: "4px 8px", borderRadius: 8, background: "#f0f0f0", border: "none", color: "#888", fontSize: 11, cursor: "pointer" }}>✕</button>
-                </div>
-              ) : (
-                <button onClick={() => { setEditingId(item.id); setEditVal(String(item.wornCount || 0)); }} style={{
-                  display: "flex", alignItems: "center", gap: 6, padding: "5px 12px",
-                  borderRadius: 20, border: "1px solid #e0dbd2", background: "#fff",
-                  cursor: "pointer", fontFamily: "'DM Sans', sans-serif",
+                <div style={{
+                  width:72, height:72, borderRadius:16, overflow:"hidden",
+                  border: themeId===t.id ? "2.5px solid #1a1a1a" : "2px solid #e0dbd2",
+                  boxShadow: themeId===t.id ? "0 4px 16px rgba(0,0,0,0.14)" : "0 1px 4px rgba(0,0,0,0.06)",
+                  display:"flex", position:"relative",
                 }}>
-                  <span style={{ fontSize: 14, fontWeight: 800, color: "#1a1a1a" }}>{item.wornCount || 0}</span>
-                  <span style={{ fontSize: 10, color: "#aaa", fontWeight: 600 }}>worn</span>
-                  <SvgEdit size={11} color="#bbb" />
-                </button>
-              )}
+                  <div style={{ width:15, background:t.nav, borderRight:`1px solid ${t.border}`, flexShrink:0, display:"flex", flexDirection:"column", alignItems:"center", paddingTop:8, gap:5 }}>
+                    <div style={{ width:9, height:9, borderRadius:3, background:t.navActive }} />
+                    {[1,2,3].map(x => <div key={x} style={{ width:6, height:4, borderRadius:2, background:t.border }} />)}
+                  </div>
+                  <div style={{ flex:1, background:t.bg, padding:"6px 5px", display:"flex", flexDirection:"column", gap:4 }}>
+                    <div style={{ height:7, borderRadius:3, background:t.card, border:`1px solid ${t.border}` }} />
+                    <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:3 }}>
+                      {[1,2,3,4].map(x => <div key={x} style={{ height:16, borderRadius:4, background:t.card, border:`1px solid ${t.border}` }} />)}
+                    </div>
+                  </div>
+                  {themeId===t.id && (
+                    <div style={{ position:"absolute", bottom:5, right:5, width:16, height:16, borderRadius:"50%", background:"#1a1a1a", display:"flex", alignItems:"center", justifyContent:"center" }}>
+                      <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                    </div>
+                  )}
+                </div>
+                <span style={{ fontSize:10, fontWeight:themeId===t.id?700:500, color:themeId===t.id?"#1a1a1a":"#888", fontFamily:"'DM Sans',sans-serif" }}>{t.label}</span>
+              </button>
+            ))}
+          </div>
+        </Card>
+
+        {/* Density */}
+        <Card>
+          <SectionLabel>Display Density</SectionLabel>
+          <div style={{ display:"flex", gap:10 }}>
+            {[["compact","Compact"],["comfortable","Comfortable"],["spacious","Spacious"]].map(([v,l]) => (
+              <button key={v} onClick={() => setDensity(v)} style={{
+                flex:1, padding:"14px 10px", borderRadius:14,
+                border: density===v ? "2px solid #1a1a1a" : "1.5px solid #e0dbd2",
+                background: density===v ? "#1a1a1a" : "#fafaf8",
+                color: density===v ? "#fff" : "#888",
+                cursor:"pointer", fontFamily:"'DM Sans',sans-serif", fontSize:12, fontWeight:700,
+                display:"flex", flexDirection:"column", alignItems:"center", gap:8
+              }}>
+                {/* Mini density preview */}
+                <div style={{ display:"flex", flexDirection:"column", gap: v==="compact"?2:v==="comfortable"?4:7, width:40 }}>
+                  {[1,2,3].map(i => <div key={i} style={{ height: v==="compact"?4:v==="comfortable"?5:7, borderRadius:3, background: density===v?"rgba(255,255,255,0.3)":"#e0dbd2" }} />)}
+                </div>
+                {l}
+              </button>
+            ))}
+          </div>
+        </Card>
+
+        {/* Toggles */}
+        <Card>
+          <SectionLabel>Display Options</SectionLabel>
+          <Toggle value={showNavLabels} onChange={setShowNavLabels} label="Show nav labels" sub="Display text labels under sidebar icons" />
+        </Card>
+      </>)}
+
+      {/* ════════════ CLOSET PREFS ════════════ */}
+      {settingsTab === "preferences" && (<>
+
+        {/* Default sort + season */}
+        <Card>
+          <SectionLabel>Default Closet View</SectionLabel>
+          <div style={{ display:"flex", flexDirection:"column", gap:14 }}>
+            <div>
+              <div style={{ fontSize:12, fontWeight:700, color:"#555", marginBottom:8 }}>Default Sort</div>
+              <div style={{ display:"flex", flexWrap:"wrap", gap:8 }}>
+                {[["default","Date Added"],["az","A → Z"],["price","Price"],["worn","Most Worn"],["newest","Newest First"]].map(([v,l]) => (
+                  <button key={v} onClick={() => setClosetSort(v)} style={{
+                    padding:"7px 14px", borderRadius:20,
+                    border: closetSort===v ? "1.5px solid #1a1a1a" : "1.5px solid #e0dbd2",
+                    background: closetSort===v ? "#1a1a1a" : "#fff",
+                    color: closetSort===v ? "#fff" : "#888",
+                    cursor:"pointer", fontFamily:"'DM Sans',sans-serif", fontSize:12, fontWeight:700
+                  }}>{l}</button>
+                ))}
+              </div>
             </div>
-          ))}
-          {(search ? itemsDb.rows.filter(i => (i.name||"").toLowerCase().includes(search.toLowerCase()) || (i.brand||"").toLowerCase().includes(search.toLowerCase())) : wornItems).length === 0 && (
-            <div style={{ textAlign: "center", color: "#ccc", fontSize: 12, padding: "20px 0" }}>{search ? "No items match your search" : "No items with wear counts yet"}</div>
+            <div>
+              <div style={{ fontSize:12, fontWeight:700, color:"#555", marginBottom:8 }}>Default Season Filter</div>
+              <div style={{ display:"flex", flexWrap:"wrap", gap:8 }}>
+                {["All", ...customSeasons].map(v => (
+                  <button key={v} onClick={() => setClosetSeasonFilter(v)} style={{
+                    padding:"7px 14px", borderRadius:20,
+                    border: closetSeasonFilter===v ? "1.5px solid #1a1a1a" : "1.5px solid #e0dbd2",
+                    background: closetSeasonFilter===v ? "#1a1a1a" : "#fff",
+                    color: closetSeasonFilter===v ? "#fff" : "#888",
+                    cursor:"pointer", fontFamily:"'DM Sans',sans-serif", fontSize:12, fontWeight:700
+                  }}>{v}</button>
+                ))}
+              </div>
+            </div>
+          </div>
+        </Card>
+
+        {/* Custom Categories */}
+        <Card>
+          <SectionLabel>Categories</SectionLabel>
+          <div style={{ display:"flex", flexWrap:"wrap", gap:8, marginBottom:12 }}>
+            {customCategories.map(cat => (
+              <div key={cat} style={{ display:"flex", alignItems:"center", gap:4, padding:"5px 10px 5px 12px", borderRadius:20, background:"#f5f3ef", border:"1px solid #e0dbd2" }}>
+                <span style={{ fontSize:12, fontWeight:700, color:"#444" }}>{cat}</span>
+                <button onClick={() => setCustomCategories(customCategories.filter(c=>c!==cat))} style={{
+                  background:"none", border:"none", cursor:"pointer", color:"#ccc", fontSize:14, lineHeight:1, padding:"0 2px",
+                  display:"flex", alignItems:"center"
+                }} onMouseEnter={e=>e.currentTarget.style.color="#e05555"} onMouseLeave={e=>e.currentTarget.style.color="#ccc"}>×</button>
+              </div>
+            ))}
+          </div>
+          <div style={{ display:"flex", gap:8 }}>
+            <input value={newCatInput} onChange={e=>setNewCatInput(e.target.value)}
+              onKeyDown={e => { if(e.key==="Enter"&&newCatInput.trim()&&!customCategories.includes(newCatInput.trim())) { setCustomCategories([...customCategories,newCatInput.trim()]); setNewCatInput(""); } }}
+              placeholder="Add category…"
+              style={{ flex:1, padding:"8px 12px", border:"1.5px solid #e0dbd2", borderRadius:10, fontFamily:"'DM Sans',sans-serif", fontSize:12, outline:"none" }} />
+            <button onClick={() => { if(newCatInput.trim()&&!customCategories.includes(newCatInput.trim())) { setCustomCategories([...customCategories,newCatInput.trim()]); setNewCatInput(""); } }}
+              style={{ padding:"8px 14px", background:"#1a1a1a", color:"#fff", border:"none", borderRadius:10, cursor:"pointer", fontSize:14, fontWeight:700, fontFamily:"'DM Sans',sans-serif" }}>+</button>
+          </div>
+        </Card>
+
+        {/* Custom Occasions */}
+        <Card>
+          <SectionLabel>Occasions</SectionLabel>
+          <div style={{ display:"flex", flexWrap:"wrap", gap:8, marginBottom:12 }}>
+            {customOccasions.map(occ => (
+              <div key={occ} style={{ display:"flex", alignItems:"center", gap:4, padding:"5px 10px 5px 12px", borderRadius:20, background:"#f5f3ef", border:"1px solid #e0dbd2" }}>
+                <span style={{ fontSize:12, fontWeight:700, color:"#444" }}>{occ}</span>
+                <button onClick={() => setCustomOccasions(customOccasions.filter(o=>o!==occ))} style={{
+                  background:"none", border:"none", cursor:"pointer", color:"#ccc", fontSize:14, lineHeight:1, padding:"0 2px",
+                  display:"flex", alignItems:"center"
+                }} onMouseEnter={e=>e.currentTarget.style.color="#e05555"} onMouseLeave={e=>e.currentTarget.style.color="#ccc"}>×</button>
+              </div>
+            ))}
+          </div>
+          <div style={{ display:"flex", gap:8 }}>
+            <input value={newOccInput} onChange={e=>setNewOccInput(e.target.value)}
+              onKeyDown={e => { if(e.key==="Enter"&&newOccInput.trim()&&!customOccasions.includes(newOccInput.trim())) { setCustomOccasions([...customOccasions,newOccInput.trim()]); setNewOccInput(""); } }}
+              placeholder="Add occasion…"
+              style={{ flex:1, padding:"8px 12px", border:"1.5px solid #e0dbd2", borderRadius:10, fontFamily:"'DM Sans',sans-serif", fontSize:12, outline:"none" }} />
+            <button onClick={() => { if(newOccInput.trim()&&!customOccasions.includes(newOccInput.trim())) { setCustomOccasions([...customOccasions,newOccInput.trim()]); setNewOccInput(""); } }}
+              style={{ padding:"8px 14px", background:"#1a1a1a", color:"#fff", border:"none", borderRadius:10, cursor:"pointer", fontSize:14, fontWeight:700, fontFamily:"'DM Sans',sans-serif" }}>+</button>
+          </div>
+        </Card>
+
+        {/* Custom Seasons */}
+        <Card>
+          <SectionLabel>Seasons / Tags</SectionLabel>
+          <div style={{ display:"flex", flexWrap:"wrap", gap:8, marginBottom:12 }}>
+            {customSeasons.map(sea => (
+              <div key={sea} style={{ display:"flex", alignItems:"center", gap:4, padding:"5px 10px 5px 12px", borderRadius:20, background:"#f5f3ef", border:"1px solid #e0dbd2" }}>
+                <span style={{ fontSize:12, fontWeight:700, color:"#444" }}>{sea}</span>
+                <button onClick={() => setCustomSeasons(customSeasons.filter(s=>s!==sea))} style={{
+                  background:"none", border:"none", cursor:"pointer", color:"#ccc", fontSize:14, lineHeight:1, padding:"0 2px",
+                  display:"flex", alignItems:"center"
+                }} onMouseEnter={e=>e.currentTarget.style.color="#e05555"} onMouseLeave={e=>e.currentTarget.style.color="#ccc"}>×</button>
+              </div>
+            ))}
+          </div>
+          <div style={{ display:"flex", gap:8 }}>
+            <input value={newSeaInput} onChange={e=>setNewSeaInput(e.target.value)}
+              onKeyDown={e => { if(e.key==="Enter"&&newSeaInput.trim()&&!customSeasons.includes(newSeaInput.trim())) { setCustomSeasons([...customSeasons,newSeaInput.trim()]); setNewSeaInput(""); } }}
+              placeholder="Add season or tag…"
+              style={{ flex:1, padding:"8px 12px", border:"1.5px solid #e0dbd2", borderRadius:10, fontFamily:"'DM Sans',sans-serif", fontSize:12, outline:"none" }} />
+            <button onClick={() => { if(newSeaInput.trim()&&!customSeasons.includes(newSeaInput.trim())) { setCustomSeasons([...customSeasons,newSeaInput.trim()]); setNewSeaInput(""); } }}
+              style={{ padding:"8px 14px", background:"#1a1a1a", color:"#fff", border:"none", borderRadius:10, cursor:"pointer", fontSize:14, fontWeight:700, fontFamily:"'DM Sans',sans-serif" }}>+</button>
+          </div>
+        </Card>
+      </>)}
+
+      {/* ════════════ DATA & SYNC ════════════ */}
+      {settingsTab === "data" && (<>
+
+        {/* Supabase status */}
+        <Card>
+          <SectionLabel>Sync Status</SectionLabel>
+          <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", padding:"10px 14px", background:"#f0faf4", borderRadius:12, border:"1px solid #c8e8d0" }}>
+            <div style={{ display:"flex", alignItems:"center", gap:10 }}>
+              <div style={{ width:10, height:10, borderRadius:"50%", background:"#3aaa6e", flexShrink:0, boxShadow:"0 0 6px #3aaa6e" }} />
+              <div>
+                <div style={{ fontSize:13, fontWeight:700, color:"#2d6a3f" }}>Connected to Supabase</div>
+                <div style={{ fontSize:11, color:"#5aaa7e", marginTop:1 }}>Last synced: {fmtSynced(lastSynced)}</div>
+              </div>
+            </div>
+            <div style={{ textAlign:"right", fontSize:11, color:"#5aaa7e", fontWeight:600 }}>{itemsDb.rows.length} items</div>
+          </div>
+        </Card>
+
+        {/* Export */}
+        <Card>
+          <SectionLabel>Export</SectionLabel>
+          <div style={{ display:"flex", flexDirection:"column", gap:10 }}>
+            <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", padding:"12px 14px", background:"#fafaf8", borderRadius:12, border:"1px solid #e8e4dc" }}>
+              <div>
+                <div style={{ fontSize:13, fontWeight:700, color:"#1a1a1a" }}>Export as CSV</div>
+                <div style={{ fontSize:11, color:"#aaa", marginTop:2 }}>Spreadsheet-compatible, all closet fields</div>
+              </div>
+              <button onClick={exportCSV} style={{
+                padding:"8px 18px", background:"#1a1a1a", color:"#fff", border:"none",
+                borderRadius:10, cursor:"pointer", fontFamily:"'DM Sans',sans-serif", fontSize:12, fontWeight:700, flexShrink:0
+              }}>Download CSV</button>
+            </div>
+            <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", padding:"12px 14px", background:"#fafaf8", borderRadius:12, border:"1px solid #e8e4dc" }}>
+              <div>
+                <div style={{ fontSize:13, fontWeight:700, color:"#1a1a1a" }}>Export as JSON</div>
+                <div style={{ fontSize:11, color:"#aaa", marginTop:2 }}>Full data with all fields, for backup or import</div>
+              </div>
+              <button onClick={exportJSON} style={{
+                padding:"8px 18px", background:"#1a1a1a", color:"#fff", border:"none",
+                borderRadius:10, cursor:"pointer", fontFamily:"'DM Sans',sans-serif", fontSize:12, fontWeight:700, flexShrink:0
+              }}>Download JSON</button>
+            </div>
+          </div>
+        </Card>
+
+        {/* Import */}
+        <Card>
+          <SectionLabel>Import</SectionLabel>
+          <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", padding:"12px 14px", background:"#fafaf8", borderRadius:12, border:"1px solid #e8e4dc" }}>
+            <div>
+              <div style={{ fontSize:13, fontWeight:700, color:"#1a1a1a" }}>Import from CSV</div>
+              <div style={{ fontSize:11, color:"#aaa", marginTop:2 }}>Adds items to your closet. Requires a "name" column.</div>
+            </div>
+            <button onClick={() => importRef.current?.click()} style={{
+              padding:"8px 18px", background:"#f5f3ef", color:"#555", border:"1.5px solid #e0dbd2",
+              borderRadius:10, cursor:"pointer", fontFamily:"'DM Sans',sans-serif", fontSize:12, fontWeight:700, flexShrink:0
+            }}>Choose CSV</button>
+            <input ref={importRef} type="file" accept=".csv" style={{ display:"none" }} onChange={importCSV} />
+          </div>
+          {importMsg && (
+            <div style={{ marginTop:10, padding:"8px 14px", borderRadius:10, background: importMsg.startsWith("✓")?"#f0faf4":"#fff0f0", color: importMsg.startsWith("✓")?"#2d6a3f":"#e05555", fontSize:12, fontWeight:700 }}>
+              {importMsg}
+            </div>
           )}
-        </div>
-      </div>
+        </Card>
+      </>)}
+
+      {/* ════════════ WEAR COUNTS ════════════ */}
+      {settingsTab === "wears" && (
+        <Card>
+          <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:14 }}>
+            <div style={{ fontSize:10, fontWeight:700, color:"#aaa", textTransform:"uppercase", letterSpacing:"0.08em" }}>Wear Counts</div>
+            <button onClick={() => setConfirmReset(true)} style={{
+              padding:"5px 12px", borderRadius:20, border:"1px solid #ffd0d0",
+              background:"#fff8f8", color:"#e05555", fontSize:11, fontWeight:700,
+              cursor:"pointer", fontFamily:"'DM Sans',sans-serif", display:"flex", alignItems:"center", gap:5
+            }}>Reset All to 0</button>
+          </div>
+          <div style={{ position:"relative", marginBottom:14 }}>
+            <SvgSearch size={13} color="#bbb" style={{ position:"absolute", left:12, top:"50%", transform:"translateY(-50%)" }} />
+            <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search items…"
+              style={{ width:"100%", padding:"8px 12px 8px 34px", border:"1px solid #e0dbd2", borderRadius:100, fontFamily:"'DM Sans',sans-serif", fontSize:12, outline:"none", background:"#fafaf8", boxSizing:"border-box" }} />
+          </div>
+          {saved==="all" && <div style={{ background:"#f0faf4", border:"1px solid #b6e8c8", borderRadius:10, padding:"8px 14px", marginBottom:12, fontSize:12, color:"#2d6a3f", fontWeight:600 }}>✓ All wear counts reset to 0</div>}
+          <div style={{ display:"flex", flexDirection:"column", gap:6, maxHeight:480, overflowY:"auto" }}>
+            {(search ? itemsDb.rows.filter(i => (i.name||"").toLowerCase().includes(search.toLowerCase()) || (i.brand||"").toLowerCase().includes(search.toLowerCase())) : wornItems).map(item => (
+              <div key={item.id} style={{ display:"flex", alignItems:"center", gap:12, padding:"8px 10px", borderRadius:12, background:saved===item.id?"#f0faf4":"#fafaf8", border:`1px solid ${saved===item.id?"#b6e8c8":"#ece8e0"}`, transition:"all 0.2s" }}>
+                <div style={{ width:40, height:40, borderRadius:8, overflow:"hidden", background:"#f5f2ed", flexShrink:0 }}>
+                  {item.image ? <img src={item.image} alt="" style={{ width:"100%", height:"100%", objectFit:"contain" }} /> : <div style={{ width:"100%", height:"100%", display:"flex", alignItems:"center", justifyContent:"center" }}><SvgHanger size={16} color="#ccc" /></div>}
+                </div>
+                <div style={{ flex:1, minWidth:0 }}>
+                  <div style={{ fontSize:13, fontWeight:600, color:"#1a1a1a", whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>{item.name||"Unnamed"}</div>
+                  <div style={{ fontSize:11, color:"#aaa" }}>{item.brand||item.category||""}</div>
+                </div>
+                {editingId===item.id ? (
+                  <div style={{ display:"flex", alignItems:"center", gap:6 }}>
+                    <input type="number" min="0" value={editVal} onChange={e=>setEditVal(e.target.value)}
+                      autoFocus onKeyDown={e=>{ if(e.key==="Enter")saveWorn(item,editVal); if(e.key==="Escape")setEditingId(null); }}
+                      style={{ width:56, padding:"4px 8px", border:"1.5px solid #1a1a1a", borderRadius:8, fontFamily:"'DM Sans',sans-serif", fontSize:13, fontWeight:700, textAlign:"center", outline:"none" }} />
+                    <button onClick={()=>saveWorn(item,editVal)} style={{ padding:"4px 10px", borderRadius:8, background:"#1a1a1a", border:"none", color:"#fff", fontSize:11, fontWeight:700, cursor:"pointer" }}>Save</button>
+                    <button onClick={()=>setEditingId(null)} style={{ padding:"4px 8px", borderRadius:8, background:"#f0f0f0", border:"none", color:"#888", fontSize:11, cursor:"pointer" }}>✕</button>
+                  </div>
+                ) : (
+                  <button onClick={()=>{ setEditingId(item.id); setEditVal(String(item.wornCount||0)); }} style={{
+                    display:"flex", alignItems:"center", gap:6, padding:"5px 12px",
+                    borderRadius:20, border:"1px solid #e0dbd2", background:"#fff", cursor:"pointer", fontFamily:"'DM Sans',sans-serif"
+                  }}>
+                    <span style={{ fontSize:14, fontWeight:800, color:"#1a1a1a" }}>{item.wornCount||0}</span>
+                    <span style={{ fontSize:10, color:"#aaa", fontWeight:600 }}>worn</span>
+                    <SvgEdit size={11} color="#bbb" />
+                  </button>
+                )}
+              </div>
+            ))}
+          </div>
+        </Card>
+      )}
 
       {/* Reset confirmation modal */}
       {confirmReset && (
-        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 500 }}>
-          <div style={{ background: "#fff", borderRadius: 20, padding: "28px 32px", maxWidth: 360, width: "90%", textAlign: "center" }}>
-            <div style={{ fontSize: 16, fontWeight: 800, marginBottom: 8 }}>Reset all wear counts?</div>
-            <div style={{ fontSize: 13, color: "#888", marginBottom: 24, lineHeight: 1.5 }}>This will set every item's wear count back to 0. This cannot be undone.</div>
-            <div style={{ display: "flex", gap: 10 }}>
-              <button onClick={() => setConfirmReset(false)} style={{ flex: 1, padding: "10px", borderRadius: 12, border: "1px solid #e0dbd2", background: "#fafaf8", cursor: "pointer", fontWeight: 600, fontFamily: "'DM Sans', sans-serif" }}>Cancel</button>
-              <button onClick={resetAllWorn} style={{ flex: 1, padding: "10px", borderRadius: 12, border: "none", background: "#e05555", color: "#fff", cursor: "pointer", fontWeight: 700, fontFamily: "'DM Sans', sans-serif" }}>Reset All</button>
+        <div style={{ position:"fixed", inset:0, background:"rgba(0,0,0,0.4)", display:"flex", alignItems:"center", justifyContent:"center", zIndex:500 }}>
+          <div style={{ background:"#fff", borderRadius:20, padding:"28px 32px", maxWidth:360, width:"90%", textAlign:"center" }}>
+            <div style={{ fontSize:16, fontWeight:800, marginBottom:8 }}>Reset all wear counts?</div>
+            <div style={{ fontSize:13, color:"#888", marginBottom:24, lineHeight:1.5 }}>This will set every item's wear count back to 0. This cannot be undone.</div>
+            <div style={{ display:"flex", gap:10 }}>
+              <button onClick={()=>setConfirmReset(false)} style={{ flex:1, padding:"10px", borderRadius:12, border:"1px solid #e0dbd2", background:"#fafaf8", cursor:"pointer", fontWeight:600, fontFamily:"'DM Sans',sans-serif" }}>Cancel</button>
+              <button onClick={resetAllWorn} style={{ flex:1, padding:"10px", borderRadius:12, border:"none", background:"#e05555", color:"#fff", cursor:"pointer", fontWeight:700, fontFamily:"'DM Sans',sans-serif" }}>Reset All</button>
             </div>
           </div>
         </div>
@@ -5368,8 +6034,24 @@ export default function App() {
   const [calendarMonth, setCalendarMonth] = useState(() => { const n = new Date(); return { year: n.getFullYear(), month: n.getMonth() }; });
   const [calendarWeather, setCalendarWeather] = useState(null);
   const [itemDetail, setItemDetail] = useState(null); // closet item detail popup
-  const [closetSort, setClosetSort] = useState("default"); // default | az | price | worn | newest
-  const [closetSeasonFilter, setClosetSeasonFilter] = useState("All");
+  const [closetSort, setClosetSort] = useState(() => { try { return localStorage.getItem("wardrobe_default_sort_v1") || "default"; } catch { return "default"; } });
+  const [closetSeasonFilter, setClosetSeasonFilter] = useState(() => { try { return localStorage.getItem("wardrobe_default_season_v1") || "All"; } catch { return "All"; } });
+  const [showNavLabels, setShowNavLabels] = useState(() => { try { return localStorage.getItem("wardrobe_nav_labels_v1") !== "0"; } catch { return true; } });
+  const [density, setDensity] = useState(() => { try { return localStorage.getItem("wardrobe_density_v1") || "comfortable"; } catch { return "comfortable"; } });
+  const CUSTOM_CATS_KEY = "wardrobe_custom_cats_v1";
+  const CUSTOM_OCC_KEY = "wardrobe_custom_occ_v1";
+  const CUSTOM_SEAS_KEY = "wardrobe_custom_seas_v1";
+  const [customCategories, setCustomCategories] = useState(() => { try { return JSON.parse(localStorage.getItem("wardrobe_custom_cats_v1") || "null") || ["Tops","Bottoms","Dresses","Outerwear","Shoes","Bags","Accessories","Activewear","Swimwear","Jewelry","Other"]; } catch { return ["Tops","Bottoms","Dresses","Outerwear","Shoes","Bags","Accessories","Activewear","Swimwear","Jewelry","Other"]; } });
+  const [customOccasions, setCustomOccasions] = useState(() => { try { return JSON.parse(localStorage.getItem("wardrobe_custom_occ_v1") || "null") || ["WFH","Disney","Universal","Date Night","Travel","Sport","Weekend","Occasion"]; } catch { return ["WFH","Disney","Universal","Date Night","Travel","Sport","Weekend","Occasion"]; } });
+  const [customSeasons, setCustomSeasons] = useState(() => { try { return JSON.parse(localStorage.getItem("wardrobe_custom_seas_v1") || "null") || ["Spring","Summer","Fall","Winter","All Season","Holiday","Disney"]; } catch { return ["Spring","Summer","Fall","Winter","All Season","Holiday","Disney"]; } });
+  const [lastSynced, setLastSynced] = useState(() => { try { return localStorage.getItem("wardrobe_last_synced_v1") || null; } catch { return null; } });
+  useEffect(() => {
+    if (itemsDb.rows.length > 0) {
+      const ts = new Date().toISOString();
+      setLastSynced(ts);
+      try { localStorage.setItem("wardrobe_last_synced_v1", ts); } catch {}
+    }
+  }, [itemsDb.rows]);
   const [closetSearch, setClosetSearch] = useState("");
   const [activeLookbook, setActiveLookbook] = useState(null);
   const [moodboardActiveIdx, setMoodboardActiveIdx] = useState(0);
@@ -5534,16 +6216,40 @@ export default function App() {
     ];
   })();
 
-  const NAV_ICON_MAP = {
-    closet: (active) => <HangerIcon size={20} color={active ? "#fff" : "#888"} />,
-    outfits: (active) => <SvgDress size={18} color={active ? "#fff" : "#888"} />,
-    lookbooks: (active) => <SvgGrid size={18} color={active ? "#fff" : "#888"} />,
-    stats: (active) => <SvgPalette size={18} color={active ? "#fff" : "#888"} />,
-    moodboard: (active) => <SvgPushPin size={18} color={active ? "#fff" : "#888"} />,
-    seller: (active) => <SvgTag size={18} color={active ? "#fff" : "#888"} />,
-    wishlist: (active) => <SvgHeart size={18} color={active ? "#fff" : "#888"} />,
-    settings: (active) => <SvgGear size={18} color={active ? "#fff" : "#888"} />,
+  // Filled glyph nav icons
+  // Custom nav icons — place SVG files in /public/icons/
+  // CSS filter: brightness(0) = black icon (default), brightness(0) invert(1) = white icon (active)
+  const NAV_SVG_SRCS = {
+    closet:    "/icons/CLOSET_TAB.svg",
+    outfits:   "/icons/Outfits.svg",
+    lookbooks: "/icons/Lookbook.svg",
+    stats:     "/icons/STYLE_PROFILE.svg",
+    moodboard: "/icons/Moodboard.svg",
+    seller:    "/icons/Seller_Dashboard.svg",
+    wishlist:  "/icons/Wishlist.svg",
+    settings:  "/icons/Settings.svg",
   };
+  const NAV_ICON_MAP = Object.fromEntries(
+    Object.entries(NAV_SVG_SRCS).map(([id, src]) => [
+      id,
+      (active) => (
+        <img
+          src={src}
+          alt=""
+          width={44}
+          height={44}
+          style={{
+            display: "block",
+            objectFit: "contain",
+            filter: active
+              ? "brightness(0) invert(1)"
+              : "brightness(0) opacity(0.55)",
+            transition: "filter 0.15s ease",
+          }}
+        />
+      ),
+    ])
+  );
 
   const PAGE_TITLES = {
     closet: ["My Closet", `${itemsDb.rows.filter(i=>!i.forSale).length} pieces`],
@@ -5557,7 +6263,7 @@ export default function App() {
   };
 
   return (
-    <div style={{ background: activeTheme.bg, minHeight: "100vh", color: activeTheme.text }}>
+    <div className={`density-${density}`} style={{ background: activeTheme.bg, minHeight: "100vh", color: activeTheme.text }}>
       <style>{globalStyles}</style>
 
       {/* ── Vertical nav sidebar ── */}
@@ -5572,8 +6278,8 @@ export default function App() {
               className={"nav-icon-btn" + (active ? " active" : "")}
               title={n.label}
             >
-              {NAV_ICON_MAP[n.id]?.(active)}
-              <span className="nav-label">{n.label}</span>
+              <span className="nav-icon-wrap">{NAV_ICON_MAP[n.id]?.(active)}</span>
+              {showNavLabels && <span className="nav-label">{n.label}</span>}
             </button>
           );
         })}
@@ -5994,7 +6700,7 @@ export default function App() {
             )}
 
             {/* STATS */}
-            {tab === "stats" && <StatsTab itemsDb={itemsDb} outfitsDb={outfitsDb} lookbooksDb={lookbooksDb} onViewItem={item => setItemDetail(item)} />}
+            {tab === "stats" && <StatsTab itemsDb={itemsDb} outfitsDb={outfitsDb} lookbooksDb={lookbooksDb} wishlistDb={wishlistDb} outfitCalendar={outfitCalendar} onViewItem={item => setItemDetail(item)} />}
 
             {/* SELLER DASHBOARD */}
             {tab === "seller" && <SellerDashboard itemsDb={itemsDb} onViewItem={(item) => setItemDetail(item)} />}
@@ -6003,7 +6709,19 @@ export default function App() {
             {tab === "moodboard" && <Moodboard closetItems={itemsDb.rows.filter(i => !i.forSale)} activeIdx={moodboardActiveIdx} setActiveIdx={setMoodboardActiveIdx} />}
 
             {/* SETTINGS */}
-            {tab === "settings" && <SettingsTab itemsDb={itemsDb} activeTheme={activeTheme} setActiveTheme={setActiveTheme} />}
+            {tab === "settings" && <SettingsTab
+                itemsDb={itemsDb}
+                activeTheme={activeTheme} setActiveTheme={setActiveTheme}
+                showNavLabels={showNavLabels} setShowNavLabels={v => { setShowNavLabels(v); try { localStorage.setItem("wardrobe_nav_labels_v1", v?"1":"0"); } catch {} }}
+                density={density} setDensity={v => { setDensity(v); try { localStorage.setItem("wardrobe_density_v1", v); } catch {} }}
+                closetSort={closetSort} setClosetSort={v => { setClosetSort(v); try { localStorage.setItem("wardrobe_default_sort_v1", v); } catch {} }}
+                closetSeasonFilter={closetSeasonFilter} setClosetSeasonFilter={v => { setClosetSeasonFilter(v); try { localStorage.setItem("wardrobe_default_season_v1", v); } catch {} }}
+                customCategories={customCategories} setCustomCategories={v => { setCustomCategories(v); try { localStorage.setItem("wardrobe_custom_cats_v1", JSON.stringify(v)); } catch {} }}
+                customOccasions={customOccasions} setCustomOccasions={v => { setCustomOccasions(v); try { localStorage.setItem("wardrobe_custom_occ_v1", JSON.stringify(v)); } catch {} }}
+                customSeasons={customSeasons} setCustomSeasons={v => { setCustomSeasons(v); try { localStorage.setItem("wardrobe_custom_seas_v1", JSON.stringify(v)); } catch {} }}
+                lastSynced={lastSynced}
+                allItemsForExport={itemsDb.rows}
+              />}
 
             {/* WISHLIST */}
             {tab === "wishlist" && <WishlistTab
@@ -6390,6 +7108,7 @@ export default function App() {
           outfits={outfitsDb.rows}
           markOutfitWorn={markOutfitWorn}
           allItems={allItems}
+          closetItems={itemsDb.rows}
           onClose={() => setActiveLookbook(null)}
           onUpdate={updateLookbook}
           onOpenOutfit={(outfit) => { setActiveLookbook(null); setOutfitPopup(outfit); }}

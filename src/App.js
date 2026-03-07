@@ -2381,7 +2381,7 @@ function BoardSizer({ boardRef: _ignored, children }) {
 }
 
 // ── Outfit Builder ───────────────────────────────────────────────────────────
-function OutfitBuilder({ itemsDb, wishlistDb, onSave, onClose, initial, seedItem }) {
+function OutfitBuilder({ itemsDb, wishlistDb, onSave, onClose, initial, seedItem, capsules }) {
   const [name, setName] = useState(initial?.name || "");
   const [notes, setNotes] = useState(initial?.notes || "");
   const [tags, setTags] = useState(initial?.tags || []);
@@ -2409,6 +2409,12 @@ function OutfitBuilder({ itemsDb, wishlistDb, onSave, onClose, initial, seedItem
     return pos;
   });
   const [itemPopup, setItemPopup] = useState(null);
+  const [capsulePickerOpen, setCapsulePickerOpen] = useState(false);
+  const OUTFIT_DRAFTS_KEY = "wardrobe_outfit_drafts_v1";
+  const loadOutfitDrafts = () => { try { return JSON.parse(localStorage.getItem("wardrobe_outfit_drafts_v1") || "[]"); } catch { return []; } };
+  const [outfitDrafts, setOutfitDrafts] = useState(loadOutfitDrafts);
+  const [showDraftPanel, setShowDraftPanel] = useState(false);
+  const [draftSaved, setDraftSaved] = useState(false);
   const [lockedIds, setLockedIds] = useState(new Set());
   const [canUndo, setCanUndo] = useState(false);
   const [canRedo, setCanRedo] = useState(false);
@@ -2470,17 +2476,30 @@ function OutfitBuilder({ itemsDb, wishlistDb, onSave, onClose, initial, seedItem
     return () => window.removeEventListener("keydown", handler);
   }, [onClose]);
 
-  const activeDb = panelTab === "closet" ? itemsDb : wishlistDb;
+  const activeDb = panelTab === "wishlist" ? wishlistDb : itemsDb;
   const allItems = [...itemsDb.rows, ...wishlistDb.rows];
   const activeFilterCount = (filterCat !== "All" ? 1 : 0) + (filterColor ? 1 : 0) + (filterSeason ? 1 : 0);
 
-  const panelItems = activeDb.rows.filter(i => {
-    const matchSearch = i.name.toLowerCase().includes(search.toLowerCase()) || (i.brand || "").toLowerCase().includes(search.toLowerCase());
-    const matchCat = filterCat === "All" || i.category === filterCat;
-    const matchColor = !filterColor || i.color === filterColor;
-    const matchSeason = !filterSeason || i.season === filterSeason;
-    return matchSearch && matchCat && matchColor && matchSeason;
-  });
+  const [activeCapsuleId, setActiveCapsuleId] = useState(null);
+  const activeCapsule = (capsules || []).find(c => c.id === activeCapsuleId) || null;
+
+  const panelItems = (() => {
+    if (panelTab === "capsule") {
+      if (!activeCapsule) return [];
+      const ids = new Set(activeCapsule.itemIds || []);
+      return itemsDb.rows.filter(i => ids.has(i.id)).filter(i => {
+        const matchSearch = !search || i.name.toLowerCase().includes(search.toLowerCase()) || (i.brand || "").toLowerCase().includes(search.toLowerCase());
+        return matchSearch;
+      });
+    }
+    return activeDb.rows.filter(i => {
+      const matchSearch = i.name.toLowerCase().includes(search.toLowerCase()) || (i.brand || "").toLowerCase().includes(search.toLowerCase());
+      const matchCat = filterCat === "All" || i.category === filterCat;
+      const matchColor = !filterColor || i.color === filterColor;
+      const matchSeason = !filterSeason || i.season === filterSeason;
+      return matchSearch && matchCat && matchColor && matchSeason;
+    });
+  })();
 
   const toggleItem = (id) => {
     if (layers.includes(id)) {
@@ -2579,6 +2598,56 @@ function OutfitBuilder({ itemsDb, wishlistDb, onSave, onClose, initial, seedItem
     setItemPopup(null);
   };
 
+  const saveOutfitDraft = () => {
+    const draft = {
+      _draftId: initial?._draftId || ("od_" + Date.now()),
+      _savedAt: Date.now(),
+      name: name || "Untitled Look",
+      notes, tags, seasons, layers, positions
+    };
+    const existing = loadOutfitDrafts().filter(d => d._draftId !== draft._draftId);
+    const updated = [draft, ...existing].slice(0, 20);
+    localStorage.setItem("wardrobe_outfit_drafts_v1", JSON.stringify(updated));
+    setOutfitDrafts(updated);
+    setDraftSaved(true);
+    setTimeout(() => setDraftSaved(false), 2000);
+  };
+
+  const loadOutfitDraft = (draft) => {
+    setName(draft.name || "");
+    setNotes(draft.notes || "");
+    setTags(draft.tags || []);
+    setSeasons(draft.seasons || []);
+    setLayers(draft.layers || []);
+    setPositions(draft.positions || {});
+    setShowDraftPanel(false);
+  };
+
+  const deleteOutfitDraft = (draftId) => {
+    const updated = loadOutfitDrafts().filter(d => d._draftId !== draftId);
+    localStorage.setItem("wardrobe_outfit_drafts_v1", JSON.stringify(updated));
+    setOutfitDrafts(updated);
+  };
+
+  const loadCapsule = (capsule) => {
+    const ids = capsule.itemIds || [];
+    const board = boardRef.current;
+    const cw = board?.offsetWidth || 400;
+    const ch = board?.offsetHeight || 500;
+    const newPos = { ...positions };
+    const newLayers = [...layers];
+    ids.forEach((id, i) => {
+      if (!newLayers.includes(id)) {
+        newLayers.push(id);
+        newPos[id] = { x: 30 + (i % 4) * 140, y: 30 + Math.floor(i / 4) * 160, w: 120, h: 140 };
+      }
+    });
+    setLayers(newLayers);
+    setPositions(newPos);
+    pushHistory(newLayers, newPos);
+    setCapsulePickerOpen(false);
+  };
+
 
   const capturePreview = () => {
     return new Promise((resolve) => {
@@ -2635,11 +2704,19 @@ function OutfitBuilder({ itemsDb, wishlistDb, onSave, onClose, initial, seedItem
       <div className="builder-topbar">
         <button onClick={onClose} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 22, color: "#888", lineHeight: 1, padding: 0 }}><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
         <span style={{ fontWeight: 700, fontSize: 15, color: "#1a1a1a" }}>Build a Look</span>
-        <button onClick={handleSave} disabled={!name || layers.length === 0} style={{
-          ...btnBase, padding: "8px 20px", fontSize: 13,
-          background: (!name || layers.length === 0) ? "#ccc" : "#2d6a3f",
-          color: "#fff", cursor: (!name || layers.length === 0) ? "not-allowed" : "pointer"
-        }}>Save Look</button>
+        <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+          <button onClick={() => setShowDraftPanel(p => !p)} style={{ ...btnBase, padding: "7px 14px", fontSize: 12, background: showDraftPanel ? "#f0f0f0" : "#f5f3ef", color: "#555", position: "relative" }}>
+            Drafts {outfitDrafts.length > 0 && <span style={{ marginLeft: 4, background: "#1a1a1a", color: "#fff", borderRadius: 10, padding: "1px 6px", fontSize: 10, fontWeight: 800 }}>{outfitDrafts.length}</span>}
+          </button>
+          <button onClick={saveOutfitDraft} style={{ ...btnBase, padding: "7px 14px", fontSize: 12, background: draftSaved ? "#f0faf4" : "#f5f3ef", color: draftSaved ? "#2d6a3f" : "#555" }}>
+            {draftSaved ? "✓ Saved" : "Save Draft"}
+          </button>
+          <button onClick={handleSave} disabled={!name || layers.length === 0} style={{
+            ...btnBase, padding: "8px 20px", fontSize: 13,
+            background: (!name || layers.length === 0) ? "#ccc" : "#2d6a3f",
+            color: "#fff", cursor: (!name || layers.length === 0) ? "not-allowed" : "pointer"
+          }}>Save Look</button>
+        </div>
       </div>
 
       <div className="builder-panels">
@@ -2823,52 +2900,68 @@ function OutfitBuilder({ itemsDb, wishlistDb, onSave, onClose, initial, seedItem
           <div style={{ padding: "10px 12px 8px", borderBottom: "1.5px solid #e8e4dc", flexShrink: 0 }}>
             {/* Tab toggle */}
             <div style={{ display: "flex", background: "#f5f2ed", borderRadius: 10, padding: 3, gap: 2, marginBottom: 8 }}>
-              {[{ id: "closet", label: "Closet" }, { id: "wishlist", label: "Wishlist" }].map(t => (
+              {[{ id: "closet", label: "Closet" }, { id: "wishlist", label: "Wishlist" }, { id: "capsule", label: "Capsule" }].map(t => (
                 <button key={t.id} onClick={() => setPanelTab(t.id)} style={{
                   flex: 1, padding: "6px 0", border: "none", borderRadius: 8,
                   background: panelTab === t.id ? "#fff" : "transparent",
                   color: panelTab === t.id ? "#1a1a1a" : "#aaa",
-                  fontFamily: "'DM Sans', sans-serif", fontSize: 12, fontWeight: 700, cursor: "pointer",
+                  fontFamily: "'DM Sans', sans-serif", fontSize: 11, fontWeight: 700, cursor: "pointer",
                   boxShadow: panelTab === t.id ? "0 1px 4px rgba(0,0,0,0.1)" : "none", transition: "all 0.15s"
                 }}>{t.label}</button>
               ))}
             </div>
 
-            {/* Search */}
-            <input className="builder-search" value={search} onChange={e => setSearch(e.target.value)} placeholder="Search…" style={{ marginBottom: 8 }} />
-
-            {/* Filter toggle button */}
-            <button onClick={() => setShowFilters(f => !f)} style={{
-              ...btnBase, width: "100%", padding: "6px", marginBottom: showFilters ? 8 : 0,
-              background: activeFilterCount > 0 ? "#f0faf4" : "#f5f3ef",
-              color: activeFilterCount > 0 ? "#2d6a3f" : "#888", fontSize: 12
-            }}>
-              {activeFilterCount > 0 ? `${activeFilterCount} filter${activeFilterCount > 1 ? "s" : ""} active` : "Filters"}
-            </button>
-
-            {showFilters && (
-              <div style={{ display: "flex", flexDirection: "column", gap: 6, marginBottom: 8 }}>
-                <select value={filterCat} onChange={e => setFilterCat(e.target.value)} style={{ ...fieldStyle }}>
-                  {CATEGORIES.map(c => <option key={c} value={c}>{c === "All" ? "All Categories" : c}</option>)}
-                </select>
-                <select value={filterColor} onChange={e => setFilterColor(e.target.value)} style={{ ...fieldStyle }}>
-                  <option value="">All Colors</option>
-                  {COLORS.map(c => <option key={c} value={c}>{c}</option>)}
-                </select>
-                <select value={filterSeason} onChange={e => setFilterSeason(e.target.value)} style={{ ...fieldStyle }}>
-                  <option value="">All Seasons</option>
-                  {SEASONS.map(s => <option key={s} value={s}>{s}</option>)}
-                </select>
-                {activeFilterCount > 0 && (
-                  <button onClick={() => { setFilterCat("All"); setFilterColor(""); setFilterSeason(""); }} style={{ ...btnBase, padding: "5px", background: "#fef2f2", color: "#e05555", fontSize: 11 }}>Clear filters</button>
+            {/* Capsule picker */}
+            {panelTab === "capsule" && (
+              <div style={{ marginBottom: 8 }}>
+                {capsules && capsules.length > 0 ? (
+                  <select value={activeCapsuleId || ""} onChange={e => setActiveCapsuleId(e.target.value || null)} style={{ ...fieldStyle, marginBottom: 0 }}>
+                    <option value="">Choose a capsule…</option>
+                    {capsules.map(c => <option key={c.id} value={c.id}>{c.name} ({(c.itemIds || []).length} items)</option>)}
+                  </select>
+                ) : (
+                  <div style={{ fontSize: 12, color: "#bbb", padding: "8px 0", textAlign: "center" }}>No capsules yet</div>
                 )}
               </div>
             )}
 
-            <div style={{ display: "flex", gap: 6, marginTop: 10 }}>
-              <button onClick={() => setItemPopup({ mode: "add" })} style={{ ...btnBase, flex: 1, padding: "7px 0", background: "#2d6a3f", color: "#fff", fontSize: 12 }}>+ Add</button>
-              <button onClick={() => activeDb.refresh()} style={{ ...btnBase, flex: 1, padding: "7px 0", background: "#f5f2ed", color: "#555", fontSize: 12 }}>↻ Fetch</button>
-            </div>
+            {/* Search */}
+            <input className="builder-search" value={search} onChange={e => setSearch(e.target.value)} placeholder="Search…" style={{ marginBottom: 8 }} />
+
+            {/* Filter toggle button — only for closet/wishlist */}
+            {panelTab !== "capsule" && (<>
+              <button onClick={() => setShowFilters(f => !f)} style={{
+                ...btnBase, width: "100%", padding: "6px", marginBottom: showFilters ? 8 : 0,
+                background: activeFilterCount > 0 ? "#f0faf4" : "#f5f3ef",
+                color: activeFilterCount > 0 ? "#2d6a3f" : "#888", fontSize: 12
+              }}>
+                {activeFilterCount > 0 ? `${activeFilterCount} filter${activeFilterCount > 1 ? "s" : ""} active` : "Filters"}
+              </button>
+
+              {showFilters && (
+                <div style={{ display: "flex", flexDirection: "column", gap: 6, marginBottom: 8 }}>
+                  <select value={filterCat} onChange={e => setFilterCat(e.target.value)} style={{ ...fieldStyle }}>
+                    {CATEGORIES.map(c => <option key={c} value={c}>{c === "All" ? "All Categories" : c}</option>)}
+                  </select>
+                  <select value={filterColor} onChange={e => setFilterColor(e.target.value)} style={{ ...fieldStyle }}>
+                    <option value="">All Colors</option>
+                    {COLORS.map(c => <option key={c} value={c}>{c}</option>)}
+                  </select>
+                  <select value={filterSeason} onChange={e => setFilterSeason(e.target.value)} style={{ ...fieldStyle }}>
+                    <option value="">All Seasons</option>
+                    {SEASONS.map(s => <option key={s} value={s}>{s}</option>)}
+                  </select>
+                  {activeFilterCount > 0 && (
+                    <button onClick={() => { setFilterCat("All"); setFilterColor(""); setFilterSeason(""); }} style={{ ...btnBase, padding: "5px", background: "#fef2f2", color: "#e05555", fontSize: 11 }}>Clear filters</button>
+                  )}
+                </div>
+              )}
+
+              <div style={{ display: "flex", gap: 6, marginTop: 10 }}>
+                <button onClick={() => setItemPopup({ mode: "add" })} style={{ ...btnBase, flex: 1, padding: "7px 0", background: "#2d6a3f", color: "#fff", fontSize: 12 }}>+ Add</button>
+                <button onClick={() => activeDb.refresh()} style={{ ...btnBase, flex: 1, padding: "7px 0", background: "#f5f2ed", color: "#555", fontSize: 12 }}>↻ Fetch</button>
+              </div>
+            </>)}
           </div>
 
           {/* Grid */}
@@ -2900,6 +2993,35 @@ function OutfitBuilder({ itemsDb, wishlistDb, onSave, onClose, initial, seedItem
           </div>
         </div>
       </div>
+
+      {/* Draft panel — slides in from left */}
+      {showDraftPanel && (
+        <div style={{ position: "absolute", top: 52, left: 0, bottom: 0, width: 300, background: "#fff", borderRight: "1.5px solid #e8e4dc", zIndex: 400, display: "flex", flexDirection: "column", boxShadow: "4px 0 20px rgba(0,0,0,0.1)" }}>
+          <div style={{ padding: "16px 16px 12px", borderBottom: "1.5px solid #e8e4dc", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+            <div style={{ fontSize: 14, fontWeight: 800, color: "#1a1a1a" }}>Saved Drafts</div>
+            <button onClick={() => setShowDraftPanel(false)} style={{ background: "none", border: "none", cursor: "pointer", color: "#aaa", fontSize: 18 }}>×</button>
+          </div>
+          <div style={{ flex: 1, overflowY: "auto", padding: "10px 12px" }}>
+            {outfitDrafts.length === 0 ? (
+              <div style={{ textAlign: "center", padding: "40px 0", color: "#ccc" }}>
+                <div style={{ fontSize: 13, fontWeight: 600 }}>No drafts yet</div>
+                <div style={{ fontSize: 11, marginTop: 4 }}>Click Save Draft to save your progress</div>
+              </div>
+            ) : outfitDrafts.map(d => (
+              <div key={d._draftId} style={{ padding: "10px 12px", borderRadius: 12, border: "1.5px solid #e8e4dc", marginBottom: 8, background: "#faf9f6" }}>
+                <div style={{ fontSize: 13, fontWeight: 700, color: "#1a1a1a", marginBottom: 2 }}>{d.name}</div>
+                <div style={{ fontSize: 11, color: "#aaa", marginBottom: 8 }}>
+                  {(d.layers || []).length} piece{(d.layers || []).length !== 1 ? "s" : ""} · {new Date(d._savedAt).toLocaleDateString("en-US", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}
+                </div>
+                <div style={{ display: "flex", gap: 6 }}>
+                  <button onClick={() => loadOutfitDraft(d)} style={{ flex: 1, padding: "6px 0", background: "#1a1a1a", color: "#fff", border: "none", borderRadius: 8, cursor: "pointer", fontSize: 12, fontWeight: 700, fontFamily: "'DM Sans', sans-serif" }}>Load</button>
+                  <button onClick={() => deleteOutfitDraft(d._draftId)} style={{ width: 32, height: 32, background: "#fef2f2", color: "#e05555", border: "none", borderRadius: 8, cursor: "pointer", fontSize: 14, display: "flex", alignItems: "center", justifyContent: "center" }}>×</button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Item popup */}
       {itemPopup && (
@@ -4540,59 +4662,92 @@ const NAV_ITEMS = [
 
 
 // ── OutfitCalendar ───────────────────────────────────────────────────────────
-function OutfitCalendar({ outfits, calendar, onSaveCalendar, month, onMonthChange, weather, onSetWeather, onOpenOutfit }) {
-  const [assignPicker, setAssignPicker] = useState(null); // date string being assigned
+function OutfitCalendar({ outfits, calendar, onSaveCalendar, month, onMonthChange, weather, onSetWeather, onOpenOutfit, allItems }) {
+  // calendar shape: { [dateStr]: string[] }  (array of outfit IDs)
+  // migrate old shape where value was a single string
+  const normalizeDay = (val) => {
+    if (!val) return [];
+    if (Array.isArray(val)) return val;
+    return [val];
+  };
+
+  const [assignPicker, setAssignPicker] = useState(null);
   const [searchQ, setSearchQ] = useState("");
+  // per-day active look index
+  const [activeLooks, setActiveLooks] = useState({});
+  // drag state
+  const [draggingInfo, setDraggingInfo] = useState(null);
+  const [dragOver, setDragOver] = useState(null);
+  // day detail popup
+  const [dayPopup, setDayPopup] = useState(null); // dateStr
+  const [dayPopupTab, setDayPopupTab] = useState(0); // active outfit index in popup
+  const [dayAddSearch, setDayAddSearch] = useState("");
+  const [showDayAdd, setShowDayAdd] = useState(false);
 
   const { year, month: mo } = month;
   const firstDay = new Date(year, mo, 1).getDay();
   const daysInMonth = new Date(year, mo + 1, 0).getDate();
   const todayStr = new Date().toISOString().slice(0, 10);
-
   const monthName = new Date(year, mo, 1).toLocaleDateString("en-US", { month: "long", year: "numeric" });
 
-  const prevMonth = () => {
-    if (mo === 0) onMonthChange({ year: year - 1, month: 11 });
-    else onMonthChange({ year, month: mo - 1 });
-  };
-  const nextMonth = () => {
-    if (mo === 11) onMonthChange({ year: year + 1, month: 0 });
-    else onMonthChange({ year, month: mo + 1 });
+  const prevMonth = () => mo === 0 ? onMonthChange({ year: year - 1, month: 11 }) : onMonthChange({ year, month: mo - 1 });
+  const nextMonth = () => mo === 11 ? onMonthChange({ year: year + 1, month: 0 }) : onMonthChange({ year, month: mo + 1 });
+
+  const [weatherLoading, setWeatherLoading] = useState(false);
+  const [showWeatherConfig, setShowWeatherConfig] = useState(false);
+  const [weatherCity, setWeatherCity] = useState("Orlando, FL");
+  const todayISO = new Date().toISOString().slice(0, 10);
+  const [weatherDateStart, setWeatherDateStart] = useState(todayISO);
+  const [weatherDateEnd, setWeatherDateEnd] = useState(() => {
+    const d = new Date(); d.setDate(d.getDate() + 13);
+    return d.toISOString().slice(0, 10);
+  });
+  const [weatherGeoError, setWeatherGeoError] = useState("");
+
+  const geocodeCity = async (cityName) => {
+    const res = await fetch("https://geocoding-api.open-meteo.com/v1/search?name=" + encodeURIComponent(cityName) + "&count=1&language=en&format=json");
+    const data = await res.json();
+    if (data.results && data.results.length > 0) {
+      return { lat: data.results[0].latitude, lon: data.results[0].longitude, name: data.results[0].name + (data.results[0].admin1 ? ", " + data.results[0].admin1 : "") };
+    }
+    return null;
   };
 
-  // Fetch weather once per session for current month
-  const [weatherLoading, setWeatherLoading] = useState(false);
-  const fetchWeather = async () => {
-    if (weather) return;
+  const fetchWeather = async (cityOverride, startOverride, endOverride) => {
+    const city = cityOverride || weatherCity;
+    const start = startOverride || weatherDateStart;
+    const end = endOverride || weatherDateEnd;
     setWeatherLoading(true);
+    setWeatherGeoError("");
     try {
-      // Use Open-Meteo free API — no key needed, uses IP location via wttr.in for coords
-      const geoRes = await fetch("https://ipapi.co/json/");
-      const geo = await geoRes.json();
-      const lat = geo.latitude, lon = geo.longitude;
-      const city = geo.city || "";
+      const geo = await geocodeCity(city);
+      if (!geo) { setWeatherGeoError("City not found — try a different spelling"); setWeatherLoading(false); return; }
+      // Calculate forecast_days from start to end (max 16)
+      const msDay = 86400000;
+      const startMs = new Date(start + "T00:00:00").getTime();
+      const endMs = new Date(end + "T00:00:00").getTime();
+      const days = Math.min(16, Math.max(1, Math.round((endMs - startMs) / msDay) + 1));
       const wRes = await fetch(
-        "https://api.open-meteo.com/v1/forecast?latitude=" + lat + "&longitude=" + lon +
-        "&daily=temperature_2m_max,temperature_2m_min,weathercode&temperature_unit=fahrenheit&timezone=auto&forecast_days=14"
+        "https://api.open-meteo.com/v1/forecast?latitude=" + geo.lat + "&longitude=" + geo.lon +
+        "&daily=temperature_2m_max,temperature_2m_min,weathercode&temperature_unit=fahrenheit&timezone=auto&forecast_days=" + days
       );
       const w = await wRes.json();
-      const days = (w.daily && w.daily.time) ? w.daily.time.map((d, i) => ({
-        date: d,
-        high: Math.round(w.daily.temperature_2m_max[i]),
-        low: Math.round(w.daily.temperature_2m_min[i]),
-        code: w.daily.weathercode[i],
+      const weatherDays = (w.daily && w.daily.time) ? w.daily.time.map((d, i) => ({
+        date: d, high: Math.round(w.daily.temperature_2m_max[i]),
+        low: Math.round(w.daily.temperature_2m_min[i]), code: w.daily.weathercode[i],
       })) : [];
-      onSetWeather({ city, days });
-    } catch(e) { onSetWeather({ city: "", days: [] }); }
+      onSetWeather({ city: geo.name, days: weatherDays });
+      setShowWeatherConfig(false);
+    } catch(e) { setWeatherGeoError("Fetch failed — check connection"); }
     setWeatherLoading(false);
   };
 
   const weatherIcon = (code) => {
-    if (code === 0) return "☀️";
-    if (code <= 2) return "🌤";
-    if (code <= 45) return "☁️";
+    if (code === 0) return "☀";
+    if (code <= 2) return "⛅";
+    if (code <= 45) return "☁";
     if (code <= 67) return "🌧";
-    if (code <= 77) return "❄️";
+    if (code <= 77) return "❄";
     if (code <= 82) return "🌦";
     return "⛈";
   };
@@ -4602,18 +4757,42 @@ function OutfitCalendar({ outfits, calendar, onSaveCalendar, month, onMonthChang
     return weather.days.find(d => d.date === dateStr) || null;
   };
 
-  const filteredOutfits = outfits.filter(o =>
-    !searchQ || (o.name || "").toLowerCase().includes(searchQ.toLowerCase())
-  );
+  const getIds = (dateStr) => normalizeDay(calendar[dateStr]);
 
-  const assignOutfit = (outfitId) => {
-    const updated = { ...calendar };
-    if (outfitId) updated[assignPicker] = outfitId;
-    else delete updated[assignPicker];
+  const addOutfitToDay = (dateStr, outfitId) => {
+    const ids = getIds(dateStr);
+    if (ids.includes(outfitId)) return;
+    const updated = { ...calendar, [dateStr]: [...ids, outfitId] };
     onSaveCalendar(updated);
+    setActiveLooks(a => ({ ...a, [dateStr]: ids.length }));
     setAssignPicker(null);
     setSearchQ("");
   };
+
+  const removeOutfitFromDay = (dateStr, outfitId) => {
+    const ids = getIds(dateStr).filter(id => id !== outfitId);
+    const updated = { ...calendar };
+    if (ids.length === 0) delete updated[dateStr];
+    else updated[dateStr] = ids;
+    onSaveCalendar(updated);
+    setActiveLooks(a => ({ ...a, [dateStr]: Math.max(0, (a[dateStr] || 0) - 1) }));
+  };
+
+  const moveOutfitToDay = (outfitId, fromDate, toDate) => {
+    if (fromDate === toDate) return;
+    const fromIds = getIds(fromDate).filter(id => id !== outfitId);
+    const toIds = getIds(toDate);
+    if (toIds.includes(outfitId)) return;
+    const updated = { ...calendar };
+    if (fromIds.length === 0) delete updated[fromDate];
+    else updated[fromDate] = fromIds;
+    updated[toDate] = [...toIds, outfitId];
+    onSaveCalendar(updated);
+  };
+
+  const filteredOutfits = outfits.filter(o =>
+    !searchQ || (o.name || "").toLowerCase().includes(searchQ.toLowerCase())
+  );
 
   const cells = [];
   for (let i = 0; i < firstDay; i++) cells.push(null);
@@ -4630,13 +4809,51 @@ function OutfitCalendar({ outfits, calendar, onSaveCalendar, month, onMonthChang
         <button onClick={nextMonth} style={{ width: 30, height: 30, borderRadius: "50%", border: "1px solid #e0dbd2", background: "#fff", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>
           <SvgArrowR size={12} color="#666" />
         </button>
-        <button onClick={fetchWeather} disabled={weatherLoading} style={{
-          padding: "6px 12px", borderRadius: 10, border: "1px solid #e0dbd2", background: "#fff",
-          cursor: "pointer", fontSize: 12, fontWeight: 600, color: "#666", fontFamily: "'DM Sans', sans-serif",
-          display: "flex", alignItems: "center", gap: 5
-        }}>
-          {weatherLoading ? "…" : (weather ? "🌤 Refresh" : "🌤 Weather")}
-        </button>
+        <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 2 }}>
+          <button onClick={() => setShowWeatherConfig(true)} style={{
+            padding: "6px 12px", borderRadius: 10, border: "1px solid #e0dbd2", background: "#fff",
+            cursor: "pointer", fontSize: 12, fontWeight: 600, color: "#666", fontFamily: "'DM Sans', sans-serif",
+            display: "flex", alignItems: "center", gap: 5
+          }}>
+            {weatherLoading ? "…" : "⛅ Weather"}
+          </button>
+          {weather && <div style={{ fontSize: 10, color: "#bbb", fontWeight: 600 }}>{weather.city}</div>}
+        </div>
+
+        {/* Weather config modal */}
+        {showWeatherConfig && (
+          <div onClick={() => setShowWeatherConfig(false)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.35)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center", backdropFilter: "blur(3px)" }}>
+            <div onClick={e => e.stopPropagation()} style={{ background: "#fff", borderRadius: 20, padding: "24px 26px", width: "min(420px, 94vw)", boxShadow: "0 20px 60px rgba(0,0,0,0.18)" }}>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
+                <div style={{ fontSize: 16, fontWeight: 800, color: "#1a1a1a" }}>⛅ Weather Forecast</div>
+                <button onClick={() => setShowWeatherConfig(false)} style={{ background: "none", border: "none", cursor: "pointer", color: "#aaa", fontSize: 18 }}>×</button>
+              </div>
+              <div style={{ marginBottom: 14 }}>
+                <label style={{ display: "block", fontSize: 11, fontWeight: 700, color: "#888", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 6 }}>City</label>
+                <input value={weatherCity} onChange={e => setWeatherCity(e.target.value)} placeholder="e.g. Orlando, FL"
+                  style={{ width: "100%", padding: "9px 12px", border: "1.5px solid #e8e4dc", borderRadius: 10, fontFamily: "'DM Sans', sans-serif", fontSize: 14, boxSizing: "border-box", outline: "none" }} />
+              </div>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 16 }}>
+                <div>
+                  <label style={{ display: "block", fontSize: 11, fontWeight: 700, color: "#888", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 6 }}>From</label>
+                  <input type="date" value={weatherDateStart} onChange={e => setWeatherDateStart(e.target.value)}
+                    style={{ width: "100%", padding: "9px 10px", border: "1.5px solid #e8e4dc", borderRadius: 10, fontFamily: "'DM Sans', sans-serif", fontSize: 13, boxSizing: "border-box", outline: "none" }} />
+                </div>
+                <div>
+                  <label style={{ display: "block", fontSize: 11, fontWeight: 700, color: "#888", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 6 }}>To</label>
+                  <input type="date" value={weatherDateEnd} onChange={e => setWeatherDateEnd(e.target.value)}
+                    style={{ width: "100%", padding: "9px 10px", border: "1.5px solid #e8e4dc", borderRadius: 10, fontFamily: "'DM Sans', sans-serif", fontSize: 13, boxSizing: "border-box", outline: "none" }} />
+                </div>
+              </div>
+              <div style={{ fontSize: 11, color: "#bbb", marginBottom: 14 }}>Forecast up to 16 days ahead · temperatures in °F</div>
+              {weatherGeoError && <div style={{ fontSize: 12, color: "#c0392b", background: "#fef2f2", borderRadius: 8, padding: "8px 12px", marginBottom: 12 }}>{weatherGeoError}</div>}
+              <button onClick={() => fetchWeather(weatherCity, weatherDateStart, weatherDateEnd)} disabled={weatherLoading || !weatherCity.trim()} style={{
+                width: "100%", padding: "11px", background: weatherLoading ? "#ccc" : "#1a1a1a", color: "#fff", border: "none",
+                borderRadius: 12, cursor: weatherLoading ? "default" : "pointer", fontSize: 14, fontWeight: 700, fontFamily: "'DM Sans', sans-serif"
+              }}>{weatherLoading ? "Fetching…" : "Get Forecast"}</button>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Day labels */}
@@ -4651,39 +4868,80 @@ function OutfitCalendar({ outfits, calendar, onSaveCalendar, month, onMonthChang
         {cells.map((day, idx) => {
           if (!day) return <div key={"blank-" + idx} />;
           const dateStr = year + "-" + String(mo + 1).padStart(2, "0") + "-" + String(day).padStart(2, "0");
-          const outfitId = calendar[dateStr];
-          const outfit = outfitId ? outfits.find(o => o.id === outfitId) : null;
+          const ids = getIds(dateStr);
+          const activeIdx = Math.min(activeLooks[dateStr] || 0, ids.length - 1);
+          const activeOutfitId = ids[activeIdx];
+          const activeOutfit = activeOutfitId ? outfits.find(o => o.id === activeOutfitId) : null;
           const isToday = dateStr === todayStr;
           const wx = getWeatherForDate(dateStr);
+          const isDragOver = dragOver === dateStr;
+          const isPicker = assignPicker === dateStr;
 
           return (
-            <div key={dateStr} onClick={() => setAssignPicker(assignPicker === dateStr ? null : dateStr)}
-              style={{
-                borderRadius: 10, border: isToday ? "2px solid #1a1a1a" : "1.5px solid #e8e4dc",
-                background: isToday ? "#fafaf8" : "#fff", cursor: "pointer",
-                minHeight: 72, padding: "5px 5px 4px", display: "flex", flexDirection: "column",
-                transition: "box-shadow 0.12s", position: "relative",
-                boxShadow: assignPicker === dateStr ? "0 0 0 2px #1a1a1a" : "none",
+            <div key={dateStr}
+              onClick={() => { setDayPopup(dateStr); setDayPopupTab(0); setShowDayAdd(false); setDayAddSearch(""); }}
+              onDragOver={e => { e.preventDefault(); setDragOver(dateStr); }}
+              onDragLeave={() => setDragOver(null)}
+              onDrop={e => {
+                e.preventDefault();
+                setDragOver(null);
+                if (draggingInfo) {
+                  moveOutfitToDay(draggingInfo.outfitId, draggingInfo.fromDate, dateStr);
+                  setDraggingInfo(null);
+                }
               }}
-              onMouseEnter={e => { if (assignPicker !== dateStr) e.currentTarget.style.boxShadow = "0 2px 8px rgba(0,0,0,0.08)"; }}
-              onMouseLeave={e => { if (assignPicker !== dateStr) e.currentTarget.style.boxShadow = "none"; }}
+              style={{
+                borderRadius: 10,
+                border: isToday ? "2px solid #1a1a1a" : isDragOver ? "2px dashed #2d6a3f" : "1.5px solid #e8e4dc",
+                background: isDragOver ? "#f0faf4" : isToday ? "#fafaf8" : "#fff",
+                cursor: "pointer", minHeight: 80, padding: "5px 5px 4px",
+                display: "flex", flexDirection: "column",
+                transition: "box-shadow 0.12s, border-color 0.1s, background 0.1s",
+                position: "relative",
+              }}
+              onMouseEnter={e => e.currentTarget.style.boxShadow = "0 2px 8px rgba(0,0,0,0.08)"}
+              onMouseLeave={e => e.currentTarget.style.boxShadow = "none"}
             >
               {/* Day number + weather */}
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 3 }}>
                 <div style={{ fontSize: 11, fontWeight: isToday ? 900 : 700, color: isToday ? "#1a1a1a" : "#888" }}>{day}</div>
-                {wx && <div style={{ fontSize: 9, color: "#aaa", textAlign: "right", lineHeight: 1.3 }}>
-                  <div>{weatherIcon(wx.code)}</div>
-                  <div style={{ fontWeight: 600 }}>{wx.high}°</div>
-                </div>}
+                {wx && (
+                  <div style={{ fontSize: 11, color: "#555", textAlign: "right", lineHeight: 1.2, fontWeight: 800 }}>
+                    <div>{weatherIcon(wx.code)}</div>
+                    <div style={{ fontSize: 10 }}>{wx.high}°</div>
+                  </div>
+                )}
               </div>
-              {/* Outfit thumbnail */}
-              {outfit ? (
-                <div style={{ flex: 1, borderRadius: 6, overflow: "hidden", background: "#f5f2ed", display: "flex", alignItems: "center", justifyContent: "center", minHeight: 36 }}
-                  onClick={e => { e.stopPropagation(); onOpenOutfit(outfit); }}>
-                  {outfit.previewImage
-                    ? <img src={outfit.previewImage} alt={outfit.name} style={{ width: "100%", height: "100%", objectFit: "contain" }} />
-                    : <div style={{ fontSize: 9, fontWeight: 700, color: "#999", textAlign: "center", padding: 2, lineHeight: 1.3, overflow: "hidden" }}>{outfit.name}</div>
-                  }
+
+              {/* Outfit area */}
+              {activeOutfit ? (
+                <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 2 }}>
+                  <div
+                    draggable
+                    onDragStart={e => { e.stopPropagation(); setDraggingInfo({ outfitId: activeOutfitId, fromDate: dateStr }); }}
+                    onDragEnd={() => setDraggingInfo(null)}
+                    style={{ flex: 1, borderRadius: 6, overflow: "hidden", background: "#f5f2ed", display: "flex", alignItems: "center", justifyContent: "center", minHeight: 36, cursor: "grab" }}
+                    onClick={e => { e.stopPropagation(); onOpenOutfit(activeOutfit); }}
+                  >
+                    {activeOutfit.previewImage
+                      ? <img src={activeOutfit.previewImage} alt={activeOutfit.name} style={{ width: "100%", height: "100%", objectFit: "contain", pointerEvents: "none" }} />
+                      : <div style={{ fontSize: 8, fontWeight: 700, color: "#999", textAlign: "center", padding: 2, lineHeight: 1.3, overflow: "hidden" }}>{activeOutfit.name}</div>
+                    }
+                  </div>
+                  {/* Look name */}
+                  <div style={{ fontSize: 9, fontWeight: 800, color: "#1a1a1a", textAlign: "center", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", lineHeight: 1.3, padding: "0 2px" }}>{activeOutfit.name}</div>
+                  {/* Remove button + look toggles */}
+                  <div style={{ display: "flex", alignItems: "center", gap: 2 }} onClick={e => e.stopPropagation()}>
+                    {ids.length > 1 && (<>
+                      <button onClick={e => { e.stopPropagation(); setActiveLooks(a => ({ ...a, [dateStr]: (activeIdx - 1 + ids.length) % ids.length })); }}
+                        style={{ width: 14, height: 14, borderRadius: "50%", border: "none", background: "#e8e4dc", cursor: "pointer", fontSize: 9, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, padding: 0 }}>‹</button>
+                      <div style={{ fontSize: 8, color: "#aaa", fontWeight: 700, flex: 1, textAlign: "center" }}>{activeIdx + 1}/{ids.length}</div>
+                      <button onClick={e => { e.stopPropagation(); setActiveLooks(a => ({ ...a, [dateStr]: (activeIdx + 1) % ids.length })); }}
+                        style={{ width: 14, height: 14, borderRadius: "50%", border: "none", background: "#e8e4dc", cursor: "pointer", fontSize: 9, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, padding: 0 }}>›</button>
+                    </>)}
+                    <button onClick={e => { e.stopPropagation(); removeOutfitFromDay(dateStr, activeOutfitId); }}
+                      style={{ width: 14, height: 14, borderRadius: "50%", border: "none", background: "#fde8e8", color: "#c0392b", cursor: "pointer", fontSize: 9, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, padding: 0, marginLeft: "auto" }}>×</button>
+                  </div>
                 </div>
               ) : (
                 <div style={{ flex: 1, borderRadius: 6, background: "#faf9f6", display: "flex", alignItems: "center", justifyContent: "center", minHeight: 36 }}>
@@ -4695,42 +4953,174 @@ function OutfitCalendar({ outfits, calendar, onSaveCalendar, month, onMonthChang
         })}
       </div>
 
-      {/* Outfit picker dropdown */}
-      {assignPicker && (
-        <div style={{ marginTop: 14, background: "#fff", border: "1.5px solid #e8e4dc", borderRadius: 16, padding: "14px 16px", boxShadow: "0 8px 24px rgba(0,0,0,0.1)" }}>
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
-            <div style={{ fontSize: 13, fontWeight: 800, color: "#1a1a1a" }}>
-              Assign outfit for {new Date(assignPicker + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" })}
-            </div>
-            <button onClick={() => { setAssignPicker(null); setSearchQ(""); }} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 18, color: "#aaa" }}>×</button>
-          </div>
-          <input value={searchQ} onChange={e => setSearchQ(e.target.value)} placeholder="Search outfits…"
-            style={{ width: "100%", padding: "8px 12px", border: "1.5px solid #e8e4dc", borderRadius: 10, fontFamily: "'DM Sans', sans-serif", fontSize: 13, marginBottom: 10, boxSizing: "border-box", outline: "none" }} />
-          {calendar[assignPicker] && (
-            <button onClick={() => assignOutfit(null)} style={{ width: "100%", padding: "8px", borderRadius: 10, border: "1px solid #f5c8c8", background: "#fef2f2", color: "#c0392b", fontFamily: "'DM Sans', sans-serif", fontSize: 12, fontWeight: 700, cursor: "pointer", marginBottom: 8 }}>
-              Remove outfit from this day
-            </button>
-          )}
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(100px, 1fr))", gap: 8, maxHeight: 240, overflowY: "auto" }}>
-            {filteredOutfits.map(o => (
-              <div key={o.id} onClick={() => assignOutfit(o.id)} style={{
-                borderRadius: 10, overflow: "hidden", background: "#f5f2ed", cursor: "pointer",
-                border: calendar[assignPicker] === o.id ? "2px solid #1a1a1a" : "2px solid transparent",
-                transition: "border-color 0.1s"
-              }}>
-                <div style={{ aspectRatio: "3/4", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                  {o.previewImage
-                    ? <img src={o.previewImage} alt={o.name} style={{ width: "100%", height: "100%", objectFit: "contain" }} />
-                    : <HangerIcon size={20} color="#ccc" />
-                  }
+
+      {/* ── Day Detail Popup ── */}
+      {dayPopup && (() => {
+        const dateStr = dayPopup;
+        const ids = getIds(dateStr);
+        const wx = getWeatherForDate(dateStr);
+        const dateLabel = new Date(dateStr + "T00:00:00").toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" });
+        const activeTabIdx = Math.min(dayPopupTab, ids.length - 1);
+        const focusedOutfit = ids.length > 0 ? outfits.find(o => o.id === ids[activeTabIdx]) : null;
+        const pieces = focusedOutfit ? (focusedOutfit.layers || focusedOutfit.itemIds || []).map(id => (allItems || []).find(i => i.id === id)).filter(Boolean) : [];
+        const weatherDesc = (code) => {
+          if (code === 0) return "Clear skies";
+          if (code <= 2) return "Partly cloudy";
+          if (code <= 45) return "Cloudy";
+          if (code <= 67) return "Rainy";
+          if (code <= 77) return "Snow";
+          if (code <= 82) return "Rain showers";
+          return "Thunderstorms";
+        };
+
+        return (
+          <div onClick={() => setDayPopup(null)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.45)", zIndex: 900, display: "flex", alignItems: "center", justifyContent: "center", padding: 20, backdropFilter: "blur(4px)" }}>
+            <div onClick={e => e.stopPropagation()} style={{ background: "#fff", borderRadius: 24, width: "min(1080px, 96vw)", maxHeight: "92vh", display: "flex", flexDirection: "column", overflow: "hidden", boxShadow: "0 24px 64px rgba(0,0,0,0.22)" }}>
+
+              {/* Header */}
+              <div style={{ padding: "18px 22px 14px", borderBottom: "1px solid #f0ece4", display: "flex", alignItems: "center", justifyContent: "space-between", flexShrink: 0 }}>
+                <div>
+                  <div style={{ fontSize: 18, fontWeight: 900, color: "#1a1a1a" }}>{dateLabel}</div>
+                  {wx && (
+                    <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 4 }}>
+                      <span style={{ fontSize: 20, fontWeight: 800 }}>{weatherIcon(wx.code)}</span>
+                      <span style={{ fontSize: 14, fontWeight: 700, color: "#1a1a1a" }}>{wx.high}° / {wx.low}°</span>
+                      <span style={{ fontSize: 13, color: "#888" }}>{weatherDesc(wx.code)} · Orlando, FL</span>
+                    </div>
+                  )}
+                  {!wx && <div style={{ fontSize: 12, color: "#bbb", marginTop: 4 }}>No weather data — click Refresh Weather</div>}
                 </div>
-                <div style={{ padding: "4px 6px 6px", fontSize: 10, fontWeight: 700, color: "#444", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{o.name}</div>
+                <button onClick={() => setDayPopup(null)} style={{ width: 32, height: 32, borderRadius: "50%", background: "#f5f2ed", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                </button>
               </div>
-            ))}
-            {filteredOutfits.length === 0 && <div style={{ gridColumn: "1/-1", textAlign: "center", fontSize: 12, color: "#ccc", padding: "20px 0" }}>No outfits found</div>}
+
+              {/* Body */}
+              <div style={{ display: "flex", flex: 1, overflow: "hidden", minHeight: 0 }}>
+
+                {/* Left — outfit preview + look tabs */}
+                <div style={{ width: 360, flexShrink: 0, borderRight: "1px solid #f0ece4", display: "flex", flexDirection: "column", overflow: "hidden" }}>
+                  {/* Look tabs + toggle */}
+                  {ids.length > 0 && (
+                    <div style={{ padding: "10px 14px 8px", borderBottom: "1px solid #f5f2ed", flexShrink: 0 }}>
+                      <div style={{ fontSize: 10, fontWeight: 700, color: "#aaa", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 8 }}>
+                        {ids.length} Look{ids.length !== 1 ? "s" : ""}
+                      </div>
+                      {ids.length > 1 ? (
+                        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                          <button onClick={() => setDayPopupTab((activeTabIdx - 1 + ids.length) % ids.length)} style={{ width: 28, height: 28, borderRadius: "50%", border: "1.5px solid #e8e4dc", background: "#fff", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                            <SvgArrowL size={11} color="#666" />
+                          </button>
+                          <div style={{ flex: 1, textAlign: "center" }}>
+                            <div style={{ fontSize: 13, fontWeight: 800, color: "#1a1a1a", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                              {outfits.find(x => x.id === ids[activeTabIdx])?.name || "Look " + (activeTabIdx + 1)}
+                            </div>
+                            <div style={{ fontSize: 11, color: "#bbb", marginTop: 1 }}>{activeTabIdx + 1} of {ids.length}</div>
+                          </div>
+                          <button onClick={() => setDayPopupTab((activeTabIdx + 1) % ids.length)} style={{ width: 28, height: 28, borderRadius: "50%", border: "1.5px solid #e8e4dc", background: "#fff", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                            <SvgArrowR size={11} color="#666" />
+                          </button>
+                        </div>
+                      ) : (
+                        <div style={{ fontSize: 13, fontWeight: 800, color: "#1a1a1a" }}>
+                          {outfits.find(x => x.id === ids[0])?.name || "Look 1"}
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Outfit image */}
+                  <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", padding: 16, background: "#faf9f7", overflow: "hidden" }}>
+                    {focusedOutfit ? (
+                      focusedOutfit.previewImage
+                        ? <img src={focusedOutfit.previewImage} alt={focusedOutfit.name} style={{ maxWidth: "100%", maxHeight: "100%", objectFit: "contain", borderRadius: 12 }} />
+                        : <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 8, color: "#ccc" }}><HangerIcon size={48} color="#ddd" /><div style={{ fontSize: 13, fontWeight: 700 }}>{focusedOutfit.name}</div></div>
+                    ) : (
+                      <div style={{ textAlign: "center", color: "#ccc" }}>
+                        <HangerIcon size={40} color="#ddd" />
+                        <div style={{ fontSize: 13, fontWeight: 600, marginTop: 8 }}>No outfits yet</div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Remove button for focused outfit */}
+                  {focusedOutfit && (
+                    <div style={{ padding: "10px 14px", borderTop: "1px solid #f0ece4", flexShrink: 0 }}>
+                      <button onClick={() => { removeOutfitFromDay(dateStr, focusedOutfit.id); setDayPopupTab(Math.max(0, activeTabIdx - 1)); }} style={{
+                        width: "100%", padding: "8px", background: "#fef2f2", border: "1px solid #fdd", borderRadius: 10,
+                        color: "#c0392b", fontFamily: "'DM Sans', sans-serif", fontSize: 12, fontWeight: 700, cursor: "pointer"
+                      }}>Remove "{focusedOutfit.name}"</button>
+                    </div>
+                  )}
+                </div>
+
+                {/* Right — pieces + add outfit */}
+                <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
+                  {/* Pieces */}
+                  <div style={{ flex: 1, overflowY: "auto", padding: "14px 16px" }}>
+                    {focusedOutfit && pieces.length > 0 ? (<>
+                      <div style={{ fontSize: 11, fontWeight: 700, color: "#aaa", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 10 }}>Pieces ({pieces.length})</div>
+                      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                        {pieces.map(item => (
+                          <div key={item.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 10px", background: "#faf9f6", borderRadius: 12, border: "1px solid #f0ece4" }}>
+                            <div style={{ width: 44, height: 44, borderRadius: 8, overflow: "hidden", background: "#f5f2ed", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                              {item.image ? <img src={item.image} alt={item.name} style={{ width: "100%", height: "100%", objectFit: "contain" }} /> : <HangerIcon size={16} color="#ccc" />}
+                            </div>
+                            <div style={{ flex: 1, minWidth: 0 }}>
+                              <div style={{ fontSize: 13, fontWeight: 700, color: "#1a1a1a", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{item.name}</div>
+                              <div style={{ fontSize: 11, color: "#aaa" }}>{[item.brand, item.category].filter(Boolean).join(" · ")}</div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </>) : (
+                      <div style={{ paddingTop: 20, textAlign: "center", color: "#ccc" }}>
+                        <div style={{ fontSize: 13, fontWeight: 600 }}>No pieces yet</div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Add outfit section */}
+                  <div style={{ borderTop: "1px solid #f0ece4", padding: "12px 16px", flexShrink: 0 }}>
+                    {!showDayAdd ? (
+                      <button onClick={() => setShowDayAdd(true)} style={{
+                        width: "100%", padding: "9px", background: "#1a1a1a", color: "#fff", border: "none",
+                        borderRadius: 12, cursor: "pointer", fontSize: 13, fontWeight: 700, fontFamily: "'DM Sans', sans-serif"
+                      }}>+ Add Another Look</button>
+                    ) : (
+                      <div>
+                        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
+                          <div style={{ fontSize: 12, fontWeight: 700, color: "#1a1a1a" }}>Add a look</div>
+                          <button onClick={() => { setShowDayAdd(false); setDayAddSearch(""); }} style={{ background: "none", border: "none", cursor: "pointer", color: "#aaa", fontSize: 16 }}>×</button>
+                        </div>
+                        <input value={dayAddSearch} onChange={e => setDayAddSearch(e.target.value)} placeholder="Search outfits…"
+                          style={{ width: "100%", padding: "7px 10px", border: "1.5px solid #e8e4dc", borderRadius: 10, fontFamily: "'DM Sans', sans-serif", fontSize: 12, marginBottom: 8, boxSizing: "border-box", outline: "none" }} />
+                        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(90px, 1fr))", gap: 6, maxHeight: 180, overflowY: "auto" }}>
+                          {outfits.filter(o => !dayAddSearch || o.name.toLowerCase().includes(dayAddSearch.toLowerCase())).map(o => {
+                            const alreadyAdded = ids.includes(o.id);
+                            return (
+                              <div key={o.id} onClick={() => { if (!alreadyAdded) { addOutfitToDay(dateStr, o.id); setDayPopupTab(ids.length); setShowDayAdd(false); setDayAddSearch(""); } }} style={{
+                                borderRadius: 8, overflow: "hidden", background: alreadyAdded ? "#f0faf4" : "#f5f2ed",
+                                cursor: alreadyAdded ? "default" : "pointer", border: alreadyAdded ? "2px solid #3aaa6e" : "2px solid transparent", position: "relative"
+                              }}>
+                                <div style={{ aspectRatio: "3/4", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                                  {o.previewImage ? <img src={o.previewImage} alt={o.name} style={{ width: "100%", height: "100%", objectFit: "contain" }} /> : <HangerIcon size={18} color="#ccc" />}
+                                </div>
+                                {alreadyAdded && <div style={{ position: "absolute", top: 3, right: 3, background: "#3aaa6e", borderRadius: "50%", width: 14, height: 14, display: "flex", alignItems: "center", justifyContent: "center" }}><SvgCheck size={8} color="#fff" /></div>}
+                                <div style={{ padding: "3px 5px 5px", fontSize: 9, fontWeight: 700, color: "#444", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{o.name}</div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
     </div>
   );
 }
@@ -4747,6 +5137,7 @@ export default function App() {
   const [catFilter, setCatFilter] = useState("All");
   const [catFilters, setCatFilters] = useState([]); // multi-select categories
   const [closetZoom, setClosetZoom] = useState(148); // card min-width in px
+  const [outfitZoom, setOutfitZoom] = useState(200); // outfit card min-width in px
   const [showNewOnly, setShowNewOnly] = useState(false); // "What's New" filter
   const [capsules, setCapsules] = useState(() => { try { return JSON.parse(localStorage.getItem("wardrobe_capsules_v1") || "[]"); } catch { return []; } });
   const [activeCapsule, setActiveCapsule] = useState(null);
@@ -5086,7 +5477,7 @@ export default function App() {
                 </div>
                 <div className="sidebar-section">
                   <div className="sidebar-label">Occasion</div>
-                  {["All", ...OCCASIONS].map(tag => (
+                  {["All", "WFH", "Disney", "Universal", "Date Night", "Travel", "Sport", "Weekend", "Occasion"].map(tag => (
                     <button key={tag} className={"sidebar-btn" + (outfitTagFilter === tag ? " active" : "")} onClick={() => setOutfitTagFilter(tag)}>{tag}</button>
                   ))}
                 </div>
@@ -5123,7 +5514,8 @@ export default function App() {
                       <option value="newest">Sort: Newest</option>
                     </select>
                     <select value={closetSeasonFilter} onChange={e => setClosetSeasonFilter(e.target.value)} className="pill-select" style={{}}>
-                      {["All", ...SEASONS].map(s => <option key={s} value={s}>{s === "All" ? "All Seasons" : s}</option>)}
+                      <option value="All">All Seasons</option>
+                      {SEASONS.filter(s => s !== "All Season").map(s => <option key={s} value={s}>{s}</option>)}
                     </select>
                     {/* Zoom slider */}
                     <div style={{ display: "flex", alignItems: "center", gap: 8, marginLeft: "auto" }}>
@@ -5188,16 +5580,14 @@ export default function App() {
                     ))}
                   </div>
                   {outfitsView === "grid" && (<>
-                    {/* Season filter pills */}
-                    {["All", ...SEASONS].map(s => (
-                      <button key={s} onClick={() => setOutfitSeasonFilter(s)} style={{
-                        padding: "6px 13px", borderRadius: 100,
-                        border: outfitSeasonFilter === s ? "1.5px solid #b6c8e8" : "1px solid #e0dbd2",
-                        background: outfitSeasonFilter === s ? "#eef3fc" : "#fff",
-                        color: outfitSeasonFilter === s ? "#2b5aa0" : "#666",
-                        fontFamily: "'DM Sans', sans-serif", fontSize: 12, fontWeight: 600, cursor: "pointer",
-                      }}>{s}</button>
-                    ))}
+                    <select value={outfitSeasonFilter} onChange={e => setOutfitSeasonFilter(e.target.value)} className="pill-select">
+                      <option value="All">All Seasons</option>
+                      <option value="Spring">Spring</option>
+                      <option value="Summer">Summer</option>
+                      <option value="Fall">Fall</option>
+                      <option value="Winter">Winter</option>
+                      <option value="Holiday">Holiday</option>
+                    </select>
                     <div style={{ flex: 1 }} />
                     <select value={outfitSort} onChange={e => setOutfitSort(e.target.value)} className="pill-select">
                       <option value="default">Sort: Default</option>
@@ -5205,12 +5595,19 @@ export default function App() {
                       <option value="newest">Sort: Newest</option>
                       <option value="pieces">Sort: Most Pieces</option>
                     </select>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                      <SvgBox size={12} color="#bbb" />
+                      <input type="range" min={140} max={300} step={10} value={outfitZoom} onChange={e => setOutfitZoom(Number(e.target.value))}
+                        style={{ width: 80, accentColor: "#1a1a1a", cursor: "pointer" }} />
+                      <SvgBox size={17} color="#bbb" />
+                    </div>
                   </>)}
                 </div>
 
                 {outfitsView === "calendar" ? (
                   <OutfitCalendar
                     outfits={outfitsDb.rows}
+                    allItems={[...itemsDb.rows, ...wishlistDb.rows]}
                     calendar={outfitCalendar}
                     onSaveCalendar={saveOutfitCalendar}
                     month={calendarMonth}
@@ -5225,7 +5622,7 @@ export default function App() {
                     <div style={{ fontSize: 15, fontWeight: 700, color: "#ccc" }}>{outfitTagFilter === "All" && outfitSeasonFilter === "All" ? "No outfits yet" : "No outfits match these filters"}</div>
                   </div>
                 ) : (
-                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: 16 }}>
+                  <div style={{ display: "grid", gridTemplateColumns: `repeat(auto-fill, minmax(${outfitZoom}px, 1fr))`, gap: 16 }}>
                     {filteredOutfits.map((outfit, i) => {
                       const outfitItems = (outfit.layers || outfit.itemIds || []).map(id => allItems.find(x => x.id === id)).filter(Boolean);
                       const tags = outfit.tags || [];
@@ -5408,12 +5805,13 @@ export default function App() {
 
           {tab === "outfits" && (() => {
             const todayKey = new Date().toISOString().slice(0, 10);
-            const todayOutfitId = outfitCalendar[todayKey];
-            const todayOutfit = todayOutfitId ? outfitsDb.rows.find(o => o.id === todayOutfitId) : null;
+            const todayRaw = outfitCalendar[todayKey];
+            const todayIds = Array.isArray(todayRaw) ? todayRaw : (todayRaw ? [todayRaw] : []);
+            const todayOutfit = todayIds.length > 0 ? outfitsDb.rows.find(o => o.id === todayIds[0]) : null;
             return (
               <div className="right-card">
                 <div className="right-card-title">Today</div>
-                <div style={{ fontSize: 10, color: "#bbb", fontWeight: 600, marginBottom: 10, marginTop: -8 }}>
+                <div style={{ fontSize: 13, color: "#1a1a1a", fontWeight: 800, marginBottom: 10, marginTop: -6 }}>
                   {new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })}
                 </div>
                 {todayOutfit ? (
@@ -5431,8 +5829,7 @@ export default function App() {
                     )}
                   </div>
                 ) : (
-                  <div style={{ textAlign: "center", padding: "16px 0 8px" }}>
-                    <div style={{ fontSize: 28, marginBottom: 6 }}>👗</div>
+                  <div style={{ textAlign: "center", padding: "12px 0 8px" }}>
                     <div style={{ fontSize: 12, color: "#bbb", fontWeight: 600, marginBottom: 10 }}>No outfit planned</div>
                     <button onClick={() => { setOutfitsView("calendar"); }} style={{
                       padding: "7px 14px", background: "#1a1a1a", color: "#fff", border: "none",
@@ -5731,6 +6128,7 @@ export default function App() {
         <OutfitBuilder
           itemsDb={itemsDb}
           wishlistDb={wishlistDb}
+          capsules={capsules}
           initial={editingOutfit}
           seedItem={outfitSeedItem}
           onSave={saveOutfit}

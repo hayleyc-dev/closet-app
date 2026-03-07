@@ -279,7 +279,12 @@ function useSupabaseTable(table) {
     else console.error("[" + table + "] add:", error.message);
   };
   const update = async (item) => {
-    const { error } = await supabase.from(table).update({ data: item }).eq("id", item.id);
+    let { error } = await supabase.from(table).update({ data: item }).eq("id", item.id);
+    if (error) {
+      // Fallback: flat schema (no data column)
+      const { id, ...rest } = item;
+      ({ error } = await supabase.from(table).update(rest).eq("id", id));
+    }
     if (!error) setRows(r => r.map(i => i.id === item.id ? item : i));
     else console.error("[" + table + "] update:", error.message);
   };
@@ -2004,19 +2009,39 @@ function LookbookViewer({ lookbook, outfits, allItems, closetItems, onClose, onU
   const [wxLoading, setWxLoading] = useState(false);
   const [coverImage, setCoverImage] = useState(lookbook.coverImage || "");
   const [wornToast, setWornToast] = useState("");
-  // Moodboard
+  // Moodboard — store by stable ID, derive index reactively
   const MOODBOARD_KEY = "wardrobe_moodboards_v1";
-  const [linkedMoodboardIdx, setLinkedMoodboardIdx] = useState(() => {
-    const v = lookbook.linkedMoodboardIdx;
-    return v !== undefined ? v : null;
-  });
-  const [moodboardView, setMoodboardView] = useState(false); // show moodboard tab in main area
   const [moodboards, setMoodboards] = useState(() => {
     try { return JSON.parse(localStorage.getItem("wardrobe_moodboards_v1") || "[]"); } catch { return []; }
   });
+  // Poll for moodboard changes (canvas is in same session)
+  useEffect(() => {
+    const iv = setInterval(() => {
+      try { setMoodboards(JSON.parse(localStorage.getItem("wardrobe_moodboards_v1") || "[]")); } catch {}
+    }, 600);
+    return () => clearInterval(iv);
+  }, []);
+  // Stable linked moodboard ID — updated when lookbook prop changes too
+  const [linkedMoodboardId, setLinkedMoodboardId] = useState(
+    lookbook.moodboardId || null
+  );
+  useEffect(() => {
+    if (lookbook.moodboardId && lookbook.moodboardId !== linkedMoodboardId) {
+      setLinkedMoodboardId(lookbook.moodboardId);
+    }
+  }, [lookbook.moodboardId]);
+  // Derive index reactively from ID + boards array
+  const linkedMoodboardIdx = linkedMoodboardId
+    ? moodboards.findIndex(b => b.id === linkedMoodboardId)
+    : (lookbook.linkedMoodboardIdx !== undefined ? lookbook.linkedMoodboardIdx : null);
+  const setLinkedMoodboardIdx = (idx) => {
+    const board = moodboards[idx];
+    if (board) { setLinkedMoodboardId(board.id); }
+  };
+  const [moodboardView, setMoodboardView] = useState(false);
   // Trip details
   const [tripDetails, setTripDetails] = useState(lookbook.tripDetails || {
-    hotel: "", hotelAddress: "", confirmationNo: "", activities: [], flights: "", carRental: "", notes: ""
+    hotel: "", activities: [], notes: ""
   });
   const [newActivity, setNewActivity] = useState("");
 
@@ -2046,13 +2071,13 @@ function LookbookViewer({ lookbook, outfits, allItems, closetItems, onClose, onU
 
   const save = (overrides = {}) => onUpdate({
     ...lookbook, name: lbName, notes, outfitIds: lookIds, lookMeta,
-    tags: lbTags, city: lbCity, coverImage, linkedMoodboardIdx, tripDetails, ...overrides
+    tags: lbTags, city: lbCity, coverImage, moodboardId: linkedMoodboardId, tripDetails, ...overrides
   });
 
   const saveTripDetails = (patch) => {
     const next = { ...tripDetails, ...patch };
     setTripDetails(next);
-    onUpdate({ ...lookbook, name: lbName, notes, outfitIds: lookIds, lookMeta, tags: lbTags, city: lbCity, coverImage, linkedMoodboardIdx, tripDetails: next });
+    onUpdate({ ...lookbook, name: lbName, notes, outfitIds: lookIds, lookMeta, tags: lbTags, city: lbCity, coverImage, moodboardId: linkedMoodboardId, tripDetails: next });
   };
 
   const removeLook = (outfitId) => {
@@ -2368,29 +2393,59 @@ function LookbookViewer({ lookbook, outfits, allItems, closetItems, onClose, onU
           ) : view === "moodboard" ? (
             /* ── MOODBOARD VIEW ── */
             <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden", background: "#faf9f6" }}>
-              {/* Moodboard selector */}
-              <div style={{ padding: "12px 20px 10px", borderBottom: "1px solid #e8e4dc", display: "flex", alignItems: "center", gap: 10, background: "#fff", flexShrink: 0 }}>
-                <div style={{ fontSize: 13, fontWeight: 700, color: "#1a1a1a", flexShrink: 0 }}>Linked Moodboard</div>
-                <select value={linkedMoodboardIdx !== null ? linkedMoodboardIdx : ""} onChange={e => {
-                  const val = e.target.value === "" ? null : Number(e.target.value);
-                  setLinkedMoodboardIdx(val);
-                  onUpdate({ ...lookbook, name: lbName, notes, outfitIds: lookIds, lookMeta, tags: lbTags, city: lbCity, coverImage, linkedMoodboardIdx: val, tripDetails });
-                }} className="pill-select" style={{ flex: 1, maxWidth: 280, padding: "6px 32px 6px 10px", borderRadius: 10, fontSize: 12, outline: "none" }}>
-                  <option value="">No moodboard linked…</option>
-                  {moodboards.map((mb, i) => <option key={mb.id || i} value={i}>{mb.name || ("Board " + (i + 1))}</option>)}
-                </select>
-                {moodboards.length === 0 && <div style={{ fontSize: 12, color: "#bbb" }}>Create moodboards in the Moodboard tab first</div>}
-              </div>
-              {/* Moodboard canvas — embedded editable */}
-              {linkedMoodboardIdx !== null && moodboards[linkedMoodboardIdx] ? (
-                <div style={{ flex: 1, overflow: "hidden", position: "relative" }}>
+              {linkedMoodboardIdx !== null && linkedMoodboardIdx >= 0 && moodboards[linkedMoodboardIdx] ? (
+                /* Fully editable moodboard canvas */
+                <div style={{ flex: 1, overflow: "auto", padding: "20px 20px 0" }}>
                   <Moodboard closetItems={closetItems || []} activeIdx={linkedMoodboardIdx} setActiveIdx={setLinkedMoodboardIdx} />
                 </div>
               ) : (
-                <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", color: "#ccc", gap: 10 }}>
-                  <SvgPushPin size={36} color="#ddd" />
-                  <div style={{ fontSize: 14, fontWeight: 700 }}>No moodboard linked yet</div>
-                  <div style={{ fontSize: 12, color: "#ccc" }}>Select a moodboard above to view and edit it here</div>
+                /* Empty state — show board list immediately if boards exist */
+                <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 16, padding: 32 }}>
+                  <SvgSparkle size={40} color="#ddd" />
+                  <div style={{ fontSize: 16, fontWeight: 800, color: "#1a1a1a" }}>No moodboard linked</div>
+                  <div style={{ fontSize: 13, color: "#aaa", textAlign: "center", maxWidth: 280 }}>
+                    {moodboards.length > 0 ? "Choose an existing board or create a new one." : "Create a new moodboard to get started."}
+                  </div>
+
+                  {moodboards.length > 0 && (
+                    <div style={{ display: "flex", flexDirection: "column", gap: 8, width: "100%", maxWidth: 360 }}>
+                      <div style={{ fontSize: 11, fontWeight: 700, color: "#bbb", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 2 }}>Your boards</div>
+                      {moodboards.map((mb, i) => (
+                        <button key={mb.id || i} onClick={() => {
+                          setLinkedMoodboardId(mb.id);
+                          onUpdate({ ...lookbook, name: lbName, notes, outfitIds: lookIds, lookMeta, tags: lbTags, city: lbCity, coverImage, moodboardId: mb.id, tripDetails });
+                        }} style={{
+                          padding: "12px 16px", background: "#fff", border: "1.5px solid #e0dbd2", borderRadius: 12,
+                          cursor: "pointer", fontFamily: "'DM Sans',sans-serif", fontSize: 13, fontWeight: 700,
+                          color: "#1a1a1a", textAlign: "left", display: "flex", alignItems: "center", gap: 10,
+                        }}
+                          onMouseEnter={e => { e.currentTarget.style.borderColor = "#1a1a1a"; }}
+                          onMouseLeave={e => { e.currentTarget.style.borderColor = "#e0dbd2"; }}
+                        >
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><rect x="3" y="3" width="18" height="18" rx="2"/></svg>
+                          <span style={{ flex: 1 }}>{mb.name || "Board " + (i + 1)}</span>
+                          <span style={{ fontSize: 11, color: "#bbb", fontWeight: 500 }}>{(mb.items || []).length} items</span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+
+                  <button onClick={() => {
+                    const boards = (() => { try { return JSON.parse(localStorage.getItem("wardrobe_moodboards_v1") || "[]"); } catch { return []; } })();
+                    const newBoard = { id: uid(), name: lbName + " Board", items: [], bg: "#ffffff" };
+                    const updated = [...boards, newBoard];
+                    try { localStorage.setItem("wardrobe_moodboards_v1", JSON.stringify(updated)); } catch {}
+                    setMoodboards(updated);
+                    setLinkedMoodboardId(newBoard.id);
+                    onUpdate({ ...lookbook, name: lbName, notes, outfitIds: lookIds, lookMeta, tags: lbTags, city: lbCity, coverImage, moodboardId: newBoard.id, tripDetails });
+                  }} style={{
+                    padding: "10px 24px", background: "#1a1a1a", border: "none", borderRadius: 12,
+                    cursor: "pointer", fontFamily: "'DM Sans',sans-serif", fontSize: 13, fontWeight: 700,
+                    color: "#fff", display: "flex", alignItems: "center", gap: 8,
+                  }}>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                    New Board
+                  </button>
                 </div>
               )}
             </div>
@@ -2616,26 +2671,6 @@ function LookbookViewer({ lookbook, outfits, allItems, closetItems, onClose, onU
                 <div style={{ fontSize: 10, fontWeight: 700, color: "#bbb", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 4 }}>Hotel</div>
                 <input value={tripDetails.hotel || ""} onChange={e => setTripDetails(d => ({ ...d, hotel: e.target.value }))} onBlur={() => saveTripDetails({})}
                   placeholder="Hotel name…"
-                  style={{ width: "100%", padding: "7px 10px", border: "1.5px solid #e8e4dc", borderRadius: 10, fontFamily: "'DM Sans', sans-serif", fontSize: 12, outline: "none", boxSizing: "border-box", marginBottom: 4 }} />
-                <input value={tripDetails.hotelAddress || ""} onChange={e => setTripDetails(d => ({ ...d, hotelAddress: e.target.value }))} onBlur={() => saveTripDetails({})}
-                  placeholder="Address…"
-                  style={{ width: "100%", padding: "7px 10px", border: "1.5px solid #e8e4dc", borderRadius: 10, fontFamily: "'DM Sans', sans-serif", fontSize: 12, outline: "none", boxSizing: "border-box", marginBottom: 4 }} />
-                <input value={tripDetails.confirmationNo || ""} onChange={e => setTripDetails(d => ({ ...d, confirmationNo: e.target.value }))} onBlur={() => saveTripDetails({})}
-                  placeholder="Confirmation #…"
-                  style={{ width: "100%", padding: "7px 10px", border: "1.5px solid #e8e4dc", borderRadius: 10, fontFamily: "'DM Sans', sans-serif", fontSize: 12, outline: "none", boxSizing: "border-box" }} />
-              </div>
-              {/* Flights */}
-              <div>
-                <div style={{ fontSize: 10, fontWeight: 700, color: "#bbb", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 4 }}>Flights</div>
-                <textarea value={tripDetails.flights || ""} onChange={e => setTripDetails(d => ({ ...d, flights: e.target.value }))} onBlur={() => saveTripDetails({})}
-                  placeholder="Flight numbers, times…"
-                  style={{ width: "100%", padding: "7px 10px", border: "1.5px solid #e8e4dc", borderRadius: 10, fontFamily: "'DM Sans', sans-serif", fontSize: 12, outline: "none", resize: "vertical", minHeight: 56, boxSizing: "border-box" }} />
-              </div>
-              {/* Car rental */}
-              <div>
-                <div style={{ fontSize: 10, fontWeight: 700, color: "#bbb", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 4 }}>Car Rental</div>
-                <input value={tripDetails.carRental || ""} onChange={e => setTripDetails(d => ({ ...d, carRental: e.target.value }))} onBlur={() => saveTripDetails({})}
-                  placeholder="Rental info…"
                   style={{ width: "100%", padding: "7px 10px", border: "1.5px solid #e8e4dc", borderRadius: 10, fontFamily: "'DM Sans', sans-serif", fontSize: 12, outline: "none", boxSizing: "border-box" }} />
               </div>
               {/* Activities */}
@@ -4736,21 +4771,19 @@ function SellerDashboard({ itemsDb, onViewItem }) {
 
 // ── Moodboard ─────────────────────────────────────────────────────────────────
 // ── MoodboardInfoPanel — reads active board from Moodboard via localStorage ──
-function MoodboardInfoPanel({ activeIdx, setActiveIdx }) {
+function MoodboardInfoPanel({ activeIdx, setActiveIdx, lookbooksDb, createLookbook, addMoodboardToLookbook, onGoToLookbook }) {
   const STORAGE_KEY = "wardrobe_moodboards_v1";
+  const ARCHIVE_KEY = "wardrobe_moodboards_archived_v1";
+
   const [data, setData] = useState(() => {
     try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]"); } catch { return []; }
   });
 
-  // Poll localStorage for changes from Moodboard component
   const suppressPoll = useRef(false);
   useEffect(() => {
     const interval = setInterval(() => {
       if (suppressPoll.current) return;
-      try {
-        const parsed = JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]");
-        setData(parsed);
-      } catch {}
+      try { setData(JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]")); } catch {}
     }, 500);
     return () => clearInterval(interval);
   }, []);
@@ -4763,84 +4796,134 @@ function MoodboardInfoPanel({ activeIdx, setActiveIdx }) {
   };
 
   const board = data[activeIdx] || null;
+
   const [hexInput, setHexInput] = useState("");
   const [editingColorIdx, setEditingColorIdx] = useState(null);
-  if (!board) return null;
+  const [newLbNameInput, setNewLbNameInput] = useState("");
+  const [lbAction, setLbAction] = useState(null); // "add" | "create"
+  const [selectedLbId, setSelectedLbId] = useState("");
+  const [lbFeedback, setLbFeedback] = useState(null);
+  const [linkedLb, setLinkedLb] = useState(null); // full lookbook object once linked
+  const [confirmArchive, setConfirmArchive] = useState(false);
 
-  const palette = board.palette || [];
+  // Reset linked lookbook when switching boards
+  useEffect(() => { setLinkedLb(null); setLbAction(null); }, [activeIdx]);
 
-  const updatePalette = (newPalette) => {
-    save(data.map((b, i) => i === activeIdx ? { ...b, palette: newPalette } : b));
-  };
+  const palette = board?.palette || [];
 
-  const addColor = () => {
-    if (palette.length >= 10) return;
-    updatePalette([...palette, "#e8e4dc"]);
-  };
+  // Reset linked lookbook when switching boards
+  useEffect(() => { setLinkedLb(null); setLbAction(null); }, [activeIdx]);
 
-  const removeColor = (idx) => {
-    updatePalette(palette.filter((_, i) => i !== idx));
-    if (editingColorIdx === idx) setEditingColorIdx(null);
-  };
-
-  const updateColor = (idx, val) => {
-    const updated = palette.map((c, i) => i === idx ? val : c);
-    updatePalette(updated);
-  };
-
+  const updatePalette = (p) => save(data.map((b,i) => i===activeIdx ? {...b, palette:p} : b));
+  const addColor = () => { if (palette.length >= 10) return; updatePalette([...palette, "#e8e4dc"]); };
+  const removeColor = (idx) => { updatePalette(palette.filter((_,i)=>i!==idx)); if(editingColorIdx===idx) setEditingColorIdx(null); };
+  const updateColor = (idx, val) => updatePalette(palette.map((c,i)=>i===idx?val:c));
   const normalizeHex = (val) => {
-    const clean = val.replace(/[^0-9a-fA-F]/g, "");
-    if (clean.length === 3) return "#" + clean.split("").map(c => c + c).join("");
-    if (clean.length === 6) return "#" + clean;
+    const clean = val.replace(/[^0-9a-fA-F]/g,"");
+    if(clean.length===3) return "#"+clean.split("").map(c=>c+c).join("");
+    if(clean.length===6) return "#"+clean;
     return null;
   };
 
+  const archiveBoard = () => {
+    if (!board) return;
+    try {
+      const archived = JSON.parse(localStorage.getItem(ARCHIVE_KEY) || "[]");
+      archived.push({ ...board, archivedAt: new Date().toISOString() });
+      localStorage.setItem(ARCHIVE_KEY, JSON.stringify(archived));
+    } catch {}
+    const updated = data.filter((_,i) => i !== activeIdx);
+    save(updated);
+    setActiveIdx(Math.max(0, activeIdx - 1));
+    setConfirmArchive(false);
+  };
+
+  const handleLbAction = async () => {
+    if (!board) return;
+    if (lbAction === "create") {
+      if (!newLbNameInput.trim()) return;
+      const newId = uid();
+      await createLookbook({ id: newId, name: newLbNameInput.trim(), moodboardId: board.id });
+      // Set a placeholder immediately; it'll be replaced once lookbooksDb refreshes
+      setLinkedLb({ id: newId, name: newLbNameInput.trim() });
+    } else if (lbAction === "add" && selectedLbId) {
+      const lb = (lookbooksDb||[]).find(l => l.id === selectedLbId);
+      await addMoodboardToLookbook(selectedLbId, board);
+      setLinkedLb(lb || { id: selectedLbId, name: "Lookbook" });
+    }
+    setLbAction(null); setSelectedLbId(""); setNewLbNameInput("");
+  };
+
+  if (data.length === 0) return (
+    <div className="right-card">
+      <div className="right-card-title">Boards</div>
+      <div style={{fontSize:12,color:"#bbb",textAlign:"center",padding:"12px 0"}}>No boards yet</div>
+      <button onClick={() => {
+        const updated = [{ id: uid(), name: "Board 1", items: [], bg: "#ffffff" }];
+        save(updated); setActiveIdx(0);
+      }} style={{width:"100%",padding:"9px 0",background:"#1a1a1a",color:"#fff",border:"none",borderRadius:10,cursor:"pointer",fontFamily:"'DM Sans',sans-serif",fontSize:12,fontWeight:700}}>+ Create Board</button>
+    </div>
+  );
+
   return (
     <>
+    {/* ── Board selector (dropdown) ── */}
     <div className="right-card">
+      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:10}}>
+        <div className="right-card-title" style={{marginBottom:0}}>Board</div>
+        <button onClick={() => {
+          const updated = [...data, {id:uid(), name:`Board ${data.length+1}`, items:[], bg:"#ffffff"}];
+          save(updated); setActiveIdx(updated.length-1);
+        }} style={{padding:"4px 10px",background:"#1a1a1a",color:"#fff",border:"none",borderRadius:8,cursor:"pointer",fontSize:11,fontWeight:700,fontFamily:"'DM Sans',sans-serif"}}>+ New</button>
+      </div>
+      <select
+        value={activeIdx}
+        onChange={e => setActiveIdx(Number(e.target.value))}
+        style={{width:"100%",padding:"8px 32px 8px 12px",border:"1.5px solid #e0dbd2",borderRadius:10,fontFamily:"'DM Sans',sans-serif",fontSize:13,fontWeight:700,background:"#fafaf8",color:"#1a1a1a",outline:"none",cursor:"pointer",appearance:"auto",boxSizing:"border-box"}}
+      >
+        {data.map((b,i) => (
+          <option key={b.id} value={i}>{b.name}</option>
+        ))}
+      </select>
+    </div>
+
+    {board && (<>
+
+    {/* ── Board Info ── */}
+    <div className="right-card" style={{marginTop:12}}>
       <div className="right-card-title">Board Info</div>
-      <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+      <div style={{display:"flex",flexDirection:"column",gap:10}}>
         <div>
-          <label style={{ display: "block", fontSize: 10, fontWeight: 700, color: "#aaa", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 5 }}>Name</label>
-          <input value={board.name || ""} onChange={e => save(data.map((b, i) => i === activeIdx ? { ...b, name: e.target.value } : b))}
+          <label style={{display:"block",fontSize:10,fontWeight:700,color:"#aaa",textTransform:"uppercase",letterSpacing:"0.08em",marginBottom:5}}>Name</label>
+          <input value={board.name||""} onChange={e => save(data.map((b,i)=>i===activeIdx?{...b,name:e.target.value}:b))}
             placeholder="Board name…"
-            style={{ width: "100%", padding: "7px 10px", border: "1px solid #e0dbd2", borderRadius: 10, fontFamily: "'DM Sans', sans-serif", fontSize: 13, fontWeight: 700, outline: "none", background: "#fafaf8", boxSizing: "border-box" }} />
+            style={{width:"100%",padding:"7px 10px",border:"1px solid #e0dbd2",borderRadius:10,fontFamily:"'DM Sans',sans-serif",fontSize:13,fontWeight:700,outline:"none",background:"#fafaf8",boxSizing:"border-box"}} />
         </div>
         <div>
-          <label style={{ display: "block", fontSize: 10, fontWeight: 700, color: "#aaa", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 5 }}>Notes</label>
-          <textarea value={board.notes || ""} onChange={e => save(data.map((b, i) => i === activeIdx ? { ...b, notes: e.target.value } : b))}
+          <label style={{display:"block",fontSize:10,fontWeight:700,color:"#aaa",textTransform:"uppercase",letterSpacing:"0.08em",marginBottom:5}}>Notes</label>
+          <textarea value={board.notes||""} onChange={e => save(data.map((b,i)=>i===activeIdx?{...b,notes:e.target.value}:b))}
             placeholder="Mood, theme, inspiration…" rows={3}
-            style={{ width: "100%", padding: "7px 10px", border: "1px solid #e0dbd2", borderRadius: 10, fontFamily: "'DM Sans', sans-serif", fontSize: 12, outline: "none", background: "#fafaf8", resize: "none", lineHeight: 1.5, boxSizing: "border-box" }} />
+            style={{width:"100%",padding:"7px 10px",border:"1px solid #e0dbd2",borderRadius:10,fontFamily:"'DM Sans',sans-serif",fontSize:12,outline:"none",background:"#fafal8",resize:"none",lineHeight:1.5,boxSizing:"border-box"}} />
         </div>
-        <div style={{ fontSize: 11, color: "#bbb", fontWeight: 500 }}>{(board.items || []).length} item{(board.items || []).length !== 1 ? "s" : ""} on board</div>
       </div>
     </div>
 
-    {/* Color Palette card */}
-    <div className="right-card" style={{ marginTop: 12 }}>
+    {/* ── Color Palette ── */}
+    <div className="right-card" style={{marginTop:12}}>
       <div className="right-card-title">Color Palette</div>
-
-      {/* Color swatches row */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 52px)", rowGap: 6, columnGap: 6, marginBottom: 12 }}>
-        {palette.map((color, idx) => (
-          <div key={idx} style={{ position: "relative", width: 52, height: 52, lineHeight: 0, flexShrink: 0 }}>
-            <div
-              onClick={() => setEditingColorIdx(editingColorIdx === idx ? null : idx)}
-              style={{
-                width: 52, height: 52, borderRadius: 12,
-                background: color,
-                border: editingColorIdx === idx ? "2px solid #1a1a1a" : "2px solid transparent",
-                boxShadow: "0 1px 4px rgba(0,0,0,0.12)",
-                cursor: "pointer",
-                outline: "1.5px solid rgba(0,0,0,0.08)",
-                outlineOffset: 1,
-              }}
-            />
+      <div style={{display:"grid",gridTemplateColumns:"repeat(4,52px)",rowGap:6,columnGap:6,marginBottom:12}}>
+        {palette.map((color,idx) => (
+          <div key={idx} style={{position:"relative",width:52,height:52,lineHeight:0,flexShrink:0}}>
+            <div onClick={() => setEditingColorIdx(editingColorIdx===idx?null:idx)} style={{
+              width:52,height:52,borderRadius:12,background:color,
+              border:editingColorIdx===idx?"2px solid #1a1a1a":"2px solid transparent",
+              boxShadow:"0 1px 4px rgba(0,0,0,0.12)",cursor:"pointer",
+              outline:"1.5px solid rgba(0,0,0,0.08)",outlineOffset:1,
+            }} />
             <button onClick={() => removeColor(idx)} className="palette-del-btn" style={{
-              position: "absolute", top: 4, right: 4,
-              width: 16, height: 16, borderRadius: "50%",
-              background: "rgba(0,0,0,0.55)", border: "none", cursor: "pointer",
-              display: "flex", alignItems: "center", justifyContent: "center",
+              position:"absolute",top:4,right:4,width:16,height:16,borderRadius:"50%",
+              background:"rgba(0,0,0,0.55)",border:"none",cursor:"pointer",
+              display:"flex",alignItems:"center",justifyContent:"center",
             }}>
               <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
             </button>
@@ -4848,52 +4931,143 @@ function MoodboardInfoPanel({ activeIdx, setActiveIdx }) {
         ))}
         {palette.length < 10 && (
           <button onClick={addColor} style={{
-            width: 52, height: 52, borderRadius: 12,
-            background: "#f5f3ef", border: "1.5px dashed #d0cac0",
-            cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
-            color: "#bbb", fontSize: 20, fontWeight: 300, lineHeight: 1,
+            width:52,height:52,borderRadius:12,background:"#f5f3ef",border:"1.5px dashed #d0cac0",
+            cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",
+            color:"#bbb",fontSize:20,fontWeight:300,lineHeight:1,
           }}>+</button>
         )}
       </div>
-
-      {/* Hex editor for selected swatch */}
-      {editingColorIdx !== null && palette[editingColorIdx] !== undefined && (
-        <div style={{ display: "flex", gap: 8, alignItems: "center", padding: "10px 12px", background: "#f9f8f6", borderRadius: 12, border: "1px solid #e8e4dc" }}>
-          <input
-            type="color"
-            value={palette[editingColorIdx]}
-            onChange={e => updateColor(editingColorIdx, e.target.value)}
-            style={{ width: 32, height: 32, border: "none", borderRadius: 8, cursor: "pointer", padding: 0, background: "none", flexShrink: 0 }}
-          />
-          <input
-            value={hexInput !== "" ? hexInput : palette[editingColorIdx]}
-            onChange={e => {
-              setHexInput(e.target.value);
-              const normalized = normalizeHex(e.target.value);
-              if (normalized) updateColor(editingColorIdx, normalized);
-            }}
+      {editingColorIdx!==null && palette[editingColorIdx]!==undefined && (
+        <div style={{display:"flex",gap:8,alignItems:"center",padding:"10px 12px",background:"#f9f8f6",borderRadius:12,border:"1px solid #e8e4dc"}}>
+          <input type="color" value={palette[editingColorIdx]} onChange={e => updateColor(editingColorIdx,e.target.value)}
+            style={{width:32,height:32,border:"none",borderRadius:8,cursor:"pointer",padding:0,background:"none",flexShrink:0}} />
+          <input value={hexInput!==""?hexInput:palette[editingColorIdx]}
+            onChange={e => { setHexInput(e.target.value); const n=normalizeHex(e.target.value); if(n) updateColor(editingColorIdx,n); }}
             onFocus={() => setHexInput(palette[editingColorIdx])}
             onBlur={() => setHexInput("")}
-            placeholder="#000000"
-            maxLength={7}
-            style={{
-              flex: 1, padding: "6px 10px", border: "1px solid #e0dbd2",
-              borderRadius: 8, fontFamily: "'DM Sans', sans-serif",
-              fontSize: 12, fontWeight: 600, outline: "none",
-              background: "#fff", color: "#1a1a1a", letterSpacing: "0.05em",
-              textTransform: "uppercase", boxSizing: "border-box",
-            }}
+            placeholder="#000000" maxLength={7}
+            style={{flex:1,padding:"6px 10px",border:"1px solid #e0dbd2",borderRadius:8,fontFamily:"'DM Sans',sans-serif",fontSize:12,fontWeight:600,outline:"none",background:"#fff",color:"#1a1a1a",letterSpacing:"0.05em",textTransform:"uppercase",boxSizing:"border-box"}}
           />
         </div>
       )}
+      {palette.length===0 && <div style={{fontSize:11,color:"#ccc",textAlign:"center",padding:"8px 0"}}>Tap + to build your palette</div>}
+    </div>
 
-      {palette.length === 0 && (
-        <div style={{ fontSize: 11, color: "#ccc", textAlign: "center", padding: "8px 0" }}>Tap + to build your palette</div>
+    {/* ── Lookbooks ── */}
+    <div className="right-card" style={{marginTop:12}}>
+      <div className="right-card-title">Lookbooks</div>
+
+      {linkedLb ? (
+        /* Linked — show the lookbook as a clickable card */
+        <div>
+          <button onClick={() => onGoToLookbook && onGoToLookbook(linkedLb)} style={{
+            width:"100%",padding:"11px 14px",background:"#f0faf4",border:"1.5px solid #b6e8c8",
+            borderRadius:12,cursor:"pointer",fontFamily:"'DM Sans',sans-serif",textAlign:"left",
+            display:"flex",alignItems:"center",gap:10,
+          }}>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#2d6a3f" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M2 3h6a4 4 0 014 4v14a3 3 0 00-3-3H2z"/><path d="M22 3h-6a4 4 0 00-4 4v14a3 3 0 013-3h7z"/></svg>
+            <div style={{flex:1,minWidth:0}}>
+              <div style={{fontSize:12,fontWeight:800,color:"#2d6a3f",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{linkedLb.name}</div>
+              <div style={{fontSize:10,color:"#5aaa7e",marginTop:1}}>Open lookbook →</div>
+            </div>
+          </button>
+          <button onClick={() => setLinkedLb(null)} style={{
+            width:"100%",marginTop:6,padding:"7px 0",background:"none",border:"none",
+            cursor:"pointer",fontFamily:"'DM Sans',sans-serif",fontSize:11,fontWeight:600,color:"#bbb",
+          }}
+            onMouseEnter={e=>e.currentTarget.style.color="#888"}
+            onMouseLeave={e=>e.currentTarget.style.color="#bbb"}
+          >Link a different lookbook</button>
+        </div>
+      ) : (
+        /* No link yet — show action buttons */
+        <>
+          {lbAction === "add" ? (
+            <div style={{display:"flex",flexDirection:"column",gap:6}}>
+              <select value={selectedLbId} onChange={e => setSelectedLbId(e.target.value)}
+                style={{width:"100%",padding:"8px 10px",border:"1.5px solid #e0dbd2",borderRadius:10,fontFamily:"'DM Sans',sans-serif",fontSize:12,fontWeight:600,background:"#fafaf8",outline:"none"}}>
+                <option value="">Choose lookbook…</option>
+                {(lookbooksDb||[]).map(lb => <option key={lb.id} value={lb.id}>{lb.name}</option>)}
+              </select>
+              <div style={{display:"flex",gap:6}}>
+                <button onClick={handleLbAction} disabled={!selectedLbId}
+                  style={{flex:1,padding:"8px 0",background:selectedLbId?"#1a1a1a":"#e0dbd2",color:"#fff",border:"none",borderRadius:10,cursor:selectedLbId?"pointer":"default",fontFamily:"'DM Sans',sans-serif",fontSize:12,fontWeight:700}}>Add</button>
+                <button onClick={() => { setLbAction(null); setSelectedLbId(""); }}
+                  style={{padding:"8px 12px",background:"#f5f3ef",border:"none",borderRadius:10,cursor:"pointer",fontSize:11,color:"#888",fontFamily:"'DM Sans',sans-serif"}}>✕</button>
+              </div>
+            </div>
+          ) : lbAction === "create" ? (
+            <div style={{display:"flex",flexDirection:"column",gap:6}}>
+              <input value={newLbNameInput} onChange={e => setNewLbNameInput(e.target.value)}
+                placeholder="New lookbook name…" autoFocus
+                onKeyDown={e => e.key==="Enter" && handleLbAction()}
+                style={{padding:"8px 12px",border:"1.5px solid #1a1a1a",borderRadius:10,fontFamily:"'DM Sans',sans-serif",fontSize:12,fontWeight:700,outline:"none"}} />
+              <div style={{display:"flex",gap:6}}>
+                <button onClick={handleLbAction}
+                  style={{flex:1,padding:"8px 0",background:"#1a1a1a",color:"#fff",border:"none",borderRadius:10,cursor:"pointer",fontFamily:"'DM Sans',sans-serif",fontSize:12,fontWeight:700}}>Create</button>
+                <button onClick={() => { setLbAction(null); setNewLbNameInput(""); }}
+                  style={{padding:"8px 12px",background:"#f5f3ef",border:"none",borderRadius:10,cursor:"pointer",fontSize:11,color:"#888",fontFamily:"'DM Sans',sans-serif"}}>✕</button>
+              </div>
+            </div>
+          ) : (
+            <div style={{display:"flex",flexDirection:"column",gap:8}}>
+              {(lookbooksDb||[]).length > 0 && (
+                <button onClick={() => setLbAction("add")} style={{
+                  width:"100%",padding:"9px 12px",background:"#fafaf8",border:"1.5px solid #e0dbd2",
+                  borderRadius:12,cursor:"pointer",fontFamily:"'DM Sans',sans-serif",fontSize:12,fontWeight:700,color:"#444",
+                  display:"flex",alignItems:"center",gap:8,
+                }}>
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><path d="M12 5v14M5 12h14"/></svg>
+                  Add to Lookbook
+                </button>
+              )}
+              <button onClick={() => setLbAction("create")} style={{
+                width:"100%",padding:"9px 12px",background:"#fafaf8",border:"1.5px solid #e0dbd2",
+                borderRadius:12,cursor:"pointer",fontFamily:"'DM Sans',sans-serif",fontSize:12,fontWeight:700,color:"#444",
+                display:"flex",alignItems:"center",gap:8,
+              }}>
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><rect x="3" y="3" width="18" height="18" rx="3"/><path d="M12 8v8M8 12h8"/></svg>
+                New Lookbook from Board
+              </button>
+            </div>
+          )}
+        </>
       )}
     </div>
+
+    {/* ── Archive ── */}
+    <div style={{marginTop:16,paddingTop:4}}>
+      {confirmArchive ? (
+        <div style={{padding:"14px 16px",background:"#fff8f8",borderRadius:14,border:"1.5px solid #ffd0d0"}}>
+          <div style={{fontSize:13,fontWeight:700,color:"#1a1a1a",marginBottom:4}}>Archive this board?</div>
+          <div style={{fontSize:11,color:"#aaa",marginBottom:12,lineHeight:1.5}}>It'll be removed from here but you can restore it from Settings → Data.</div>
+          <div style={{display:"flex",gap:8}}>
+            <button onClick={() => setConfirmArchive(false)} style={{flex:1,padding:"8px 0",background:"#f5f3ef",border:"none",borderRadius:10,cursor:"pointer",fontFamily:"'DM Sans',sans-serif",fontSize:12,fontWeight:600,color:"#888"}}>Cancel</button>
+            <button onClick={archiveBoard} style={{flex:1,padding:"8px 0",background:"#e05555",border:"none",borderRadius:10,cursor:"pointer",fontFamily:"'DM Sans',sans-serif",fontSize:12,fontWeight:700,color:"#fff"}}>Archive</button>
+          </div>
+        </div>
+      ) : (
+        <button onClick={() => setConfirmArchive(true)} style={{
+          width:"100%",padding:"9px 12px",background:"transparent",border:"1.5px solid #ece8e0",
+          borderRadius:12,cursor:"pointer",fontFamily:"'DM Sans',sans-serif",fontSize:12,fontWeight:600,color:"#bbb",
+          display:"flex",alignItems:"center",gap:8,
+        }}
+          onMouseEnter={e=>{e.currentTarget.style.borderColor="#ffd0d0";e.currentTarget.style.color="#e05555";}}
+          onMouseLeave={e=>{e.currentTarget.style.borderColor="#ece8e0";e.currentTarget.style.color="#bbb";}}
+        >
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><polyline points="21 8 21 21 3 21 3 8"/><rect x="1" y="3" width="22" height="5"/><line x1="10" y1="12" x2="14" y2="12"/></svg>
+          Archive Board
+        </button>
+      )}
+    </div>
+
+    </>)}
+
+    {/* Archive confirm modal */}
     </>
   );
 }
+
 
 function Moodboard({ closetItems = [], activeIdx, setActiveIdx }) {
   const closetItemsForMoodboard = closetItems;
@@ -4901,18 +5075,24 @@ function Moodboard({ closetItems = [], activeIdx, setActiveIdx }) {
   const [boards, setBoards] = useState(() => {
     try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]"); } catch { return []; }
   });
-  const [renamingIdx, setRenamingIdx] = useState(null);
-  const [renameVal, setRenameVal] = useState("");
   const [selectedId, setSelectedId] = useState(null);
-  const [bgColor, setBgColor] = useState(null);
   const canvasRef = useRef(null);
   const dragging = useRef(null);
   const resizing = useRef(null);
+  const rotating = useRef(null);
   const fileRef = useRef(null);
+  const editingTextRef = useRef(null);
   const [showUrlImport, setShowUrlImport] = useState(false);
   const [urlInput, setUrlInput] = useState("");
   const [urlLoading, setUrlLoading] = useState(false);
   const [showClosetPicker, setShowClosetPicker] = useState(false);
+  const [editingTextId, setEditingTextId] = useState(null);
+  const [editingTextVal, setEditingTextVal] = useState("");
+
+  // ── Undo/redo history ──
+  const history = useRef([]);   // array of board item snapshots
+  const historyIdx = useRef(-1);
+  const skipHistory = useRef(false);
 
   const board = boards[activeIdx] || null;
   const items = board?.items || [];
@@ -4922,32 +5102,50 @@ function Moodboard({ closetItems = [], activeIdx, setActiveIdx }) {
     try { localStorage.setItem(STORAGE_KEY, JSON.stringify(boards)); } catch(e) {}
   }, [boards]);
 
-  const updateBoard = (updater) => {
-    setBoards(bs => bs.map((b, i) => i === activeIdx ? { ...b, items: updater(b.items) } : b));
+  const pushHistory = (snapshot) => {
+    if (skipHistory.current) return;
+    history.current = history.current.slice(0, historyIdx.current + 1);
+    history.current.push(JSON.parse(JSON.stringify(snapshot)));
+    if (history.current.length > 30) history.current.shift();
+    historyIdx.current = history.current.length - 1;
   };
+
+  const undo = () => {
+    if (historyIdx.current <= 0) return;
+    historyIdx.current--;
+    const snap = history.current[historyIdx.current];
+    skipHistory.current = true;
+    setBoards(bs => bs.map((b,i) => i===activeIdx ? {...b, items: snap} : b));
+    skipHistory.current = false;
+  };
+
+  const redo = () => {
+    if (historyIdx.current >= history.current.length - 1) return;
+    historyIdx.current++;
+    const snap = history.current[historyIdx.current];
+    skipHistory.current = true;
+    setBoards(bs => bs.map((b,i) => i===activeIdx ? {...b, items: snap} : b));
+    skipHistory.current = false;
+  };
+
+  const updateBoard = (updater) => {
+    setBoards(bs => bs.map((b,i) => {
+      if (i !== activeIdx) return b;
+      const newItems = typeof updater === "function" ? updater(b.items || []) : updater;
+      pushHistory(newItems);
+      return {...b, items: newItems};
+    }));
+  };
+
   const updateBoardMeta = (patch) => {
-    setBoards(bs => bs.map((b, i) => i === activeIdx ? { ...b, ...patch } : b));
+    setBoards(bs => bs.map((b,i) => i===activeIdx ? {...b, ...patch} : b));
   };
 
   const addBoard = () => {
     const name = `Board ${boards.length + 1}`;
-    setBoards(bs => [...bs, { id: uid(), name, items: [], bg: "#ffffff" }]);
+    setBoards(bs => [...bs, {id:uid(), name, items:[], bg:"#ffffff"}]);
     setActiveIdx(boards.length);
     setSelectedId(null);
-  };
-
-  const deleteBoard = (i) => {
-    setBoards(bs => bs.filter((_, idx) => idx !== i));
-    setActiveIdx(prev => Math.max(0, prev >= i ? prev - 1 : prev));
-    setSelectedId(null);
-  };
-
-  const renameBoard = (i, name) => {
-    setBoards(bs => bs.map((b, idx) => idx === i ? { ...b, name } : b));
-  };
-
-  const setBoardBg = (color) => {
-    setBoards(bs => bs.map((b, i) => i === activeIdx ? { ...b, bg: color } : b));
   };
 
   const importImages = (files) => {
@@ -4956,20 +5154,13 @@ function Moodboard({ closetItems = [], activeIdx, setActiveIdx }) {
       reader.onload = (e) => {
         const img = new Image();
         img.onload = () => {
-          const maxW = 260; const maxH = 220;
-          let w = img.naturalWidth; let h = img.naturalHeight;
-          if (w > maxW) { h = h * maxW / w; w = maxW; }
-          if (h > maxH) { w = w * maxH / h; h = maxH; }
-          const canvas = canvasRef.current;
-          const cx = canvas ? canvas.offsetWidth / 2 - w / 2 + (Math.random() - 0.5) * 80 : 100;
-          const cy = canvas ? canvas.offsetHeight / 2 - h / 2 + (Math.random() - 0.5) * 80 : 100;
-          const newItem = {
-            id: uid(), src: e.target.result,
-            x: Math.max(0, cx), y: Math.max(0, cy),
-            w: Math.round(w), h: Math.round(h),
-            rotation: (Math.random() - 0.5) * 6, zIndex: Date.now(),
-            opacity: 1, label: "", showLabel: false,
-          };
+          const maxW=260; const maxH=220;
+          let w=img.naturalWidth; let h=img.naturalHeight;
+          if(w>maxW){h=h*maxW/w;w=maxW;} if(h>maxH){w=w*maxH/h;h=maxH;}
+          const canvas=canvasRef.current;
+          const cx=canvas?canvas.offsetWidth/2-w/2+(Math.random()-0.5)*80:100;
+          const cy=canvas?canvas.offsetHeight/2-h/2+(Math.random()-0.5)*80:100;
+          const newItem={id:uid(),src:e.target.result,x:Math.max(0,cx),y:Math.max(0,cy),w:Math.round(w),h:Math.round(h),rotation:(Math.random()-0.5)*6,zIndex:Date.now(),opacity:1,label:"",showLabel:false,flipH:false};
           updateBoard(items => [...items, newItem]);
           setSelectedId(newItem.id);
         };
@@ -4982,314 +5173,320 @@ function Moodboard({ closetItems = [], activeIdx, setActiveIdx }) {
   const addTextNote = () => {
     const canvas = canvasRef.current;
     const newItem = {
-      id: uid(), type: "text", text: "Double-click to edit",
-      x: canvas ? canvas.offsetWidth / 2 - 80 : 120,
-      y: canvas ? canvas.offsetHeight / 2 - 30 : 120,
-      w: 180, h: 60, rotation: 0, zIndex: Date.now(),
-      fontSize: 14, color: "#1a1a1a", bg: "#fff9e6", bold: false,
+      id:uid(), type:"text", text:"Double-click to edit",
+      x:canvas?canvas.offsetWidth/2-80:120, y:canvas?canvas.offsetHeight/2-30:120,
+      w:180, h:60, rotation:0, zIndex:Date.now(),
+      fontSize:14, color:"#1a1a1a", bg:"#fff9e6", bold:false,
     };
     updateBoard(items => [...items, newItem]);
     setSelectedId(newItem.id);
   };
 
-  const removeItem = (id) => {
-    updateBoard(items => items.filter(i => i.id !== id));
-    setSelectedId(null);
-  };
+  const removeItem = (id) => { updateBoard(items => items.filter(i => i.id!==id)); setSelectedId(null); };
+  const bringForward = (id) => { const maxZ=Math.max(...items.map(i=>i.zIndex||0)); updateBoard(items=>items.map(i=>i.id===id?{...i,zIndex:maxZ+1}:i)); };
+  const sendBackward = (id) => { const minZ=Math.min(...items.map(i=>i.zIndex||0)); updateBoard(items=>items.map(i=>i.id===id?{...i,zIndex:minZ-1}:i)); };
+  const updateItem = (id, patch) => { updateBoard(items=>items.map(i=>i.id===id?{...i,...patch}:i)); };
+  const duplicateItem = (id) => { const item=items.find(i=>i.id===id); if(!item)return; const copy={...item,id:uid(),x:item.x+20,y:item.y+20,zIndex:Date.now()}; updateBoard(items=>[...items,copy]); setSelectedId(copy.id); };
 
-  const bringForward = (id) => {
-    const maxZ = Math.max(...items.map(i => i.zIndex || 0));
-    updateBoard(items => items.map(i => i.id === id ? { ...i, zIndex: maxZ + 1 } : i));
-  };
+  // ── Keyboard shortcuts ──
+  useEffect(() => {
+    const onKey = (e) => {
+      if (editingTextId) return; // don't intercept while typing
+      const tag = document.activeElement?.tagName;
+      if (tag === "INPUT" || tag === "TEXTAREA") return;
+      if ((e.metaKey || e.ctrlKey) && e.key === "z") { e.preventDefault(); undo(); return; }
+      if ((e.metaKey || e.ctrlKey) && (e.key === "y" || (e.shiftKey && e.key === "z"))) { e.preventDefault(); redo(); return; }
+      if (!selectedId) return;
+      if (e.key === "Delete" || e.key === "Backspace") { e.preventDefault(); removeItem(selectedId); return; }
+      if (e.key === "Escape") { setSelectedId(null); return; }
+      const NUDGE = e.shiftKey ? 10 : 1;
+      if (e.key === "ArrowLeft")  { e.preventDefault(); updateItem(selectedId, { x: (items.find(i=>i.id===selectedId)?.x||0) - NUDGE }); return; }
+      if (e.key === "ArrowRight") { e.preventDefault(); updateItem(selectedId, { x: (items.find(i=>i.id===selectedId)?.x||0) + NUDGE }); return; }
+      if (e.key === "ArrowUp")    { e.preventDefault(); updateItem(selectedId, { y: (items.find(i=>i.id===selectedId)?.y||0) - NUDGE }); return; }
+      if (e.key === "ArrowDown")  { e.preventDefault(); updateItem(selectedId, { y: (items.find(i=>i.id===selectedId)?.y||0) + NUDGE }); return; }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [selectedId, items, editingTextId]);
 
-  const sendBackward = (id) => {
-    const minZ = Math.min(...items.map(i => i.zIndex || 0));
-    updateBoard(items => items.map(i => i.id === id ? { ...i, zIndex: minZ - 1 } : i));
-  };
-
-  const updateItem = (id, patch) => {
-    updateBoard(items => items.map(i => i.id === id ? { ...i, ...patch } : i));
-  };
-
-  const duplicateItem = (id) => {
-    const item = items.find(i => i.id === id);
-    if (!item) return;
-    const copy = { ...item, id: uid(), x: item.x + 20, y: item.y + 20, zIndex: Date.now() };
-    updateBoard(items => [...items, copy]);
-    setSelectedId(copy.id);
-  };
-
-  // Mouse down — start drag or resize
+  // ── Mouse interaction ──
   const onMouseDown = (e, id, mode) => {
-    e.stopPropagation();
-    e.preventDefault();
-    const item = items.find(i => i.id === id);
+    e.stopPropagation(); e.preventDefault();
+    const item = items.find(i=>i.id===id);
     if (!item) return;
     setSelectedId(id);
     bringForward(id);
     if (mode === "drag") {
-      dragging.current = { id, startX: e.clientX - item.x, startY: e.clientY - item.y };
+      dragging.current = {id, startX:e.clientX-item.x, startY:e.clientY-item.y};
     } else if (mode === "resize") {
-      resizing.current = { id, startX: e.clientX, startY: e.clientY, startW: item.w, startH: item.h };
+      resizing.current = {id, startX:e.clientX, startY:e.clientY, startW:item.w, startH:item.h};
+    } else if (mode === "rotate") {
+      const canvas = canvasRef.current;
+      const canvasRect = canvas?.getBoundingClientRect();
+      // item center in page coords
+      const cx = (canvasRect?.left||0) + item.x + item.w/2;
+      const cy = (canvasRect?.top||0)  + item.y + item.h/2;
+      rotating.current = {id, cx, cy, startAngle: Math.atan2(e.clientY-cy, e.clientX-cx) * 180/Math.PI, startRotation: item.rotation||0};
     }
   };
 
   const onMouseMove = (e) => {
     if (dragging.current) {
-      const { id, startX, startY } = dragging.current;
-      updateBoard(items => items.map(i => i.id === id ? { ...i, x: e.clientX - startX, y: e.clientY - startY } : i));
+      const {id,startX,startY}=dragging.current;
+      skipHistory.current = true;
+      setBoards(bs=>bs.map((b,i)=>i!==activeIdx?b:{...b,items:(b.items||[]).map(it=>it.id===id?{...it,x:e.clientX-startX,y:e.clientY-startY}:it)}));
+      skipHistory.current = false;
     } else if (resizing.current) {
-      const { id, startX, startY, startW, startH } = resizing.current;
-      const dx = e.clientX - startX; const dy = e.clientY - startY;
-      updateBoard(items => items.map(i => i.id === id ? { ...i, w: Math.max(60, startW + dx), h: Math.max(40, startH + dy) } : i));
+      const {id,startX,startY,startW,startH}=resizing.current;
+      const dx=e.clientX-startX; const dy=e.clientY-startY;
+      skipHistory.current = true;
+      setBoards(bs=>bs.map((b,i)=>i!==activeIdx?b:{...b,items:(b.items||[]).map(it=>it.id===id?{...it,w:Math.max(60,startW+dx),h:Math.max(40,startH+dy)}:it)}));
+      skipHistory.current = false;
+    } else if (rotating.current) {
+      const {id,cx,cy,startAngle,startRotation}=rotating.current;
+      const angle = Math.atan2(e.clientY-cy, e.clientX-cx) * 180/Math.PI;
+      const newRot = startRotation + (angle - startAngle);
+      skipHistory.current = true;
+      setBoards(bs=>bs.map((b,i)=>i!==activeIdx?b:{...b,items:(b.items||[]).map(it=>it.id===id?{...it,rotation:newRot}:it)}));
+      skipHistory.current = false;
     }
   };
 
-  const onMouseUp = () => { dragging.current = null; resizing.current = null; };
-
-  // Touch support
-  const onTouchStart = (e, id, mode) => {
-    const touch = e.touches[0];
-    onMouseDown({ clientX: touch.clientX, clientY: touch.clientY, stopPropagation: () => {}, preventDefault: () => {} }, id, mode);
+  const onMouseUp = () => {
+    if (dragging.current || resizing.current || rotating.current) {
+      // Push to history on release
+      pushHistory(items);
+    }
+    dragging.current = null; resizing.current = null; rotating.current = null;
   };
-  const onTouchMove = (e) => { const t = e.touches[0]; onMouseMove({ clientX: t.clientX, clientY: t.clientY }); };
+
+  const onTouchStart = (e,id,mode) => { const t=e.touches[0]; onMouseDown({clientX:t.clientX,clientY:t.clientY,stopPropagation:()=>{},preventDefault:()=>{}},id,mode); };
+  const onTouchMove = (e) => { const t=e.touches[0]; onMouseMove({clientX:t.clientX,clientY:t.clientY}); };
   const onTouchEnd = () => onMouseUp();
 
-  const selectedItem = items.find(i => i.id === selectedId);
+  const selectedItem = items.find(i=>i.id===selectedId);
 
-  const loadScript = (src) => new Promise((resolve, reject) => {
-    if (document.querySelector(`script[src="${src}"]`)) { resolve(); return; }
-    const s = document.createElement("script"); s.src = src; s.onload = resolve; s.onerror = reject;
+  const loadScript = (src) => new Promise((resolve,reject) => {
+    if(document.querySelector(`script[src="${src}"]`)){resolve();return;}
+    const s=document.createElement("script");s.src=src;s.onload=resolve;s.onerror=reject;
     document.head.appendChild(s);
   });
 
   const exportCanvas = () => {
     const canvas = canvasRef.current;
     if (!canvas) return;
-    loadScript("https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js").then(() => {
-      const h2c = window.html2canvas;
-      h2c(canvas, { useCORS: true, backgroundColor: board?.bg || "#fff" }).then(c => {
-        const a = document.createElement("a");
-        a.href = c.toDataURL("image/jpeg", 0.92);
-        a.download = `${board?.name || "moodboard"}.jpg`;
-        a.click();
+    loadScript("https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js").then(()=>{
+      window.html2canvas(canvas,{useCORS:true,backgroundColor:board?.bg||"#fff"}).then(c=>{
+        const a=document.createElement("a"); a.href=c.toDataURL("image/jpeg",0.92); a.download=`${board?.name||"moodboard"}.jpg`; a.click();
       });
-    }).catch(() => alert("Export failed — try right-clicking and saving the image manually."));
+    }).catch(()=>alert("Export failed — try right-clicking the board to save manually."));
   };
 
   const importFromUrl = async () => {
-    if (!urlInput.trim()) return;
+    if(!urlInput.trim())return;
     setUrlLoading(true);
     try {
-      // Try to use a CORS proxy for external images
-      const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(urlInput.trim())}`;
-      const res = await fetch(proxyUrl);
-      const blob = await res.blob();
-      if (!blob.type.startsWith("image/")) throw new Error("Not an image");
-      const reader = new FileReader();
-      reader.onload = e => { importImages([new File([blob], "imported.jpg", { type: blob.type })]); };
+      const proxyUrl=`https://api.allorigins.win/raw?url=${encodeURIComponent(urlInput.trim())}`;
+      const res=await fetch(proxyUrl); const blob=await res.blob();
+      if(!blob.type.startsWith("image/"))throw new Error("Not an image");
+      const reader=new FileReader();
+      reader.onload=e=>{importImages([new File([blob],"imported.jpg",{type:blob.type})]);};
       reader.readAsDataURL(blob);
       setUrlInput(""); setShowUrlImport(false);
-    } catch(err) {
-      // Fallback: just create an img element with the URL directly
-      const canvas = canvasRef.current;
-      const newItem = {
-        id: uid(), src: urlInput.trim(),
-        x: canvas ? canvas.offsetWidth / 2 - 130 : 80,
-        y: canvas ? canvas.offsetHeight / 2 - 100 : 80,
-        w: 260, h: 200, rotation: 0, zIndex: Date.now(), opacity: 1,
-      };
-      updateBoard(items => [...items, newItem]);
+    } catch {
+      const canvas=canvasRef.current;
+      const newItem={id:uid(),src:urlInput.trim(),x:canvas?canvas.offsetWidth/2-130:80,y:canvas?canvas.offsetHeight/2-100:80,w:260,h:200,rotation:0,zIndex:Date.now(),opacity:1,flipH:false};
+      updateBoard(items=>[...items,newItem]);
       setSelectedId(newItem.id);
       setUrlInput(""); setShowUrlImport(false);
     }
     setUrlLoading(false);
   };
 
-  const BG_PRESETS = ["#ffffff", "#fafaf8", "#f5f3ef", "#f0f4f8", "#1a1a1a", "#2d2d2d", "#f9f0e8", "#e8f0e9", "#f0e8f5", "#fff9e6"];
-
   if (boards.length === 0) return (
-    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", height: "60vh", gap: 16 }}>
+    <div style={{display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",height:"60vh",gap:16}}>
       <div><SvgSparkle size={40} color="#ddd" /></div>
-      <div style={{ fontSize: 18, fontWeight: 800, color: "#1a1a1a" }}>No moodboards yet</div>
-      <div style={{ fontSize: 13, color: "#aaa" }}>Create a board and start arranging inspiration</div>
-      <button onClick={addBoard} style={{ padding: "12px 28px", background: "#1a1a1a", color: "#fff", border: "none", borderRadius: 14, cursor: "pointer", fontFamily: "'DM Sans', sans-serif", fontSize: 14, fontWeight: 700 }}>+ Create Moodboard</button>
+      <div style={{fontSize:18,fontWeight:800,color:"#1a1a1a"}}>No moodboards yet</div>
+      <div style={{fontSize:13,color:"#aaa"}}>Create a board in the right panel and start arranging inspiration</div>
+      <button onClick={addBoard} style={{padding:"12px 28px",background:"#1a1a1a",color:"#fff",border:"none",borderRadius:14,cursor:"pointer",fontFamily:"'DM Sans',sans-serif",fontSize:14,fontWeight:700}}>+ Create Moodboard</button>
     </div>
   );
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", height: "calc(100vh - 160px)", userSelect: "none" }}>
-
-      {/* Board tabs row */}
-      <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 12, flexWrap: "wrap" }}>
-        {boards.map((b, i) => (
-          <div key={b.id} style={{ display: "flex", alignItems: "center", gap: 0, background: activeIdx === i ? "#1a1a1a" : "#f5f3ef", borderRadius: 10, overflow: "hidden" }}>
-            {renamingIdx === i ? (
-              <input autoFocus value={renameVal} onChange={e => setRenameVal(e.target.value)}
-                onBlur={() => { renameBoard(i, renameVal || b.name); setRenamingIdx(null); }}
-                onKeyDown={e => { if (e.key === "Enter") { renameBoard(i, renameVal || b.name); setRenamingIdx(null); } }}
-                style={{ padding: "6px 10px", border: "none", outline: "none", fontFamily: "'DM Sans', sans-serif", fontSize: 12, fontWeight: 700, background: "#f0faf4", minWidth: 80 }} />
-            ) : (
-              <button onClick={() => { setActiveIdx(i); setSelectedId(null); }}
-                onDoubleClick={() => { setRenamingIdx(i); setRenameVal(b.name); }}
-                style={{ padding: "7px 14px", background: "none", border: "none", cursor: "pointer", fontFamily: "'DM Sans', sans-serif", fontSize: 12, fontWeight: 700, color: activeIdx === i ? "#fff" : "#666" }}>
-                {b.name}
-              </button>
-            )}
-            <button onClick={() => deleteBoard(i)} style={{ padding: "7px 8px", background: "none", border: "none", cursor: "pointer", color: activeIdx === i ? "rgba(255,255,255,0.5)" : "#ccc", fontSize: 11 }}><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
-          </div>
-        ))}
-        <button onClick={addBoard} style={{ padding: "7px 14px", background: "#f5f2ed", border: "none", borderRadius: 10, cursor: "pointer", fontFamily: "'DM Sans', sans-serif", fontSize: 12, fontWeight: 700, color: "#888" }}>+ New Board</button>
-      </div>
+    <div style={{display:"flex",flexDirection:"column",height:"calc(100vh - 160px)",userSelect:"none"}}>
 
       {/* Toolbar */}
-      <div style={{ display: "flex", gap: 8, marginBottom: 10, flexWrap: "wrap", alignItems: "center" }}>
-        <input ref={fileRef} type="file" accept="image/*" multiple style={{ display: "none" }} onChange={e => { importImages(e.target.files); e.target.value = ""; }} />
-        <button onClick={() => fileRef.current.click()} style={{ padding: "8px 16px", background: "#1a1a1a", color: "#fff", border: "none", borderRadius: 10, cursor: "pointer", fontFamily: "'DM Sans', sans-serif", fontSize: 12, fontWeight: 700, display: "flex", alignItems: "center", gap: 8 }}><SvgCamera size={13} color="#fff" />Import Images</button>
-        <button onClick={addTextNote} style={{ padding: "8px 16px", background: "#fff9e6", border: "1.5px solid #f0e0a0", borderRadius: 10, cursor: "pointer", fontFamily: "'DM Sans', sans-serif", fontSize: 12, fontWeight: 700, color: "#7a6000", display: "flex", alignItems: "center", gap: 8 }}><SvgEdit size={13} color="#7a6000" />Add Text</button>
-        <button onClick={() => setShowUrlImport(u => !u)} style={{ padding: "8px 14px", background: showUrlImport ? "#f0f4ff" : "#f5f3ef", border: showUrlImport ? "1.5px solid #a0b4f0" : "none", borderRadius: 10, cursor: "pointer", fontFamily: "'DM Sans', sans-serif", fontSize: 12, fontWeight: 700, color: showUrlImport ? "#3a5fe0" : "#666", display: "flex", alignItems: "center", gap: 8 }}><SvgLink size={13} color="currentColor" />URL</button>
-        <button onClick={() => setShowClosetPicker(p => !p)} style={{ padding: "8px 14px", background: showClosetPicker ? "#f0faf4" : "#f5f3ef", border: showClosetPicker ? "1.5px solid #b6e8c8" : "none", borderRadius: 10, cursor: "pointer", fontFamily: "'DM Sans', sans-serif", fontSize: 12, fontWeight: 700, color: showClosetPicker ? "#2d6a3f" : "#666", display: "flex", alignItems: "center", gap: 8 }}><SvgHanger size={13} color="currentColor" />From Closet</button>
-        {/* BG colors */}
-        <div style={{ display: "flex", gap: 5, alignItems: "center", marginLeft: 4 }}>
-          <span style={{ fontSize: 11, color: "#aaa", fontWeight: 600 }}>BG:</span>
-          {BG_PRESETS.map(c => (
-            <div key={c} onClick={() => setBoardBg(c)} style={{ width: 20, height: 20, borderRadius: "50%", background: c, border: (board?.bg || "#fff") === c ? "2px solid #2d6a3f" : "1.5px solid #ddd", cursor: "pointer", flexShrink: 0 }} />
-          ))}
+      <div style={{display:"flex",gap:8,marginBottom:10,flexWrap:"wrap",alignItems:"center"}}>
+        <input ref={fileRef} type="file" accept="image/*" multiple style={{display:"none"}} onChange={e=>{importImages(e.target.files);e.target.value="";}} />
+        <button onClick={()=>fileRef.current.click()} style={{padding:"8px 16px",background:"#1a1a1a",color:"#fff",border:"none",borderRadius:10,cursor:"pointer",fontFamily:"'DM Sans',sans-serif",fontSize:12,fontWeight:700,display:"flex",alignItems:"center",gap:8}}><SvgCamera size={13} color="#fff" />Import Images</button>
+        <button onClick={addTextNote} style={{padding:"8px 16px",background:"#fff9e6",border:"1.5px solid #f0e0a0",borderRadius:10,cursor:"pointer",fontFamily:"'DM Sans',sans-serif",fontSize:12,fontWeight:700,color:"#7a6000",display:"flex",alignItems:"center",gap:8}}><SvgEdit size={13} color="#7a6000" />Add Text</button>
+        <button onClick={()=>setShowUrlImport(u=>!u)} style={{padding:"8px 14px",background:showUrlImport?"#f0f4ff":"#f5f3ef",border:showUrlImport?"1.5px solid #a0b4f0":"none",borderRadius:10,cursor:"pointer",fontFamily:"'DM Sans',sans-serif",fontSize:12,fontWeight:700,color:showUrlImport?"#3a5fe0":"#666",display:"flex",alignItems:"center",gap:8}}><SvgLink size={13} color="currentColor" />URL</button>
+        <button onClick={()=>setShowClosetPicker(p=>!p)} style={{padding:"8px 14px",background:showClosetPicker?"#f0faf4":"#f5f3ef",border:showClosetPicker?"1.5px solid #b6e8c8":"none",borderRadius:10,cursor:"pointer",fontFamily:"'DM Sans',sans-serif",fontSize:12,fontWeight:700,color:showClosetPicker?"#2d6a3f":"#666",display:"flex",alignItems:"center",gap:8}}><SvgHanger size={13} color="currentColor" />From Closet</button>
+        <div style={{display:"flex",gap:6,marginLeft:"auto",alignItems:"center"}}>
+          <button onClick={undo} title="Undo (⌘Z)" style={{padding:"7px 10px",background:"#f5f3ef",border:"none",borderRadius:8,cursor:"pointer",fontSize:11,fontWeight:700,color:"#666",fontFamily:"'DM Sans',sans-serif",display:"flex",alignItems:"center",gap:5}}>
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><path d="M3 7v6h6"/><path d="M21 17a9 9 0 00-9-9 9 9 0 00-6 2.3L3 13"/></svg>
+          </button>
+          <button onClick={redo} title="Redo (⌘⇧Z)" style={{padding:"7px 10px",background:"#f5f3ef",border:"none",borderRadius:8,cursor:"pointer",fontSize:11,fontWeight:700,color:"#666",fontFamily:"'DM Sans',sans-serif",display:"flex",alignItems:"center",gap:5}}>
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><path d="M21 7v6h-6"/><path d="M3 17a9 9 0 019-9 9 9 0 016 2.3l3 2.7"/></svg>
+          </button>
+          <button onClick={exportCanvas} style={{padding:"8px 14px",background:"#f5f2ed",border:"none",borderRadius:10,cursor:"pointer",fontFamily:"'DM Sans',sans-serif",fontSize:12,fontWeight:700,color:"#666",display:"flex",alignItems:"center",gap:8}}><SvgDownload size={13} color="#666" />Export JPG</button>
         </div>
-        <button onClick={exportCanvas} style={{ padding: "8px 14px", background: "#f5f2ed", border: "none", borderRadius: 10, cursor: "pointer", fontFamily: "'DM Sans', sans-serif", fontSize: 12, fontWeight: 700, color: "#666", marginLeft: "auto", display: "flex", alignItems: "center", gap: 8 }}><SvgDownload size={13} color="#666" />Export JPG</button>
       </div>
 
       {/* URL import bar */}
       {showUrlImport && (
-        <div style={{ display: "flex", gap: 8, marginBottom: 8 }}>
-          <input autoFocus value={urlInput} onChange={e => setUrlInput(e.target.value)} placeholder="Paste image URL or Instagram post URL…"
-            onKeyDown={e => e.key === "Enter" && importFromUrl()}
-            style={{ flex: 1, padding: "8px 14px", border: "1.5px solid #a0b4f0", borderRadius: 10, fontFamily: "'DM Sans', sans-serif", fontSize: 12, outline: "none" }} />
-          <button onClick={importFromUrl} disabled={urlLoading} style={{ padding: "8px 16px", background: "#3a5fe0", color: "#fff", border: "none", borderRadius: 10, cursor: "pointer", fontSize: 12, fontWeight: 700, fontFamily: "'DM Sans', sans-serif" }}>{urlLoading ? "…" : "Import"}</button>
+        <div style={{display:"flex",gap:8,marginBottom:8}}>
+          <input autoFocus value={urlInput} onChange={e=>setUrlInput(e.target.value)} placeholder="Paste image URL…"
+            onKeyDown={e=>e.key==="Enter"&&importFromUrl()}
+            style={{flex:1,padding:"8px 14px",border:"1.5px solid #a0b4f0",borderRadius:10,fontFamily:"'DM Sans',sans-serif",fontSize:12,outline:"none"}} />
+          <button onClick={importFromUrl} disabled={urlLoading} style={{padding:"8px 16px",background:"#3a5fe0",color:"#fff",border:"none",borderRadius:10,cursor:"pointer",fontSize:12,fontWeight:700,fontFamily:"'DM Sans',sans-serif"}}>{urlLoading?"…":"Import"}</button>
         </div>
       )}
+
       {/* Closet picker */}
       {showClosetPicker && (
-        <div style={{ marginBottom: 8, padding: "10px 12px", background: "#f0faf4", borderRadius: 12, border: "1.5px solid #b6e8c8", maxHeight: 140, overflowY: "auto" }}>
-          <div style={{ fontSize: 11, fontWeight: 700, color: "#2d6a3f", marginBottom: 8, textTransform: "uppercase", letterSpacing: "0.06em" }}>Pin from Closet</div>
-          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-            {(closetItemsForMoodboard || []).filter(i => i.image).map(item => (
-              <div key={item.id} onClick={() => {
-                const canvas = canvasRef.current;
-                const newItem = { id: uid(), src: item.image, x: canvas ? canvas.offsetWidth/2 - 80 + Math.random()*60-30 : 80, y: canvas ? canvas.offsetHeight/2 - 100 + Math.random()*60-30 : 80, w: 160, h: 200, rotation: (Math.random()-0.5)*4, zIndex: Date.now(), opacity: 1, label: item.name, transparent: true };
-                updateBoard(items => [...items, newItem]);
+        <div style={{marginBottom:8,padding:"10px 12px",background:"#f0faf4",borderRadius:12,border:"1.5px solid #b6e8c8",maxHeight:140,overflowY:"auto"}}>
+          <div style={{fontSize:11,fontWeight:700,color:"#2d6a3f",marginBottom:8,textTransform:"uppercase",letterSpacing:"0.06em"}}>Pin from Closet</div>
+          <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+            {(closetItemsForMoodboard||[]).filter(i=>i.image).map(item=>(
+              <div key={item.id} onClick={()=>{
+                const canvas=canvasRef.current;
+                const newItem={id:uid(),src:item.image,x:canvas?canvas.offsetWidth/2-80+Math.random()*60-30:80,y:canvas?canvas.offsetHeight/2-100+Math.random()*60-30:80,w:160,h:200,rotation:(Math.random()-0.5)*4,zIndex:Date.now(),opacity:1,label:item.name,transparent:true,flipH:false};
+                updateBoard(items=>[...items,newItem]);
                 setSelectedId(newItem.id);
                 setShowClosetPicker(false);
-              }} title={item.name} style={{ width: 52, height: 52, borderRadius: 10, overflow: "hidden", background: "#f5f2ed", cursor: "pointer", flexShrink: 0, border: "1.5px solid #d0f0d8" }}>
-                <img src={item.image} alt={item.name} style={{ width: "100%", height: "100%", objectFit: "contain" }} />
+              }} title={item.name} style={{width:52,height:52,borderRadius:10,overflow:"hidden",background:"#f5f2ed",cursor:"pointer",flexShrink:0,border:"1.5px solid #d0f0d8"}}>
+                <img src={item.image} alt={item.name} style={{width:"100%",height:"100%",objectFit:"contain"}} />
               </div>
             ))}
-            {(closetItemsForMoodboard || []).filter(i => i.image).length === 0 && <div style={{ fontSize: 12, color: "#aaa" }}>No items with images in your closet</div>}
+            {(closetItemsForMoodboard||[]).filter(i=>i.image).length===0&&<div style={{fontSize:12,color:"#aaa"}}>No items with images in your closet</div>}
           </div>
         </div>
       )}
+
       {/* Selected item toolbar */}
       {selectedItem && (
-        <div style={{ display: "flex", gap: 8, marginBottom: 8, alignItems: "center", flexWrap: "wrap", padding: "8px 12px", background: "#faf9f6", borderRadius: 12, border: "1px solid #e8e4dc" }}>
-          <span style={{ fontSize: 11, fontWeight: 700, color: "#aaa" }}>SELECTED:</span>
-          <button onClick={() => bringForward(selectedId)} style={{ padding: "5px 10px", fontSize: 11, background: "#f5f2ed", border: "none", borderRadius: 8, cursor: "pointer", fontWeight: 700, color: "#555", fontFamily: "'DM Sans', sans-serif" }}><SvgArrowUp size={12} color="#555" style={{marginRight:6}} />Forward</button>
-          <button onClick={() => sendBackward(selectedId)} style={{ padding: "5px 10px", fontSize: 11, background: "#f5f2ed", border: "none", borderRadius: 8, cursor: "pointer", fontWeight: 700, color: "#555", fontFamily: "'DM Sans', sans-serif" }}><SvgArrowDn size={12} color="#555" style={{marginRight:6}} />Back</button>
-          <button onClick={() => duplicateItem(selectedId)} style={{ padding: "5px 10px", fontSize: 11, background: "#f5f2ed", border: "none", borderRadius: 8, cursor: "pointer", fontWeight: 700, color: "#555", fontFamily: "'DM Sans', sans-serif" }}><SvgCopy size={12} color="#555" style={{marginRight:6}} />Duplicate</button>
+        <div style={{display:"flex",gap:6,marginBottom:8,alignItems:"center",flexWrap:"wrap",padding:"8px 12px",background:"#faf9f6",borderRadius:12,border:"1px solid #e8e4dc"}}>
+          <span style={{fontSize:10,fontWeight:700,color:"#aaa",flexShrink:0}}>SELECTED</span>
+          <button onClick={()=>bringForward(selectedId)} style={{padding:"5px 10px",fontSize:11,background:"#f5f2ed",border:"none",borderRadius:8,cursor:"pointer",fontWeight:700,color:"#555",fontFamily:"'DM Sans',sans-serif"}}><SvgArrowUp size={12} color="#555" style={{marginRight:4}} />Fwd</button>
+          <button onClick={()=>sendBackward(selectedId)} style={{padding:"5px 10px",fontSize:11,background:"#f5f2ed",border:"none",borderRadius:8,cursor:"pointer",fontWeight:700,color:"#555",fontFamily:"'DM Sans',sans-serif"}}><SvgArrowDn size={12} color="#555" style={{marginRight:4}} />Back</button>
+          <button onClick={()=>duplicateItem(selectedId)} style={{padding:"5px 10px",fontSize:11,background:"#f5f2ed",border:"none",borderRadius:8,cursor:"pointer",fontWeight:700,color:"#555",fontFamily:"'DM Sans',sans-serif"}}><SvgCopy size={12} color="#555" style={{marginRight:4}} />Dupe</button>
           {selectedItem.type !== "text" && (
             <>
-              <label style={{ fontSize: 11, fontWeight: 700, color: "#aaa" }}>Opacity</label>
-              <input type="range" min="0.1" max="1" step="0.05" value={selectedItem.opacity ?? 1}
-                onChange={e => updateItem(selectedId, { opacity: parseFloat(e.target.value) })}
-                style={{ width: 80 }} />
-              <label style={{ fontSize: 11, fontWeight: 700, color: "#aaa" }}>Rotate</label>
-              <input type="range" min="-180" max="180" step="1" value={selectedItem.rotation ?? 0}
-                onChange={e => updateItem(selectedId, { rotation: parseFloat(e.target.value) })}
-                style={{ width: 80 }} />
+              <button onClick={()=>updateItem(selectedId,{flipH:!selectedItem.flipH})} style={{padding:"5px 10px",fontSize:11,background:selectedItem.flipH?"#1a1a1a":"#f5f2ed",border:"none",borderRadius:8,cursor:"pointer",fontWeight:700,color:selectedItem.flipH?"#fff":"#555",fontFamily:"'DM Sans',sans-serif"}}>⇆ Flip</button>
+              <label style={{fontSize:10,fontWeight:700,color:"#aaa",flexShrink:0}}>Opacity</label>
+              <input type="range" min="0.1" max="1" step="0.05" value={selectedItem.opacity??1}
+                onChange={e=>updateItem(selectedId,{opacity:parseFloat(e.target.value)})}
+                style={{width:72}} />
             </>
           )}
           {selectedItem.type === "text" && (
             <>
-              <label style={{ fontSize: 11, fontWeight: 700, color: "#aaa" }}>Size</label>
-              <input type="range" min="10" max="48" step="1" value={selectedItem.fontSize ?? 14}
-                onChange={e => updateItem(selectedId, { fontSize: parseInt(e.target.value) })}
-                style={{ width: 70 }} />
-              <input type="color" value={selectedItem.color ?? "#1a1a1a"} onChange={e => updateItem(selectedId, { color: e.target.value })}
-                style={{ width: 28, height: 28, border: "none", borderRadius: 6, cursor: "pointer", padding: 0 }} title="Text color" />
-              <button onClick={() => updateItem(selectedId, { transparentBg: !selectedItem.transparentBg })}
-                style={{ padding: "5px 10px", fontSize: 11, background: selectedItem.transparentBg ? "#1a1a1a" : "#f5f3ef", color: selectedItem.transparentBg ? "#fff" : "#555", border: "none", borderRadius: 8, cursor: "pointer", fontWeight: 700, fontFamily: "'DM Sans', sans-serif" }}>
-                {selectedItem.transparentBg ? "◻ No BG" : "◼ BG"}
+              <label style={{fontSize:10,fontWeight:700,color:"#aaa",flexShrink:0}}>Size</label>
+              <input type="range" min="10" max="48" step="1" value={selectedItem.fontSize??14}
+                onChange={e=>updateItem(selectedId,{fontSize:parseInt(e.target.value)})}
+                style={{width:64}} />
+              <input type="color" value={selectedItem.color??"#1a1a1a"} onChange={e=>updateItem(selectedId,{color:e.target.value})}
+                style={{width:26,height:26,border:"none",borderRadius:6,cursor:"pointer",padding:0}} title="Text color" />
+              <button onClick={()=>updateItem(selectedId,{transparentBg:!selectedItem.transparentBg})}
+                style={{padding:"5px 10px",fontSize:11,background:selectedItem.transparentBg?"#1a1a1a":"#f5f3ef",color:selectedItem.transparentBg?"#fff":"#555",border:"none",borderRadius:8,cursor:"pointer",fontWeight:700,fontFamily:"'DM Sans',sans-serif"}}>
+                {selectedItem.transparentBg?"◻ No BG":"◼ BG"}
               </button>
               {!selectedItem.transparentBg && (
-                <input type="color" value={selectedItem.bg ?? "#fff9e6"} onChange={e => updateItem(selectedId, { bg: e.target.value })}
-                  style={{ width: 28, height: 28, border: "none", borderRadius: 6, cursor: "pointer", padding: 0 }} title="Background color" />
+                <input type="color" value={selectedItem.bg??"#fff9e6"} onChange={e=>updateItem(selectedId,{bg:e.target.value})}
+                  style={{width:26,height:26,border:"none",borderRadius:6,cursor:"pointer",padding:0}} title="Background color" />
               )}
-              <button onClick={() => updateItem(selectedId, { bold: !selectedItem.bold })}
-                style={{ padding: "5px 10px", fontSize: 12, background: selectedItem.bold ? "#1a1a1a" : "#f5f3ef", color: selectedItem.bold ? "#fff" : "#555", border: "none", borderRadius: 8, cursor: "pointer", fontWeight: 800, fontFamily: "'DM Sans', sans-serif" }}>B</button>
+              <button onClick={()=>updateItem(selectedId,{bold:!selectedItem.bold})}
+                style={{padding:"5px 10px",fontSize:12,background:selectedItem.bold?"#1a1a1a":"#f5f3ef",color:selectedItem.bold?"#fff":"#555",border:"none",borderRadius:8,cursor:"pointer",fontWeight:800,fontFamily:"'DM Sans',sans-serif"}}>B</button>
             </>
           )}
-          <button onClick={() => removeItem(selectedId)} style={{ padding: "5px 10px", fontSize: 11, background: "#fef2f2", border: "none", borderRadius: 8, cursor: "pointer", fontWeight: 700, color: "#e05555", fontFamily: "'DM Sans', sans-serif", marginLeft: "auto" }}><SvgTrash size={12} color="#e05555" style={{marginRight:6}} />Remove</button>
+          <button onClick={()=>removeItem(selectedId)} style={{padding:"5px 10px",fontSize:11,background:"#fef2f2",border:"none",borderRadius:8,cursor:"pointer",fontWeight:700,color:"#e05555",fontFamily:"'DM Sans',sans-serif",marginLeft:"auto"}}><SvgTrash size={12} color="#e05555" style={{marginRight:4}} />Remove</button>
         </div>
       )}
 
       {/* Canvas */}
       <div
         ref={canvasRef}
-        onMouseDown={e => { if (e.target === canvasRef.current) setSelectedId(null); }}
+        onMouseDown={e=>{if(e.target===canvasRef.current){setSelectedId(null); if(editingTextId){setEditingTextId(null); updateItem(editingTextId,{text:editingTextVal}); setEditingTextId(null);}}}}
         onMouseMove={onMouseMove}
         onMouseUp={onMouseUp}
-        onMouseLeave={onMouseUp}
         onTouchMove={onTouchMove}
         onTouchEnd={onTouchEnd}
-        onDragOver={e => e.preventDefault()}
-        onDrop={e => { e.preventDefault(); importImages(e.dataTransfer.files); }}
-        style={{ flex: 1, position: "relative", background: board?.bg || "#ffffff", borderRadius: 20, border: "1.5px solid #e8e4dc", overflow: "hidden", cursor: "default", minHeight: 400 }}
+        onDragOver={e=>e.preventDefault()}
+        onDrop={e=>{e.preventDefault();importImages(e.dataTransfer.files);}}
+        style={{flex:1,position:"relative",background:board?.bg||"#ffffff",borderRadius:20,border:"1.5px solid #e8e4dc",overflow:"hidden",cursor:"default",minHeight:400}}
       >
-        {items.length === 0 && (
-          <div style={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", pointerEvents: "none", gap: 10 }}>
-            <div style={{ opacity: 0.15 }}><SvgSparkle size={32} color="#888" /></div>
-            <div style={{ fontSize: 13, color: "#bbb", fontWeight: 600 }}>Import images or drag & drop to start</div>
+        {items.length===0&&(
+          <div style={{position:"absolute",inset:0,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",pointerEvents:"none",gap:10}}>
+            <div style={{opacity:0.15}}><SvgSparkle size={32} color="#888" /></div>
+            <div style={{fontSize:13,color:"#bbb",fontWeight:600}}>Import images or drag & drop to start</div>
+            <div style={{fontSize:11,color:"#ccc",fontWeight:500}}>⌘Z to undo · ⌫ to delete · arrows to nudge</div>
           </div>
         )}
 
-        {[...items].sort((a, b) => (a.zIndex || 0) - (b.zIndex || 0)).map(item => {
+        {[...items].sort((a,b)=>(a.zIndex||0)-(b.zIndex||0)).map(item=>{
           const isSelected = item.id === selectedId;
+          const isEditingText = item.id === editingTextId;
+
           if (item.type === "text") {
             return (
               <div key={item.id}
-                onMouseDown={e => onMouseDown(e, item.id, "drag")}
-                onTouchStart={e => onTouchStart(e, item.id, "drag")}
-                onDoubleClick={e => {
+                onMouseDown={e=>{ if(!isEditingText) onMouseDown(e,item.id,"drag"); }}
+                onTouchStart={e=>{ if(!isEditingText) onTouchStart(e,item.id,"drag"); }}
+                onDoubleClick={e=>{
                   e.stopPropagation();
-                  const val = window.prompt("Edit text:", item.text);
-                  if (val !== null) updateItem(item.id, { text: val });
+                  setEditingTextId(item.id);
+                  setEditingTextVal(item.text||"");
+                  setSelectedId(item.id);
                 }}
                 style={{
-                  position: "absolute", left: item.x, top: item.y,
-                  width: item.w, minHeight: item.h,
-                  transform: `rotate(${item.rotation || 0}deg)`,
-                  zIndex: item.zIndex || 1,
-                  background: item.transparentBg ? "transparent" : (item.bg || "#fff9e6"),
-                  borderRadius: 10, padding: "10px 14px",
-                  cursor: "move",
-                  outline: isSelected ? "2px solid #2d6a3f" : "2px solid transparent",
-                  outlineOffset: 2,
-                  boxShadow: item.transparentBg ? "none" : (isSelected ? "0 4px 20px rgba(0,0,0,0.15)" : "0 2px 8px rgba(0,0,0,0.08)"),
-                  fontSize: item.fontSize || 14,
-                  fontWeight: item.bold ? 800 : 500,
-                  color: item.color || "#1a1a1a",
-                  fontFamily: "'DM Sans', sans-serif",
-                  lineHeight: 1.5,
-                  wordBreak: "break-word",
-                  userSelect: "none",
+                  position:"absolute",left:item.x,top:item.y,
+                  width:item.w,minHeight:item.h,
+                  transform:`rotate(${item.rotation||0}deg)`,
+                  zIndex:item.zIndex||1,
+                  background:item.transparentBg?"transparent":(item.bg||"#fff9e6"),
+                  borderRadius:10,padding:"10px 14px",
+                  cursor:isEditingText?"text":"move",
+                  outline:isSelected?"2px solid #2d6a3f":"2px solid transparent",
+                  outlineOffset:2,
+                  boxShadow:item.transparentBg?"none":(isSelected?"0 4px 20px rgba(0,0,0,0.15)":"0 2px 8px rgba(0,0,0,0.08)"),
+                  fontSize:item.fontSize||14,
+                  fontWeight:item.bold?800:500,
+                  color:item.color||"#1a1a1a",
+                  fontFamily:"'DM Sans',sans-serif",
+                  lineHeight:1.5,
+                  wordBreak:"break-word",
+                  userSelect:isEditingText?"text":"none",
                 }}
               >
-                {item.text}
-                {/* Resize handle */}
-                {isSelected && (
-                  <div onMouseDown={e => onMouseDown(e, item.id, "resize")} onTouchStart={e => onTouchStart(e, item.id, "resize")}
-                    style={{ position: "absolute", bottom: 0, right: 0, width: 18, height: 18, cursor: "se-resize", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                    <div style={{ width: 8, height: 8, borderRight: "2px solid #2d6a3f", borderBottom: "2px solid #2d6a3f", borderRadius: 1 }} />
-                  </div>
+                {isEditingText ? (
+                  <textarea
+                    ref={editingTextRef}
+                    autoFocus
+                    value={editingTextVal}
+                    onChange={e=>setEditingTextVal(e.target.value)}
+                    onBlur={()=>{ updateItem(item.id,{text:editingTextVal}); setEditingTextId(null); }}
+                    onKeyDown={e=>{ if(e.key==="Escape"||((e.metaKey||e.ctrlKey)&&e.key==="Enter")){ updateItem(item.id,{text:editingTextVal}); setEditingTextId(null); } e.stopPropagation(); }}
+                    style={{
+                      width:"100%",minHeight:40,background:"transparent",border:"none",outline:"none",
+                      fontFamily:"'DM Sans',sans-serif",fontSize:item.fontSize||14,fontWeight:item.bold?800:500,
+                      color:item.color||"#1a1a1a",resize:"none",lineHeight:1.5,padding:0,
+                    }}
+                  />
+                ) : item.text}
+                {isSelected&&!isEditingText&&(
+                  <>
+                    {/* Resize handle */}
+                    <div onMouseDown={e=>onMouseDown(e,item.id,"resize")} onTouchStart={e=>onTouchStart(e,item.id,"resize")}
+                      style={{position:"absolute",bottom:0,right:0,width:18,height:18,cursor:"se-resize",display:"flex",alignItems:"center",justifyContent:"center"}}>
+                      <div style={{width:8,height:8,borderRight:"2px solid #2d6a3f",borderBottom:"2px solid #2d6a3f",borderRadius:1}} />
+                    </div>
+                    {/* Rotation handle — top center */}
+                    <div onMouseDown={e=>onMouseDown(e,item.id,"rotate")} onTouchStart={e=>onTouchStart(e,item.id,"rotate")}
+                      style={{position:"absolute",top:-22,left:"50%",transform:"translateX(-50%)",width:16,height:16,borderRadius:"50%",background:"#2d6a3f",cursor:"grab",display:"flex",alignItems:"center",justifyContent:"center",boxShadow:"0 1px 4px rgba(0,0,0,0.2)"}}>
+                      <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3" strokeLinecap="round"><path d="M21 7v6h-6"/><path d="M3 17a9 9 0 019-9 9 9 0 016 2.3l3 2.7"/></svg>
+                    </div>
+                  </>
                 )}
               </div>
             );
@@ -5297,30 +5494,37 @@ function Moodboard({ closetItems = [], activeIdx, setActiveIdx }) {
 
           return (
             <div key={item.id}
-              onMouseDown={e => onMouseDown(e, item.id, "drag")}
-              onTouchStart={e => onTouchStart(e, item.id, "drag")}
+              onMouseDown={e=>onMouseDown(e,item.id,"drag")}
+              onTouchStart={e=>onTouchStart(e,item.id,"drag")}
               style={{
-                position: "absolute", left: item.x, top: item.y,
-                width: item.w, height: item.h,
-                transform: `rotate(${item.rotation || 0}deg)`,
-                zIndex: item.zIndex || 1,
-                cursor: "move",
-                outline: isSelected ? "2px solid #2d6a3f" : "2px solid transparent",
-                outlineOffset: 3,
-                opacity: item.opacity ?? 1,
-                boxShadow: isSelected ? "0 4px 24px rgba(0,0,0,0.18)" : "0 2px 10px rgba(0,0,0,0.08)",
-                borderRadius: 4,
-                overflow: item.transparent ? "visible" : "hidden",
+                position:"absolute",left:item.x,top:item.y,
+                width:item.w,height:item.h,
+                transform:`rotate(${item.rotation||0}deg)`,
+                zIndex:item.zIndex||1,
+                cursor:"move",
+                outline:isSelected?"2px solid #2d6a3f":"2px solid transparent",
+                outlineOffset:3,
+                opacity:item.opacity??1,
+                boxShadow:isSelected?"0 4px 24px rgba(0,0,0,0.18)":"0 2px 10px rgba(0,0,0,0.08)",
+                borderRadius:4,
+                overflow:item.transparent?"visible":"hidden",
               }}
             >
               <img src={item.src} alt="" draggable={false}
-                style={{ width: "100%", height: "100%", objectFit: item.transparent ? "contain" : "cover", display: "block", pointerEvents: "none", background: item.transparent ? "transparent" : undefined }} />
-              {/* Resize handle */}
-              {isSelected && (
-                <div onMouseDown={e => onMouseDown(e, item.id, "resize")} onTouchStart={e => onTouchStart(e, item.id, "resize")}
-                  style={{ position: "absolute", bottom: 0, right: 0, width: 22, height: 22, cursor: "se-resize", background: "rgba(45,106,63,0.85)", display: "flex", alignItems: "center", justifyContent: "center", borderRadius: "4px 0 4px 0" }}>
-                  <div style={{ width: 8, height: 8, borderRight: "2px solid #fff", borderBottom: "2px solid #fff", borderRadius: 1 }} />
-                </div>
+                style={{width:"100%",height:"100%",objectFit:item.transparent?"contain":"cover",display:"block",pointerEvents:"none",background:item.transparent?"transparent":undefined,transform:item.flipH?"scaleX(-1)":"none"}} />
+              {isSelected&&(
+                <>
+                  {/* Resize handle */}
+                  <div onMouseDown={e=>onMouseDown(e,item.id,"resize")} onTouchStart={e=>onTouchStart(e,item.id,"resize")}
+                    style={{position:"absolute",bottom:0,right:0,width:22,height:22,cursor:"se-resize",background:"rgba(45,106,63,0.85)",display:"flex",alignItems:"center",justifyContent:"center",borderRadius:"4px 0 4px 0"}}>
+                    <div style={{width:8,height:8,borderRight:"2px solid #fff",borderBottom:"2px solid #fff",borderRadius:1}} />
+                  </div>
+                  {/* Rotation handle — top center */}
+                  <div onMouseDown={e=>onMouseDown(e,item.id,"rotate")} onTouchStart={e=>onTouchStart(e,item.id,"rotate")}
+                    style={{position:"absolute",top:-22,left:"50%",transform:"translateX(-50%)",width:18,height:18,borderRadius:"50%",background:"#2d6a3f",cursor:"grab",display:"flex",alignItems:"center",justifyContent:"center",boxShadow:"0 1px 4px rgba(0,0,0,0.2)"}}>
+                    <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3" strokeLinecap="round"><path d="M21 7v6h-6"/><path d="M3 17a9 9 0 019-9 9 9 0 016 2.3l3 2.7"/></svg>
+                  </div>
+                </>
               )}
             </div>
           );
@@ -5329,6 +5533,7 @@ function Moodboard({ closetItems = [], activeIdx, setActiveIdx }) {
     </div>
   );
 }
+
 
 // ── Nav + App ────────────────────────────────────────────────────────────────
 
@@ -5425,6 +5630,11 @@ function SettingsTab({
   // Data & sync
   const [importMsg, setImportMsg] = useState(null);
   const importRef = useRef(null);
+
+  // Archived moodboards
+  const MB_ARCHIVE_KEY = "wardrobe_moodboards_archived_v1";
+  const MB_ACTIVE_KEY  = "wardrobe_moodboards_v1";
+  const [archivedBoards, setArchivedBoards] = useState(() => { try { return JSON.parse(localStorage.getItem("wardrobe_moodboards_archived_v1") || "[]"); } catch { return []; } });
 
   useEffect(() => {
     setWornItems(itemsDb.rows.filter(i => (i.wornCount || 0) >= 0).sort((a,b) => (b.wornCount||0)-(a.wornCount||0)));
@@ -5804,6 +6014,41 @@ function SettingsTab({
             <div style={{ textAlign:"right", fontSize:11, color:"#5aaa7e", fontWeight:600 }}>{itemsDb.rows.length} items</div>
           </div>
         </Card>
+
+        {/* Archived Moodboards */}
+        {archivedBoards.length > 0 && (
+          <Card>
+            <SectionLabel>Archived Moodboards</SectionLabel>
+            <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
+              {archivedBoards.map((board, i) => (
+                <div key={board.id||i} style={{ display:"flex", alignItems:"center", gap:10, padding:"10px 12px", background:"#fafaf8", borderRadius:12, border:"1px solid #ece8e0" }}>
+                  <div style={{ flex:1, minWidth:0 }}>
+                    <div style={{ fontSize:13, fontWeight:700, color:"#1a1a1a", overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{board.name||"Unnamed Board"}</div>
+                    <div style={{ fontSize:11, color:"#bbb", marginTop:1 }}>{(board.items||[]).length} items · archived {board.archivedAt ? new Date(board.archivedAt).toLocaleDateString("en-US",{month:"short",day:"numeric",year:"numeric"}) : ""}</div>
+                  </div>
+                  <button onClick={() => {
+                    try {
+                      const active = JSON.parse(localStorage.getItem(MB_ACTIVE_KEY)||"[]");
+                      const restored = { ...board }; delete restored.archivedAt;
+                      active.push(restored);
+                      localStorage.setItem(MB_ACTIVE_KEY, JSON.stringify(active));
+                      const updated = archivedBoards.filter((_,idx)=>idx!==i);
+                      localStorage.setItem(MB_ARCHIVE_KEY, JSON.stringify(updated));
+                      setArchivedBoards(updated);
+                    } catch {}
+                  }} style={{ padding:"6px 12px", background:"#f0faf4", border:"1px solid #b6e8c8", borderRadius:8, cursor:"pointer", fontFamily:"'DM Sans',sans-serif", fontSize:11, fontWeight:700, color:"#2d6a3f", flexShrink:0 }}>Restore</button>
+                  <button onClick={() => {
+                    if (window.confirm(`Permanently delete "${board.name||"this board"}"?`)) {
+                      const updated = archivedBoards.filter((_,idx)=>idx!==i);
+                      localStorage.setItem(MB_ARCHIVE_KEY, JSON.stringify(updated));
+                      setArchivedBoards(updated);
+                    }
+                  }} style={{ padding:"6px 10px", background:"#fff8f8", border:"1px solid #ffd0d0", borderRadius:8, cursor:"pointer", fontFamily:"'DM Sans',sans-serif", fontSize:11, fontWeight:700, color:"#e05555", flexShrink:0 }}>Delete</button>
+                </div>
+              ))}
+            </div>
+          </Card>
+        )}
 
         {/* Export */}
         <Card>
@@ -7234,7 +7479,24 @@ export default function App() {
           {/* Sort moved to top toolbar for closet/outfits */}
 
           {/* Moodboard board info */}
-          {tab === "moodboard" && <MoodboardInfoPanel activeIdx={moodboardActiveIdx} setActiveIdx={setMoodboardActiveIdx} />}
+          {tab === "moodboard" && <MoodboardInfoPanel
+            activeIdx={moodboardActiveIdx} setActiveIdx={setMoodboardActiveIdx}
+            lookbooksDb={lookbooksDb.rows}
+            createLookbook={async ({id: newId, name, moodboardId}) => {
+              const lbId = newId || uid();
+              const newLb = { id: lbId, name, notes: "", coverImage: "", dateStart: "", dateEnd: "", outfitIds: [], lookMeta: {}, moodboardId };
+              let { error } = await supabase.from("lookbooks").insert({ id: lbId, data: newLb });
+              if (error) ({ error } = await supabase.from("lookbooks").insert(newLb));
+              await lookbooksDb.refresh();
+            }}
+            addMoodboardToLookbook={async (lookbookId, board) => {
+              const lb = lookbooksDb.rows.find(l => l.id === lookbookId);
+              if (!lb) return;
+              await lookbooksDb.update({ ...lb, moodboardId: board.id });
+              await lookbooksDb.refresh();
+            }}
+            onGoToLookbook={(lb) => { setTab("lookbooks"); setActiveLookbook(lb); }}
+          />}
 
           {tab === "outfits" && (() => {
             const todayKey = new Date().toISOString().slice(0, 10);

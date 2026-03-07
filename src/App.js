@@ -89,7 +89,7 @@ const globalStyles = `
   /* ── Vertical nav sidebar ── */
   .app-shell { display: flex; min-height: 100vh; }
   .app-nav-sidebar {
-    width: 68px; flex-shrink: 0; background: #fff;
+    width: 76px; flex-shrink: 0; background: #fff;
     border-right: 1px solid #ece8e0;
     display: flex; flex-direction: column; align-items: center;
     padding: 22px 0 18px; position: fixed; top: 0; left: 0; height: 100vh; z-index: 100;
@@ -100,10 +100,10 @@ const globalStyles = `
     margin-bottom: 28px; flex-shrink: 0;
   }
   .nav-icon-btn {
-    width: 42px; height: 46px; border-radius: 12px; border: none; cursor: pointer;
+    width: 100%; height: 52px; border-radius: 0; border: none; cursor: pointer;
     display: flex; flex-direction: column; align-items: center; justify-content: center;
     gap: 3px; transition: all 0.15s; background: transparent;
-    font-family: 'DM Sans', sans-serif; margin-bottom: 2px; position: relative;
+    font-family: 'DM Sans', sans-serif; margin-bottom: 0; position: relative;
   }
   .nav-icon-btn:hover { background: #f7f5f2; }
   .nav-icon-btn.active { background: #1a1a1a; }
@@ -113,11 +113,11 @@ const globalStyles = `
     transition: height 0.15s;
   }
   .nav-icon-btn.active::after { height: 0; }
-  .nav-icon-btn .nav-label { font-size: 8.5px; font-weight: 600; letter-spacing: 0.04em; color: #c0b8b0; text-transform: uppercase; line-height: 1; }
+  .nav-icon-btn .nav-label { font-size: 9px; font-weight: 600; letter-spacing: 0.02em; color: #c0b8b0; text-transform: uppercase; line-height: 1; }
   .nav-icon-btn.active .nav-label { color: rgba(255,255,255,0.6); }
   .nav-icon-btn-bottom { margin-top: auto; }
 
-  .app-body { margin-left: 68px; flex: 1; display: flex; min-height: 100vh; }
+  .app-body { margin-left: 76px; flex: 1; display: flex; min-height: 100vh; }
   .app-main-area { flex: 1; min-width: 0; padding: 36px 32px; }
   .app-right-rail { width: 272px; flex-shrink: 0; padding: 32px 18px 32px 0; position: sticky; top: 0; height: 100vh; overflow-y: auto; display: flex; flex-direction: column; gap: 12px; }
 
@@ -880,8 +880,8 @@ function saveDrafts(d) { try { localStorage.setItem(DRAFTS_KEY, JSON.stringify(d
 
 // ── Add Item Modal ────────────────────────────────────────────────────────────
 // Unified form with Closet/Wishlist toggle at top + draft folder
-function AddItemModal({ onSave, onSaveWish, onCancel, initial, editMode }) {
-  const isWishInitial = !!(initial?.link);
+function AddItemModal({ onSave, onSaveWish, onCancel, initial, editMode, initialDest }) {
+  const isWishInitial = !!(initial?.link) || initialDest === "wishlist";
   const [dest, setDest] = useState(isWishInitial ? "wishlist" : "closet"); // "closet" | "wishlist"
   const [form, setForm] = useState({
     ...BLANK,
@@ -997,6 +997,7 @@ function AddItemModal({ onSave, onSaveWish, onCancel, initial, editMode }) {
       {/* Core fields */}
       <Input label="Name" value={form.name} onChange={set("name")} placeholder="e.g. White linen shirt" />
       <Input label="Brand" value={form.brand} onChange={set("brand")} placeholder="e.g. Zara" />
+      {dest === "wishlist" && <Input label="Store" value={form.store || ""} onChange={e => setForm(f => ({ ...f, store: e.target.value }))} placeholder="e.g. Zara, ASOS, Amazon" />}
 
       <div style={{ display: "flex", gap: 10 }}>
         <div style={{ flex: 1 }}><SelectField label="Category" options={CATEGORIES.slice(1)} value={form.category} onChange={set("category")} /></div>
@@ -2839,6 +2840,175 @@ function StatsTab({ itemsDb, outfitsDb, lookbooksDb, onViewItem }) {
   );
 }
 
+
+// ── Wishlist Tab ──────────────────────────────────────────────────────────────
+function WishlistTab({ wishlistDb, wishlistsDb, saveWishlistsMeta, activeWishlistId, setActiveWishlistId, wlSort, setWlSort, wlSortCat, setWlSortCat, moveToCloset, onEdit }) {
+  const [showNewWl, setShowNewWl] = useState(false);
+  const [newWlName, setNewWlName] = useState("");
+  const [newWlNotes, setNewWlNotes] = useState("");
+  const [editingWlId, setEditingWlId] = useState(null);
+
+  const priorityMeta = { high: { label: "High", bg: "#fff0f0", color: "#e05555", border: "#ffc5c5" }, medium: { label: "Medium", bg: "#fff8ee", color: "#a07000", border: "#f5c842" }, low: { label: "Low", bg: "#f5f3ef", color: "#aaa", border: "#e0dbd0" } };
+
+  const visibleItems = wishlistDb.rows.filter(i =>
+    !activeWishlistId || i.wishlistId === activeWishlistId
+  );
+  const sortedItems = [...visibleItems].sort((a, b) => {
+    const po = { high: 0, medium: 1, low: 2 };
+    if (wlSort === "priority") return (po[a.priority] ?? 1) - (po[b.priority] ?? 1);
+    if (wlSort === "store") return (a.store || "").localeCompare(b.store || "");
+    if (wlSort === "category") return (a.category || "").localeCompare(b.category || "");
+    if (wlSort === "price") return (parseFloat((b.price||"").replace(/[^0-9.]/g,""))||0) - (parseFloat((a.price||"").replace(/[^0-9.]/g,""))||0);
+    return 0;
+  }).filter(i => wlSortCat === "All" || i.category === wlSortCat);
+
+  const wlCategories = [...new Set(wishlistDb.rows.map(i => i.category).filter(Boolean))];
+
+  return (
+    <div className="fade-up">
+      {/* Wishlists row */}
+      <div style={{ display: "flex", gap: 8, marginBottom: 20, flexWrap: "wrap", alignItems: "center" }}>
+        {[{ id: null, name: "All Items" }, ...wishlistsDb].map(wl => (
+          <button key={wl.id ?? "all"} onClick={() => setActiveWishlistId(wl.id)}
+            style={{ padding: "7px 16px", borderRadius: 100, border: activeWishlistId === wl.id ? "none" : "1px solid #e0dbd2", background: activeWishlistId === wl.id ? "#1a1a1a" : "#fff", color: activeWishlistId === wl.id ? "#fff" : "#555", fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "'DM Sans', sans-serif", display: "flex", alignItems: "center", gap: 6 }}>
+            {wl.name}
+            {wl.id && <span style={{ opacity: 0.5, fontSize: 10 }}>{wishlistDb.rows.filter(i => i.wishlistId === wl.id).length}</span>}
+          </button>
+        ))}
+        <button onClick={() => setShowNewWl(v => !v)}
+          style={{ padding: "7px 14px", borderRadius: 100, border: "1px dashed #c0b8b0", background: "transparent", color: "#aaa", fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "'DM Sans', sans-serif" }}>
+          + New List
+        </button>
+      </div>
+
+      {/* New wishlist form */}
+      {showNewWl && (
+        <div style={{ background: "#fff", borderRadius: 16, border: "1px solid #ece8e0", padding: "16px 18px", marginBottom: 16 }}>
+          <div style={{ fontSize: 12, fontWeight: 700, color: "#1a1a1a", marginBottom: 10 }}>New Wishlist</div>
+          <input value={newWlName} onChange={e => setNewWlName(e.target.value)} placeholder="Name (e.g. Summer Haul, Wedding)"
+            style={{ width: "100%", padding: "8px 12px", border: "1px solid #e0dbd2", borderRadius: 10, fontFamily: "'DM Sans', sans-serif", fontSize: 13, marginBottom: 8, outline: "none" }} />
+          <textarea value={newWlNotes} onChange={e => setNewWlNotes(e.target.value)} placeholder="Notes (optional)" rows={2}
+            style={{ width: "100%", padding: "8px 12px", border: "1px solid #e0dbd2", borderRadius: 10, fontFamily: "'DM Sans', sans-serif", fontSize: 12, resize: "none", outline: "none", marginBottom: 10 }} />
+          <div style={{ display: "flex", gap: 8 }}>
+            <button onClick={() => {
+              if (!newWlName.trim()) return;
+              const wl = { id: uid(), name: newWlName.trim(), notes: newWlNotes };
+              saveWishlistsMeta([...wishlistsDb, wl]);
+              setNewWlName(""); setNewWlNotes(""); setShowNewWl(false);
+              setActiveWishlistId(wl.id);
+            }} style={{ flex: 1, padding: "8px", background: "#1a1a1a", color: "#fff", border: "none", borderRadius: 10, cursor: "pointer", fontSize: 13, fontWeight: 700, fontFamily: "'DM Sans', sans-serif" }}>Create</button>
+            <button onClick={() => setShowNewWl(false)} style={{ padding: "8px 14px", background: "#f5f2ed", border: "none", borderRadius: 10, cursor: "pointer", fontSize: 12, color: "#888", fontFamily: "'DM Sans', sans-serif" }}>Cancel</button>
+          </div>
+        </div>
+      )}
+
+      {/* Active wishlist header */}
+      {activeWishlistId && (() => {
+        const wl = wishlistsDb.find(w => w.id === activeWishlistId);
+        if (!wl) return null;
+        if (editingWlId === wl.id) return (
+          <div style={{ background: "#fff", borderRadius: 14, border: "1px solid #ece8e0", padding: "14px 16px", marginBottom: 16 }}>
+            <input value={wl.name} onChange={e => saveWishlistsMeta(wishlistsDb.map(w => w.id === wl.id ? { ...w, name: e.target.value } : w))}
+              style={{ width: "100%", padding: "6px 10px", border: "1px solid #e0dbd2", borderRadius: 8, fontFamily: "'DM Sans', sans-serif", fontSize: 13, marginBottom: 6, outline: "none", fontWeight: 700 }} />
+            <textarea value={wl.notes || ""} onChange={e => saveWishlistsMeta(wishlistsDb.map(w => w.id === wl.id ? { ...w, notes: e.target.value } : w))} rows={2}
+              style={{ width: "100%", padding: "6px 10px", border: "1px solid #e0dbd2", borderRadius: 8, fontFamily: "'DM Sans', sans-serif", fontSize: 12, resize: "none", outline: "none", marginBottom: 8 }} />
+            <button onClick={() => setEditingWlId(null)} style={{ padding: "6px 14px", background: "#1a1a1a", color: "#fff", border: "none", borderRadius: 8, cursor: "pointer", fontSize: 12, fontWeight: 700, fontFamily: "'DM Sans', sans-serif" }}>Done</button>
+          </div>
+        );
+        return (
+          <div style={{ display: "flex", alignItems: "flex-start", gap: 10, marginBottom: 16, padding: "12px 16px", background: "#fff", borderRadius: 14, border: "1px solid #ece8e0" }}>
+            <div style={{ flex: 1 }}>
+              <div style={{ fontSize: 14, fontWeight: 700, color: "#1a1a1a" }}>{wl.name}</div>
+              {wl.notes && <div style={{ fontSize: 12, color: "#aaa", marginTop: 3 }}>{wl.notes}</div>}
+            </div>
+            <button onClick={() => setEditingWlId(wl.id)} style={{ padding: "5px 10px", background: "#f5f2ed", border: "none", borderRadius: 8, cursor: "pointer", fontSize: 12, color: "#666", fontFamily: "'DM Sans', sans-serif" }}>✎ Edit</button>
+            <button onClick={() => { if (window.confirm("Delete this list? Items stay in All Items.")) { saveWishlistsMeta(wishlistsDb.filter(w => w.id !== activeWishlistId)); setActiveWishlistId(null); }}} style={{ padding: "5px 10px", background: "#fef2f2", border: "none", borderRadius: 8, cursor: "pointer", fontSize: 12, color: "#e05555", fontFamily: "'DM Sans', sans-serif" }}>🗑</button>
+          </div>
+        );
+      })()}
+
+      {/* Sort + filter bar */}
+      <div style={{ display: "flex", gap: 8, marginBottom: 16, flexWrap: "wrap", alignItems: "center" }}>
+        <select value={wlSort} onChange={e => setWlSort(e.target.value)}
+          style={{ padding: "7px 12px", border: "1px solid #e0dbd2", borderRadius: 100, fontFamily: "'DM Sans', sans-serif", fontSize: 12, background: "#fff", color: "#555", fontWeight: 500, cursor: "pointer" }}>
+          <option value="priority">Priority</option>
+          <option value="store">Store</option>
+          <option value="category">Category</option>
+          <option value="price">Price ↓</option>
+        </select>
+        {wlCategories.length > 1 && (
+          <select value={wlSortCat} onChange={e => setWlSortCat(e.target.value)}
+            style={{ padding: "7px 12px", border: "1px solid #e0dbd2", borderRadius: 100, fontFamily: "'DM Sans', sans-serif", fontSize: 12, background: "#fff", color: "#555", fontWeight: 500, cursor: "pointer" }}>
+            <option value="All">All Categories</option>
+            {wlCategories.map(c => <option key={c} value={c}>{c}</option>)}
+          </select>
+        )}
+        <div style={{ marginLeft: "auto", fontSize: 12, color: "#aaa", fontWeight: 500 }}>{sortedItems.length} item{sortedItems.length !== 1 ? "s" : ""}</div>
+      </div>
+
+      {sortedItems.length === 0 ? (
+        <div style={{ textAlign: "center", padding: "60px 0" }}>
+          <div style={{ fontSize: 36, marginBottom: 10 }}>♡</div>
+          <div style={{ fontSize: 14, fontWeight: 600, color: "#ccc" }}>{wishlistDb.rows.length === 0 ? "Your wishlist is empty" : "No items in this list"}</div>
+          <div style={{ fontSize: 12, color: "#ddd", marginTop: 4 }}>{wishlistDb.rows.length === 0 ? "Tap + to save items you want" : "Add items with the + button"}</div>
+        </div>
+      ) : (
+        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+          {sortedItems.map((item, i) => {
+            const pm = priorityMeta[item.priority] || null;
+            const wl = wishlistsDb.find(w => w.id === item.wishlistId);
+            return (
+              <div key={item.id} className="card fade-up" style={{
+                background: "#fff", borderRadius: 18, overflow: "hidden",
+                border: `1px solid ${pm ? pm.border : "#ece8e0"}`,
+                boxShadow: "0 2px 10px rgba(0,0,0,0.04)", animationDelay: `${i * 0.04}s`, opacity: 0, display: "flex"
+              }}>
+                <div style={{ width: 120, flexShrink: 0, alignSelf: "stretch", background: item.image ? `url(${item.image}) center/contain no-repeat #f7f5f2` : "#f7f5f2", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                  {!item.image && <span style={{ opacity: 0.15, fontSize: 26 }}>♡</span>}
+                </div>
+                <div style={{ padding: "13px 15px", flex: 1, minWidth: 0 }}>
+                  <div style={{ display: "flex", alignItems: "flex-start", gap: 8, marginBottom: 3 }}>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: 14, fontWeight: 700, color: "#1a1a1a", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{item.name}</div>
+                      <div style={{ display: "flex", gap: 6, marginTop: 2, flexWrap: "wrap", alignItems: "center" }}>
+                        {item.brand && <span style={{ fontSize: 11, color: "#aaa" }}>{item.brand}</span>}
+                        {item.store && <span style={{ fontSize: 11, color: "#7c6fe0", fontWeight: 600, background: "#f5f0ff", padding: "1px 7px", borderRadius: 100 }}>{item.store}</span>}
+                        {item.category && <span style={{ fontSize: 11, color: "#888", background: "#f5f2ed", padding: "1px 7px", borderRadius: 100 }}>{item.category}</span>}
+                        {wl && !activeWishlistId && <span style={{ fontSize: 10, color: "#b0a898", fontStyle: "italic" }}>{wl.name}</span>}
+                      </div>
+                    </div>
+                    <select value={item.priority || ""} onChange={e => wishlistDb.update({ ...item, priority: e.target.value || undefined })}
+                      style={{ padding: "5px 28px 5px 12px", border: `1px solid ${pm ? pm.border : "#e0dbd2"}`, borderRadius: 100, fontSize: 10, fontWeight: 700, color: pm ? pm.color : "#aaa", background: `${pm ? pm.bg : "#fafaf8"} url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%23aaa' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E") no-repeat right 10px center`, fontFamily: "'DM Sans', sans-serif", cursor: "pointer", flexShrink: 0, appearance: "none", WebkitAppearance: "none" }}>
+                      <option value="">Priority</option>
+                      <option value="high">🔴 High</option>
+                      <option value="medium">🟡 Med</option>
+                      <option value="low">⚪ Low</option>
+                    </select>
+                  </div>
+                  {item.price && <div style={{ fontSize: 15, fontWeight: 700, color: "#1a1a1a", marginTop: 6, marginBottom: 8 }}>
+                    {/^\$/.test(item.price) ? item.price : `$${item.price}`}
+                  </div>}
+                  <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginTop: item.price ? 0 : 8 }}>
+                    {item.link && (
+                      <a href={item.link} target="_blank" rel="noreferrer"
+                        style={{ padding: "6px 14px", background: "#1a1a1a", color: "#fff", borderRadius: 100, fontSize: 11, fontWeight: 700, textDecoration: "none", fontFamily: "'DM Sans', sans-serif", display: "inline-flex", alignItems: "center", gap: 5 }}>
+                        🛍 Purchase
+                      </a>
+                    )}
+                    <button onClick={() => moveToCloset(item)} style={{ padding: "6px 12px", background: "#f0faf4", border: "none", borderRadius: 100, cursor: "pointer", fontSize: 11, fontWeight: 700, color: "#3aaa6e", fontFamily: "'DM Sans', sans-serif" }}>→ I bought it</button>
+                    <button onClick={() => onEdit(item)} style={{ padding: "6px 10px", background: "#f5f2ed", border: "none", borderRadius: 100, cursor: "pointer", fontSize: 11, fontWeight: 600, color: "#666", fontFamily: "'DM Sans', sans-serif" }}>✎</button>
+                    <button onClick={() => wishlistDb.remove(item.id)} style={{ padding: "6px 10px", background: "#fef2f2", border: "none", borderRadius: 100, cursor: "pointer", fontSize: 11, fontWeight: 600, color: "#e05555", fontFamily: "'DM Sans', sans-serif" }}>✕</button>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── Seller Dashboard ──────────────────────────────────────────────────────────
 const SALE_STATUSES = ["listed", "pending", "sold", "archived"];
 const SALE_STATUS_META = {
@@ -3519,6 +3689,11 @@ export default function App() {
   const [lbSearch, setLbSearch] = useState("");
   const [lbSort, setLbSort] = useState("newest");
   const [bulkMode, setBulkMode] = useState(false);
+  const [wishlistDest, setWishlistDest] = useState(false);
+  const [wlSort, setWlSort] = useState("priority");
+  const [wlSortCat, setWlSortCat] = useState("All");
+  const [activeWishlistId, setActiveWishlistId] = useState(null); // null = "All"
+  const [wishlistsDb, setWishlistsLocal] = useState(() => { try { return JSON.parse(localStorage.getItem("wardrobe_wishlists_v1") || "[]"); } catch { return []; } });
   const [bulkSelected, setBulkSelected] = useState(new Set());
   const [globalSearch, setGlobalSearch] = useState("");
   const [showGlobalSearch, setShowGlobalSearch] = useState(false);
@@ -3530,6 +3705,10 @@ export default function App() {
   const [newLbDateEnd, setNewLbDateEnd] = useState("");
   const [newLbSelected, setNewLbSelected] = useState([]);
 
+  const saveWishlistsMeta = (wls) => {
+    setWishlistsLocal(wls);
+    try { localStorage.setItem("wardrobe_wishlists_v1", JSON.stringify(wls)); } catch {}
+  };
   const closeModal = () => { setModal(null); setEditItem(null); };
 
   const saveItem = async (form) => {
@@ -3688,7 +3867,7 @@ export default function App() {
               title={n.label}
             >
               {NAV_ICON_MAP[n.id]?.(active)}
-              <span className="nav-label">{n.label.slice(0,4)}</span>
+              <span className="nav-label">{n.label}</span>
             </button>
           );
         })}
@@ -3751,7 +3930,8 @@ export default function App() {
                 <button className="btn-primary" onClick={() => {
                   if (tab === "outfits") openNewOutfit();
                   else if (tab === "lookbooks") setLookbookModal(true);
-                  else { setEditItem(null); setModal("item"); }
+                  else if (tab === "wishlist") { setEditItem(null); setWishlistDest(true); setModal("item"); }
+                  else { setEditItem(null); setWishlistDest(false); setModal("item"); }
                 }} style={{
                   padding: "10px 20px", borderRadius: 14, background: "#1a1a1a",
                   border: "none", cursor: "pointer", fontSize: 13, fontWeight: 600, color: "#fff",
@@ -4028,55 +4208,18 @@ export default function App() {
             {tab === "moodboard" && <Moodboard closetItems={itemsDb.rows.filter(i => !i.forSale)} />}
 
             {/* WISHLIST */}
-            {tab === "wishlist" && (
-              <div className="fade-up">
-                {wishlistDb.rows.length === 0 ? (
-                  <div style={{ textAlign: "center", padding: "80px 0" }}>
-                    <div style={{ fontSize: 40, marginBottom: 12 }}>♡</div>
-                    <div style={{ fontSize: 15, fontWeight: 700, color: "#ccc" }}>Your wishlist is empty</div>
-                    <div style={{ fontSize: 13, color: "#ddd", marginTop: 4 }}>Tap + to save items you want</div>
-                  </div>
-                ) : (
-                  <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-                    {[...wishlistDb.rows].sort((a, b) => {
-                      const po = { high: 0, medium: 1, low: 2, undefined: 1 };
-                      return (po[a.priority] ?? 1) - (po[b.priority] ?? 1);
-                    }).map((item, i) => {
-                      const priorityMeta = { high: { label: "High", bg: "#fff0f0", color: "#e05555", border: "#ffc5c5" }, medium: { label: "Medium", bg: "#fff8ee", color: "#a07000", border: "#f5c842" }, low: { label: "Low", bg: "#f5f3ef", color: "#aaa", border: "#e0dbd0" } };
-                      const pm = priorityMeta[item.priority] || null;
-                      return (
-                      <div key={item.id} className="card fade-up" style={{
-                        background: "#fff", borderRadius: 20, overflow: "hidden", border: `1.5px solid ${pm ? pm.border : "#f0ece4"}`,
-                        boxShadow: "0 2px 12px rgba(0,0,0,0.04)", animationDelay: `${i * 0.05}s`, opacity: 0, display: "flex"
-                      }}>
-                        <div style={{ width: 100, flexShrink: 0, background: item.image ? `url(${item.image}) center/contain no-repeat #f8f6f2` : "#f8f6f2", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                          {!item.image && <span style={{ opacity: 0.2, fontSize: 28 }}>♡</span>}
-                        </div>
-                        <div style={{ padding: "14px 16px", flex: 1 }}>
-                          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 2 }}>
-                            <div style={{ fontSize: 14, fontWeight: 700, color: "#1a1a1a", flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{item.name}</div>
-                            <select value={item.priority || ""} onChange={e => wishlistDb.update({ ...item, priority: e.target.value || undefined })}
-                              style={{ padding: "3px 8px", border: `1.5px solid ${pm ? pm.border : "#e8e4dc"}`, borderRadius: 20, fontSize: 11, fontWeight: 700, color: pm ? pm.color : "#aaa", background: pm ? pm.bg : "#fafaf8", fontFamily: "'DM Sans', sans-serif", cursor: "pointer" }}>
-                              <option value="">Priority</option>
-                              <option value="high">🔴 High</option>
-                              <option value="medium">🟡 Medium</option>
-                              <option value="low">⚪ Low</option>
-                            </select>
-                          </div>
-                          {item.brand && <div style={{ fontSize: 12, color: "#aaa", marginTop: 2 }}>{item.brand}</div>}
-                          {item.price && <div style={{ fontSize: 13, fontWeight: 700, color: "#888", marginTop: 6 }}>{item.price}</div>}
-                          <button onClick={() => moveToCloset(item)} style={{ marginTop: 10, padding: "7px 14px", background: "#f0faf4", border: "none", borderRadius: 10, cursor: "pointer", fontSize: 12, fontWeight: 700, color: "#3aaa6e", fontFamily: "'DM Sans', sans-serif" }}>→ Move to Closet</button>
-                          <div style={{ display: "flex", gap: 6, marginTop: 6 }}>
-                            <button onClick={() => { setEditItem(item); setModal("item"); }} style={{ flex: 1, padding: "7px", background: "#f5f2ed", border: "none", borderRadius: 10, cursor: "pointer", fontSize: 12, fontWeight: 600, color: "#666", fontFamily: "'DM Sans', sans-serif" }}>Edit</button>
-                            <button onClick={() => wishlistDb.remove(item.id)} style={{ flex: 1, padding: "7px", background: "#fef2f2", border: "none", borderRadius: 10, cursor: "pointer", fontSize: 12, fontWeight: 600, color: "#e05555", fontFamily: "'DM Sans', sans-serif" }}>Remove</button>
-                          </div>
-                        </div>
-                      </div>
-                    );})}
-                  </div>
-                )}
-              </div>
-            )}
+            {tab === "wishlist" && <WishlistTab
+              wishlistDb={wishlistDb}
+              wishlistsDb={wishlistsDb}
+              saveWishlistsMeta={saveWishlistsMeta}
+              activeWishlistId={activeWishlistId}
+              setActiveWishlistId={setActiveWishlistId}
+              wlSort={wlSort} setWlSort={setWlSort}
+              wlSortCat={wlSortCat} setWlSortCat={setWlSortCat}
+              moveToCloset={moveToCloset}
+              onEdit={(item) => { setEditItem(item); setWishlistDest(true); setModal("item"); }}
+            />}
+
             </>
           )}
         </div>
@@ -4151,7 +4294,7 @@ export default function App() {
           )}
 
           {/* Wardrobe stats card */}
-          {itemsDb.rows.length > 0 && (() => {
+          {tab !== "wishlist" && itemsDb.rows.length > 0 && (() => {
             const items = itemsDb.rows;
             const totalValue = items.reduce((s, i) => s + (parseFloat((i.price || "").replace(/[^0-9.]/g, "")) || 0), 0);
             const avgValue = totalValue / items.length;
@@ -4191,7 +4334,7 @@ export default function App() {
           })()}
 
           {/* Category breakdown */}
-          {itemsDb.rows.length > 0 && (() => {
+          {tab !== "wishlist" && itemsDb.rows.length > 0 && (() => {
             const byCat = CATEGORIES.slice(1).map(cat => ({ cat, count: itemsDb.rows.filter(i => i.category === cat).length })).filter(c => c.count > 0);
             const maxC = Math.max(...byCat.map(c => c.count), 1);
             return (
@@ -4227,8 +4370,9 @@ export default function App() {
         <AddItemModal
           initial={editItem || BLANK}
           editMode={editItem ? "manual" : null}
+          initialDest={wishlistDest ? "wishlist" : undefined}
           onSave={saveItem}
-          onSaveWish={saveWishItem}
+          onSaveWish={(form) => saveWishItem({ ...form, wishlistId: activeWishlistId || undefined })}
           onCancel={closeModal}
         />
       </Modal>

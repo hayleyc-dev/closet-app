@@ -1583,11 +1583,17 @@ function LookbookViewer({ lookbook, outfits, allItems, onClose, onUpdate, onOpen
     });
   };
 
+  const loadScript = (src) => new Promise((resolve, reject) => {
+    if (document.querySelector(`script[src="${src}"]`)) { resolve(); return; }
+    const s = document.createElement("script"); s.src = src; s.onload = resolve; s.onerror = reject;
+    document.head.appendChild(s);
+  });
+
   const handleExport = async () => {
     setExportingPdf(true);
     try {
-      const { jsPDF } = await import("https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js");
-      const pdf = new jsPDF.jsPDF({ orientation: "portrait", unit: "px", format: [400, 520] });
+      await loadScript("https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js");
+      const pdf = new window.jspdf.jsPDF({ orientation: "portrait", unit: "px", format: [400, 520] });
       for (let i = 0; i < looks.length; i++) {
         const look = looks[i];
         if (i > 0) pdf.addPage();
@@ -2919,11 +2925,17 @@ function Moodboard({ closetItems = [] }) {
 
   const selectedItem = items.find(i => i.id === selectedId);
 
+  const loadScript = (src) => new Promise((resolve, reject) => {
+    if (document.querySelector(`script[src="${src}"]`)) { resolve(); return; }
+    const s = document.createElement("script"); s.src = src; s.onload = resolve; s.onerror = reject;
+    document.head.appendChild(s);
+  });
+
   const exportCanvas = () => {
     const canvas = canvasRef.current;
     if (!canvas) return;
-    import("https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js").then(m => {
-      const h2c = m.default || window.html2canvas;
+    loadScript("https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js").then(() => {
+      const h2c = window.html2canvas;
       h2c(canvas, { useCORS: true, backgroundColor: board?.bg || "#fff" }).then(c => {
         const a = document.createElement("a");
         a.href = c.toDataURL("image/jpeg", 0.92);

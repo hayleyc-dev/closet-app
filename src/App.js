@@ -35,6 +35,26 @@ const SvgGear     = ({size=16,color="currentColor"}) => <Ico size={size} color={
 const SvgUnlock   = ({size=14,color="currentColor"}) => <Ico size={size} color={color}><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 019.9-1"/></Ico>;
 const SvgPushPin  = ({size=16,color="currentColor"}) => <Ico size={size} color={color}><line x1="12" y1="17" x2="12" y2="22"/><path d="M5 17h14"/><path d="M15 5h1a2 2 0 012 2v1a2 2 0 01-2 2H8a2 2 0 01-2-2V7a2 2 0 012-2h1"/><rect x="9" y="2" width="6" height="4" rx="1"/></Ico>;
 const SvgPalette  = ({size=16,color="currentColor"}) => <Ico size={size} color={color}><path d="M12 2a10 10 0 100 20 4 4 0 004-4c0-1.1-.9-2-2-2h-1a1 1 0 010-2h1a2 2 0 002-2 10 10 0 00-4-10z"/><circle cx="8.5" cy="9" r="1.5" fill={color} stroke="none"/><circle cx="12" cy="6" r="1.5" fill={color} stroke="none"/><circle cx="15.5" cy="9" r="1.5" fill={color} stroke="none"/></Ico>;
+const SvgDress = ({size=16,color="currentColor",style}) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" style={style}>
+    {/* neckline */}
+    <path d="M9 3 C9 3 9 6 12 6 C15 6 15 3 15 3" />
+    {/* straps going out to shoulders */}
+    <path d="M9 3 L5 8" />
+    <path d="M15 3 L19 8" />
+    {/* bodice sides */}
+    <path d="M5 8 L7 13" />
+    <path d="M19 8 L17 13" />
+    {/* waist band */}
+    <path d="M7 13 Q12 11 17 13" />
+    {/* skirt flare */}
+    <path d="M7 13 L3 22" />
+    <path d="M17 13 L21 22" />
+    <path d="M9.5 14 L8 22" />
+    <path d="M14.5 14 L16 22" />
+    <path d="M12 13.5 L12 22" />
+  </svg>
+);
 const SvgSparkle  = ({size=16,color="currentColor"}) => <Ico size={size} color={color}><path d="M12 2l2.4 7.4H22l-6.2 4.5 2.4 7.4L12 17l-6.2 4.3 2.4-7.4L2 9.4h7.6z"/></Ico>;
 
 
@@ -64,12 +84,13 @@ const uid = () => Math.random().toString(36).slice(2);
 
 // SVG hanger icon
 const HangerIcon = ({ size = 20, color = "currentColor", opacity = 1 }) => (
-  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.8"
+  <svg width={size} height={size} viewBox="0 0 100 100" fill="none" stroke={color} strokeWidth="7"
     strokeLinecap="round" strokeLinejoin="round" style={{ opacity, flexShrink: 0 }}>
-    <path d="M12 4a2 2 0 0 1 2 2c0 1.5-2 2.5-2 4" />
-    <path d="M3 18l9-6 9 6" />
-    <path d="M2 18h20" />
-    <circle cx="12" cy="4" r="1" fill={color} stroke="none" />
+    <path d="M50 28 C50 28 58 10 66 14 C74 18 72 30 62 30" />
+    <path d="M50 30 L50 42" />
+    <path d="M50 42 C44 46 16 58 7 72" />
+    <path d="M50 42 C56 46 84 58 93 72" />
+    <path d="M7 72 Q50 84 93 72" />
   </svg>
 );
 
@@ -322,7 +343,9 @@ const BLANK_WISH = { name: "", brand: "", price: "", image: "", link: "" };
 // ── Shared image helpers ─────────────────────────────────────────────────────
 
 // Canvas-based background removal: floods from corners to find background colour,
-// then makes near-matching pixels transparent using a tolerance walk.
+// Removes background using corner-sampled flood fill.
+// Uses a lower tolerance and checks that the bg colour is actually
+// distinct enough from the item — prevents eating light-coloured clothing.
 function removeBgCanvas(dataUrl) {
   return new Promise((resolve, reject) => {
     const img = new Image();
@@ -336,39 +359,61 @@ function removeBgCanvas(dataUrl) {
       const data = imageData.data;
       const w = canvas.width, h = canvas.height;
 
-      // Sample background colour from the 4 corners
-      const corners = [[0,0],[w-1,0],[0,h-1],[w-1,h-1]];
+      // Sample bg from corners + edge midpoints for a more reliable bg estimate
+      const samplePts = [
+        [0,0],[w-1,0],[0,h-1],[w-1,h-1],
+        [Math.floor(w/2),0],[Math.floor(w/2),h-1],
+        [0,Math.floor(h/2)],[w-1,Math.floor(h/2)],
+      ];
       let rSum=0, gSum=0, bSum=0;
-      corners.forEach(([x,y]) => {
+      samplePts.forEach(([x,y]) => {
         const i = (y*w+x)*4;
         rSum+=data[i]; gSum+=data[i+1]; bSum+=data[i+2];
       });
-      const bgR=rSum/4, bgG=gSum/4, bgB=bSum/4;
+      const n = samplePts.length;
+      const bgR=rSum/n, bgG=gSum/n, bgB=bSum/n;
 
-      // Flood-fill from all 4 corners with tolerance
-      const tolerance = 38;
+      const colorDist = (i, r, g, b) => {
+        const dr=data[i]-r, dg=data[i+1]-g, db=data[i+2]-b;
+        return Math.sqrt(dr*dr+dg*dg+db*db);
+      };
+
+      // Reduce tolerance so we don't eat light-coloured items.
+      // Also: only remove pixels that are closer to bg than to the
+      // "average item colour" sampled from the image centre.
+      const tolerance = 28;
+
+      // Sample item colour from centre of image as a guard
+      const cx = Math.floor(w/2), cy = Math.floor(h/2);
+      const ci = (cy*w+cx)*4;
+      const itemR=data[ci], itemG=data[ci+1], itemB=data[ci+2];
+
       const visited = new Uint8Array(w * h);
 
-      const colorMatch = (i) => {
-        const dr = data[i]-bgR, dg = data[i+1]-bgG, db = data[i+2]-bgB;
-        return Math.sqrt(dr*dr+dg*dg+db*db) < tolerance;
+      const shouldRemove = (i) => {
+        const distToBg = colorDist(i, bgR, bgG, bgB);
+        if (distToBg >= tolerance) return false;
+        // Don't remove if the pixel is closer to the item centre colour than to bg
+        // (protects light items on light backgrounds from being over-eaten)
+        const distToItem = colorDist(i, itemR, itemG, itemB);
+        return distToBg <= distToItem * 0.85;
       };
 
       const queue = [];
-      corners.forEach(([x,y]) => {
+      samplePts.forEach(([x,y]) => {
         const idx = y*w+x;
-        if (!visited[idx] && colorMatch(idx*4)) { visited[idx]=1; queue.push(idx); }
+        if (!visited[idx] && shouldRemove(idx*4)) { visited[idx]=1; queue.push(idx); }
       });
 
       while (queue.length) {
         const idx = queue.pop();
-        data[idx*4+3] = 0; // make transparent
+        data[idx*4+3] = 0;
         const x = idx % w, y = Math.floor(idx / w);
         [[1,0],[-1,0],[0,1],[0,-1]].forEach(([dx,dy]) => {
           const nx=x+dx, ny=y+dy;
           if (nx<0||nx>=w||ny<0||ny>=h) return;
           const ni = ny*w+nx;
-          if (!visited[ni] && colorMatch(ni*4)) { visited[ni]=1; queue.push(ni); }
+          if (!visited[ni] && shouldRemove(ni*4)) { visited[ni]=1; queue.push(ni); }
         });
       }
 
@@ -1341,13 +1386,13 @@ function ItemDetailPopup({ item, onClose, onEdit, onDelete, onWorn, onCreateOutf
   return (
     <div className="item-detail-overlay fade-in" onClick={onClose}>
       <div className="fade-up" onClick={e => e.stopPropagation()} style={{
-        background: "#fff", borderRadius: 24, width: "100%", maxWidth: 1020,
+        background: "#fff", borderRadius: 24, width: "min(1200px, 96vw)",  maxWidth: 1200,
         maxHeight: "90vh", overflow: "hidden", boxShadow: "0 30px 80px rgba(0,0,0,0.2)",
         display: "flex", flexDirection: "row"
       }}>
 
         {/* ── LEFT: image + info ── */}
-        <div style={{ width: 320, flexShrink: 0, display: "flex", flexDirection: "column", overflowY: "auto" }}>
+        <div style={{ width: 280, flexShrink: 0, display: "flex", flexDirection: "column", overflowY: "auto" }}>
           {/* Image */}
           <div style={{ width: "100%", aspectRatio: "3/4", background: "#f5f2ed", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", position: "relative" }}>
             {item.image
@@ -1639,7 +1684,7 @@ function OccasionPill({ tag, selected, onClick, small }) {
 }
 
 // ── Outfit Detail Popup ──────────────────────────────────────────────────────
-function OutfitDetailPopup({ outfit, allItems, lookbooks, onClose, onEdit, onDelete, onMarkWorn, onDuplicate, onAddToLookbook, onGoToLookbook, onItemClick }) {
+function OutfitDetailPopup({ outfit, allItems, allOutfits, lookbooks, onClose, onEdit, onDelete, onMarkWorn, onDuplicate, onAddToLookbook, onGoToLookbook, onItemClick }) {
   const [addingToLb, setAddingToLb] = useState(false);
   const [selectedLb, setSelectedLb] = useState("");
   const [exported, setExported] = useState(false);
@@ -1664,6 +1709,16 @@ function OutfitDetailPopup({ outfit, allItems, lookbooks, onClose, onEdit, onDel
 
   const outfitItems = (outfit.layers || outfit.itemIds || []).map(id => allItems.find(i => i.id === id)).filter(Boolean);
   const memberLookbooks = lookbooks.filter(lb => (lb.outfitIds || []).includes(outfit.id));
+  const myIds = new Set(outfit.layers || outfit.itemIds || []);
+  const similarOutfits = (allOutfits || []).filter(o => {
+    if (o.id === outfit.id) return false;
+    const shared = (o.layers || o.itemIds || []).filter(id => myIds.has(id)).length;
+    return shared >= 2;
+  }).sort((a, b) => {
+    const sa = (b.layers || b.itemIds || []).filter(id => myIds.has(id)).length;
+    const sb = (a.layers || a.itemIds || []).filter(id => myIds.has(id)).length;
+    return sa - sb;
+  }).slice(0, 6);
   const nonMemberLookbooks = lookbooks.filter(lb => !(lb.outfitIds || []).includes(outfit.id));
   const totalValue = outfitItems.reduce((sum, item) => sum + (parseFloat((item.price || "").replace(/[^0-9.]/g, "")) || 0), 0);
   const totalSpent = outfitItems.reduce((sum, item) => sum + (parseFloat((item.spent || "").replace(/[^0-9.]/g, "")) || 0), 0);
@@ -1671,13 +1726,13 @@ function OutfitDetailPopup({ outfit, allItems, lookbooks, onClose, onEdit, onDel
   return (
     <div className="item-detail-overlay fade-in" onClick={onClose}>
       <div className="fade-up" onClick={e => e.stopPropagation()} style={{
-        background: "#fff", borderRadius: 24, width: "100%", maxWidth: 1020,
+        background: "#fff", borderRadius: 24, width: "min(1200px, 96vw)",  maxWidth: 1200,
         maxHeight: "90vh", overflow: "hidden", boxShadow: "0 30px 80px rgba(0,0,0,0.2)",
         display: "flex", flexDirection: "row"
       }}>
 
         {/* ── LEFT: preview + info ── */}
-        <div style={{ width: 320, flexShrink: 0, display: "flex", flexDirection: "column", overflowY: "auto" }}>
+        <div style={{ width: 280, flexShrink: 0, display: "flex", flexDirection: "column", overflowY: "auto" }}>
           {/* Preview image */}
           <div style={{ width: "100%", aspectRatio: "4/5", background: "#f5f2ed", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden" }}>
             {outfit.previewImage
@@ -1758,7 +1813,7 @@ function OutfitDetailPopup({ outfit, allItems, lookbooks, onClose, onEdit, onDel
           <div style={{ padding: "12px 16px", display: "flex", alignItems: "center", justifyContent: "space-between", borderBottom: "1px solid #e8e4dc", flexShrink: 0, gap: 8, flexWrap: "wrap" }}>
             {/* Tab toggle */}
             <div style={{ display: "flex", background: "#f5f2ed", borderRadius: 10, padding: 3, gap: 2 }}>
-              {[["pieces", `Pieces (${outfitItems.length})`], ["lookbooks", `Lookbooks (${memberLookbooks.length})`]].map(([v, lbl]) => (
+              {[["pieces", `Pieces (${outfitItems.length})`], ["lookbooks", `Lookbooks (${memberLookbooks.length})`], ["history", "History"], ["similar", "Similar"]].map(([v, lbl]) => (
                 <button key={v} onClick={() => setRightTab(v)} style={{
                   padding: "6px 14px", border: "none", borderRadius: 8, cursor: "pointer",
                   background: rightTab === v ? "#fff" : "transparent",
@@ -1857,6 +1912,61 @@ function OutfitDetailPopup({ outfit, allItems, lookbooks, onClose, onEdit, onDel
                   )}
                 </div>
               )
+            )}
+            {rightTab === "history" && (
+              <div>
+                <div style={{ fontSize: 11, fontWeight: 700, color: "#aaa", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 12 }}>
+                  Worn {(outfit.wornDates || []).length} time{(outfit.wornDates || []).length !== 1 ? "s" : ""}
+                </div>
+                {(outfit.wornDates || []).length === 0 ? (
+                  <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", paddingTop: 40, color: "#ccc", gap: 10 }}>
+                    <SvgCalendar size={32} color="#ddd" />
+                    <div style={{ fontSize: 13, fontWeight: 600 }}>No wear history yet</div>
+                    <div style={{ fontSize: 12 }}>Click Worn to log a date</div>
+                  </div>
+                ) : (
+                  <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                    {[...(outfit.wornDates || [])].reverse().map((d, i) => (
+                      <div key={i} style={{ display: "flex", alignItems: "center", gap: 10, padding: "9px 12px", background: "#faf9f6", borderRadius: 10 }}>
+                        <SvgCalendar size={13} color="#bbb" />
+                        <div style={{ fontSize: 13, fontWeight: 600, color: "#444" }}>
+                          {new Date(d + "T00:00:00").toLocaleDateString("en-US", { weekday: "short", month: "long", day: "numeric", year: "numeric" })}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+            {rightTab === "similar" && (
+              <div>
+                <div style={{ fontSize: 11, fontWeight: 700, color: "#aaa", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 12 }}>
+                  Outfits sharing 2+ pieces
+                </div>
+                {similarOutfits.length === 0 ? (
+                  <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", paddingTop: 40, color: "#ccc", gap: 10 }}>
+                    <SvgSparkle size={32} color="#ddd" />
+                    <div style={{ fontSize: 13, fontWeight: 600 }}>No similar outfits found</div>
+                  </div>
+                ) : (
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(130px, 1fr))", gap: 10 }}>
+                    {similarOutfits.map(o => {
+                      const sharedCount = (o.layers || o.itemIds || []).filter(id => myIds.has(id)).length;
+                      return (
+                        <div key={o.id} onClick={() => onItemClick && onItemClick(o)} style={{ borderRadius: 14, overflow: "hidden", background: "#f5f2ed", cursor: "pointer", position: "relative" }}>
+                          <div style={{ aspectRatio: "3/4", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                            {o.previewImage ? <img src={o.previewImage} alt={o.name} style={{ width: "100%", height: "100%", objectFit: "contain" }} /> : <HangerIcon size={24} color="#ddd" />}
+                          </div>
+                          <div style={{ position: "absolute", top: 6, right: 6, background: "rgba(0,0,0,0.55)", color: "#fff", borderRadius: 20, padding: "2px 7px", fontSize: 10, fontWeight: 700 }}>{sharedCount} shared</div>
+                          <div style={{ padding: "6px 8px 8px" }}>
+                            <div style={{ fontSize: 11, fontWeight: 700, color: "#1a1a1a", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{o.name}</div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
             )}
           </div>
         </div>
@@ -2394,6 +2504,34 @@ function OutfitBuilder({ itemsDb, wishlistDb, onSave, onClose, initial, seedItem
 
   const toggleLock = (id) => setLockedIds(prev => { const next = new Set(prev); next.has(id) ? next.delete(id) : next.add(id); return next; });
 
+  const autoArrange = () => {
+    const board = boardRef.current;
+    if (!board || layers.length === 0) return;
+    const bw = board.offsetWidth, bh = board.offsetHeight;
+    // Sort by clothing category order: tops first, then bottoms, then shoes, then accessories
+    const CAT_ORDER = ["Tops","Knits","Sweaters","Dresses","Outerwear","Trousers","Denim","Shorts + Skirts","Shoes","Bags","Accessories","Jewelry","Activewear","Swim","Intimates","Loungewear","Sleepwear","Socks + Tights"];
+    const sorted = [...layers].sort((a, b) => {
+      const ia = allItems.find(i => i.id === a); const ib = allItems.find(i => i.id === b);
+      const oa = CAT_ORDER.indexOf(ia?.category || ""); const ob = CAT_ORDER.indexOf(ib?.category || "");
+      return (oa === -1 ? 99 : oa) - (ob === -1 ? 99 : ob);
+    });
+    const count = sorted.length;
+    const cols = count <= 2 ? count : count <= 4 ? 2 : 3;
+    const rows = Math.ceil(count / cols);
+    const itemW = Math.min(160, Math.floor((bw - 40) / cols));
+    const itemH = Math.round(itemW * 1.2);
+    const padX = Math.floor((bw - cols * itemW) / (cols + 1));
+    const padY = Math.floor((bh - rows * itemH) / (rows + 1));
+    const newPos = {};
+    sorted.forEach((id, idx) => {
+      const col = idx % cols, row = Math.floor(idx / cols);
+      newPos[id] = { x: padX + col * (itemW + padX), y: padY + row * (itemH + padY), w: itemW, h: itemH };
+    });
+    setPositions(p => ({ ...p, ...newPos }));
+    setLayers(sorted);
+    pushHistory(sorted, { ...positions, ...newPos });
+  };
+
   const moveLayerUp = (id) => setLayers(ls => { const i = ls.indexOf(id); if (i === ls.length - 1) return ls; const n = [...ls]; [n[i], n[i + 1]] = [n[i + 1], n[i]]; pushHistory(n, positions); return n; });
   const moveLayerDown = (id) => setLayers(ls => { const i = ls.indexOf(id); if (i === 0) return ls; const n = [...ls]; [n[i], n[i - 1]] = [n[i - 1], n[i]]; pushHistory(n, positions); return n; });
   const bringToFront = (id) => setLayers(ls => [...ls.filter(x => x !== id), id]);
@@ -2496,11 +2634,7 @@ function OutfitBuilder({ itemsDb, wishlistDb, onSave, onClose, initial, seedItem
       <style>{globalStyles}</style>
       <div className="builder-topbar">
         <button onClick={onClose} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 22, color: "#888", lineHeight: 1, padding: 0 }}><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
-        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-          <button onClick={undo} disabled={!canUndo} title="Undo" style={{ ...btnBase, padding: "6px 10px", background: canUndo ? "#f5f3ef" : "transparent", color: canUndo ? "#444" : "#ccc", fontSize: 13, cursor: canUndo ? "pointer" : "default" }}>↩</button>
-          <button onClick={redo} disabled={!canRedo} title="Redo" style={{ ...btnBase, padding: "6px 10px", background: canRedo ? "#f5f3ef" : "transparent", color: canRedo ? "#444" : "#ccc", fontSize: 13, cursor: canRedo ? "pointer" : "default" }}>↪</button>
-          <span style={{ fontWeight: 700, fontSize: 15, color: "#1a1a1a", marginLeft: 4 }}>Build a Look</span>
-        </div>
+        <span style={{ fontWeight: 700, fontSize: 15, color: "#1a1a1a" }}>Build a Look</span>
         <button onClick={handleSave} disabled={!name || layers.length === 0} style={{
           ...btnBase, padding: "8px 20px", fontSize: 13,
           background: (!name || layers.length === 0) ? "#ccc" : "#2d6a3f",
@@ -2536,7 +2670,7 @@ function OutfitBuilder({ itemsDb, wishlistDb, onSave, onClose, initial, seedItem
               ))}
             </div>
           </div>
-          <div>
+          <div style={{ marginBottom: 18 }}>
             <label style={labelStyle}>Occasion</label>
             <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
               {OCCASIONS.map(tag => {
@@ -2552,6 +2686,36 @@ function OutfitBuilder({ itemsDb, wishlistDb, onSave, onClose, initial, seedItem
               })}
             </div>
           </div>
+
+          {/* Live preview thumbnail */}
+          {layers.length > 0 && (() => {
+            // Compute a scaled-down snapshot of board positions for preview
+            const boardEl = boardRef.current;
+            const bw = boardEl?.offsetWidth || 320;
+            const bh = boardEl?.offsetHeight || 400;
+            const PREV_W = 180, PREV_H = Math.round(PREV_W * (bh / bw));
+            const scale = PREV_W / bw;
+            return (
+              <div style={{ marginBottom: 18 }}>
+                <label style={labelStyle}>Preview</label>
+                <div style={{ width: PREV_W, height: PREV_H, background: "#fff", border: "1.5px solid #e8e4dc", borderRadius: 12, position: "relative", overflow: "hidden", boxShadow: "0 2px 12px rgba(0,0,0,0.06)" }}>
+                  {layers.map((id, zi) => {
+                    const item = allItems.find(i => i.id === id);
+                    const pos = positions[id];
+                    if (!item || !pos) return null;
+                    return (
+                      <div key={id} style={{ position: "absolute", left: pos.x * scale, top: pos.y * scale, width: pos.w * scale, height: pos.h * scale, zIndex: zi + 1 }}>
+                        {item.image
+                          ? <img src={item.image} alt="" style={{ width: "100%", height: "100%", objectFit: "contain", pointerEvents: "none" }} />
+                          : <div style={{ width: "100%", height: "100%", background: "#f0ece4", display: "flex", alignItems: "center", justifyContent: "center" }}><HangerIcon size={12} color="#ccc" /></div>
+                        }
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })()}
         </div>
 
         {/* CANVAS — centered white 4:5 board */}
@@ -2562,7 +2726,7 @@ function OutfitBuilder({ itemsDb, wishlistDb, onSave, onClose, initial, seedItem
                 ref={boardRef}
                 className="outfit-board"
                 style={{ width: boardW, height: boardH }}
-                onClick={e => e.stopPropagation()}
+                onClick={() => setActiveId(null)}
               >
                 {layers.length === 0 && (
                   <div style={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", color: "#ccc", pointerEvents: "none" }}>
@@ -2595,20 +2759,31 @@ function OutfitBuilder({ itemsDb, wishlistDb, onSave, onClose, initial, seedItem
                       </div>
                       {isActive && (
                         <div onClick={e => e.stopPropagation()} style={{
-                          position: "absolute", top: -40, left: "50%", transform: "translateX(-50%)",
-                          display: "flex", gap: 1, background: "#1a1a1a", borderRadius: 20, padding: "4px 6px",
-                          boxShadow: "0 4px 16px rgba(0,0,0,0.3)", whiteSpace: "nowrap", zIndex: 9999
+                          position: "absolute", top: -46, left: "50%", transform: "translateX(-50%)",
+                          display: "flex", alignItems: "center", gap: 2,
+                          background: "rgba(20,20,20,0.95)", borderRadius: 22, padding: "5px 8px",
+                          boxShadow: "0 6px 20px rgba(0,0,0,0.4)", whiteSpace: "nowrap", zIndex: 9999,
+                          backdropFilter: "blur(6px)"
                         }}>
-                          {!lockedIds.has(id) && [{ label: "Fwd", icon: <SvgArrowUp size={11} color="#555" />, action: () => moveLayerUp(id), disabled: isTop }, { label: "Back", icon: <SvgArrowDn size={11} color="#555" />, action: () => moveLayerDown(id), disabled: isBottom }].map(btn => (
-                            <button key={btn.label} onClick={btn.action} disabled={btn.disabled} style={{
-                              background: "none", border: "none", color: btn.disabled ? "#555" : "#fff",
-                              cursor: btn.disabled ? "default" : "pointer", padding: "3px 9px",
-                              fontSize: 12, fontFamily: "'DM Sans', sans-serif", fontWeight: 700, borderRadius: 14
-                            }}>{btn.label}</button>
-                          ))}
-                          <div style={{ width: 1, background: "#333", margin: "3px 1px" }} />
-                          <button onClick={() => toggleLock(id)} title={lockedIds.has(id) ? "Unlock" : "Lock"} style={{ background: "none", border: "none", color: lockedIds.has(id) ? "#f0c040" : "#aaa", cursor: "pointer", padding: "3px 8px", fontSize: 13, borderRadius: 14 }}>{lockedIds.has(id) ? <SvgLock size={13} color="#f0c040" /> : <SvgUnlock size={13} color="#aaa" />}</button>
-                          {!lockedIds.has(id) && <><div style={{ width: 1, background: "#333", margin: "3px 1px" }} /><button onClick={() => toggleItem(id)} style={{ background: "none", border: "none", color: "#ff6b6b", cursor: "pointer", padding: "3px 8px", fontSize: 13, borderRadius: 14 }}><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></>}
+                          {!lockedIds.has(id) && (<>
+                            <button onClick={() => moveLayerUp(id)} disabled={isTop} title="Bring Forward" style={{ background: isTop ? "none" : "rgba(255,255,255,0.08)", border: "none", color: isTop ? "#555" : "#fff", cursor: isTop ? "default" : "pointer", padding: "4px 9px", fontSize: 11, fontFamily: "'DM Sans', sans-serif", fontWeight: 700, borderRadius: 14, display: "flex", alignItems: "center", gap: 4 }}>
+                              <SvgArrowUp size={10} color="currentColor" /> Fwd
+                            </button>
+                            <button onClick={() => moveLayerDown(id)} disabled={isBottom} title="Send Backward" style={{ background: isBottom ? "none" : "rgba(255,255,255,0.08)", border: "none", color: isBottom ? "#555" : "#fff", cursor: isBottom ? "default" : "pointer", padding: "4px 9px", fontSize: 11, fontFamily: "'DM Sans', sans-serif", fontWeight: 700, borderRadius: 14, display: "flex", alignItems: "center", gap: 4 }}>
+                              <SvgArrowDn size={10} color="currentColor" /> Back
+                            </button>
+                            <div style={{ width: 1, background: "#444", margin: "3px 2px", height: 16 }} />
+                          </>)}
+                          <button onClick={() => toggleLock(id)} title={lockedIds.has(id) ? "Unlock" : "Lock"} style={{ background: lockedIds.has(id) ? "rgba(240,192,64,0.15)" : "rgba(255,255,255,0.08)", border: "none", color: lockedIds.has(id) ? "#f0c040" : "#aaa", cursor: "pointer", padding: "4px 9px", fontSize: 11, fontFamily: "'DM Sans', sans-serif", fontWeight: 700, borderRadius: 14, display: "flex", alignItems: "center", gap: 4 }}>
+                            {lockedIds.has(id) ? <SvgLock size={11} color="#f0c040" /> : <SvgUnlock size={11} color="#aaa" />}
+                            {lockedIds.has(id) ? "Locked" : "Lock"}
+                          </button>
+                          {!lockedIds.has(id) && (<>
+                            <div style={{ width: 1, background: "#444", margin: "3px 2px", height: 16 }} />
+                            <button onClick={() => toggleItem(id)} title="Remove" style={{ background: "rgba(255,107,107,0.15)", border: "none", color: "#ff6b6b", cursor: "pointer", padding: "4px 9px", fontSize: 11, fontFamily: "'DM Sans', sans-serif", fontWeight: 700, borderRadius: 14, display: "flex", alignItems: "center", gap: 4 }}>
+                              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg> Remove
+                            </button>
+                          </>)}
                         </div>
                       )}
                     </div>
@@ -2617,6 +2792,13 @@ function OutfitBuilder({ itemsDb, wishlistDb, onSave, onClose, initial, seedItem
               </div>
             )}
           </BoardSizer>
+          {/* Canvas bottom toolbar */}
+          <div style={{ position: "absolute", bottom: 14, left: "50%", transform: "translateX(-50%)", display: "flex", gap: 4, background: "rgba(26,26,26,0.88)", borderRadius: 20, padding: "5px 8px", boxShadow: "0 4px 16px rgba(0,0,0,0.25)", zIndex: 200, backdropFilter: "blur(8px)", whiteSpace: "nowrap" }}>
+            <button onClick={undo} disabled={!canUndo} title="Undo" style={{ background: "none", border: "none", color: canUndo ? "#fff" : "#555", cursor: canUndo ? "pointer" : "default", padding: "4px 10px", fontSize: 12, fontFamily: "'DM Sans', sans-serif", fontWeight: 700, borderRadius: 12, display: "flex", alignItems: "center", gap: 5 }}>↩ Undo</button>
+            <button onClick={redo} disabled={!canRedo} title="Redo" style={{ background: "none", border: "none", color: canRedo ? "#fff" : "#555", cursor: canRedo ? "pointer" : "default", padding: "4px 10px", fontSize: 12, fontFamily: "'DM Sans', sans-serif", fontWeight: 700, borderRadius: 12, display: "flex", alignItems: "center", gap: 5 }}>↪ Redo</button>
+            <div style={{ width: 1, background: "#444", margin: "4px 2px" }} />
+            <button onClick={autoArrange} disabled={layers.length === 0} title="Auto-arrange" style={{ background: "none", border: "none", color: layers.length > 0 ? "#fff" : "#555", cursor: layers.length > 0 ? "pointer" : "default", padding: "4px 10px", fontSize: 12, fontFamily: "'DM Sans', sans-serif", fontWeight: 700, borderRadius: 12, display: "flex", alignItems: "center", gap: 5 }}>⊹ Arrange</button>
+          </div>
         </div>
 
         {/* RIGHT PANEL */}
@@ -4356,6 +4538,203 @@ const NAV_ITEMS = [
   { id: "settings", label: "Settings" },
 ];
 
+
+// ── OutfitCalendar ───────────────────────────────────────────────────────────
+function OutfitCalendar({ outfits, calendar, onSaveCalendar, month, onMonthChange, weather, onSetWeather, onOpenOutfit }) {
+  const [assignPicker, setAssignPicker] = useState(null); // date string being assigned
+  const [searchQ, setSearchQ] = useState("");
+
+  const { year, month: mo } = month;
+  const firstDay = new Date(year, mo, 1).getDay();
+  const daysInMonth = new Date(year, mo + 1, 0).getDate();
+  const todayStr = new Date().toISOString().slice(0, 10);
+
+  const monthName = new Date(year, mo, 1).toLocaleDateString("en-US", { month: "long", year: "numeric" });
+
+  const prevMonth = () => {
+    if (mo === 0) onMonthChange({ year: year - 1, month: 11 });
+    else onMonthChange({ year, month: mo - 1 });
+  };
+  const nextMonth = () => {
+    if (mo === 11) onMonthChange({ year: year + 1, month: 0 });
+    else onMonthChange({ year, month: mo + 1 });
+  };
+
+  // Fetch weather once per session for current month
+  const [weatherLoading, setWeatherLoading] = useState(false);
+  const fetchWeather = async () => {
+    if (weather) return;
+    setWeatherLoading(true);
+    try {
+      // Use Open-Meteo free API — no key needed, uses IP location via wttr.in for coords
+      const geoRes = await fetch("https://ipapi.co/json/");
+      const geo = await geoRes.json();
+      const lat = geo.latitude, lon = geo.longitude;
+      const city = geo.city || "";
+      const wRes = await fetch(
+        "https://api.open-meteo.com/v1/forecast?latitude=" + lat + "&longitude=" + lon +
+        "&daily=temperature_2m_max,temperature_2m_min,weathercode&temperature_unit=fahrenheit&timezone=auto&forecast_days=14"
+      );
+      const w = await wRes.json();
+      const days = (w.daily && w.daily.time) ? w.daily.time.map((d, i) => ({
+        date: d,
+        high: Math.round(w.daily.temperature_2m_max[i]),
+        low: Math.round(w.daily.temperature_2m_min[i]),
+        code: w.daily.weathercode[i],
+      })) : [];
+      onSetWeather({ city, days });
+    } catch(e) { onSetWeather({ city: "", days: [] }); }
+    setWeatherLoading(false);
+  };
+
+  const weatherIcon = (code) => {
+    if (code === 0) return "☀️";
+    if (code <= 2) return "🌤";
+    if (code <= 45) return "☁️";
+    if (code <= 67) return "🌧";
+    if (code <= 77) return "❄️";
+    if (code <= 82) return "🌦";
+    return "⛈";
+  };
+
+  const getWeatherForDate = (dateStr) => {
+    if (!weather || !weather.days) return null;
+    return weather.days.find(d => d.date === dateStr) || null;
+  };
+
+  const filteredOutfits = outfits.filter(o =>
+    !searchQ || (o.name || "").toLowerCase().includes(searchQ.toLowerCase())
+  );
+
+  const assignOutfit = (outfitId) => {
+    const updated = { ...calendar };
+    if (outfitId) updated[assignPicker] = outfitId;
+    else delete updated[assignPicker];
+    onSaveCalendar(updated);
+    setAssignPicker(null);
+    setSearchQ("");
+  };
+
+  const cells = [];
+  for (let i = 0; i < firstDay; i++) cells.push(null);
+  for (let d = 1; d <= daysInMonth; d++) cells.push(d);
+
+  return (
+    <div>
+      {/* Calendar header */}
+      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 16 }}>
+        <button onClick={prevMonth} style={{ width: 30, height: 30, borderRadius: "50%", border: "1px solid #e0dbd2", background: "#fff", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>
+          <SvgArrowL size={12} color="#666" />
+        </button>
+        <div style={{ flex: 1, fontSize: 15, fontWeight: 800, color: "#1a1a1a", textAlign: "center" }}>{monthName}</div>
+        <button onClick={nextMonth} style={{ width: 30, height: 30, borderRadius: "50%", border: "1px solid #e0dbd2", background: "#fff", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>
+          <SvgArrowR size={12} color="#666" />
+        </button>
+        <button onClick={fetchWeather} disabled={weatherLoading} style={{
+          padding: "6px 12px", borderRadius: 10, border: "1px solid #e0dbd2", background: "#fff",
+          cursor: "pointer", fontSize: 12, fontWeight: 600, color: "#666", fontFamily: "'DM Sans', sans-serif",
+          display: "flex", alignItems: "center", gap: 5
+        }}>
+          {weatherLoading ? "…" : (weather ? "🌤 Refresh" : "🌤 Weather")}
+        </button>
+      </div>
+
+      {/* Day labels */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 4, marginBottom: 4 }}>
+        {["Sun","Mon","Tue","Wed","Thu","Fri","Sat"].map(d => (
+          <div key={d} style={{ textAlign: "center", fontSize: 10, fontWeight: 700, color: "#bbb", textTransform: "uppercase", letterSpacing: "0.06em", padding: "4px 0" }}>{d}</div>
+        ))}
+      </div>
+
+      {/* Calendar grid */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 4 }}>
+        {cells.map((day, idx) => {
+          if (!day) return <div key={"blank-" + idx} />;
+          const dateStr = year + "-" + String(mo + 1).padStart(2, "0") + "-" + String(day).padStart(2, "0");
+          const outfitId = calendar[dateStr];
+          const outfit = outfitId ? outfits.find(o => o.id === outfitId) : null;
+          const isToday = dateStr === todayStr;
+          const wx = getWeatherForDate(dateStr);
+
+          return (
+            <div key={dateStr} onClick={() => setAssignPicker(assignPicker === dateStr ? null : dateStr)}
+              style={{
+                borderRadius: 10, border: isToday ? "2px solid #1a1a1a" : "1.5px solid #e8e4dc",
+                background: isToday ? "#fafaf8" : "#fff", cursor: "pointer",
+                minHeight: 72, padding: "5px 5px 4px", display: "flex", flexDirection: "column",
+                transition: "box-shadow 0.12s", position: "relative",
+                boxShadow: assignPicker === dateStr ? "0 0 0 2px #1a1a1a" : "none",
+              }}
+              onMouseEnter={e => { if (assignPicker !== dateStr) e.currentTarget.style.boxShadow = "0 2px 8px rgba(0,0,0,0.08)"; }}
+              onMouseLeave={e => { if (assignPicker !== dateStr) e.currentTarget.style.boxShadow = "none"; }}
+            >
+              {/* Day number + weather */}
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 3 }}>
+                <div style={{ fontSize: 11, fontWeight: isToday ? 900 : 700, color: isToday ? "#1a1a1a" : "#888" }}>{day}</div>
+                {wx && <div style={{ fontSize: 9, color: "#aaa", textAlign: "right", lineHeight: 1.3 }}>
+                  <div>{weatherIcon(wx.code)}</div>
+                  <div style={{ fontWeight: 600 }}>{wx.high}°</div>
+                </div>}
+              </div>
+              {/* Outfit thumbnail */}
+              {outfit ? (
+                <div style={{ flex: 1, borderRadius: 6, overflow: "hidden", background: "#f5f2ed", display: "flex", alignItems: "center", justifyContent: "center", minHeight: 36 }}
+                  onClick={e => { e.stopPropagation(); onOpenOutfit(outfit); }}>
+                  {outfit.previewImage
+                    ? <img src={outfit.previewImage} alt={outfit.name} style={{ width: "100%", height: "100%", objectFit: "contain" }} />
+                    : <div style={{ fontSize: 9, fontWeight: 700, color: "#999", textAlign: "center", padding: 2, lineHeight: 1.3, overflow: "hidden" }}>{outfit.name}</div>
+                  }
+                </div>
+              ) : (
+                <div style={{ flex: 1, borderRadius: 6, background: "#faf9f6", display: "flex", alignItems: "center", justifyContent: "center", minHeight: 36 }}>
+                  <span style={{ fontSize: 16, opacity: 0.2 }}>+</span>
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Outfit picker dropdown */}
+      {assignPicker && (
+        <div style={{ marginTop: 14, background: "#fff", border: "1.5px solid #e8e4dc", borderRadius: 16, padding: "14px 16px", boxShadow: "0 8px 24px rgba(0,0,0,0.1)" }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
+            <div style={{ fontSize: 13, fontWeight: 800, color: "#1a1a1a" }}>
+              Assign outfit for {new Date(assignPicker + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+            </div>
+            <button onClick={() => { setAssignPicker(null); setSearchQ(""); }} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 18, color: "#aaa" }}>×</button>
+          </div>
+          <input value={searchQ} onChange={e => setSearchQ(e.target.value)} placeholder="Search outfits…"
+            style={{ width: "100%", padding: "8px 12px", border: "1.5px solid #e8e4dc", borderRadius: 10, fontFamily: "'DM Sans', sans-serif", fontSize: 13, marginBottom: 10, boxSizing: "border-box", outline: "none" }} />
+          {calendar[assignPicker] && (
+            <button onClick={() => assignOutfit(null)} style={{ width: "100%", padding: "8px", borderRadius: 10, border: "1px solid #f5c8c8", background: "#fef2f2", color: "#c0392b", fontFamily: "'DM Sans', sans-serif", fontSize: 12, fontWeight: 700, cursor: "pointer", marginBottom: 8 }}>
+              Remove outfit from this day
+            </button>
+          )}
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(100px, 1fr))", gap: 8, maxHeight: 240, overflowY: "auto" }}>
+            {filteredOutfits.map(o => (
+              <div key={o.id} onClick={() => assignOutfit(o.id)} style={{
+                borderRadius: 10, overflow: "hidden", background: "#f5f2ed", cursor: "pointer",
+                border: calendar[assignPicker] === o.id ? "2px solid #1a1a1a" : "2px solid transparent",
+                transition: "border-color 0.1s"
+              }}>
+                <div style={{ aspectRatio: "3/4", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                  {o.previewImage
+                    ? <img src={o.previewImage} alt={o.name} style={{ width: "100%", height: "100%", objectFit: "contain" }} />
+                    : <HangerIcon size={20} color="#ccc" />
+                  }
+                </div>
+                <div style={{ padding: "4px 6px 6px", fontSize: 10, fontWeight: 700, color: "#444", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{o.name}</div>
+              </div>
+            ))}
+            {filteredOutfits.length === 0 && <div style={{ gridColumn: "1/-1", textAlign: "center", fontSize: 12, color: "#ccc", padding: "20px 0" }}>No outfits found</div>}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function App() {
   const [activeTheme, setActiveTheme] = useState(() => getTheme());
   const itemsDb = useSupabaseTable("items");
@@ -4384,6 +4763,12 @@ export default function App() {
   const [outfitSearch, setOutfitSearch] = useState("");
   const [outfitSort, setOutfitSort] = useState("default");
   const [outfitPopup, setOutfitPopup] = useState(null); // outfit object
+  const [outfitsView, setOutfitsView] = useState("grid"); // "grid" | "calendar"
+  const OUTFIT_CALENDAR_KEY = "wardrobe_outfit_calendar_v1";
+  const [outfitCalendar, setOutfitCalendar] = useState(() => { try { return JSON.parse(localStorage.getItem("wardrobe_outfit_calendar_v1") || "{}"); } catch { return {}; } });
+  const saveOutfitCalendar = (cal) => { setOutfitCalendar(cal); localStorage.setItem("wardrobe_outfit_calendar_v1", JSON.stringify(cal)); };
+  const [calendarMonth, setCalendarMonth] = useState(() => { const n = new Date(); return { year: n.getFullYear(), month: n.getMonth() }; });
+  const [calendarWeather, setCalendarWeather] = useState(null);
   const [itemDetail, setItemDetail] = useState(null); // closet item detail popup
   const [closetSort, setClosetSort] = useState("default"); // default | az | price | worn | newest
   const [closetSeasonFilter, setClosetSeasonFilter] = useState("All");
@@ -4478,12 +4863,16 @@ export default function App() {
     await lookbooksDb.update(lb);
   };
 
-  const markOutfitWorn = async (outfit) => {
+  const markOutfitWorn = async (outfit, dateStr) => {
     const ids = outfit.layers || outfit.itemIds || [];
     for (const id of ids) {
       const item = itemsDb.rows.find(i => i.id === id);
       if (item) await itemsDb.update({ ...item, wornCount: (item.wornCount || 0) + 1 });
     }
+    // Log to outfit's wornDates array
+    const today = dateStr || new Date().toISOString().slice(0, 10);
+    const updated = { ...outfit, wornCount: (outfit.wornCount || 0) + 1, wornDates: [...(outfit.wornDates || []), today] };
+    await outfitsDb.update(updated);
   };
 
   const markWorn = async (item) => {
@@ -4545,7 +4934,7 @@ export default function App() {
 
   const NAV_ICON_MAP = {
     closet: (active) => <HangerIcon size={20} color={active ? "#fff" : "#888"} />,
-    outfits: (active) => <SvgSparkle size={18} color={active ? "#fff" : "#888"} />,
+    outfits: (active) => <SvgDress size={18} color={active ? "#fff" : "#888"} />,
     lookbooks: (active) => <SvgGrid size={18} color={active ? "#fff" : "#888"} />,
     stats: (active) => <SvgPalette size={18} color={active ? "#fff" : "#888"} />,
     moodboard: (active) => <SvgPushPin size={18} color={active ? "#fff" : "#888"} />,
@@ -4701,12 +5090,6 @@ export default function App() {
                     <button key={tag} className={"sidebar-btn" + (outfitTagFilter === tag ? " active" : "")} onClick={() => setOutfitTagFilter(tag)}>{tag}</button>
                   ))}
                 </div>
-                <div className="sidebar-section">
-                  <div className="sidebar-label">Season</div>
-                  {["All", ...SEASONS].map(s => (
-                    <button key={s} className={"sidebar-btn" + (outfitSeasonFilter === s ? " active" : "")} onClick={() => setOutfitSeasonFilter(s)}>{s}</button>
-                  ))}
-                </div>
               </>)}
             </div>
           </div>
@@ -4790,18 +5173,53 @@ export default function App() {
             {/* OUTFITS */}
             {tab === "outfits" && (
               <div className="fade-up">
-                {/* Outfits toolbar: sort dropdown */}
-                <div style={{ display: "flex", gap: 10, marginBottom: 20, flexWrap: "wrap", alignItems: "center" }}>
-                  <select value={outfitSort} onChange={e => setOutfitSort(e.target.value)}
-className="pill-select" style={{}}>
-                    <option value="default">Sort: Default</option>
-                    <option value="az">Sort: A – Z</option>
-                    <option value="newest">Sort: Newest</option>
-                    <option value="pieces">Sort: Most Pieces</option>
-                  </select>
+                {/* Outfits toolbar */}
+                <div style={{ display: "flex", gap: 8, marginBottom: 20, flexWrap: "wrap", alignItems: "center" }}>
+                  {/* Grid / Calendar toggle */}
+                  <div style={{ display: "flex", background: "#f0ece4", borderRadius: 10, padding: 3, gap: 0 }}>
+                    {[["grid","Grid"],["calendar","Calendar"]].map(([v,lbl]) => (
+                      <button key={v} onClick={() => setOutfitsView(v)} style={{
+                        padding: "6px 14px", borderRadius: 8, border: "none", cursor: "pointer",
+                        background: outfitsView === v ? "#fff" : "transparent",
+                        color: outfitsView === v ? "#1a1a1a" : "#aaa",
+                        fontFamily: "'DM Sans', sans-serif", fontSize: 12, fontWeight: 700,
+                        boxShadow: outfitsView === v ? "0 1px 4px rgba(0,0,0,0.08)" : "none", transition: "all 0.15s"
+                      }}>{lbl}</button>
+                    ))}
+                  </div>
+                  {outfitsView === "grid" && (<>
+                    {/* Season filter pills */}
+                    {["All", ...SEASONS].map(s => (
+                      <button key={s} onClick={() => setOutfitSeasonFilter(s)} style={{
+                        padding: "6px 13px", borderRadius: 100,
+                        border: outfitSeasonFilter === s ? "1.5px solid #b6c8e8" : "1px solid #e0dbd2",
+                        background: outfitSeasonFilter === s ? "#eef3fc" : "#fff",
+                        color: outfitSeasonFilter === s ? "#2b5aa0" : "#666",
+                        fontFamily: "'DM Sans', sans-serif", fontSize: 12, fontWeight: 600, cursor: "pointer",
+                      }}>{s}</button>
+                    ))}
+                    <div style={{ flex: 1 }} />
+                    <select value={outfitSort} onChange={e => setOutfitSort(e.target.value)} className="pill-select">
+                      <option value="default">Sort: Default</option>
+                      <option value="az">Sort: A – Z</option>
+                      <option value="newest">Sort: Newest</option>
+                      <option value="pieces">Sort: Most Pieces</option>
+                    </select>
+                  </>)}
                 </div>
 
-                {filteredOutfits.length === 0 ? (
+                {outfitsView === "calendar" ? (
+                  <OutfitCalendar
+                    outfits={outfitsDb.rows}
+                    calendar={outfitCalendar}
+                    onSaveCalendar={saveOutfitCalendar}
+                    month={calendarMonth}
+                    onMonthChange={setCalendarMonth}
+                    weather={calendarWeather}
+                    onSetWeather={setCalendarWeather}
+                    onOpenOutfit={setOutfitPopup}
+                  />
+                ) : filteredOutfits.length === 0 ? (
                   <div style={{ textAlign: "center", padding: "60px 0" }}>
                     <div style={{ marginBottom: 12 }}><SvgSparkle size={36} color="#ddd" /></div>
                     <div style={{ fontSize: 15, fontWeight: 700, color: "#ccc" }}>{outfitTagFilter === "All" && outfitSeasonFilter === "All" ? "No outfits yet" : "No outfits match these filters"}</div>
@@ -4988,42 +5406,40 @@ className="pill-select" style={{}}>
           {/* Moodboard board info */}
           {tab === "moodboard" && <MoodboardInfoPanel activeIdx={moodboardActiveIdx} setActiveIdx={setMoodboardActiveIdx} />}
 
-          {tab === "outfits" && outfitsDb.rows.length > 0 && (() => {
-            const outfits = outfitsDb.rows;
-            const allPieces = [...itemsDb.rows, ...wishlistDb.rows];
-            const itemUsage = {};
-            outfits.forEach(o => (o.layers || o.itemIds || []).forEach(id => { itemUsage[id] = (itemUsage[id] || 0) + 1; }));
-            const mostUsedId = Object.entries(itemUsage).sort((a,b) => b[1]-a[1])[0]?.[0];
-            const mostUsedItem = mostUsedId ? allPieces.find(i => i.id === mostUsedId) : null;
-            const totalValue = outfits.reduce((sum, o) => sum + (o.layers || o.itemIds || []).reduce((s, id) => { const it = allPieces.find(i => i.id === id); return s + (parseFloat((it?.price || "").replace(/[^0-9.]/g,""))||0); }, 0), 0);
+          {tab === "outfits" && (() => {
+            const todayKey = new Date().toISOString().slice(0, 10);
+            const todayOutfitId = outfitCalendar[todayKey];
+            const todayOutfit = todayOutfitId ? outfitsDb.rows.find(o => o.id === todayOutfitId) : null;
             return (
               <div className="right-card">
-                <div className="right-card-title">Outfit Stats</div>
-                <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-                  {[
-                    { lbl: "Total Outfits", val: outfits.length },
-                    { lbl: "Total Value", val: `$${totalValue.toFixed(0)}` },
-                  ].map(s => (
-                    <div key={s.lbl} style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                      <span style={{ fontSize: 12, color: "#999", fontWeight: 600 }}>{s.lbl}</span>
-                      <span style={{ fontSize: 15, fontWeight: 800, color: "#1a1a1a" }}>{s.val}</span>
-                    </div>
-                  ))}
-                  {mostUsedItem && (
-                    <div style={{ borderTop: "1px solid #e8e4dc", paddingTop: 10 }}>
-                      <div style={{ fontSize: 10, fontWeight: 700, color: "#aaa", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 8 }}>Most Featured</div>
-                      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                        <div style={{ width: 36, height: 36, borderRadius: 8, overflow: "hidden", background: "#f5f2ed", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>
-                          {mostUsedItem.image ? <img src={mostUsedItem.image} style={{ width: "100%", height: "100%", objectFit: "contain" }} alt="" /> : <HangerIcon size={14} color="#ccc" />}
-                        </div>
-                        <div style={{ flex: 1, minWidth: 0 }}>
-                          <div style={{ fontSize: 12, fontWeight: 700, color: "#1a1a1a", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{mostUsedItem.name}</div>
-                          <div style={{ fontSize: 11, color: "#aaa" }}>{itemUsage[mostUsedId]}× outfits</div>
-                        </div>
-                      </div>
-                    </div>
-                  )}
+                <div className="right-card-title">Today</div>
+                <div style={{ fontSize: 10, color: "#bbb", fontWeight: 600, marginBottom: 10, marginTop: -8 }}>
+                  {new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })}
                 </div>
+                {todayOutfit ? (
+                  <div onClick={() => setOutfitPopup(todayOutfit)} style={{ cursor: "pointer" }}>
+                    {todayOutfit.previewImage && (
+                      <div style={{ borderRadius: 12, overflow: "hidden", background: "#f5f2ed", marginBottom: 10, aspectRatio: "4/3" }}>
+                        <img src={todayOutfit.previewImage} alt={todayOutfit.name} style={{ width: "100%", height: "100%", objectFit: "contain" }} />
+                      </div>
+                    )}
+                    <div style={{ fontSize: 13, fontWeight: 800, color: "#1a1a1a", marginBottom: 4 }}>{todayOutfit.name}</div>
+                    {(todayOutfit.tags || []).length > 0 && (
+                      <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
+                        {(todayOutfit.tags || []).map(t => <OccasionPill key={t} tag={t} selected small />)}
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div style={{ textAlign: "center", padding: "16px 0 8px" }}>
+                    <div style={{ fontSize: 28, marginBottom: 6 }}>👗</div>
+                    <div style={{ fontSize: 12, color: "#bbb", fontWeight: 600, marginBottom: 10 }}>No outfit planned</div>
+                    <button onClick={() => { setOutfitsView("calendar"); }} style={{
+                      padding: "7px 14px", background: "#1a1a1a", color: "#fff", border: "none",
+                      borderRadius: 10, cursor: "pointer", fontSize: 12, fontWeight: 700, fontFamily: "'DM Sans', sans-serif"
+                    }}>Open Calendar</button>
+                  </div>
+                )}
               </div>
             );
           })()}
@@ -5296,6 +5712,7 @@ className="pill-select" style={{}}>
         <OutfitDetailPopup
           outfit={outfitPopup}
           allItems={allItems}
+          allOutfits={outfitsDb.rows}
           lookbooks={lookbooksDb.rows}
           onClose={() => setOutfitPopup(null)}
           onEdit={() => { openEditOutfit(outfitPopup); setOutfitPopup(null); }}
@@ -5305,6 +5722,7 @@ className="pill-select" style={{}}>
           onAddToLookbook={addOutfitToLookbook}
           onGoToLookbook={(lb) => { setOutfitPopup(null); setActiveLookbook(lb); }}
           onItemClick={(item) => { setOutfitPopup(null); setItemDetail(item); }}
+          onSimilarClick={(o) => setOutfitPopup(o)}
         />
       )}
 

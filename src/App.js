@@ -37,92 +37,143 @@ const HangerIcon = ({ size = 20, color = "currentColor", opacity = 1 }) => (
 );
 
 const globalStyles = `
-  @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700;800&family=DM+Serif+Display:ital@0;1&display=swap');
+  @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600;9..40,700&display=swap');
   * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { background: #f0ede8; color: #1a1a1a; font-family: 'DM Sans', sans-serif; }
-  ::-webkit-scrollbar { width: 4px; }
-  ::-webkit-scrollbar-thumb { background: #d8d2c8; border-radius: 4px; }
-  @keyframes fadeUp { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+  body { background: #f7f5f2; color: #1a1a1a; font-family: 'DM Sans', sans-serif; }
+  ::-webkit-scrollbar { width: 3px; }
+  ::-webkit-scrollbar-thumb { background: #ddd8d0; border-radius: 4px; }
+  @keyframes fadeUp { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
   @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
   @keyframes slideLeft { from { opacity: 0; transform: translateX(40px); } to { opacity: 1; transform: translateX(0); } }
   @keyframes slideRight { from { opacity: 0; transform: translateX(-40px); } to { opacity: 1; transform: translateX(0); } }
-  .fade-up { animation: fadeUp 0.3s ease forwards; }
+  @keyframes shimmer { 0%,100% { opacity: 0.6 } 50% { opacity: 1 } }
+  .fade-up { animation: fadeUp 0.35s cubic-bezier(0.22,1,0.36,1) forwards; }
   .fade-in { animation: fadeIn 0.2s ease forwards; }
   .slide-enter-left { animation: slideLeft 0.25s ease forwards; }
   .slide-enter-right { animation: slideRight 0.25s ease forwards; }
-  .card { transition: transform 0.2s, box-shadow 0.2s; }
-  .card:hover { transform: translateY(-3px); box-shadow: 0 16px 40px rgba(0,0,0,0.10) !important; }
+  .card { transition: transform 0.22s cubic-bezier(0.22,1,0.36,1), box-shadow 0.22s; }
+  .card:hover { transform: translateY(-4px); box-shadow: 0 20px 48px rgba(0,0,0,0.09) !important; }
   .pill { transition: all 0.18s; cursor: pointer; }
-  .pill:hover { background: #e0dbd2 !important; }
+  .pill:hover { background: #e8e4dc !important; }
   .btn-primary { transition: all 0.15s; }
-  .btn-primary:hover { transform: translateY(-1px); box-shadow: 0 6px 20px rgba(0,0,0,0.15); }
-  input:focus, select:focus, textarea:focus { outline: none; border-color: #b8b0a0 !important; }
-  .builder-overlay { position: fixed; inset: 0; z-index: 300; background: #f0ede8; display: flex; flex-direction: column; }
+  .btn-primary:hover { transform: translateY(-1px); box-shadow: 0 8px 24px rgba(0,0,0,0.18); }
+  input:focus, select:focus, textarea:focus { outline: none; border-color: #c0b8b0 !important; }
+
+  /* Builder */
+  .builder-overlay { position: fixed; inset: 0; z-index: 300; background: #f7f5f2; display: flex; flex-direction: column; }
   .builder-panels { display: flex; flex: 1; overflow: hidden; }
-  .builder-left { width: 280px; flex-shrink: 0; background: #fff; border-right: 1.5px solid #e4dfd6; padding: 28px 22px; display: flex; flex-direction: column; overflow-y: auto; }
-  .builder-canvas { flex: 1; position: relative; overflow: hidden; background: #e4dfd6; display: flex; align-items: center; justify-content: center; }
-  .outfit-board { position: relative; background: #fff; box-shadow: 0 8px 40px rgba(0,0,0,0.15); border-radius: 4px; overflow: hidden; flex-shrink: 0; }
-  .builder-right { width: 320px; flex-shrink: 0; background: #fff; border-left: 1.5px solid #e4dfd6; display: flex; flex-direction: column; overflow: hidden; }
+  .builder-left { width: 280px; flex-shrink: 0; background: #fff; border-right: 1px solid #ece8e0; padding: 28px 22px; display: flex; flex-direction: column; overflow-y: auto; }
+  .builder-canvas { flex: 1; position: relative; overflow: hidden; background: #ece8e0; display: flex; align-items: center; justify-content: center; }
+  .outfit-board { position: relative; background: #fff; box-shadow: 0 12px 60px rgba(0,0,0,0.12); border-radius: 2px; overflow: hidden; flex-shrink: 0; }
+  .builder-right { width: 320px; flex-shrink: 0; background: #fff; border-left: 1px solid #ece8e0; display: flex; flex-direction: column; overflow: hidden; }
   .canvas-item { position: absolute; cursor: grab; user-select: none; }
   .canvas-item:active { cursor: grabbing; }
   .product-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; padding: 12px; overflow-y: auto; }
-  .product-thumb { border-radius: 12px; overflow: hidden; cursor: pointer; border: 2px solid transparent; background: #f5f2ed; aspect-ratio: 1; display: flex; align-items: center; justify-content: center; transition: border-color 0.15s; position: relative; }
+  .product-thumb { border-radius: 10px; overflow: hidden; cursor: pointer; border: 1.5px solid transparent; background: #f7f5f2; aspect-ratio: 1; display: flex; align-items: center; justify-content: center; transition: border-color 0.15s; position: relative; }
   .product-thumb.selected { border-color: #1a1a1a; }
   .product-thumb img { width: 100%; height: 100%; object-fit: cover; }
-  .product-thumb .check { position: absolute; bottom: 6px; right: 6px; width: 22px; height: 22px; border-radius: 50%; background: #1a1a1a; display: flex; align-items: center; justify-content: center; color: #fff; font-size: 12px; font-weight: 700; }
+  .product-thumb .check { position: absolute; bottom: 6px; right: 6px; width: 20px; height: 20px; border-radius: 50%; background: #1a1a1a; display: flex; align-items: center; justify-content: center; color: #fff; font-size: 11px; font-weight: 700; }
   .selected-strip { display: flex; gap: 8px; padding: 10px 12px; overflow-x: auto; scrollbar-width: none; align-items: center; }
   .selected-strip::-webkit-scrollbar { display: none; }
-  .selected-thumb { width: 58px; height: 58px; border-radius: 10px; overflow: hidden; flex-shrink: 0; border: 2px solid #1a1a1a; background: #f5f2ed; display: flex; align-items: center; justify-content: center; cursor: pointer; }
+  .selected-thumb { width: 56px; height: 56px; border-radius: 8px; overflow: hidden; flex-shrink: 0; border: 1.5px solid #1a1a1a; background: #f7f5f2; display: flex; align-items: center; justify-content: center; cursor: pointer; }
   .selected-thumb img { width: 100%; height: 100%; object-fit: cover; }
-  .builder-search { border: 1.5px solid #e4dfd6; border-radius: 20px; padding: 7px 14px; font-family: 'DM Sans', sans-serif; font-size: 13px; width: 100%; background: #faf9f6; color: #1a1a1a; }
+  .builder-search { border: 1px solid #ece8e0; border-radius: 100px; padding: 7px 16px; font-family: 'DM Sans', sans-serif; font-size: 13px; width: 100%; background: #f7f5f2; color: #1a1a1a; }
   .builder-search:focus { outline: none; border-color: #1a1a1a; }
-  .builder-topbar { height: 52px; background: #fff; border-bottom: 1.5px solid #e4dfd6; display: flex; align-items: center; justify-content: space-between; padding: 0 22px; flex-shrink: 0; }
-  .lookbook-overlay { position: fixed; inset: 0; z-index: 400; background: #f0ede8; display: flex; flex-direction: column; }
-  .lookbook-topbar { height: 56px; background: #fff; border-bottom: 1.5px solid #e8e4dc; display: flex; align-items: center; justify-content: space-between; padding: 0 24px; flex-shrink: 0; }
-  .outfit-popup-canvas { position: relative; width: 100%; background: #faf9f6; border-radius: 20px; border: 1.5px solid #e8e4dc; overflow: hidden; }
-  .filter-row { display: flex; gap: 8px; overflow-x: auto; scrollbar-width: none; padding-bottom: 4px; }
+  .builder-topbar { height: 52px; background: #fff; border-bottom: 1px solid #ece8e0; display: flex; align-items: center; justify-content: space-between; padding: 0 22px; flex-shrink: 0; }
+  .lookbook-overlay { position: fixed; inset: 0; z-index: 400; background: #f7f5f2; display: flex; flex-direction: column; }
+  .lookbook-topbar { height: 56px; background: #fff; border-bottom: 1px solid #ece8e0; display: flex; align-items: center; justify-content: space-between; padding: 0 24px; flex-shrink: 0; }
+  .outfit-popup-canvas { position: relative; width: 100%; background: #f7f5f2; border-radius: 16px; border: 1px solid #ece8e0; overflow: hidden; }
+  .filter-row { display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; padding-bottom: 4px; }
   .filter-row::-webkit-scrollbar { display: none; }
 
-  /* ── NEW LAYOUT: vertical icon sidebar ── */
+  /* ── Vertical nav sidebar ── */
   .app-shell { display: flex; min-height: 100vh; }
-  .app-nav-sidebar { width: 72px; flex-shrink: 0; background: #fff; border-right: 1px solid #e8e4dc; display: flex; flex-direction: column; align-items: center; padding: 20px 0; position: fixed; top: 0; left: 0; height: 100vh; z-index: 100; gap: 4px; }
-  .app-nav-logo { width: 40px; height: 40px; background: #1a1a1a; border-radius: 12px; display: flex; align-items: center; justify-content: center; margin-bottom: 24px; flex-shrink: 0; }
-  .nav-icon-btn { width: 44px; height: 44px; border-radius: 14px; border: none; cursor: pointer; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; transition: all 0.15s; background: transparent; font-family: 'DM Sans', sans-serif; }
-  .nav-icon-btn:hover { background: #f5f2ed; }
+  .app-nav-sidebar {
+    width: 68px; flex-shrink: 0; background: #fff;
+    border-right: 1px solid #ece8e0;
+    display: flex; flex-direction: column; align-items: center;
+    padding: 22px 0 18px; position: fixed; top: 0; left: 0; height: 100vh; z-index: 100;
+  }
+  .app-nav-logo {
+    width: 36px; height: 36px; background: #1a1a1a; border-radius: 10px;
+    display: flex; align-items: center; justify-content: center;
+    margin-bottom: 28px; flex-shrink: 0;
+  }
+  .nav-icon-btn {
+    width: 42px; height: 46px; border-radius: 12px; border: none; cursor: pointer;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 3px; transition: all 0.15s; background: transparent;
+    font-family: 'DM Sans', sans-serif; margin-bottom: 2px; position: relative;
+  }
+  .nav-icon-btn:hover { background: #f7f5f2; }
   .nav-icon-btn.active { background: #1a1a1a; }
-  .nav-icon-btn .nav-label { font-size: 9px; font-weight: 600; letter-spacing: 0.03em; color: #bbb; text-transform: uppercase; line-height: 1; }
-  .nav-icon-btn.active .nav-label { color: rgba(255,255,255,0.7); }
+  .nav-icon-btn::after {
+    content: ''; position: absolute; left: -1px; top: 50%; transform: translateY(-50%);
+    width: 3px; height: 0; background: #1a1a1a; border-radius: 0 3px 3px 0;
+    transition: height 0.15s;
+  }
+  .nav-icon-btn.active::after { height: 0; }
+  .nav-icon-btn .nav-label { font-size: 8.5px; font-weight: 600; letter-spacing: 0.04em; color: #c0b8b0; text-transform: uppercase; line-height: 1; }
+  .nav-icon-btn.active .nav-label { color: rgba(255,255,255,0.6); }
   .nav-icon-btn-bottom { margin-top: auto; }
 
-  .app-body { margin-left: 72px; flex: 1; display: flex; min-height: 100vh; }
-  .app-main-area { flex: 1; min-width: 0; padding: 32px 28px; }
-  .app-right-rail { width: 280px; flex-shrink: 0; padding: 28px 20px 28px 0; position: sticky; top: 0; height: 100vh; overflow-y: auto; display: flex; flex-direction: column; gap: 14px; }
+  .app-body { margin-left: 68px; flex: 1; display: flex; min-height: 100vh; }
+  .app-main-area { flex: 1; min-width: 0; padding: 36px 32px; }
+  .app-right-rail { width: 272px; flex-shrink: 0; padding: 32px 18px 32px 0; position: sticky; top: 0; height: 100vh; overflow-y: auto; display: flex; flex-direction: column; gap: 12px; }
 
-  /* Page hero */
-  .page-hero { margin-bottom: 28px; }
-  .page-hero-title { font-family: 'DM Serif Display', serif; font-size: 42px; font-weight: 400; color: #1a1a1a; line-height: 1.1; letter-spacing: -0.01em; margin-bottom: 6px; }
-  .page-hero-sub { font-size: 14px; color: #999; font-weight: 400; }
+  /* Page hero — editorial serif */
+  .page-hero { margin-bottom: 32px; }
+  .page-hero-eyebrow { font-size: 10px; font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase; color: #c0b8b0; margin-bottom: 6px; }
+  .page-hero-title {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 46px; font-weight: 300; font-style: italic;
+    color: #1a1a1a; line-height: 1.05; letter-spacing: -0.01em;
+    margin-bottom: 4px;
+  }
+  .page-hero-sub { font-size: 13px; color: #b0a898; font-weight: 400; letter-spacing: 0.01em; }
 
   /* Filter pills */
-  .filter-pill { display: inline-flex; align-items: center; gap: 6px; padding: 8px 16px; border-radius: 100px; border: 1.5px solid #e4dfd6; background: #fff; font-family: 'DM Sans', sans-serif; font-size: 13px; font-weight: 500; color: #555; cursor: pointer; transition: all 0.15s; white-space: nowrap; }
-  .filter-pill:hover { border-color: #c8c0b4; background: #faf9f6; }
+  .filter-pill {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 7px 15px; border-radius: 100px;
+    border: 1px solid #e0dbd2; background: #fff;
+    font-family: 'DM Sans', sans-serif; font-size: 12px; font-weight: 500;
+    color: #666; cursor: pointer; transition: all 0.15s; white-space: nowrap;
+  }
+  .filter-pill:hover { border-color: #c0b8b0; color: #1a1a1a; }
   .filter-pill.active { background: #1a1a1a; border-color: #1a1a1a; color: #fff; font-weight: 600; }
 
-  /* Cards */
-  .item-card { background: #fff; border-radius: 20px; overflow: hidden; border: 1.5px solid #e8e4dc; box-shadow: 0 2px 12px rgba(0,0,0,0.04); cursor: pointer; transition: transform 0.18s, box-shadow 0.18s; }
-  .item-card:hover { transform: translateY(-3px); box-shadow: 0 12px 32px rgba(0,0,0,0.10); }
-  .item-card-img { width: 100%; aspect-ratio: 3/4; object-fit: cover; display: block; background: #f5f2ed; }
-  .right-card { background: #fff; border-radius: 20px; border: 1.5px solid #e8e4dc; padding: 20px 18px; }
-  .right-card-title { font-size: 11px; font-weight: 700; color: #aaa; text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 14px; }
+  /* Item cards — refined */
+  .item-card {
+    background: #fff; border-radius: 16px; overflow: hidden;
+    border: 1px solid #ece8e0;
+    cursor: pointer;
+    transition: transform 0.22s cubic-bezier(0.22,1,0.36,1), box-shadow 0.22s, border-color 0.15s;
+  }
+  .item-card:hover { transform: translateY(-4px) scale(1.01); box-shadow: 0 16px 40px rgba(0,0,0,0.09); border-color: #d8d2c8; }
+  .item-card-label {
+    padding: 10px 12px 12px;
+    border-top: 1px solid #f5f2ee;
+  }
+  .item-card-name { font-size: 12px; font-weight: 600; color: #1a1a1a; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-bottom: 2px; }
+  .item-card-brand { font-size: 11px; color: #b0a898; font-weight: 400; }
+  .item-card-img { width: 100%; aspect-ratio: 3/4; object-fit: contain; display: block; background: #f7f5f2; padding: 8px; }
 
-  /* Sidebar filter buttons */
-  .sidebar-btn { display: block; width: 100%; text-align: left; padding: 7px 10px; border-radius: 10px; border: none; cursor: pointer; font-family: 'DM Sans', sans-serif; font-size: 12px; font-weight: 500; background: transparent; color: #666; transition: all 0.15s; }
-  .sidebar-btn:hover { background: #f5f2ed; }
+  /* Right rail cards */
+  .right-card { background: #fff; border-radius: 16px; border: 1px solid #ece8e0; padding: 18px 16px; }
+  .right-card-title { font-size: 10px; font-weight: 700; color: #c0b8b0; text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 14px; }
+
+  /* Sidebar btns */
+  .sidebar-btn { display: block; width: 100%; text-align: left; padding: 7px 10px; border-radius: 8px; border: none; cursor: pointer; font-family: 'DM Sans', sans-serif; font-size: 12px; font-weight: 500; background: transparent; color: #777; transition: all 0.12s; }
+  .sidebar-btn:hover { background: #f7f5f2; color: #1a1a1a; }
   .sidebar-btn.active { background: #1a1a1a; color: #fff; font-weight: 600; }
 
   /* Search */
-  .closet-search { width: 100%; padding: 9px 14px 9px 36px; border: 1.5px solid #e4dfd6; border-radius: 14px; font-family: 'DM Sans', sans-serif; font-size: 13px; background: #faf9f6; color: #1a1a1a; }
-  .closet-search:focus { outline: none; border-color: #b8b0a0; }
+  .closet-search { width: 100%; padding: 9px 14px 9px 36px; border: 1px solid #e0dbd2; border-radius: 100px; font-family: 'DM Sans', sans-serif; font-size: 13px; background: #fff; color: #1a1a1a; transition: border-color 0.15s; }
+  .closet-search:focus { outline: none; border-color: #1a1a1a; }
+
+  /* Item card edit btn reveal on hover */
+  .item-card:hover .item-card-edit-btn { opacity: 1 !important; }
 
   /* Legacy compat */
   .closet-layout { display: flex; gap: 0; align-items: flex-start; }
@@ -2401,9 +2452,9 @@ function StatsTab({ itemsDb, outfitsDb, lookbooksDb, onViewItem }) {
   const items = itemsDb.rows.filter(i => !i.forSale);
   const now = new Date();
   const thisMonth = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,"0")}`;
+  const [statsView, setStatsView] = useState("profile"); // "profile" | "insights"
 
-  // Rewear suggestions: items not worn in 90+ days (using wornCount as proxy — no date, so use items with wornCount>0 but treat 0 as never worn)
-  const ninetyDaysAgo = new Date(now - 90 * 24 * 60 * 60 * 1000);
+  // Rewear suggestions
   const unworn = items.filter(i => !(i.wornCount > 0)).slice(0, 20);
   const rewear = items.filter(i => (i.wornCount || 0) > 0).sort((a,b) => (a.wornCount||0)-(b.wornCount||0)).slice(0, 12);
 
@@ -2417,7 +2468,6 @@ function StatsTab({ itemsDb, outfitsDb, lookbooksDb, onViewItem }) {
     const c = i.color || (i.colors && i.colors[0]);
     if (c) colorCounts[c] = (colorCounts[c] || 0) + 1;
   });
-  const COLOR_HEX = { Black:"#1a1a1a", White:"#f5f5f5", Grey:"#9a9a9a", Blue:"#4a7fd4", Navy:"#1e3a6e", Brown:"#7a5c3e", Tan:"#c4a882", Cream:"#f5eed8", Red:"#e05555", Pink:"#f0a0b0", Orange:"#e07e30", Yellow:"#f0c840", Green:"#4aaa6e", Purple:"#9a6fe0", Gold:"#d4a820", Silver:"#c0c0c0", Clear:"#e8f4ff" };
   const colorEntries = Object.entries(colorCounts).sort((a,b) => b[1]-a[1]);
 
   // Duplicate detection: same category + similar name (first word match)
@@ -2443,6 +2493,64 @@ function StatsTab({ itemsDb, outfitsDb, lookbooksDb, onViewItem }) {
   }
   const maxSpent = Math.max(...monthlyData.map(m => m.spent), 1);
 
+  // ── Style Profile data ──
+  const COLOR_HEX = { Black:"#1a1a1a", White:"#f5f5f5", Grey:"#9a9a9a", Blue:"#4a7fd4", Navy:"#1e3a6e", Brown:"#7a5c3e", Tan:"#c4a882", Cream:"#f5eed8", Red:"#e05555", Pink:"#f0a0b0", Orange:"#e07e30", Yellow:"#f0c840", Green:"#4aaa6e", Purple:"#9a6fe0", Gold:"#d4a820", Silver:"#c0c0c0", Clear:"#e8f4ff" };
+
+  const topColors = (() => {
+    const counts = {};
+    items.forEach(i => { const c = i.color || (i.colors&&i.colors[0]); if (c) counts[c] = (counts[c]||0) + 1; });
+    return Object.entries(counts).sort((a,b)=>b[1]-a[1]).slice(0,6);
+  })();
+
+  const topCategories = (() => {
+    const counts = {};
+    items.forEach(i => { if (i.category && i.category !== "All") counts[i.category] = (counts[i.category]||0) + 1; });
+    return Object.entries(counts).sort((a,b)=>b[1]-a[1]).slice(0,5);
+  })();
+
+  const topBrands = (() => {
+    const counts = {};
+    items.forEach(i => { if (i.brand) counts[i.brand] = (counts[i.brand]||0) + 1; });
+    return Object.entries(counts).sort((a,b)=>b[1]-a[1]).slice(0,5);
+  })();
+
+  const topSeasons = (() => {
+    const counts = {};
+    items.forEach(i => (i.seasons||[i.season]).filter(Boolean).forEach(s => { counts[s] = (counts[s]||0)+1; }));
+    return Object.entries(counts).sort((a,b)=>b[1]-a[1]);
+  })();
+
+  const topOccasions = (() => {
+    const counts = {};
+    items.forEach(i => (i.occasions||[i.occasion]).filter(Boolean).forEach(o => { counts[o] = (counts[o]||0)+1; }));
+    return Object.entries(counts).sort((a,b)=>b[1]-a[1]).slice(0,5);
+  })();
+
+  const totalValue = items.reduce((s,i) => s + (parseFloat((i.price||"").replace(/[^0-9.]/g,""))||0), 0);
+  const totalWears = items.reduce((s,i) => s + (i.wornCount||0), 0);
+  const mostWorn = [...items].sort((a,b)=>(b.wornCount||0)-(a.wornCount||0)).slice(0,5);
+  const mostValuable = [...items].sort((a,b)=>(parseFloat((b.price||"").replace(/[^0-9.]/g,""))||0)-(parseFloat((a.price||"").replace(/[^0-9.]/g,""))||0)).slice(0,3);
+
+  // Style archetype based on top occasion
+  const ARCHETYPES = {
+    "WFH": { label: "The Professional", desc: "Your wardrobe leans work-ready — polished, functional, and put-together.", emoji: "💼" },
+    "Date Night": { label: "The Romantic", desc: "You dress with intention. Your closet is built for moments that matter.", emoji: "✨" },
+    "Weekend": { label: "The Casual Cool", desc: "Effortlessly stylish — your wardrobe is made for living life at ease.", emoji: "☀️" },
+    "Sport": { label: "The Athlete", desc: "Performance meets style. You keep it active and functional.", emoji: "⚡" },
+    "Disney": { label: "The Dreamer", desc: "Bold, fun, and full of personality — you dress for the magic.", emoji: "🏰" },
+    "Travel": { label: "The Adventurer", desc: "Versatile and ready for anything. Your wardrobe goes where you go.", emoji: "✈️" },
+    "Occasion": { label: "The Elegante", desc: "You always dress for the occasion — polished and event-ready.", emoji: "🌹" },
+    "Universal": { label: "The Trendsetter", desc: "Pop culture meets personal style. You always stand out.", emoji: "🎬" },
+  };
+  const archetype = topOccasions[0] ? (ARCHETYPES[topOccasions[0][0]] || { label: "The Individualist", desc: "Your style defies categories — uniquely and completely you.", emoji: "🌟" }) : null;
+
+  const SEASON_COLORS = { Spring:"#e8f5ee", Summer:"#fff8ee", Fall:"#fff2e8", Winter:"#eef0ff", "All Season":"#f5f3ef", Holiday:"#fff0f5", Disney:"#fff0fb" };
+  const SEASON_TEXT = { Spring:"#3aaa6e", Summer:"#a07000", Fall:"#c06020", Winter:"#4a5fe0", "All Season":"#888", Holiday:"#e05588", Disney:"#d040b0" };
+  const CAT_ICONS = { Accessories:"💍", Activewear:"🏃", Bags:"👜", Denim:"👖", Dresses:"👗", Intimates:"🩲", Jewelry:"💎", Knits:"🧶", Loungewear:"🛋", Outerwear:"🧥", Shoes:"👠", "Shorts + Skirts":"🩴", Sleepwear:"😴", "Socks + Tights":"🧦", Sweaters:"🧣", Swim:"👙", Tops:"👕", Trousers:"👔" };
+
+  const maxCat = topCategories[0]?.[1] || 1;
+  const maxBrand = topBrands[0]?.[1] || 1;
+
   const SECTION = ({ title, children }) => (
     <div style={{ background: "#fff", borderRadius: 20, border: "1.5px solid #e8e4dc", padding: "20px 22px", marginBottom: 18 }}>
       <div style={{ fontSize: 14, fontWeight: 800, color: "#1a1a1a", marginBottom: 16, letterSpacing: "-0.01em" }}>{title}</div>
@@ -2452,8 +2560,188 @@ function StatsTab({ itemsDb, outfitsDb, lookbooksDb, onViewItem }) {
 
   return (
     <div className="fade-up">
-      {/* Monthly recap */}
-      <SECTION title={`📅 ${now.toLocaleDateString("en-US",{month:"long",year:"numeric"})} Recap`}>
+      {/* Tab toggle */}
+      <div style={{ display: "flex", gap: 24, marginBottom: 28, borderBottom: "1px solid #ece8e0", paddingBottom: 0 }}>
+        {[["profile","Style Profile"],["insights","Insights"]].map(([v,l]) => (
+          <button key={v} onClick={() => setStatsView(v)} style={{
+            padding: "0 0 14px", border: "none", background: "transparent", cursor: "pointer",
+            fontFamily: "'DM Sans', sans-serif", fontSize: 13, fontWeight: statsView === v ? 700 : 500,
+            color: statsView === v ? "#1a1a1a" : "#b0a898",
+            borderBottom: statsView === v ? "2px solid #1a1a1a" : "2px solid transparent",
+            marginBottom: -1, transition: "all 0.15s", letterSpacing: "0.01em"
+          }}>{l}</button>
+        ))}
+      </div>
+
+      {/* ── STYLE PROFILE ── */}
+      {statsView === "profile" && (
+        <div>
+          {items.length === 0 ? (
+            <div style={{ textAlign:"center", padding:"60px 0", color:"#ccc" }}>
+              <div style={{ fontSize:36, marginBottom:12 }}>✦</div>
+              <div style={{ fontSize:14, fontWeight:700 }}>Add items to your closet to see your style profile</div>
+            </div>
+          ) : (
+            <>
+              {/* Archetype hero */}
+              {archetype && (
+                <div style={{ background: "linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%)", borderRadius: 22, padding: "28px 26px", marginBottom: 16, color: "#fff", position: "relative", overflow: "hidden" }}>
+                  <div style={{ position: "absolute", top: -20, right: -20, fontSize: 100, opacity: 0.07, lineHeight: 1 }}>{archetype.emoji}</div>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: "rgba(255,255,255,0.5)", textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 8 }}>Your Style Archetype</div>
+                  <div style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 34, fontWeight: 300, fontStyle: "italic", letterSpacing: "-0.01em", marginBottom: 8 }}>{archetype.emoji} {archetype.label}</div>
+                  <div style={{ fontSize: 13, color: "rgba(255,255,255,0.7)", lineHeight: 1.6, maxWidth: 340 }}>{archetype.desc}</div>
+                  <div style={{ display:"flex", gap:16, marginTop:20, flexWrap:"wrap" }}>
+                    {[
+                      { label: "Pieces", value: items.length },
+                      { label: "Total Value", value: `$${totalValue.toFixed(0)}` },
+                      { label: "Total Wears", value: totalWears },
+                    ].map(s => (
+                      <div key={s.label}>
+                        <div style={{ fontSize: 20, fontWeight: 800 }}>{s.value}</div>
+                        <div style={{ fontSize: 10, fontWeight: 700, color: "rgba(255,255,255,0.45)", textTransform: "uppercase", letterSpacing: "0.07em" }}>{s.label}</div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Color DNA */}
+              {topColors.length > 0 && (
+                <div style={{ background: "#fff", borderRadius: 20, border: "1.5px solid #e8e4dc", padding: "20px 22px", marginBottom: 14 }}>
+                  <div style={{ fontSize: 13, fontWeight: 800, color: "#1a1a1a", marginBottom: 14 }}>🎨 Color DNA</div>
+                  <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                    {topColors.map(([color, count], idx) => {
+                      const hex = COLOR_HEX[color] || "#ccc";
+                      const size = idx === 0 ? 56 : idx === 1 ? 48 : 40;
+                      return (
+                        <div key={color} style={{ display:"flex", flexDirection:"column", alignItems:"center", gap:5 }}>
+                          <div style={{ width:size, height:size, borderRadius:"50%", background:hex, border:(color==="White"||color==="Cream")?"1.5px solid #e0dbd0":"none", boxShadow:"0 3px 10px rgba(0,0,0,0.12)", transition:"transform 0.15s" }}
+                            onMouseEnter={e=>e.currentTarget.style.transform="scale(1.1)"}
+                            onMouseLeave={e=>e.currentTarget.style.transform="scale(1)"} />
+                          <div style={{ fontSize:10, fontWeight:700, color:"#555" }}>{color}</div>
+                          <div style={{ fontSize:10, color:"#bbb" }}>{count}</div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* Two col: categories + brands */}
+              <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:12, marginBottom:14 }}>
+                {/* Top categories */}
+                <div style={{ background:"#fff", borderRadius:20, border:"1.5px solid #e8e4dc", padding:"18px 18px" }}>
+                  <div style={{ fontSize:13, fontWeight:800, color:"#1a1a1a", marginBottom:14 }}>👗 Categories</div>
+                  <div style={{ display:"flex", flexDirection:"column", gap:10 }}>
+                    {topCategories.slice(0,5).map(([cat, count]) => (
+                      <div key={cat}>
+                        <div style={{ display:"flex", justifyContent:"space-between", marginBottom:4 }}>
+                          <span style={{ fontSize:12, fontWeight:700, color:"#444" }}>{CAT_ICONS[cat] || "•"} {cat}</span>
+                          <span style={{ fontSize:11, color:"#aaa", fontWeight:600 }}>{count}</span>
+                        </div>
+                        <div style={{ height:5, background:"#f0ece4", borderRadius:99, overflow:"hidden" }}>
+                          <div style={{ height:"100%", width:`${(count/maxCat)*100}%`, background:"#1a1a1a", borderRadius:99, transition:"width 0.4s" }} />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Top brands */}
+                <div style={{ background:"#fff", borderRadius:20, border:"1.5px solid #e8e4dc", padding:"18px 18px" }}>
+                  <div style={{ fontSize:13, fontWeight:800, color:"#1a1a1a", marginBottom:14 }}>🏷 Brands</div>
+                  {topBrands.length === 0 ? (
+                    <div style={{ fontSize:12, color:"#ccc", textAlign:"center", paddingTop:16 }}>No brands tagged yet</div>
+                  ) : (
+                    <div style={{ display:"flex", flexDirection:"column", gap:10 }}>
+                      {topBrands.map(([brand, count]) => (
+                        <div key={brand}>
+                          <div style={{ display:"flex", justifyContent:"space-between", marginBottom:4 }}>
+                            <span style={{ fontSize:12, fontWeight:700, color:"#444", overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap", maxWidth:90 }}>{brand}</span>
+                            <span style={{ fontSize:11, color:"#aaa", fontWeight:600 }}>{count}</span>
+                          </div>
+                          <div style={{ height:5, background:"#f0ece4", borderRadius:99, overflow:"hidden" }}>
+                            <div style={{ height:"100%", width:`${(count/maxBrand)*100}%`, background:"#7c6fe0", borderRadius:99, transition:"width 0.4s" }} />
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Seasons + Occasions */}
+              <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:12, marginBottom:14 }}>
+                <div style={{ background:"#fff", borderRadius:20, border:"1.5px solid #e8e4dc", padding:"18px 18px" }}>
+                  <div style={{ fontSize:13, fontWeight:800, color:"#1a1a1a", marginBottom:12 }}>🌤 Seasons</div>
+                  <div style={{ display:"flex", flexWrap:"wrap", gap:6 }}>
+                    {topSeasons.map(([s, count]) => (
+                      <div key={s} style={{ padding:"5px 11px", background:SEASON_COLORS[s]||"#f5f3ef", borderRadius:20, fontSize:11, fontWeight:700, color:SEASON_TEXT[s]||"#888" }}>{s} <span style={{ opacity:0.6 }}>·{count}</span></div>
+                    ))}
+                  </div>
+                </div>
+                <div style={{ background:"#fff", borderRadius:20, border:"1.5px solid #e8e4dc", padding:"18px 18px" }}>
+                  <div style={{ fontSize:13, fontWeight:800, color:"#1a1a1a", marginBottom:12 }}>✦ Occasions</div>
+                  <div style={{ display:"flex", flexWrap:"wrap", gap:6 }}>
+                    {topOccasions.length === 0 ? <div style={{ fontSize:12, color:"#ccc" }}>None tagged yet</div> : topOccasions.map(([o, count]) => (
+                      <div key={o} style={{ padding:"5px 11px", background: (OCCASION_COLORS[o]||{bg:"#f5f3ef"}).bg, borderRadius:20, fontSize:11, fontWeight:700, color:(OCCASION_COLORS[o]||{color:"#888"}).color }}>{o} <span style={{ opacity:0.6 }}>·{count}</span></div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              {/* Most worn + most valuable */}
+              <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:12, marginBottom:14 }}>
+                <div style={{ background:"#fff", borderRadius:20, border:"1.5px solid #e8e4dc", padding:"18px 18px" }}>
+                  <div style={{ fontSize:13, fontWeight:800, color:"#1a1a1a", marginBottom:12 }}>👑 Most Worn</div>
+                  <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
+                    {mostWorn.filter(i=>i.wornCount>0).slice(0,4).map((item,idx)=>(
+                      <div key={item.id} onClick={()=>onViewItem(item)} style={{ display:"flex", alignItems:"center", gap:8, cursor:"pointer" }}>
+                        <div style={{ fontSize:12, fontWeight:800, color:"#ddd", width:16, flexShrink:0 }}>#{idx+1}</div>
+                        <div style={{ width:32, height:32, borderRadius:8, overflow:"hidden", background:"#f5f3ef", flexShrink:0 }}>
+                          {item.image ? <img src={item.image} alt="" style={{ width:"100%", height:"100%", objectFit:"contain" }} /> : <HangerIcon size={14} color="#ddd" />}
+                        </div>
+                        <div style={{ flex:1, minWidth:0 }}>
+                          <div style={{ fontSize:11, fontWeight:700, color:"#1a1a1a", overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{item.name}</div>
+                          <div style={{ fontSize:10, color:"#aaa" }}>{item.wornCount}× worn</div>
+                        </div>
+                      </div>
+                    ))}
+                    {mostWorn.filter(i=>i.wornCount>0).length===0 && <div style={{ fontSize:12, color:"#ccc" }}>Start marking outfits as worn</div>}
+                  </div>
+                </div>
+                <div style={{ background:"#fff", borderRadius:20, border:"1.5px solid #e8e4dc", padding:"18px 18px" }}>
+                  <div style={{ fontSize:13, fontWeight:800, color:"#1a1a1a", marginBottom:12 }}>💰 Most Valuable</div>
+                  <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
+                    {mostValuable.filter(i=>parseFloat((i.price||"").replace(/[^0-9.]/g,""))).slice(0,4).map((item,idx)=>{
+                      const price = parseFloat((item.price||"").replace(/[^0-9.]/g,""));
+                      return (
+                        <div key={item.id} onClick={()=>onViewItem(item)} style={{ display:"flex", alignItems:"center", gap:8, cursor:"pointer" }}>
+                          <div style={{ fontSize:12, fontWeight:800, color:"#ddd", width:16, flexShrink:0 }}>#{idx+1}</div>
+                          <div style={{ width:32, height:32, borderRadius:8, overflow:"hidden", background:"#f5f3ef", flexShrink:0 }}>
+                            {item.image ? <img src={item.image} alt="" style={{ width:"100%", height:"100%", objectFit:"contain" }} /> : <HangerIcon size={14} color="#ddd" />}
+                          </div>
+                          <div style={{ flex:1, minWidth:0 }}>
+                            <div style={{ fontSize:11, fontWeight:700, color:"#1a1a1a", overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{item.name}</div>
+                            <div style={{ fontSize:10, color:"#aaa" }}>${price.toFixed(0)}</div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                    {mostValuable.filter(i=>parseFloat((i.price||"").replace(/[^0-9.]/g,""))).length===0 && <div style={{ fontSize:12, color:"#ccc" }}>Add prices to your items</div>}
+                  </div>
+                </div>
+              </div>
+            </>
+          )}
+        </div>
+      )}
+
+      {/* ── INSIGHTS ── */}
+      {statsView === "insights" && (
+        <div>
+          {/* Monthly recap */}
+          <SECTION title={`📅 ${now.toLocaleDateString("en-US",{month:"long",year:"numeric"})} Recap`}>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(130px, 1fr))", gap: 10 }}>
           {[
             { label: "Items Added", value: addedThisMonth.length, color: "#2d6a3f", bg: "#f0faf4" },
@@ -2544,6 +2832,8 @@ function StatsTab({ itemsDb, outfitsDb, lookbooksDb, onViewItem }) {
             ))}
           </div>
         </SECTION>
+      )}
+        </div>
       )}
     </div>
   );
@@ -3375,20 +3665,20 @@ export default function App() {
     closet: ["My Closet", `${itemsDb.rows.filter(i=>!i.forSale).length} pieces`],
     outfits: ["My Outfits", `${outfitsDb.rows.length} looks`],
     lookbooks: ["Lookbooks", "Curated collections"],
-    stats: ["Wardrobe Stats", "Your insights"],
+    stats: ["Style", "Your wardrobe story"],
     moodboard: ["Moodboard", "Inspire yourself"],
     seller: ["Seller Dashboard", "What's for sale"],
     wishlist: ["Wishlist", "Want it"],
   };
 
   return (
-    <div style={{ background: "#f0ede8", minHeight: "100vh" }}>
+    <div style={{ background: "#f7f5f2", minHeight: "100vh" }}>
       <style>{globalStyles}</style>
 
       {/* ── Vertical nav sidebar ── */}
       <nav className="app-nav-sidebar">
         <div className="app-nav-logo">
-          <HangerIcon size={20} color="#fff" />
+          <span style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 22, fontWeight: 300, fontStyle: "italic", color: "#fff", lineHeight: 1 }}>W</span>
         </div>
         {NAV_ITEMS.map(n => {
           const active = tab === n.id;
@@ -3413,6 +3703,7 @@ export default function App() {
           {/* Page hero + global search */}
           <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 28, gap: 16 }}>
             <div className="page-hero" style={{ marginBottom: 0 }}>
+              <div className="page-hero-eyebrow">My Wardrobe</div>
               <div className="page-hero-title">{PAGE_TITLES[tab]?.[0]}</div>
               <div className="page-hero-sub">{PAGE_TITLES[tab]?.[1]}</div>
             </div>

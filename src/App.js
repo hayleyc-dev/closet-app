@@ -175,7 +175,7 @@ const globalStyles = `
   .nav-icon-btn .nav-label { font-size: 9px; font-weight: 600; letter-spacing: 0.02em; color: #c0b8b0; text-transform: uppercase; line-height: 1; }
   .nav-icon-btn.active .nav-label { color: rgba(255,255,255,0.6); }
   .nav-icon-btn-bottom { margin-top: auto; }
-  .pill-select { padding: 7px 36px 7px 14px !important; border-radius: 100px; border: 1px solid #e0dbd2; font-family: 'DM Sans', sans-serif; font-size: 12px; font-weight: 600; background: #fff; color: #444; cursor: pointer; appearance: none; -webkit-appearance: none; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%23888' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 14px center; }
+  .pill-select { padding: 7px 44px 7px 14px !important; border-radius: 100px; border: 1px solid #e0dbd2; font-family: 'DM Sans', sans-serif; font-size: 12px; font-weight: 600; background: #fff; color: #444; cursor: pointer; appearance: none; -webkit-appearance: none; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%23888' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 14px center; }
 
   .app-body { margin-left: 76px; flex: 1; display: flex; min-height: 100vh; }
   .app-main-area { flex: 1; min-width: 0; padding: 36px 32px; }
@@ -1977,8 +1977,9 @@ function OutfitDetailPopup({ outfit, allItems, allOutfits, lookbooks, onClose, o
 }
 
 // ── Lookbook Viewer ──────────────────────────────────────────────────────────
-function LookbookViewer({ lookbook, outfits, allItems, onClose, onUpdate, onOpenOutfit }) {
-  const [view, setView] = useState("slide");
+function LookbookViewer({ lookbook, outfits, allItems, onClose, onUpdate, onOpenOutfit, markOutfitWorn }) {
+  const LB_TAGS = ["Travel","Work Week","Event","Disney","Sport","Weekend","Vacation"];
+  const [view, setView] = useState("editorial"); // "editorial" | "grid"
   const [idx, setIdx] = useState(0);
   const [slideDir, setSlideDir] = useState("left");
   const [notes, setNotes] = useState(lookbook.notes || "");
@@ -1989,19 +1990,32 @@ function LookbookViewer({ lookbook, outfits, allItems, onClose, onUpdate, onOpen
   const [reordering, setReordering] = useState(false);
   const [addingOutfit, setAddingOutfit] = useState(false);
   const [exportingPdf, setExportingPdf] = useState(false);
-  const [shareToast, setShareToast] = useState(false);
+  const [shareToast, setShareToast] = useState("");
   const [showPackList, setShowPackList] = useState(false);
+  const [checkedPack, setCheckedPack] = useState({});
+  const [dragIdx, setDragIdx] = useState(null);
+  const [dragOver2, setDragOver2] = useState(null);
+  const [lbTags, setLbTags] = useState(lookbook.tags || []);
+  const [lbCity, setLbCity] = useState(lookbook.city || "");
+  const [lbWeather, setLbWeather] = useState(null);
+  const [wxLoading, setWxLoading] = useState(false);
+  const [coverImage, setCoverImage] = useState(lookbook.coverImage || "");
+  const [wornToast, setWornToast] = useState("");
 
   const looks = lookIds.map(id => outfits.find(o => o.id === id)).filter(Boolean);
   const availableToAdd = outfits.filter(o => !lookIds.includes(o.id));
 
   const fmtDate = (d) => {
     if (!d) return null;
-    const dt = new Date(d + "T00:00:00");
-    return dt.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+    return new Date(d + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" });
   };
   const dateStr = (lookbook.dateStart || lookbook.dateEnd)
-    ? [fmtDate(lookbook.dateStart), fmtDate(lookbook.dateEnd)].filter(Boolean).join(" – ")
+    ? [fmtDate(lookbook.dateStart), fmtDate(lookbook.dateEnd)].filter(Boolean).join(" \u2013 ")
+    : null;
+
+  // Days / outfits ratio
+  const tripDays = (lookbook.dateStart && lookbook.dateEnd)
+    ? Math.max(1, Math.round((new Date(lookbook.dateEnd) - new Date(lookbook.dateStart)) / 86400000) + 1)
     : null;
 
   const totalVal = looks.flatMap(o => (o.layers || o.itemIds || []).map(id => allItems.find(x => x.id === id)).filter(Boolean))
@@ -2012,43 +2026,96 @@ function LookbookViewer({ lookbook, outfits, allItems, onClose, onUpdate, onOpen
     setIdx(i => Math.max(0, Math.min(looks.length - 1, i + dir)));
   };
 
-  const moveLook = (from, to) => {
-    const next = [...lookIds];
-    const [moved] = next.splice(from, 1);
-    next.splice(to, 0, moved);
-    setLookIds(next);
-  };
+  const save = (overrides = {}) => onUpdate({
+    ...lookbook, name: lbName, notes, outfitIds: lookIds, lookMeta,
+    tags: lbTags, city: lbCity, coverImage, ...overrides
+  });
 
   const removeLook = (outfitId) => {
     const next = lookIds.filter(id => id !== outfitId);
     setLookIds(next);
     setIdx(i => Math.min(i, Math.max(0, next.length - 1)));
-    onUpdate({ ...lookbook, name: lbName, notes, outfitIds: next, lookMeta });
+    onUpdate({ ...lookbook, name: lbName, notes, outfitIds: next, lookMeta, tags: lbTags, city: lbCity, coverImage });
   };
 
   const addLook = (outfitId) => {
     const next = [...lookIds, outfitId];
     setLookIds(next);
     setAddingOutfit(false);
-    onUpdate({ ...lookbook, name: lbName, notes, outfitIds: next, lookMeta });
+    onUpdate({ ...lookbook, name: lbName, notes, outfitIds: next, lookMeta, tags: lbTags, city: lbCity, coverImage });
   };
 
   const updateMeta = (outfitId, field, value) => {
-    setLookMeta(m => ({ ...m, [outfitId]: { ...(m[outfitId] || {}), [field]: value } }));
+    const next = { ...lookMeta, [outfitId]: { ...(lookMeta[outfitId] || {}), [field]: value } };
+    setLookMeta(next);
   };
 
-  const save = () => onUpdate({ ...lookbook, name: lbName, notes, outfitIds: lookIds, lookMeta });
+  const handleWorn = async (look) => {
+    const today = new Date().toISOString().slice(0, 10);
+    if (markOutfitWorn) await markOutfitWorn(look, today);
+    setWornToast(look.name);
+    setTimeout(() => setWornToast(""), 2500);
+  };
 
   const handleShare = () => {
-    const url = window.location.href;
+    const data = {
+      name: lbName, dateStr, outfits: looks.map(l => ({ name: l.name, preview: l.previewImage }))
+    };
+    const encoded = btoa(encodeURIComponent(JSON.stringify(data)));
+    const url = window.location.origin + window.location.pathname + "?lb=" + encoded;
     navigator.clipboard.writeText(url).then(() => {
-      setShareToast(true);
-      setTimeout(() => setShareToast(false), 2200);
+      setShareToast("Share link copied!");
+      setTimeout(() => setShareToast(""), 2500);
     });
   };
 
+  const fetchWeather = async () => {
+    const city = lbCity.trim();
+    if (!city) return;
+    setWxLoading(true);
+    try {
+      const geoRes = await fetch("https://geocoding-api.open-meteo.com/v1/search?name=" + encodeURIComponent(city) + "&count=1&language=en&format=json");
+      const geo = await geoRes.json();
+      const loc = geo.results?.[0];
+      if (!loc) { setLbWeather({ error: "City not found" }); setWxLoading(false); return; }
+      const wRes = await fetch("https://api.open-meteo.com/v1/forecast?latitude=" + loc.latitude + "&longitude=" + loc.longitude + "&daily=temperature_2m_max,temperature_2m_min,weathercode&temperature_unit=fahrenheit&timezone=auto&forecast_days=16");
+      const w = await wRes.json();
+      const days = (w.daily?.time || []).map((d, i) => ({
+        date: d, high: Math.round(w.daily.temperature_2m_max[i]),
+        low: Math.round(w.daily.temperature_2m_min[i]), code: w.daily.weathercode[i],
+      }));
+      setLbWeather({ city: loc.name, days });
+    } catch(e) { setLbWeather({ error: "Weather unavailable" }); }
+    setWxLoading(false);
+  };
+
+  const wxIcon = (code) => {
+    if (code === 0) return "\u2600";
+    if (code <= 2) return "\u26C5";
+    if (code <= 45) return "\u2601";
+    if (code <= 67) return "\uD83C\uDF27";
+    if (code <= 77) return "\u2744";
+    if (code <= 82) return "\uD83C\uDF26";
+    return "\u26C8";
+  };
+
+  const getWxForDate = (dateStr2) => lbWeather?.days?.find(d => d.date === dateStr2) || null;
+
+  // Drag-to-reorder looks list
+  const handleDragStart = (i) => setDragIdx(i);
+  const handleDragEnter = (i) => setDragOver2(i);
+  const handleDrop = () => {
+    if (dragIdx === null || dragOver2 === null || dragIdx === dragOver2) { setDragIdx(null); setDragOver2(null); return; }
+    const next = [...lookIds];
+    const [moved] = next.splice(dragIdx, 1);
+    next.splice(dragOver2, 0, moved);
+    setLookIds(next);
+    setDragIdx(null); setDragOver2(null);
+    onUpdate({ ...lookbook, name: lbName, notes, outfitIds: next, lookMeta, tags: lbTags, city: lbCity, coverImage });
+  };
+
   const loadScript = (src) => new Promise((resolve, reject) => {
-    if (document.querySelector(`script[src="${src}"]`)) { resolve(); return; }
+    if (document.querySelector('script[src="' + src + '"]')) { resolve(); return; }
     const s = document.createElement("script"); s.src = src; s.onload = resolve; s.onerror = reject;
     document.head.appendChild(s);
   });
@@ -2057,22 +2124,43 @@ function LookbookViewer({ lookbook, outfits, allItems, onClose, onUpdate, onOpen
     setExportingPdf(true);
     try {
       await loadScript("https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js");
-      const pdf = new window.jspdf.jsPDF({ orientation: "portrait", unit: "px", format: [400, 520] });
+      const pdf = new window.jspdf.jsPDF({ orientation: "portrait", unit: "px", format: [420, 560] });
+      // Cover page
+      pdf.setFillColor(26, 26, 26);
+      pdf.rect(0, 0, 420, 560, "F");
+      pdf.setTextColor(255, 255, 255);
+      pdf.setFontSize(28); pdf.setFont("helvetica", "bold");
+      pdf.text(lbName, 30, 80, { maxWidth: 360 });
+      if (dateStr) { pdf.setFontSize(13); pdf.setFont("helvetica", "normal"); pdf.text(dateStr, 30, 110); }
+      if (looks.length > 0) { pdf.setFontSize(11); pdf.text(looks.length + " looks", 30, 130); }
+      // Look pages
       for (let i = 0; i < looks.length; i++) {
         const look = looks[i];
-        if (i > 0) pdf.addPage();
-        pdf.setFontSize(16); pdf.setFont("helvetica", "bold");
-        pdf.text(look.name || `Look ${i + 1}`, 20, 36);
-        if (look.previewImage) {
-          pdf.addImage(look.previewImage, "JPEG", 20, 50, 360, 420);
+        pdf.addPage();
+        pdf.setFillColor(250, 249, 246);
+        pdf.rect(0, 0, 420, 560, "F");
+        pdf.setTextColor(26, 26, 26);
+        pdf.setFontSize(18); pdf.setFont("helvetica", "bold");
+        pdf.text(look.name || ("Look " + (i + 1)), 20, 36);
+        const meta = lookMeta[look.id] || {};
+        if (meta.occasion || meta.day) {
+          pdf.setFontSize(11); pdf.setFont("helvetica", "normal"); pdf.setTextColor(136, 136, 136);
+          pdf.text([meta.day, meta.occasion, meta.lookNotes].filter(Boolean).join("  \u00B7  "), 20, 52);
         }
+        if (look.previewImage) {
+          pdf.addImage(look.previewImage, "JPEG", 20, 64, 380, 420);
+        }
+        // Pieces list at bottom
+        const pieces = (look.layers || look.itemIds || []).map(id => allItems.find(x => x.id === id)).filter(Boolean);
+        pdf.setFontSize(9); pdf.setFont("helvetica", "normal"); pdf.setTextColor(100, 100, 100);
+        const piecesStr = pieces.map(p => p.name).join("  \u00B7  ");
+        pdf.text(piecesStr, 20, 500, { maxWidth: 380 });
       }
-      pdf.save(`${lbName}.pdf`);
+      pdf.save((lbName || "lookbook") + ".pdf");
     } catch(e) {
-      // fallback: open images in new tab
-      const imgs = looks.filter(l => l.previewImage).map(l => `<img src="${l.previewImage}" style="max-width:100%;margin:10px 0;display:block"/>`).join("");
+      const imgs = looks.filter(l => l.previewImage).map(l => '<img src="' + l.previewImage + '" style="max-width:100%;margin:10px 0;display:block"/>').join("");
       const w = window.open("", "_blank");
-      w.document.write(`<html><body style="background:#111;padding:20px">${imgs}</body></html>`);
+      if (w) w.document.write('<html><body style="background:#111;padding:20px">' + imgs + '</body></html>');
     }
     setExportingPdf(false);
   };
@@ -2087,135 +2175,204 @@ function LookbookViewer({ lookbook, outfits, allItems, onClose, onUpdate, onOpen
     : [];
 
   const btnBase = { border: "none", cursor: "pointer", fontFamily: "'DM Sans', sans-serif", fontWeight: 700, borderRadius: 10, transition: "all 0.15s" };
-  const DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
+  const DAYS = ["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"];
+
+  // Pack list items (deduplicated)
+  const packItems = (() => {
+    const seen = {};
+    looks.forEach(look => {
+      (look.layers || look.itemIds || []).forEach(id => {
+        const item = allItems.find(i => i.id === id);
+        if (item) seen[id] = item;
+      });
+    });
+    return Object.values(seen);
+  })();
 
   return (
     <div className="lookbook-overlay">
       <style>{globalStyles}</style>
 
-      {/* Share toast */}
-      {shareToast && (
+      {/* Toasts */}
+      {(shareToast || wornToast) && (
         <div style={{ position: "fixed", bottom: 32, left: "50%", transform: "translateX(-50%)", background: "#1a1a1a", color: "#fff", padding: "10px 22px", borderRadius: 20, fontSize: 13, fontWeight: 700, zIndex: 9999, boxShadow: "0 4px 20px rgba(0,0,0,0.2)", fontFamily: "'DM Sans', sans-serif" }}>
-          Link copied to clipboard!
+          {wornToast ? "\u2713 Marked \"" + wornToast + "\" as worn" : shareToast}
         </div>
       )}
 
+      {/* Top bar */}
       <div className="lookbook-topbar">
-        <button onClick={() => { save(); onClose(); }} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 20, color: "#888", display: "flex", alignItems: "center", gap: 6 }}>
+        <button onClick={() => { save(); onClose(); }} style={{ background: "none", border: "none", cursor: "pointer", display: "flex", alignItems: "center", gap: 6, color: "#aaa" }}>
           <SvgArrowL size={18} color="#aaa" />
         </button>
-        <div style={{ display: "flex", alignItems: "center", gap: 8, flex: 1, justifyContent: "center" }}>
-          {editingName
-            ? <input autoFocus value={lbName} onChange={e => setLbName(e.target.value)} onBlur={() => { setEditingName(false); save(); }}
-                style={{ fontSize: 16, fontWeight: 700, border: "none", borderBottom: "2px solid #1a1a1a", outline: "none", fontFamily: "'DM Sans', sans-serif", background: "transparent", textAlign: "center", minWidth: 120 }} />
-            : <span onClick={() => setEditingName(true)} style={{ fontSize: 16, fontWeight: 700, color: "#1a1a1a", cursor: "pointer" }}>{lbName}</span>
-          }
-          <span style={{ fontSize: 12, color: "#aaa" }}>{looks.length} look{looks.length !== 1 ? "s" : ""}</span>
-          {dateStr && <span style={{ fontSize: 11, color: "#b0a898", fontWeight: 600, background: "#f5f2ed", borderRadius: 8, padding: "2px 8px" }}><SvgCalendar size={11} color="#b0a898" style={{marginRight:6,verticalAlign:"middle"}} />{dateStr}</span>}
-          {totalVal > 0 && <span style={{ fontSize: 11, color: "#7c6fe0", fontWeight: 700, background: "#f5f0ff", borderRadius: 8, padding: "2px 8px" }}>${totalVal.toFixed(0)}</span>}
+        <div style={{ flex: 1, display: "flex", flexDirection: "column", paddingLeft: 10 }}>
+          {editingName ? (
+            <input autoFocus value={lbName} onChange={e => setLbName(e.target.value)}
+              onBlur={() => { setEditingName(false); save(); }}
+              onKeyDown={e => { if (e.key === "Enter") { setEditingName(false); save(); } }}
+              style={{ fontSize: 16, fontWeight: 800, color: "#1a1a1a", border: "none", borderBottom: "2px solid #1a1a1a", outline: "none", background: "transparent", fontFamily: "'DM Sans', sans-serif", padding: "2px 0", width: "100%", maxWidth: 320 }} />
+          ) : (
+            <div onClick={() => setEditingName(true)} style={{ fontSize: 16, fontWeight: 800, color: "#1a1a1a", cursor: "text", display: "flex", alignItems: "center", gap: 6 }}>
+              {lbName} <SvgEdit size={12} color="#ccc" />
+            </div>
+          )}
+          {dateStr && <div style={{ fontSize: 11, color: "#aaa", fontWeight: 600, marginTop: 1 }}>{dateStr}{tripDays ? " \u00B7 " + tripDays + " day" + (tripDays !== 1 ? "s" : "") : ""}</div>}
         </div>
-        <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
-          <button onClick={handleShare} title="Copy link" style={{ ...btnBase, padding: "6px 10px", background: "#f5f2ed", fontSize: 13, color: "#666" }}>Share</button>
-          <button onClick={handleExport} disabled={exportingPdf} title="Export as PDF" style={{ ...btnBase, padding: "6px 10px", background: "#f5f2ed", fontSize: 13, color: "#666" }}>{exportingPdf ? "…" : <><SvgDownload size={13} color="#666" style={{marginRight:6}} />Export</>}</button>
-          <div style={{ display: "flex", background: "#f5f2ed", borderRadius: 10, padding: 3, gap: 2 }}>
-            {[{ id: "slide", icon: "⊡" }, { id: "grid", icon: "⊞" }].map(v => (
+        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+          {/* View toggle */}
+          <div style={{ display: "flex", background: "#f0ece4", borderRadius: 10, padding: 3, gap: 2 }}>
+            {[{ id: "editorial", icon: "\u2016\u2016" }, { id: "grid", icon: "\u22EF" }].map(v => (
               <button key={v.id} onClick={() => setView(v.id)} style={{
-                ...btnBase, padding: "5px 12px", borderRadius: 8, fontSize: 16,
+                ...btnBase, padding: "6px 12px", fontSize: 13, borderRadius: 8,
                 background: view === v.id ? "#fff" : "transparent",
                 color: view === v.id ? "#1a1a1a" : "#aaa",
                 boxShadow: view === v.id ? "0 1px 4px rgba(0,0,0,0.1)" : "none"
               }}>{v.icon}</button>
             ))}
           </div>
+          <button onClick={handleShare} style={{ ...btnBase, padding: "7px 14px", background: "#f5f3ef", color: "#555", fontSize: 12 }}>
+            Share
+          </button>
+          <button onClick={handleExport} disabled={exportingPdf} style={{ ...btnBase, padding: "7px 14px", background: "#f5f3ef", color: "#555", fontSize: 12 }}>
+            {exportingPdf ? "Exporting\u2026" : "Export PDF"}
+          </button>
+          <button onClick={() => { save(); onClose(); }} style={{ ...btnBase, padding: "7px 18px", background: "#1a1a1a", color: "#fff", fontSize: 13 }}>Save</button>
         </div>
       </div>
 
       <div style={{ display: "flex", flex: 1, overflow: "hidden" }}>
-        {/* Main */}
+        {/* ── MAIN CONTENT ── */}
         <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
+
           {looks.length === 0 ? (
             <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", color: "#ccc", gap: 12 }}>
-              <div><SvgGrid size={36} color="#ddd" /></div>
+              <SvgGrid size={36} color="#ddd" />
               <div style={{ fontSize: 14, fontWeight: 600 }}>No looks yet</div>
               <button onClick={() => setAddingOutfit(true)} style={{ ...btnBase, padding: "10px 22px", background: "#1a1a1a", color: "#fff", fontSize: 13 }}>+ Add Outfits</button>
             </div>
-          ) : view === "slide" ? (
+
+          ) : view === "editorial" ? (
+            /* ── EDITORIAL / MAGAZINE VIEW ── */
             <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
-              <div style={{ textAlign: "center", padding: "12px 0 4px", fontSize: 13, fontWeight: 700, color: "#888", display: "flex", alignItems: "center", justifyContent: "center", gap: 10 }}>
-                <span>{currentLook?.name || `Look ${idx + 1}`} · {idx + 1} / {looks.length}</span>
-                {currentLook && <button onClick={() => onOpenOutfit && onOpenOutfit(currentLook)} style={{ ...btnBase, fontSize: 11, padding: "3px 10px", background: "#f5f2ed", color: "#666", border: "none" }}>View Details</button>}
-                {currentLook && <button onClick={() => removeLook(currentLook.id)} style={{ ...btnBase, fontSize: 11, padding: "3px 10px", background: "#fef2f2", color: "#e05555", border: "none" }}>Remove</button>}
-              </div>
-              {/* Preview: previewImage first, canvas fallback */}
-              <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", padding: "8px 24px 0", overflow: "hidden" }}>
-                <div className={`slide-enter-${slideDir}`} key={idx} style={{ position: "relative", width: "100%", maxWidth: 480, height: 380, background: "#fff", borderRadius: 20, border: "1.5px solid #e8e4dc", overflow: "hidden", boxShadow: "0 4px 24px rgba(0,0,0,0.06)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+              {/* Large hero image */}
+              <div style={{ flex: 1, position: "relative", overflow: "hidden", background: "#0e0e0e" }}>
+                <div className={"slide-enter-" + slideDir} key={idx} style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>
                   {currentLook?.previewImage ? (
                     <img src={currentLook.previewImage} alt={currentLook.name} style={{ width: "100%", height: "100%", objectFit: "contain" }} />
                   ) : canvasItems.length > 0 ? (
-                    canvasItems.map(({ item, pos }, i) => (
-                      <div key={item.id} style={{ position: "absolute", left: pos.x, top: pos.y, width: pos.w, zIndex: i + 1, pointerEvents: "none" }}>
-                        {item.image
-                          ? <img src={item.image} alt={item.name} style={{ width: pos.w, height: pos.h, objectFit: "contain", display: "block" }} />
-                          : <div style={{ width: pos.w, height: pos.h, background: "#f0ece4", borderRadius: 8, display: "flex", alignItems: "center", justifyContent: "center" }}><HangerIcon size={28} color="#ccc" /></div>
-                        }
-                      </div>
-                    ))
+                    <div style={{ position: "relative", width: "100%", height: "100%" }}>
+                      {canvasItems.map(({ item, pos }, ii) => (
+                        <div key={item.id} style={{ position: "absolute", left: pos.x, top: pos.y, width: pos.w, zIndex: ii + 1, pointerEvents: "none" }}>
+                          {item.image
+                            ? <img src={item.image} alt={item.name} style={{ width: pos.w, height: pos.h, objectFit: "contain" }} />
+                            : <div style={{ width: pos.w, height: pos.h, background: "#222", borderRadius: 8 }} />}
+                        </div>
+                      ))}
+                    </div>
                   ) : (
-                    <div style={{ color: "#ccc", fontSize: 13, fontWeight: 600 }}>No preview available</div>
+                    <div style={{ color: "#444", fontSize: 13, fontWeight: 600 }}>No preview</div>
                   )}
                 </div>
+
+                {/* Editorial overlay — look name + tags + weather */}
+                <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, background: "linear-gradient(to top, rgba(0,0,0,0.82) 0%, rgba(0,0,0,0) 100%)", padding: "40px 24px 20px" }}>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: "rgba(255,255,255,0.5)", textTransform: "uppercase", letterSpacing: "0.12em", marginBottom: 4 }}>
+                    Look {idx + 1} of {looks.length}
+                  </div>
+                  <div style={{ fontSize: 26, fontWeight: 900, color: "#fff", lineHeight: 1.1, marginBottom: 6 }}>
+                    {currentLook?.name}
+                  </div>
+                  {/* Occasion tags */}
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 8 }}>
+                    {(currentLook?.tags || []).map(t => (
+                      <div key={t} style={{ padding: "3px 10px", borderRadius: 20, background: "rgba(255,255,255,0.15)", backdropFilter: "blur(8px)", color: "#fff", fontSize: 11, fontWeight: 700 }}>{t}</div>
+                    ))}
+                    {lookMeta[currentLook?.id]?.occasion && (
+                      <div style={{ padding: "3px 10px", borderRadius: 20, background: "rgba(255,255,255,0.15)", backdropFilter: "blur(8px)", color: "#fff", fontSize: 11, fontWeight: 700 }}>
+                        {lookMeta[currentLook.id].occasion}
+                      </div>
+                    )}
+                  </div>
+                  {/* Weather for this look's date */}
+                  {(() => {
+                    const metaDate = lookMeta[currentLook?.id]?.date;
+                    const wx = metaDate ? getWxForDate(metaDate) : null;
+                    return wx ? (
+                      <div style={{ fontSize: 13, color: "rgba(255,255,255,0.8)", display: "flex", alignItems: "center", gap: 8 }}>
+                        <span style={{ fontSize: 18 }}>{wxIcon(wx.code)}</span>
+                        <span>{wx.high}\u00B0 / {wx.low}\u00B0</span>
+                        <span style={{ opacity: 0.6 }}>{lbCity}</span>
+                      </div>
+                    ) : null;
+                  })()}
+                </div>
+
+                {/* Prev/Next arrows over image */}
+                <button onClick={() => go(-1)} disabled={idx === 0} style={{ position: "absolute", left: 16, top: "50%", transform: "translateY(-50%)", width: 44, height: 44, borderRadius: "50%", background: "rgba(255,255,255,0.15)", backdropFilter: "blur(8px)", border: "none", cursor: idx === 0 ? "default" : "pointer", opacity: idx === 0 ? 0.3 : 1, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                  <SvgArrowL size={18} color="#fff" />
+                </button>
+                <button onClick={() => go(1)} disabled={idx === looks.length - 1} style={{ position: "absolute", right: 16, top: "50%", transform: "translateY(-50%)", width: 44, height: 44, borderRadius: "50%", background: "rgba(255,255,255,0.15)", backdropFilter: "blur(8px)", border: "none", cursor: idx === looks.length - 1 ? "default" : "pointer", opacity: idx === looks.length - 1 ? 0.3 : 1, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                  <SvgArrowR size={18} color="#fff" />
+                </button>
               </div>
 
-              {/* Per-look meta */}
+              {/* Bottom strip — meta inputs + pieces + actions */}
               {currentLook && (
-                <div style={{ padding: "12px 24px 8px", display: "flex", gap: 8, flexWrap: "wrap" }}>
-                  <select value={lookMeta[currentLook.id]?.day || ""} onChange={e => updateMeta(currentLook.id, "day", e.target.value)} onBlur={save}
-                    style={{ flex: "1 1 130px", padding: "7px 10px", border: "1.5px solid #e8e4dc", borderRadius: 10, fontFamily: "'DM Sans', sans-serif", fontSize: 12, color: "#1a1a1a", background: "#fff" }}>
-                    <option value="">Day of week…</option>
+                <div style={{ background: "#fff", borderTop: "1px solid #f0ece4", padding: "12px 20px", display: "flex", gap: 12, flexWrap: "wrap", alignItems: "center" }}>
+                  <select value={lookMeta[currentLook.id]?.day || ""} onChange={e => updateMeta(currentLook.id, "day", e.target.value)} onBlur={() => save()}
+                    style={{ padding: "6px 10px", border: "1.5px solid #e8e4dc", borderRadius: 10, fontFamily: "'DM Sans', sans-serif", fontSize: 12, color: "#1a1a1a", background: "#fff", minWidth: 120 }}>
+                    <option value="">Day of week\u2026</option>
                     {DAYS.map(d => <option key={d} value={d}>{d}</option>)}
                   </select>
-                  <input type="text" value={lookMeta[currentLook.id]?.occasion || ""} onChange={e => updateMeta(currentLook.id, "occasion", e.target.value)} onBlur={save}
-                    placeholder="Occasion (e.g. Wedding)"
-                    style={{ flex: "2 1 160px", padding: "7px 10px", border: "1.5px solid #e8e4dc", borderRadius: 10, fontFamily: "'DM Sans', sans-serif", fontSize: 12 }} />
-                  <input type="date" value={lookMeta[currentLook.id]?.date || ""} onChange={e => updateMeta(currentLook.id, "date", e.target.value)} onBlur={save}
-                    style={{ flex: "1 1 140px", padding: "7px 10px", border: "1.5px solid #e8e4dc", borderRadius: 10, fontFamily: "'DM Sans', sans-serif", fontSize: 12 }} />
+                  <input value={lookMeta[currentLook.id]?.occasion || ""} onChange={e => updateMeta(currentLook.id, "occasion", e.target.value)} onBlur={() => save()}
+                    placeholder="Occasion" style={{ padding: "6px 10px", border: "1.5px solid #e8e4dc", borderRadius: 10, fontFamily: "'DM Sans', sans-serif", fontSize: 12, flex: "1 1 140px", outline: "none" }} />
+                  <input type="date" value={lookMeta[currentLook.id]?.date || ""} onChange={e => updateMeta(currentLook.id, "date", e.target.value)} onBlur={() => save()}
+                    style={{ padding: "6px 10px", border: "1.5px solid #e8e4dc", borderRadius: 10, fontFamily: "'DM Sans', sans-serif", fontSize: 12 }} />
+                  <input value={lookMeta[currentLook.id]?.lookNotes || ""} onChange={e => updateMeta(currentLook.id, "lookNotes", e.target.value)} onBlur={() => save()}
+                    placeholder="Notes for this look\u2026" style={{ padding: "6px 10px", border: "1.5px solid #e8e4dc", borderRadius: 10, fontFamily: "'DM Sans', sans-serif", fontSize: 12, flex: "2 1 200px", outline: "none" }} />
+                  <div style={{ marginLeft: "auto", display: "flex", gap: 6 }}>
+                    <button onClick={() => handleWorn(currentLook)} style={{ ...btnBase, padding: "6px 14px", background: "#f0faf4", color: "#2d6a3f", fontSize: 12, border: "none" }}>
+                      \u2713 Mark Worn
+                    </button>
+                    <button onClick={() => onOpenOutfit && onOpenOutfit(currentLook)} style={{ ...btnBase, padding: "6px 12px", background: "#f5f2ed", color: "#666", fontSize: 12, border: "none" }}>Details</button>
+                    <button onClick={() => removeLook(currentLook.id)} style={{ ...btnBase, padding: "6px 12px", background: "#fef2f2", color: "#e05555", fontSize: 12, border: "none" }}>Remove</button>
+                  </div>
                 </div>
               )}
-
-              {/* Nav */}
-              <div style={{ display: "flex", justifyContent: "center", gap: 16, padding: "8px 0 16px" }}>
-                <button onClick={() => go(-1)} disabled={idx === 0} style={{ ...btnBase, width: 40, height: 40, borderRadius: "50%", background: idx === 0 ? "#f0ece4" : "#1a1a1a", color: idx === 0 ? "#ccc" : "#fff", fontSize: 18, cursor: idx === 0 ? "default" : "pointer" }}><SvgArrowL size={18} color="currentColor" /></button>
-                <button onClick={() => go(1)} disabled={idx === looks.length - 1} style={{ ...btnBase, width: 40, height: 40, borderRadius: "50%", background: idx === looks.length - 1 ? "#f0ece4" : "#1a1a1a", color: idx === looks.length - 1 ? "#ccc" : "#fff", fontSize: 18, cursor: idx === looks.length - 1 ? "default" : "pointer" }}><SvgArrowR size={18} color="currentColor" /></button>
-              </div>
             </div>
+
           ) : (
-            /* Grid view */
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))", gap: 14, padding: 20, overflowY: "auto", flex: 1 }}>
+            /* ── GRID VIEW ── */
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: 14, padding: 20, overflowY: "auto", flex: 1 }}>
               {looks.map((look, i) => {
-                const items = (look.layers || look.itemIds || []).map(id => allItems.find(x => x.id === id)).filter(Boolean);
+                const pieces = (look.layers || look.itemIds || []).map(id => allItems.find(x => x.id === id)).filter(Boolean);
                 const meta = lookMeta[look.id] || {};
+                const metaWx = meta.date ? getWxForDate(meta.date) : null;
                 return (
                   <div key={look.id} style={{ cursor: "pointer", background: "#fff", borderRadius: 16, overflow: "hidden", border: "1.5px solid #e8e4dc", boxShadow: "0 2px 12px rgba(0,0,0,0.04)", position: "relative" }}>
-                    <div onClick={() => { setIdx(i); setView("slide"); }}>
+                    <div onClick={() => { setIdx(i); setView("editorial"); }}>
                       {look.previewImage ? (
-                        <div style={{ height: 140, background: `url(${look.previewImage}) center/contain no-repeat #f5f3ef` }} />
+                        <div style={{ height: 180, background: "url(" + look.previewImage + ") center/contain no-repeat #f5f3ef" }}>
+                          {metaWx && <div style={{ position: "absolute", top: 8, right: 8, background: "rgba(0,0,0,0.55)", borderRadius: 10, padding: "3px 8px", color: "#fff", fontSize: 11, fontWeight: 700 }}>{wxIcon(metaWx.code)} {metaWx.high}\u00B0</div>}
+                        </div>
                       ) : (
-                        <div style={{ display: "grid", gridTemplateColumns: items.length >= 2 ? "1fr 1fr" : "1fr", height: 140 }}>
-                          {items.slice(0, 4).map(item => (
-                            <div key={item.id} style={{ background: item.image ? `url(${item.image}) center/contain no-repeat #f5f3ef` : "#f5f3ef", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                        <div style={{ display: "grid", gridTemplateColumns: pieces.length >= 2 ? "1fr 1fr" : "1fr", height: 140 }}>
+                          {pieces.slice(0, 4).map(item => (
+                            <div key={item.id} style={{ background: item.image ? "url(" + item.image + ") center/contain no-repeat #f5f3ef" : "#f5f3ef", display: "flex", alignItems: "center", justifyContent: "center" }}>
                               {!item.image && <HangerIcon size={20} color="#ccc" />}
                             </div>
                           ))}
                         </div>
                       )}
-                      <div style={{ padding: "8px 10px 10px" }}>
-                        <div style={{ fontSize: 12, fontWeight: 700, color: "#1a1a1a", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{look.name || `Look ${i + 1}`}</div>
-                        {(meta.day || meta.occasion) && <div style={{ fontSize: 10, color: "#aaa", marginTop: 2 }}>{[meta.day, meta.occasion].filter(Boolean).join(" · ")}</div>}
-                        <div style={{ fontSize: 10, color: "#ccc", marginTop: 2 }}>{items.length} piece{items.length !== 1 ? "s" : ""}</div>
+                      <div style={{ padding: "8px 10px 4px" }}>
+                        <div style={{ fontSize: 12, fontWeight: 800, color: "#1a1a1a", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{look.name || ("Look " + (i+1))}</div>
+                        {(meta.day || meta.occasion) && <div style={{ fontSize: 10, color: "#aaa", marginTop: 2 }}>{[meta.day, meta.occasion].filter(Boolean).join(" \u00B7 ")}</div>}
+                        {meta.lookNotes && <div style={{ fontSize: 10, color: "#bbb", marginTop: 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{meta.lookNotes}</div>}
+                        <div style={{ fontSize: 10, color: "#ccc", marginTop: 2 }}>{pieces.length} piece{pieces.length !== 1 ? "s" : ""}</div>
                       </div>
                     </div>
-                    {/* Actions overlay */}
                     <div style={{ display: "flex", gap: 4, padding: "0 10px 10px" }}>
+                      <button onClick={() => handleWorn(look)} style={{ ...btnBase, flex: 1, fontSize: 10, padding: "4px 6px", background: "#f0faf4", color: "#2d6a3f", border: "none" }}>\u2713 Worn</button>
                       <button onClick={() => onOpenOutfit && onOpenOutfit(look)} style={{ ...btnBase, flex: 1, fontSize: 10, padding: "4px 6px", background: "#f5f2ed", color: "#666", border: "none" }}>Details</button>
                       <button onClick={() => removeLook(look.id)} style={{ ...btnBase, flex: 1, fontSize: 10, padding: "4px 6px", background: "#fef2f2", color: "#e05555", border: "none" }}>Remove</button>
                     </div>
@@ -2226,77 +2383,121 @@ function LookbookViewer({ lookbook, outfits, allItems, onClose, onUpdate, onOpen
           )}
         </div>
 
-        {/* Right sidebar */}
-        <div style={{ width: 260, background: "#fff", borderLeft: "1.5px solid #e8e4dc", padding: "18px 16px", display: "flex", flexDirection: "column", gap: 18, overflowY: "auto", flexShrink: 0 }}>
+        {/* ── RIGHT SIDEBAR ── */}
+        <div style={{ width: 272, background: "#fff", borderLeft: "1.5px solid #e8e4dc", padding: "16px 16px", display: "flex", flexDirection: "column", gap: 16, overflowY: "auto", flexShrink: 0 }}>
 
           {/* Stats */}
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
             {[
-              { label: "Outfits", value: looks.length },
-              { label: "Total Value", value: totalVal > 0 ? `$${totalVal.toFixed(0)}` : "—" },
-            ].map(s => (
-              <div key={s.label} style={{ background: "#faf9f6", borderRadius: 10, padding: "10px 10px", textAlign: "center" }}>
-                <div style={{ fontSize: 15, fontWeight: 800, color: "#1a1a1a" }}>{s.value}</div>
-                <div style={{ fontSize: 10, color: "#aaa", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.06em", marginTop: 1 }}>{s.label}</div>
+              { label: "Looks", value: looks.length },
+              { label: "Pieces", value: packItems.length },
+              { label: "Value", value: totalVal > 0 ? "$" + totalVal.toFixed(0) : "\u2014" },
+              tripDays ? { label: "Days", value: tripDays + (looks.length > 0 ? " / " + looks.length + " looks" : ""), small: true } : null,
+            ].filter(Boolean).map(s => (
+              <div key={s.label} style={{ background: "#faf9f6", borderRadius: 10, padding: "10px", textAlign: "center" }}>
+                <div style={{ fontSize: s.small ? 12 : 16, fontWeight: 800, color: "#1a1a1a", lineHeight: 1.2 }}>{s.value}</div>
+                <div style={{ fontSize: 10, color: "#aaa", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.06em", marginTop: 2 }}>{s.label}</div>
               </div>
             ))}
           </div>
 
-          {/* Pack List generator */}
+          {/* Tags */}
+          <div>
+            <div style={{ fontSize: 11, fontWeight: 700, color: "#aaa", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 8 }}>Tags</div>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 5 }}>
+              {["Travel","Work Week","Event","Disney","Sport","Weekend","Vacation"].map(t => {
+                const on = lbTags.includes(t);
+                return (
+                  <button key={t} onClick={() => { const next = on ? lbTags.filter(x => x !== t) : [...lbTags, t]; setLbTags(next); save({ tags: next }); }} style={{
+                    padding: "4px 10px", borderRadius: 20, border: "1px solid",
+                    borderColor: on ? "#1a1a1a" : "#e0dbd2",
+                    background: on ? "#1a1a1a" : "#fff",
+                    color: on ? "#fff" : "#888",
+                    fontFamily: "'DM Sans', sans-serif", fontSize: 11, fontWeight: 700, cursor: "pointer"
+                  }}>{t}</button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Weather */}
+          <div>
+            <div style={{ fontSize: 11, fontWeight: 700, color: "#aaa", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 8 }}>Trip Weather</div>
+            <div style={{ display: "flex", gap: 6 }}>
+              <input value={lbCity} onChange={e => setLbCity(e.target.value)} placeholder="City (e.g. Orlando, FL)"
+                onKeyDown={e => { if (e.key === "Enter") fetchWeather(); }}
+                style={{ flex: 1, padding: "7px 10px", border: "1.5px solid #e8e4dc", borderRadius: 10, fontFamily: "'DM Sans', sans-serif", fontSize: 12, outline: "none" }} />
+              <button onClick={fetchWeather} disabled={wxLoading || !lbCity.trim()} style={{ ...btnBase, padding: "7px 10px", background: "#f5f3ef", color: "#555", fontSize: 12, border: "none", flexShrink: 0 }}>
+                {wxLoading ? "\u2026" : "\u26C5"}
+              </button>
+            </div>
+            {lbWeather?.error && <div style={{ fontSize: 11, color: "#e05555", marginTop: 6 }}>{lbWeather.error}</div>}
+            {lbWeather?.days && lbWeather.days.length > 0 && (
+              <div style={{ marginTop: 8, maxHeight: 140, overflowY: "auto", display: "flex", flexDirection: "column", gap: 3 }}>
+                {lbWeather.days.filter(d => {
+                  if (!lookbook.dateStart && !lookbook.dateEnd) return true;
+                  return d.date >= (lookbook.dateStart || "0") && d.date <= (lookbook.dateEnd || "9999");
+                }).slice(0, 14).map(d => (
+                  <div key={d.date} style={{ display: "flex", alignItems: "center", gap: 8, padding: "4px 6px", borderRadius: 8, background: "#faf9f6" }}>
+                    <span style={{ fontSize: 14 }}>{wxIcon(d.code)}</span>
+                    <span style={{ fontSize: 11, fontWeight: 700, color: "#555", flex: 1 }}>{new Date(d.date + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" })}</span>
+                    <span style={{ fontSize: 11, color: "#1a1a1a", fontWeight: 700 }}>{d.high}\u00B0</span>
+                    <span style={{ fontSize: 10, color: "#bbb" }}>{d.low}\u00B0</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Pack list */}
           {looks.length > 0 && (
             <div>
               <button onClick={() => setShowPackList(p => !p)} style={{ width: "100%", padding: "8px 12px", background: showPackList ? "#f0faf4" : "#f5f3ef", border: showPackList ? "1.5px solid #b6e8c8" : "none", borderRadius: 10, cursor: "pointer", fontSize: 12, fontWeight: 700, color: showPackList ? "#2d6a3f" : "#666", fontFamily: "'DM Sans', sans-serif", textAlign: "left" }}>
-                <SvgLuggage size={13} color="currentColor" style={{marginRight:6}} />{showPackList ? "Hide" : "Generate"} Pack List
+                <SvgLuggage size={13} color="currentColor" style={{ marginRight: 6 }} />{showPackList ? "Hide" : "Packing List"} ({packItems.length} items)
               </button>
-              {showPackList && (() => {
-                const packed = {};
-                looks.forEach(look => {
-                  (look.layers || look.itemIds || []).forEach(id => {
-                    const item = allItems.find(i => i.id === id);
-                    if (item) packed[id] = item;
-                  });
-                });
-                const packItems = Object.values(packed);
-                return (
-                  <div style={{ marginTop: 8, background: "#faf9f6", borderRadius: 10, padding: "10px 12px" }}>
-                    <div style={{ fontSize: 11, fontWeight: 700, color: "#aaa", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 8 }}>{packItems.length} unique piece{packItems.length !== 1 ? "s" : ""}</div>
-                    <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
-                      {packItems.map(item => (
-                        <div key={item.id} style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                          <div style={{ width: 14, height: 14, borderRadius: 3, border: "1.5px solid #ccc", flexShrink: 0 }} />
-                          <div style={{ fontSize: 12, color: "#444", fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{item.name}</div>
-                          {item.category && <div style={{ fontSize: 10, color: "#bbb", flexShrink: 0 }}>{item.category}</div>}
-                        </div>
-                      ))}
-                    </div>
+              {showPackList && (
+                <div style={{ marginTop: 8, background: "#faf9f6", borderRadius: 10, padding: "10px 12px", maxHeight: 220, overflowY: "auto" }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
+                    <div style={{ fontSize: 11, fontWeight: 700, color: "#aaa", textTransform: "uppercase", letterSpacing: "0.06em" }}>{packItems.filter(i => checkedPack[i.id]).length} / {packItems.length} packed</div>
+                    <button onClick={() => setCheckedPack({})} style={{ fontSize: 10, fontWeight: 700, color: "#aaa", background: "none", border: "none", cursor: "pointer", fontFamily: "'DM Sans', sans-serif" }}>Reset</button>
                   </div>
-                );
-              })()}
+                  {/* Progress bar */}
+                  <div style={{ height: 4, borderRadius: 4, background: "#e8e4dc", marginBottom: 10, overflow: "hidden" }}>
+                    <div style={{ height: "100%", borderRadius: 4, background: "#2d6a3f", width: (packItems.length > 0 ? (packItems.filter(i => checkedPack[i.id]).length / packItems.length * 100) : 0) + "%", transition: "width 0.3s" }} />
+                  </div>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
+                    {packItems.map(item => (
+                      <div key={item.id} onClick={() => setCheckedPack(c => ({ ...c, [item.id]: !c[item.id] }))} style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer", opacity: checkedPack[item.id] ? 0.45 : 1 }}>
+                        <div style={{ width: 16, height: 16, borderRadius: 4, border: "2px solid", borderColor: checkedPack[item.id] ? "#2d6a3f" : "#ccc", background: checkedPack[item.id] ? "#2d6a3f" : "transparent", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                          {checkedPack[item.id] && <SvgCheck size={9} color="#fff" />}
+                        </div>
+                        <div style={{ fontSize: 12, color: "#444", fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1, textDecoration: checkedPack[item.id] ? "line-through" : "none" }}>{item.name}</div>
+                        {item.category && <div style={{ fontSize: 10, color: "#bbb", flexShrink: 0 }}>{item.category}</div>}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           )}
+
           {/* Notes */}
           <div>
-            <div style={{ fontSize: 11, fontWeight: 700, color: "#aaa", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 6 }}>Styling Notes</div>
-            <textarea value={notes} onChange={e => setNotes(e.target.value)} onBlur={save}
-              placeholder="Add notes…"
-              style={{ ...inputStyle, minHeight: 80, resize: "vertical", fontSize: 12 }} />
+            <div style={{ fontSize: 11, fontWeight: 700, color: "#aaa", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 6 }}>Lookbook Notes</div>
+            <textarea value={notes} onChange={e => setNotes(e.target.value)} onBlur={() => save()}
+              placeholder="Add notes\u2026"
+              style={{ width: "100%", padding: "9px 12px", border: "1.5px solid #e8e4dc", borderRadius: 12, fontFamily: "'DM Sans', sans-serif", fontSize: 12, resize: "vertical", minHeight: 70, outline: "none", boxSizing: "border-box" }} />
           </div>
 
-          {/* Add outfit */}
+          {/* Looks list with drag-to-reorder */}
           <div>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
               <div style={{ fontSize: 11, fontWeight: 700, color: "#aaa", textTransform: "uppercase", letterSpacing: "0.08em" }}>Looks</div>
-              <div style={{ display: "flex", gap: 6 }}>
-                <button onClick={() => setAddingOutfit(a => !a)} style={{ fontSize: 11, fontWeight: 700, color: addingOutfit ? "#2d6a3f" : "#888", background: "none", border: "none", cursor: "pointer", fontFamily: "'DM Sans', sans-serif" }}>
-                  {addingOutfit ? "Cancel" : "+ Add"}
-                </button>
-                <button onClick={() => { setReordering(r => !r); if (reordering) save(); }} style={{ fontSize: 11, fontWeight: 700, color: reordering ? "#2d6a3f" : "#888", background: "none", border: "none", cursor: "pointer", fontFamily: "'DM Sans', sans-serif" }}>
-                  {reordering ? "Done" : "Reorder"}
-                </button>
-              </div>
+              <button onClick={() => setAddingOutfit(a => !a)} style={{ fontSize: 11, fontWeight: 700, color: addingOutfit ? "#2d6a3f" : "#888", background: "none", border: "none", cursor: "pointer", fontFamily: "'DM Sans', sans-serif" }}>
+                {addingOutfit ? "Cancel" : "+ Add"}
+              </button>
             </div>
 
-            {/* Add outfit picker */}
             {addingOutfit && (
               <div style={{ marginBottom: 10, maxHeight: 160, overflowY: "auto", display: "flex", flexDirection: "column", gap: 5 }}>
                 {availableToAdd.length === 0 ? (
@@ -2308,37 +2509,44 @@ function LookbookViewer({ lookbook, outfits, allItems, onClose, onUpdate, onOpen
                     cursor: "pointer", fontFamily: "'DM Sans', sans-serif", textAlign: "left", width: "100%"
                   }}>
                     {o.previewImage && <img src={o.previewImage} alt="" style={{ width: 28, height: 28, objectFit: "contain", borderRadius: 6, background: "#f0ece4" }} />}
-                    <span style={{ fontSize: 12, fontWeight: 700, color: "#1a1a1a", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{o.name}</span>
-                    <span style={{ marginLeft: "auto", fontSize: 11, color: "#2d6a3f", fontWeight: 700 }}>+ Add</span>
+                    <span style={{ fontSize: 12, fontWeight: 700, color: "#1a1a1a", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1 }}>{o.name}</span>
+                    <span style={{ fontSize: 11, color: "#2d6a3f", fontWeight: 700 }}>+ Add</span>
                   </button>
                 ))}
               </div>
             )}
 
-            {/* Looks list */}
+            {/* Draggable looks list */}
             <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
               {looks.map((look, i) => {
                 const meta = lookMeta[look.id] || {};
+                const isDraggingOver = dragOver2 === i;
                 return (
-                  <div key={look.id} onClick={() => { setIdx(i); setView("slide"); }} style={{
-                    display: "flex", alignItems: "center", gap: 8, padding: "7px 10px",
-                    background: idx === i ? "#f0faf4" : "#fafaf8", borderRadius: 10,
-                    border: idx === i ? "1.5px solid #3aaa6e" : "1.5px solid #e8e4dc", cursor: "pointer"
-                  }}>
-                    {reordering && (
-                      <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-                        <button onClick={e => { e.stopPropagation(); if (i > 0) moveLook(i, i - 1); }} disabled={i === 0}
-                          style={{ background: "none", border: "none", cursor: i === 0 ? "default" : "pointer", color: i === 0 ? "#ccc" : "#888", fontSize: 10, padding: 0 }}>▲</button>
-                        <button onClick={e => { e.stopPropagation(); if (i < looks.length - 1) moveLook(i, i + 1); }} disabled={i === looks.length - 1}
-                          style={{ background: "none", border: "none", cursor: i === looks.length - 1 ? "default" : "pointer", color: i === looks.length - 1 ? "#ccc" : "#888", fontSize: 10, padding: 0 }}>▼</button>
-                      </div>
-                    )}
+                  <div key={look.id}
+                    draggable
+                    onDragStart={() => handleDragStart(i)}
+                    onDragEnter={() => handleDragEnter(i)}
+                    onDragEnd={handleDrop}
+                    onDragOver={e => e.preventDefault()}
+                    onClick={() => { setIdx(i); setView("editorial"); }}
+                    style={{
+                      display: "flex", alignItems: "center", gap: 8, padding: "7px 10px",
+                      background: idx === i ? "#f0faf4" : isDraggingOver ? "#f5f3ef" : "#fafaf8",
+                      borderRadius: 10,
+                      border: idx === i ? "1.5px solid #3aaa6e" : isDraggingOver ? "1.5px dashed #888" : "1.5px solid #e8e4dc",
+                      cursor: "grab", transition: "border-color 0.12s, background 0.12s"
+                    }}>
+                    <span style={{ color: "#ccc", fontSize: 12, flexShrink: 0 }}>\u2630</span>
                     <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontSize: 11, fontWeight: 700, color: "#1a1a1a", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{look.name || `Look ${i + 1}`}</div>
-                      {(meta.day || meta.occasion) && <div style={{ fontSize: 10, color: "#aaa", marginTop: 1 }}>{[meta.day, meta.occasion].filter(Boolean).join(" · ")}</div>}
+                      <div style={{ fontSize: 11, fontWeight: 700, color: "#1a1a1a", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{look.name || ("Look " + (i + 1))}</div>
+                      {(meta.day || meta.occasion) && <div style={{ fontSize: 10, color: "#aaa", marginTop: 1 }}>{[meta.day, meta.occasion].filter(Boolean).join(" \u00B7 ")}</div>}
                     </div>
-                    <button onClick={e => { e.stopPropagation(); removeLook(look.id); }} style={{ background: "none", border: "none", color: "#ddd", cursor: "pointer", fontSize: 12, padding: "0 2px", flexShrink: 0 }}
-                      onMouseEnter={e => e.currentTarget.style.color = "#e05555"} onMouseLeave={e => e.currentTarget.style.color = "#ddd"}><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+                    <button onClick={e => { e.stopPropagation(); removeLook(look.id); }}
+                      style={{ background: "none", border: "none", color: "#ddd", cursor: "pointer", fontSize: 12, padding: "0 2px", flexShrink: 0 }}
+                      onMouseEnter={e => e.currentTarget.style.color = "#e05555"}
+                      onMouseLeave={e => e.currentTarget.style.color = "#ddd"}>
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                    </button>
                   </div>
                 );
               })}
@@ -2349,7 +2557,6 @@ function LookbookViewer({ lookbook, outfits, allItems, onClose, onUpdate, onOpen
     </div>
   );
 }
-
 // ── BoardSizer — measures available space and renders a 4:5 white board ──────
 function BoardSizer({ boardRef: _ignored, children }) {
   const containerRef = useRef(null);
@@ -4653,7 +4860,7 @@ const NAV_ITEMS = [
   { id: "closet", label: "Closet" },
   { id: "outfits", label: "Outfits" },
   { id: "lookbooks", label: "Lookbooks" },
-  { id: "stats", label: "Story" },
+  { id: "stats", label: "Style Profile" },
   { id: "moodboard", label: "Moodboard" },
   { id: "seller", label: "Seller" },
   { id: "wishlist", label: "Wishlist" },
@@ -5168,6 +5375,8 @@ export default function App() {
   const [moodboardActiveIdx, setMoodboardActiveIdx] = useState(0);
   const [lbSearch, setLbSearch] = useState("");
   const [lbSort, setLbSort] = useState("newest");
+  const [lbZoom, setLbZoom] = useState(210);
+  const [lbTagFilter, setLbTagFilter] = useState("All");
   const [bulkMode, setBulkMode] = useState(false);
   const [wishlistDest, setWishlistDest] = useState(false);
   const [wlSort, setWlSort] = useState("priority");
@@ -5182,6 +5391,8 @@ export default function App() {
   const [newLbNotes, setNewLbNotes] = useState("");
   const [newLbCover, setNewLbCover] = useState(""); // base64 data URL
   const [newLbDateStart, setNewLbDateStart] = useState("");
+  const [newLbTags, setNewLbTags] = useState([]);
+  const [newLbCity, setNewLbCity] = useState("");
   const [newLbDateEnd, setNewLbDateEnd] = useState("");
   const [newLbSelected, setNewLbSelected] = useState([]);
 
@@ -5232,7 +5443,7 @@ export default function App() {
     };
     setLookbookModal(false);
     setNewLbName(""); setNewLbNotes(""); setNewLbCover("");
-    setNewLbDateStart(""); setNewLbDateEnd(""); setNewLbSelected([]);
+    setNewLbDateStart(""); setNewLbDateEnd(""); setNewLbSelected([]); setNewLbTags([]); setNewLbCity("");
     // Try wrapped {id, data} schema first, fall back to flat insert
     let { error } = await supabase.from("lookbooks").insert({ id: newLb.id, data: newLb });
     if (error) {
@@ -5338,7 +5549,7 @@ export default function App() {
     closet: ["My Closet", `${itemsDb.rows.filter(i=>!i.forSale).length} pieces`],
     outfits: ["My Outfits", `${outfitsDb.rows.length} looks`],
     lookbooks: ["Lookbooks", "Curated collections"],
-    stats: ["My Story", "Your wardrobe in focus"],
+    stats: ["Style Profile", "Your wardrobe in focus"],
     moodboard: ["Moodboard", "Inspire yourself"],
     seller: ["Seller Dashboard", "What's for sale"],
     wishlist: ["Wishlist", "Want it"],
@@ -5677,19 +5888,34 @@ export default function App() {
             {tab === "lookbooks" && (
               <div className="fade-up">
                 {/* Toolbar */}
-                <div style={{ display: "flex", gap: 10, marginBottom: 20, flexWrap: "wrap", alignItems: "center" }}>
+                <div style={{ display: "flex", gap: 10, marginBottom: 10, flexWrap: "wrap", alignItems: "center" }}>
                   <input value={lbSearch} onChange={e => setLbSearch(e.target.value)} placeholder="Search lookbooks…"
                     style={{ flex: "1 1 180px", padding: "9px 14px", border: "1.5px solid #e8e4dc", borderRadius: 12, fontFamily: "'DM Sans', sans-serif", fontSize: 13, outline: "none", background: "#faf9f6" }} />
-                  <select value={lbSort} onChange={e => setLbSort(e.target.value)}
-                    style={{ padding: "9px 12px", border: "1.5px solid #e8e4dc", borderRadius: 12, fontFamily: "'DM Sans', sans-serif", fontSize: 13, background: "#faf9f6", color: "#555", fontWeight: 600 }}>
+                  <select value={lbSort} onChange={e => setLbSort(e.target.value)} className="pill-select">
                     <option value="newest">Newest</option>
                     <option value="az">A – Z</option>
                     <option value="most">Most Outfits</option>
                   </select>
-                  <button className="btn-primary" onClick={() => setLookbookModal(true)} style={{
-                    padding: "9px 18px", background: "#1a1a1a", color: "#fff", border: "none",
-                    borderRadius: 12, cursor: "pointer", fontFamily: "'DM Sans', sans-serif", fontSize: 13, fontWeight: 700, whiteSpace: "nowrap"
-                  }}>+ New Lookbook</button>
+                  {/* Zoom slider */}
+                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    <SvgBox size={12} color="#bbb" />
+                    <input type="range" min={160} max={340} step={10} value={lbZoom} onChange={e => setLbZoom(Number(e.target.value))}
+                      style={{ width: 80, accentColor: "#1a1a1a", cursor: "pointer" }} />
+                    <SvgBox size={17} color="#bbb" />
+                  </div>
+
+                </div>
+                {/* Tag filter row */}
+                <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 18 }}>
+                  {["All","Travel","Work Week","Event","Disney","Sport","Weekend","Vacation"].map(t => (
+                    <button key={t} onClick={() => setLbTagFilter(t)} style={{
+                      padding: "5px 13px", borderRadius: 100, border: "1px solid",
+                      borderColor: lbTagFilter === t ? "#1a1a1a" : "#e0dbd2",
+                      background: lbTagFilter === t ? "#1a1a1a" : "#fff",
+                      color: lbTagFilter === t ? "#fff" : "#666",
+                      fontFamily: "'DM Sans', sans-serif", fontSize: 12, fontWeight: 600, cursor: "pointer"
+                    }}>{t}</button>
+                  ))}
                 </div>
 
                 {(() => {
@@ -5698,9 +5924,11 @@ export default function App() {
                     const dt = new Date(d + "T00:00:00");
                     return dt.toLocaleDateString("en-US", { month: "short", day: "numeric" });
                   };
-                  let filtered = lookbooksDb.rows.filter(lb =>
-                    !lbSearch || lb.name.toLowerCase().includes(lbSearch.toLowerCase())
-                  );
+                  let filtered = lookbooksDb.rows.filter(lb => {
+                    const matchSearch = !lbSearch || lb.name.toLowerCase().includes(lbSearch.toLowerCase());
+                    const matchTag = lbTagFilter === "All" || (lb.tags || []).includes(lbTagFilter);
+                    return matchSearch && matchTag;
+                  });
                   if (lbSort === "az") filtered = [...filtered].sort((a, b) => a.name.localeCompare(b.name));
                   else if (lbSort === "most") filtered = [...filtered].sort((a, b) => (b.outfitIds || []).length - (a.outfitIds || []).length);
 
@@ -5713,7 +5941,7 @@ export default function App() {
                   );
 
                   return (
-                    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(210px, 1fr))", gap: 16 }}>
+                    <div style={{ display: "grid", gridTemplateColumns: `repeat(auto-fill, minmax(${lbZoom}px, 1fr))`, gap: 16 }}>
                       {filtered.map((lb, i) => {
                         const lbOutfits = (lb.outfitIds || []).map(id => outfitsDb.rows.find(o => o.id === id)).filter(Boolean);
                         const previewItems = lbOutfits.slice(0, 4).flatMap(o =>
@@ -5754,7 +5982,7 @@ export default function App() {
                                 <span style={{ fontSize: 11, color: "#aaa", fontWeight: 600 }}>{lbOutfits.length} outfit{lbOutfits.length !== 1 ? "s" : ""}</span>
                                 {totalVal > 0 && <span style={{ fontSize: 11, color: "#aaa" }}>· ${totalVal.toFixed(0)} total</span>}
                               </div>
-                              {dateStr && <div style={{ fontSize: 11, color: "#b0a898", marginTop: 4, fontWeight: 600 }}><SvgCalendar size={11} color="#b0a898" style={{marginRight:6, verticalAlign:"middle"}} />{dateStr}</div>}
+                              {dateStr && <div style={{ fontSize: 11, color: "#b0a898", marginTop: 4, fontWeight: 600, display:"flex", alignItems:"center", gap:5 }}><SvgCalendar size={11} color="#b0a898" style={{marginRight:4, verticalAlign:"middle", flexShrink:0}} />{dateStr}</div>}
                             </div>
                           </div>
                         );
@@ -5795,8 +6023,8 @@ export default function App() {
           )}
         </div>
 
-        {/* ── RIGHT PANEL (always visible) ── */}
-        <div className="app-right-panel" style={{ top: 24 }}>
+        {/* ── RIGHT PANEL (closet / outfits / moodboard only) ── */}
+        {["closet","outfits","moodboard"].includes(tab) && <div className="app-right-panel" style={{ top: 24 }}>
 
           {/* Sort moved to top toolbar for closet/outfits */}
 
@@ -5885,7 +6113,7 @@ export default function App() {
 
 
 
-        </div>
+        </div>}
           </div>{/* end app-layout */}
         </div>{/* end app-main-area */}
         {/* ── RIGHT RAIL (stats/sort/etc) ── */}
@@ -5942,6 +6170,25 @@ export default function App() {
           <div style={{ flex: 1 }}>
             <label style={{ display: "block", fontSize: 11, fontWeight: 600, color: "#999", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 6 }}>End Date</label>
             <input type="date" value={newLbDateEnd} onChange={e => setNewLbDateEnd(e.target.value)} style={inputStyle} />
+          </div>
+        </div>
+        <div style={{ marginBottom: 14 }}>
+          <label style={{ display: "block", fontSize: 11, fontWeight: 600, color: "#999", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 6 }}>City (for weather)</label>
+          <input value={newLbCity} onChange={e => setNewLbCity(e.target.value)} placeholder="e.g. Orlando, FL" style={inputStyle} />
+        </div>
+        <div style={{ marginBottom: 14 }}>
+          <label style={{ display: "block", fontSize: 11, fontWeight: 600, color: "#999", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 8 }}>Tags</label>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+            {["Travel","Work Week","Event","Disney","Sport","Weekend","Vacation"].map(t => {
+              const on = newLbTags.includes(t);
+              return (
+                <button key={t} onClick={() => setNewLbTags(s => on ? s.filter(x => x !== t) : [...s, t])} style={{
+                  padding: "4px 12px", borderRadius: 20, border: "1px solid", fontFamily: "'DM Sans', sans-serif",
+                  borderColor: on ? "#1a1a1a" : "#e0dbd2", background: on ? "#1a1a1a" : "#fff",
+                  color: on ? "#fff" : "#888", fontSize: 12, fontWeight: 700, cursor: "pointer"
+                }}>{t}</button>
+              );
+            })}
           </div>
         </div>
         {outfitsDb.rows.length > 0 && (
@@ -6141,6 +6388,7 @@ export default function App() {
         <LookbookViewer
           lookbook={activeLookbook}
           outfits={outfitsDb.rows}
+          markOutfitWorn={markOutfitWorn}
           allItems={allItems}
           onClose={() => setActiveLookbook(null)}
           onUpdate={updateLookbook}

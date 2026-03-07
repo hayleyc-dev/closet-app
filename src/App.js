@@ -32,7 +32,8 @@ const SvgCalendar = ({size=14,color="currentColor"}) => <Ico size={size} color={
 const SvgLuggage  = ({size=14,color="currentColor"}) => <Ico size={size} color={color}><rect x="4" y="7" width="16" height="14" rx="2"/><path d="M16 7V5a2 2 0 00-2-2h-4a2 2 0 00-2 2v2"/><line x1="12" y1="12" x2="12" y2="16"/><line x1="10" y1="14" x2="14" y2="14"/></Ico>;
 const SvgLock     = ({size=14,color="currentColor"}) => <Ico size={size} color={color}><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></Ico>;
 const SvgUnlock   = ({size=14,color="currentColor"}) => <Ico size={size} color={color}><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 019.9-1"/></Ico>;
-const SvgPalette  = ({size=16,color="currentColor"}) => <Ico size={size} color={color}><circle cx="13.5" cy="6.5" r=".5" fill={color}/><circle cx="17.5" cy="10.5" r=".5" fill={color}/><circle cx="8.5" cy="7.5" r=".5" fill={color}/><circle cx="6.5" cy="12.5" r=".5" fill={color}/><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10c.28 0 .5-.22.5-.5 0-.26-.1-.49-.26-.68-.44-.52-.26-1.32.4-1.32H14c3.31 0 6-2.69 6-6 0-4.97-4.48-9-10-9z"/></Ico>;
+const SvgPushPin  = ({size=16,color="currentColor"}) => <Ico size={size} color={color}><line x1="12" y1="17" x2="12" y2="22"/><path d="M5 17h14"/><path d="M15 5h1a2 2 0 012 2v1a2 2 0 01-2 2H8a2 2 0 01-2-2V7a2 2 0 012-2h1"/><rect x="9" y="2" width="6" height="4" rx="1"/></Ico>;
+const SvgPalette  = ({size=16,color="currentColor"}) => <Ico size={size} color={color}><path d="M12 2a10 10 0 100 20 4 4 0 004-4c0-1.1-.9-2-2-2h-1a1 1 0 010-2h1a2 2 0 002-2 10 10 0 00-4-10z"/><circle cx="8.5" cy="9" r="1.5" fill={color} stroke="none"/><circle cx="12" cy="6" r="1.5" fill={color} stroke="none"/><circle cx="15.5" cy="9" r="1.5" fill={color} stroke="none"/></Ico>;
 const SvgSparkle  = ({size=16,color="currentColor"}) => <Ico size={size} color={color}><path d="M12 2l2.4 7.4H22l-6.2 4.5 2.4 7.4L12 17l-6.2 4.3 2.4-7.4L2 9.4h7.6z"/></Ico>;
 
 
@@ -151,7 +152,7 @@ const globalStyles = `
   .nav-icon-btn .nav-label { font-size: 9px; font-weight: 600; letter-spacing: 0.02em; color: #c0b8b0; text-transform: uppercase; line-height: 1; }
   .nav-icon-btn.active .nav-label { color: rgba(255,255,255,0.6); }
   .nav-icon-btn-bottom { margin-top: auto; }
-  .pill-select { padding: 7px 32px 7px 14px !important; border-radius: 100px; border: 1px solid #e0dbd2; font-family: 'DM Sans', sans-serif; font-size: 12px; font-weight: 600; background: #fff; color: #444; cursor: pointer; appearance: none; -webkit-appearance: none; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%23888' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 12px center; }
+  .pill-select { padding: 7px 36px 7px 14px !important; border-radius: 100px; border: 1px solid #e0dbd2; font-family: 'DM Sans', sans-serif; font-size: 12px; font-weight: 600; background: #fff; color: #444; cursor: pointer; appearance: none; -webkit-appearance: none; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%23888' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 14px center; }
 
   .app-body { margin-left: 76px; flex: 1; display: flex; min-height: 100vh; }
   .app-main-area { flex: 1; min-width: 0; padding: 36px 32px; }
@@ -210,6 +211,8 @@ const globalStyles = `
 
   /* Item card edit btn reveal on hover */
   .item-card:hover .item-card-edit-btn { opacity: 1 !important; }
+  .palette-del-btn { opacity: 0 !important; transition: opacity 0.15s; }
+  div:hover > .palette-del-btn { opacity: 1 !important; }
 
   /* Legacy compat */
   .closet-layout { display: flex; gap: 0; align-items: flex-start; }
@@ -916,9 +919,11 @@ function saveDrafts(d) { try { localStorage.setItem(DRAFTS_KEY, JSON.stringify(d
 
 // ── Add Item Modal ────────────────────────────────────────────────────────────
 // Unified form with Closet/Wishlist toggle at top + draft folder
-function AddItemModal({ onSave, onSaveWish, onCancel, initial, editMode, initialDest }) {
+function AddItemModal({ onSave, onSaveWish, onCancel, initial, editMode, initialDest, wishlistsDb = [], saveWishlistsMeta }) {
   const isWishInitial = !!(initial?.link) || initialDest === "wishlist";
   const [dest, setDest] = useState(isWishInitial ? "wishlist" : "closet"); // "closet" | "wishlist"
+  const [selectedListId, setSelectedListId] = useState("none"); // "none" | existing id | "new"
+  const [newListName, setNewListName] = useState("");
   const [form, setForm] = useState({
     ...BLANK,
     colors: [], seasons: [], spent: "",
@@ -955,8 +960,17 @@ function AddItemModal({ onSave, onSaveWish, onCancel, initial, editMode, initial
 
   const handleSave = () => {
     const out = { ...form, color: (form.colors||[])[0] || "", season: (form.seasons||[])[0] || "" };
-    if (dest === "wishlist") onSaveWish(out);
-    else onSave(out);
+    if (dest === "wishlist") {
+      let listId = selectedListId === "none" ? undefined : selectedListId;
+      if (selectedListId === "new" && newListName.trim()) {
+        const newList = { id: Date.now().toString(36), name: newListName.trim(), notes: "" };
+        if (saveWishlistsMeta) saveWishlistsMeta([...wishlistsDb, newList]);
+        listId = newList.id;
+      }
+      onSaveWish(out, listId);
+    } else {
+      onSave(out);
+    }
   };
 
   // ── Drafts panel ──
@@ -1035,6 +1049,36 @@ function AddItemModal({ onSave, onSaveWish, onCancel, initial, editMode, initial
       <Input label="Brand" value={form.brand} onChange={set("brand")} placeholder="e.g. Zara" />
       {dest === "wishlist" && <Input label="Store" value={form.store || ""} onChange={e => setForm(f => ({ ...f, store: e.target.value }))} placeholder="e.g. Zara, ASOS, Amazon" />}
 
+      {/* Wishlist list picker */}
+      {dest === "wishlist" && (
+        <div style={{ marginBottom: 14 }}>
+          <label style={{ display: "block", fontSize: 11, fontWeight: 600, color: "#999", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 6 }}>Add to List</label>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+            <button type="button" onClick={() => setSelectedListId("none")} style={{
+              padding: "6px 14px", borderRadius: 100, border: selectedListId === "none" ? "none" : "1px solid #e0dbd2",
+              background: selectedListId === "none" ? "#1a1a1a" : "#fff", color: selectedListId === "none" ? "#fff" : "#555",
+              fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "'DM Sans', sans-serif",
+            }}>No List</button>
+            {wishlistsDb.map(wl => (
+              <button key={wl.id} type="button" onClick={() => setSelectedListId(wl.id)} style={{
+                padding: "6px 14px", borderRadius: 100, border: selectedListId === wl.id ? "none" : "1px solid #e0dbd2",
+                background: selectedListId === wl.id ? "#1a1a1a" : "#fff", color: selectedListId === wl.id ? "#fff" : "#555",
+                fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "'DM Sans', sans-serif",
+              }}>{wl.name}</button>
+            ))}
+            <button type="button" onClick={() => setSelectedListId("new")} style={{
+              padding: "6px 14px", borderRadius: 100, border: selectedListId === "new" ? "none" : "1.5px dashed #c0b8b0",
+              background: selectedListId === "new" ? "#1a1a1a" : "transparent", color: selectedListId === "new" ? "#fff" : "#aaa",
+              fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "'DM Sans', sans-serif",
+            }}>+ New List</button>
+          </div>
+          {selectedListId === "new" && (
+            <input value={newListName} onChange={e => setNewListName(e.target.value)} placeholder="New list name…" autoFocus
+              style={{ marginTop: 8, width: "100%", padding: "8px 12px", border: "1px solid #e0dbd2", borderRadius: 10, fontFamily: "'DM Sans', sans-serif", fontSize: 13, fontWeight: 600, outline: "none", boxSizing: "border-box" }} />
+          )}
+        </div>
+      )}
+
       <div style={{ display: "flex", gap: 10 }}>
         <div style={{ flex: 1 }}><SelectField label="Category" options={CATEGORIES.slice(1)} value={form.category} onChange={set("category")} /></div>
         <div style={{ flex: 1 }}><SelectField label="Size" options={SIZES} value={form.size} onChange={set("size")} /></div>
@@ -1111,7 +1155,7 @@ function ItemCard({ item, onClick, onEdit }) {
 }
 
 // ── Item Detail Popup ────────────────────────────────────────────────────────
-function ItemDetailPopup({ item, onClose, onEdit, onDelete, onWorn, onCreateOutfit, onListForSale, outfits, lookbooks }) {
+function ItemDetailPopup({ item, onClose, onEdit, onDelete, onWorn, onCreateOutfit, onListForSale, onMoveToCloset, outfits, lookbooks, isWishlist }) {
   const priceNum = parseFloat((item.price || "").replace(/[^0-9.]/g, "")) || 0;
   const spentNum = parseFloat((item.spent || "").replace(/[^0-9.]/g, "")) || 0;
   const worn = item.wornCount || 0;
@@ -1161,8 +1205,10 @@ function ItemDetailPopup({ item, onClose, onEdit, onDelete, onWorn, onCreateOutf
               {[
                 { label: "Price", value: priceNum > 0 ? `$${priceNum.toFixed(0)}` : "—" },
                 { label: "Spent", value: spentNum > 0 ? `$${spentNum.toFixed(0)}` : "—" },
-                { label: "Worn", value: worn > 0 ? `${worn}×` : "—" },
-                { label: "Cost/wear", value: cpw ? `$${cpw}` : "—" },
+                ...(!isWishlist ? [
+                  { label: "Worn", value: worn > 0 ? `${worn}×` : "—" },
+                  { label: "Cost/wear", value: cpw ? `$${cpw}` : "—" },
+                ] : []),
                 { label: "Outfits", value: featuredOutfits.length },
                 { label: "Lookbooks", value: featuredLookbookCount },
               ].map(s => (
@@ -1173,21 +1219,21 @@ function ItemDetailPopup({ item, onClose, onEdit, onDelete, onWorn, onCreateOutf
               ))}
             </div>
 
-            <button onClick={onWorn} style={{
-              width: "100%", padding: "10px", marginBottom: 10,
-              background: "#f0faf4", border: "1.5px solid #b6e8c8", borderRadius: 12,
-              cursor: "pointer", fontSize: 13, fontWeight: 700, color: "#2d6a3f",
-              fontFamily: "'DM Sans', sans-serif"
-            }}><SvgHanger size={13} color="currentColor" style={{marginRight:4}} />Mark as Worn{worn > 0 ? ` (${worn}×)` : ""}</button>
+            {!isWishlist && (
+              <button onClick={onWorn} style={{
+                width: "100%", padding: "10px", marginBottom: 10,
+                background: "#f0faf4", border: "1.5px solid #b6e8c8", borderRadius: 12,
+                cursor: "pointer", fontSize: 13, fontWeight: 700, color: "#2d6a3f",
+                fontFamily: "'DM Sans', sans-serif"
+              }}><SvgHanger size={13} color="currentColor" style={{marginRight:6}} />Mark as Worn{worn > 0 ? ` (${worn}×)` : ""}</button>
+            )}
 
             {item.purchaseDate && (
               <div style={{ fontSize: 11, color: "#bbb", marginBottom: 10, textAlign: "center" }}>
                 Purchased {new Date(item.purchaseDate + "T00:00:00").toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}
               </div>
             )}
-            {item.link && (
-              <a href={item.link} target="_blank" rel="noreferrer" style={{ display: "block", fontSize: 12, color: "#2bafd4", fontWeight: 700, textAlign: "center", marginBottom: 10, textDecoration: "none" }}>View Product</a>
-            )}
+
             {item.notes && (
               <div style={{ background: "#faf9f6", borderRadius: 10, padding: "10px 12px", fontSize: 12, color: "#555", lineHeight: 1.6 }}>{item.notes}</div>
             )}
@@ -1203,22 +1249,22 @@ function ItemDetailPopup({ item, onClose, onEdit, onDelete, onWorn, onCreateOutf
               <div style={{ fontSize: 11, color: "#bbb", marginTop: 1 }}>{featuredOutfits.length} outfit{featuredOutfits.length !== 1 ? "s" : ""}</div>
             </div>
             <div style={{ display: "flex", gap: 7, alignItems: "center" }}>
-              {/* Worn badge */}
-              {worn > 0 && (
-                <div style={{ padding: "6px 12px", background: "#f0faf4", borderRadius: 10, fontSize: 12, fontWeight: 700, color: "#2d6a3f" }}><SvgHanger size={12} color="#2d6a3f" style={{marginRight:3}} />{worn}×</div>
+              {/* Worn badge — closet only */}
+              {!isWishlist && worn > 0 && (
+                <div style={{ padding: "6px 12px", background: "#f0faf4", borderRadius: 10, fontSize: 12, fontWeight: 700, color: "#2d6a3f" }}><SvgHanger size={12} color="#2d6a3f" style={{marginRight:6}} />{worn}×</div>
               )}
               {/* Edit */}
               <button onClick={onEdit} title="Edit" style={{ width: 34, height: 34, borderRadius: "50%", background: "#f5f2ed", border: "none", cursor: "pointer", fontSize: 15, color: "#444", display: "flex", alignItems: "center", justifyContent: "center" }}><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>
               {/* Delete */}
               <button onClick={onDelete} title="Delete" style={{ width: 34, height: 34, borderRadius: "50%", background: "#fef2f2", border: "none", cursor: "pointer", fontSize: 15, color: "#e05555", display: "flex", alignItems: "center", justifyContent: "center" }}><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4h6v2"/></svg></button>
-              {/* List for Sale */}
-              <button onClick={onListForSale} title="List for Sale" style={{ padding: "6px 12px", background: "#fff8ee", border: "1.5px solid #f5c842", borderRadius: 12, cursor: "pointer", fontSize: 12, fontWeight: 700, color: "#a07000", fontFamily: "'DM Sans', sans-serif", display: "flex", alignItems: "center", gap: 5 }}><SvgTag size={12} color="currentColor" style={{marginRight:4}} />List for Sale</button>
-              {/* Create Outfit */}
-              <button onClick={onCreateOutfit} style={{
-                padding: "8px 14px", background: "#1a1a1a", border: "none", borderRadius: 12,
-                cursor: "pointer", fontSize: 12, fontWeight: 700, color: "#fff",
-                fontFamily: "'DM Sans', sans-serif", display: "flex", alignItems: "center", gap: 6
-              }}><SvgSparkle size={13} color="currentColor" style={{marginRight:4}} />Create Outfit</button>
+              {/* Wishlist: Buy + Purchased | Closet: List for Sale + Create Outfit */}
+              {isWishlist ? (<>
+                {item.link && <a href={item.link} target="_blank" rel="noreferrer" style={{ padding: "8px 14px", background: "#1a1a1a", borderRadius: 12, fontSize: 12, fontWeight: 700, color: "#fff", fontFamily: "'DM Sans', sans-serif", display: "flex", alignItems: "center", gap: 6, textDecoration: "none" }}><SvgShop size={13} color="#fff" style={{marginRight:6}} />Buy</a>}
+                <button onClick={onMoveToCloset} style={{ padding: "8px 14px", background: "#f0faf4", border: "1.5px solid #b6e8c8", borderRadius: 12, cursor: "pointer", fontSize: 12, fontWeight: 700, color: "#2d6a3f", fontFamily: "'DM Sans', sans-serif", display: "flex", alignItems: "center", gap: 6 }}><SvgCheck size={13} color="currentColor" style={{marginRight:6}} />Purchased</button>
+              </>) : (<>
+                <button onClick={onListForSale} title="List for Sale" style={{ padding: "6px 12px", background: "#fff8ee", border: "1.5px solid #f5c842", borderRadius: 12, cursor: "pointer", fontSize: 12, fontWeight: 700, color: "#a07000", fontFamily: "'DM Sans', sans-serif", display: "flex", alignItems: "center", gap: 5 }}><SvgTag size={12} color="currentColor" style={{marginRight:6}} />List for Sale</button>
+                <button onClick={onCreateOutfit} style={{ padding: "8px 14px", background: "#1a1a1a", border: "none", borderRadius: 12, cursor: "pointer", fontSize: 12, fontWeight: 700, color: "#fff", fontFamily: "'DM Sans', sans-serif", display: "flex", alignItems: "center", gap: 6 }}><SvgSparkle size={13} color="currentColor" style={{marginRight:6}} />Create Outfit</button>
+              </>)}
               {/* Close */}
               <button onClick={onClose} style={{ width: 34, height: 34, borderRadius: "50%", background: "#f5f2ed", border: "none", cursor: "pointer", fontSize: 15, color: "#888", display: "flex", alignItems: "center", justifyContent: "center" }}><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
             </div>
@@ -1461,7 +1507,7 @@ function OutfitDetailPopup({ outfit, allItems, lookbooks, onClose, onEdit, onDel
                     <button key={lb.id} onClick={() => onGoToLookbook(lb)} style={{
                       padding: "4px 12px", borderRadius: 20, background: "#f5f0ff", border: "1.5px solid #c4b0f0",
                       color: "#7c6fe0", fontSize: 11, fontWeight: 700, cursor: "pointer", fontFamily: "'DM Sans', sans-serif"
-                    }}><SvgGrid size={12} color="currentColor" style={{marginRight:4}} />{lb.name}</button>
+                    }}><SvgGrid size={12} color="currentColor" style={{marginRight:6}} />{lb.name}</button>
                   ))}
                 </div>
               </div>
@@ -1504,9 +1550,9 @@ function OutfitDetailPopup({ outfit, allItems, lookbooks, onClose, onEdit, onDel
             </div>
             {/* Action buttons */}
             <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
-              <button onClick={handleMarkWorn} style={{ padding: "6px 12px", borderRadius: 10, background: wornFlash ? "#2d6a3f" : "#f0faf4", border: "1.5px solid #b6e8c8", cursor: "pointer", fontSize: 12, fontWeight: 700, color: wornFlash ? "#fff" : "#2d6a3f", fontFamily: "'DM Sans', sans-serif", transition: "all 0.2s" }}><SvgHanger size={12} color="currentColor" style={{marginRight:4}} />{wornFlash ? "Marked!" : "Worn"}</button>
-              <button onClick={onDuplicate} style={{ padding: "6px 12px", borderRadius: 10, background: "#f5f2ed", border: "none", cursor: "pointer", fontSize: 12, fontWeight: 700, color: "#666", fontFamily: "'DM Sans', sans-serif" }}><SvgCopy size={12} color="currentColor" style={{marginRight:4}} />Copy</button>
-              {outfit.previewImage && <button onClick={exportPreview} style={{ padding: "6px 12px", borderRadius: 10, background: exported ? "#f0faf4" : "#f5f3ef", border: "none", cursor: "pointer", fontSize: 12, fontWeight: 700, color: exported ? "#2d6a3f" : "#666", fontFamily: "'DM Sans', sans-serif" }}>{exported ? <><SvgCheck size={12} color="currentColor" style={{marginRight:3}} />Saved</> : <><SvgDownload size={12} color="currentColor" style={{marginRight:3}} />Export</>}</button>}
+              <button onClick={handleMarkWorn} style={{ padding: "6px 12px", borderRadius: 10, background: wornFlash ? "#2d6a3f" : "#f0faf4", border: "1.5px solid #b6e8c8", cursor: "pointer", fontSize: 12, fontWeight: 700, color: wornFlash ? "#fff" : "#2d6a3f", fontFamily: "'DM Sans', sans-serif", transition: "all 0.2s" }}><SvgHanger size={12} color="currentColor" style={{marginRight:6}} />{wornFlash ? "Marked!" : "Worn"}</button>
+              <button onClick={onDuplicate} style={{ padding: "6px 12px", borderRadius: 10, background: "#f5f2ed", border: "none", cursor: "pointer", fontSize: 12, fontWeight: 700, color: "#666", fontFamily: "'DM Sans', sans-serif" }}><SvgCopy size={12} color="currentColor" style={{marginRight:6}} />Copy</button>
+              {outfit.previewImage && <button onClick={exportPreview} style={{ padding: "6px 12px", borderRadius: 10, background: exported ? "#f0faf4" : "#f5f3ef", border: "none", cursor: "pointer", fontSize: 12, fontWeight: 700, color: exported ? "#2d6a3f" : "#666", fontFamily: "'DM Sans', sans-serif" }}>{exported ? <><SvgCheck size={12} color="currentColor" style={{marginRight:6}} />Saved</> : <><SvgDownload size={12} color="currentColor" style={{marginRight:6}} />Export</>}</button>}
               <button onClick={onEdit} style={{ width: 32, height: 32, borderRadius: "50%", background: "#f5f2ed", border: "none", cursor: "pointer", fontSize: 14, color: "#444", display: "flex", alignItems: "center", justifyContent: "center" }}><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>
               <button onClick={onDelete} style={{ width: 32, height: 32, borderRadius: "50%", background: "#fef2f2", border: "none", cursor: "pointer", color: "#e05555", display: "flex", alignItems: "center", justifyContent: "center" }}><SvgTrash size={14} color="#e05555" /></button>
               <button onClick={onClose} style={{ width: 32, height: 32, borderRadius: "50%", background: "#f5f2ed", border: "none", cursor: "pointer", fontSize: 14, color: "#888", display: "flex", alignItems: "center", justifyContent: "center" }}><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
@@ -1735,12 +1781,12 @@ function LookbookViewer({ lookbook, outfits, allItems, onClose, onUpdate, onOpen
             : <span onClick={() => setEditingName(true)} style={{ fontSize: 16, fontWeight: 700, color: "#1a1a1a", cursor: "pointer" }}>{lbName}</span>
           }
           <span style={{ fontSize: 12, color: "#aaa" }}>{looks.length} look{looks.length !== 1 ? "s" : ""}</span>
-          {dateStr && <span style={{ fontSize: 11, color: "#b0a898", fontWeight: 600, background: "#f5f2ed", borderRadius: 8, padding: "2px 8px" }}><SvgCalendar size={11} color="#b0a898" style={{marginRight:3,verticalAlign:"middle"}} />{dateStr}</span>}
+          {dateStr && <span style={{ fontSize: 11, color: "#b0a898", fontWeight: 600, background: "#f5f2ed", borderRadius: 8, padding: "2px 8px" }}><SvgCalendar size={11} color="#b0a898" style={{marginRight:6,verticalAlign:"middle"}} />{dateStr}</span>}
           {totalVal > 0 && <span style={{ fontSize: 11, color: "#7c6fe0", fontWeight: 700, background: "#f5f0ff", borderRadius: 8, padding: "2px 8px" }}>${totalVal.toFixed(0)}</span>}
         </div>
         <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
           <button onClick={handleShare} title="Copy link" style={{ ...btnBase, padding: "6px 10px", background: "#f5f2ed", fontSize: 13, color: "#666" }}>Share</button>
-          <button onClick={handleExport} disabled={exportingPdf} title="Export as PDF" style={{ ...btnBase, padding: "6px 10px", background: "#f5f2ed", fontSize: 13, color: "#666" }}>{exportingPdf ? "…" : <><SvgDownload size={13} color="#666" style={{marginRight:4}} />Export</>}</button>
+          <button onClick={handleExport} disabled={exportingPdf} title="Export as PDF" style={{ ...btnBase, padding: "6px 10px", background: "#f5f2ed", fontSize: 13, color: "#666" }}>{exportingPdf ? "…" : <><SvgDownload size={13} color="#666" style={{marginRight:6}} />Export</>}</button>
           <div style={{ display: "flex", background: "#f5f2ed", borderRadius: 10, padding: 3, gap: 2 }}>
             {[{ id: "slide", icon: "⊡" }, { id: "grid", icon: "⊞" }].map(v => (
               <button key={v.id} onClick={() => setView(v.id)} style={{
@@ -1870,7 +1916,7 @@ function LookbookViewer({ lookbook, outfits, allItems, onClose, onUpdate, onOpen
           {looks.length > 0 && (
             <div>
               <button onClick={() => setShowPackList(p => !p)} style={{ width: "100%", padding: "8px 12px", background: showPackList ? "#f0faf4" : "#f5f3ef", border: showPackList ? "1.5px solid #b6e8c8" : "none", borderRadius: 10, cursor: "pointer", fontSize: 12, fontWeight: 700, color: showPackList ? "#2d6a3f" : "#666", fontFamily: "'DM Sans', sans-serif", textAlign: "left" }}>
-                <SvgLuggage size={13} color="currentColor" style={{marginRight:4}} />{showPackList ? "Hide" : "Generate"} Pack List
+                <SvgLuggage size={13} color="currentColor" style={{marginRight:6}} />{showPackList ? "Hide" : "Generate"} Pack List
               </button>
               {showPackList && (() => {
                 const packed = {};
@@ -2892,7 +2938,7 @@ function StatsTab({ itemsDb, outfitsDb, lookbooksDb, onViewItem }) {
 
 
 // ── Wishlist Tab ──────────────────────────────────────────────────────────────
-function WishlistTab({ wishlistDb, wishlistsDb, saveWishlistsMeta, activeWishlistId, setActiveWishlistId, wlSort, setWlSort, wlSortCat, setWlSortCat, moveToCloset, onEdit }) {
+function WishlistTab({ wishlistDb, wishlistsDb, saveWishlistsMeta, activeWishlistId, setActiveWishlistId, wlSort, setWlSort, wlSortCat, setWlSortCat, moveToCloset, onEdit, onItemClick }) {
   const [showNewWl, setShowNewWl] = useState(false);
   const [newWlName, setNewWlName] = useState("");
   const [newWlNotes, setNewWlNotes] = useState("");
@@ -2913,148 +2959,178 @@ function WishlistTab({ wishlistDb, wishlistsDb, saveWishlistsMeta, activeWishlis
   }).filter(i => wlSortCat === "All" || i.category === wlSortCat);
 
   const wlCategories = [...new Set(wishlistDb.rows.map(i => i.category).filter(Boolean))];
+  const activeWl = wishlistsDb.find(w => w.id === activeWishlistId) || null;
 
   return (
-    <div className="fade-up">
-      {/* Wishlists row */}
-      <div style={{ display: "flex", gap: 8, marginBottom: 20, flexWrap: "wrap", alignItems: "center" }}>
-        {[{ id: null, name: "All Items" }, ...wishlistsDb].map(wl => (
-          <button key={wl.id ?? "all"} onClick={() => setActiveWishlistId(wl.id)}
-            style={{ padding: "7px 16px", borderRadius: 100, border: activeWishlistId === wl.id ? "none" : "1px solid #e0dbd2", background: activeWishlistId === wl.id ? "#1a1a1a" : "#fff", color: activeWishlistId === wl.id ? "#fff" : "#555", fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "'DM Sans', sans-serif", display: "flex", alignItems: "center", gap: 6 }}>
-            {wl.name}
-            {wl.id && <span style={{ opacity: 0.5, fontSize: 10 }}>{wishlistDb.rows.filter(i => i.wishlistId === wl.id).length}</span>}
+    <div className="fade-up" style={{ display: "flex", gap: 16, alignItems: "flex-start" }}>
+
+      {/* ── Left sidebar: list navigation ── */}
+      <div style={{ width: 180, flexShrink: 0, display: "flex", flexDirection: "column", gap: 4 }}>
+        {/* All Items */}
+        <button onClick={() => setActiveWishlistId(null)} style={{
+          width: "100%", textAlign: "left", padding: "9px 14px", borderRadius: 12,
+          border: "none", cursor: "pointer", fontFamily: "'DM Sans', sans-serif",
+          fontSize: 13, fontWeight: activeWishlistId === null ? 700 : 500,
+          background: activeWishlistId === null ? "#1a1a1a" : "transparent",
+          color: activeWishlistId === null ? "#fff" : "#555",
+          display: "flex", alignItems: "center", justifyContent: "space-between",
+          transition: "all 0.15s",
+        }}>
+          <span>All Items</span>
+          <span style={{ fontSize: 11, opacity: 0.5, fontWeight: 600 }}>{wishlistDb.rows.length}</span>
+        </button>
+
+        {/* Named lists */}
+        {wishlistsDb.map(wl => (
+          <button key={wl.id} onClick={() => setActiveWishlistId(wl.id)} style={{
+            width: "100%", textAlign: "left", padding: "9px 14px", borderRadius: 12,
+            border: "none", cursor: "pointer", fontFamily: "'DM Sans', sans-serif",
+            fontSize: 13, fontWeight: activeWishlistId === wl.id ? 700 : 500,
+            background: activeWishlistId === wl.id ? "#1a1a1a" : "transparent",
+            color: activeWishlistId === wl.id ? "#fff" : "#555",
+            display: "flex", alignItems: "center", justifyContent: "space-between",
+            transition: "all 0.15s",
+          }}>
+            <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1 }}>{wl.name}</span>
+            <span style={{ fontSize: 11, opacity: 0.5, fontWeight: 600, flexShrink: 0, marginLeft: 6 }}>{wishlistDb.rows.filter(i => i.wishlistId === wl.id).length}</span>
           </button>
         ))}
-        <button onClick={() => setShowNewWl(v => !v)}
-          style={{ padding: "7px 14px", borderRadius: 100, border: "1px dashed #c0b8b0", background: "transparent", color: "#aaa", fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "'DM Sans', sans-serif" }}>
-          + New List
-        </button>
-      </div>
 
-      {/* New wishlist form */}
-      {showNewWl && (
-        <div style={{ background: "#fff", borderRadius: 16, border: "1px solid #ece8e0", padding: "16px 18px", marginBottom: 16 }}>
-          <div style={{ fontSize: 12, fontWeight: 700, color: "#1a1a1a", marginBottom: 10 }}>New Wishlist</div>
-          <input value={newWlName} onChange={e => setNewWlName(e.target.value)} placeholder="Name (e.g. Summer Haul, Wedding)"
-            style={{ width: "100%", padding: "8px 12px", border: "1px solid #e0dbd2", borderRadius: 10, fontFamily: "'DM Sans', sans-serif", fontSize: 13, marginBottom: 8, outline: "none" }} />
-          <textarea value={newWlNotes} onChange={e => setNewWlNotes(e.target.value)} placeholder="Notes (optional)" rows={2}
-            style={{ width: "100%", padding: "8px 12px", border: "1px solid #e0dbd2", borderRadius: 10, fontFamily: "'DM Sans', sans-serif", fontSize: 12, resize: "none", outline: "none", marginBottom: 10 }} />
-          <div style={{ display: "flex", gap: 8 }}>
-            <button onClick={() => {
-              if (!newWlName.trim()) return;
-              const wl = { id: uid(), name: newWlName.trim(), notes: newWlNotes };
-              saveWishlistsMeta([...wishlistsDb, wl]);
-              setNewWlName(""); setNewWlNotes(""); setShowNewWl(false);
-              setActiveWishlistId(wl.id);
-            }} style={{ flex: 1, padding: "8px", background: "#1a1a1a", color: "#fff", border: "none", borderRadius: 10, cursor: "pointer", fontSize: 13, fontWeight: 700, fontFamily: "'DM Sans', sans-serif" }}>Create</button>
-            <button onClick={() => setShowNewWl(false)} style={{ padding: "8px 14px", background: "#f5f2ed", border: "none", borderRadius: 10, cursor: "pointer", fontSize: 12, color: "#888", fontFamily: "'DM Sans', sans-serif" }}>Cancel</button>
-          </div>
-        </div>
-      )}
-
-      {/* Active wishlist header */}
-      {activeWishlistId && (() => {
-        const wl = wishlistsDb.find(w => w.id === activeWishlistId);
-        if (!wl) return null;
-        if (editingWlId === wl.id) return (
-          <div style={{ background: "#fff", borderRadius: 14, border: "1px solid #ece8e0", padding: "14px 16px", marginBottom: 16 }}>
-            <input value={wl.name} onChange={e => saveWishlistsMeta(wishlistsDb.map(w => w.id === wl.id ? { ...w, name: e.target.value } : w))}
-              style={{ width: "100%", padding: "6px 10px", border: "1px solid #e0dbd2", borderRadius: 8, fontFamily: "'DM Sans', sans-serif", fontSize: 13, marginBottom: 6, outline: "none", fontWeight: 700 }} />
-            <textarea value={wl.notes || ""} onChange={e => saveWishlistsMeta(wishlistsDb.map(w => w.id === wl.id ? { ...w, notes: e.target.value } : w))} rows={2}
-              style={{ width: "100%", padding: "6px 10px", border: "1px solid #e0dbd2", borderRadius: 8, fontFamily: "'DM Sans', sans-serif", fontSize: 12, resize: "none", outline: "none", marginBottom: 8 }} />
-            <button onClick={() => setEditingWlId(null)} style={{ padding: "6px 14px", background: "#1a1a1a", color: "#fff", border: "none", borderRadius: 8, cursor: "pointer", fontSize: 12, fontWeight: 700, fontFamily: "'DM Sans', sans-serif" }}>Done</button>
-          </div>
-        );
-        return (
-          <div style={{ display: "flex", alignItems: "flex-start", gap: 10, marginBottom: 16, padding: "12px 16px", background: "#fff", borderRadius: 14, border: "1px solid #ece8e0" }}>
-            <div style={{ flex: 1 }}>
-              <div style={{ fontSize: 14, fontWeight: 700, color: "#1a1a1a" }}>{wl.name}</div>
-              {wl.notes && <div style={{ fontSize: 12, color: "#aaa", marginTop: 3 }}>{wl.notes}</div>}
-            </div>
-            <button onClick={() => setEditingWlId(wl.id)} style={{ padding: "5px 10px", background: "#f5f2ed", border: "none", borderRadius: 8, cursor: "pointer", fontSize: 12, color: "#666", fontFamily: "'DM Sans', sans-serif" }}><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg> Edit</button>
-            <button onClick={() => { if (window.confirm("Delete this list? Items stay in All Items.")) { saveWishlistsMeta(wishlistsDb.filter(w => w.id !== activeWishlistId)); setActiveWishlistId(null); }}} style={{ padding: "5px 10px", background: "#fef2f2", border: "none", borderRadius: 8, cursor: "pointer", fontSize: 12, color: "#e05555", fontFamily: "'DM Sans', sans-serif" }}><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4h6v2"/></svg></button>
-          </div>
-        );
-      })()}
-
-      {/* Sort + filter bar */}
-      <div style={{ display: "flex", gap: 8, marginBottom: 16, flexWrap: "wrap", alignItems: "center" }}>
-        <select value={wlSort} onChange={e => setWlSort(e.target.value)}
-          style={{ padding: "7px 12px", border: "1px solid #e0dbd2", borderRadius: 100, fontFamily: "'DM Sans', sans-serif", fontSize: 12, background: "#fff", color: "#555", fontWeight: 500, cursor: "pointer", paddingRight: 28 }}>
-          <option value="priority">Priority</option>
-          <option value="store">Store</option>
-          <option value="category">Category</option>
-          <option value="price">Price ↓</option>
-        </select>
-        {wlCategories.length > 1 && (
-          <select value={wlSortCat} onChange={e => setWlSortCat(e.target.value)}
-            style={{ padding: "7px 12px", border: "1px solid #e0dbd2", borderRadius: 100, fontFamily: "'DM Sans', sans-serif", fontSize: 12, background: "#fff", color: "#555", fontWeight: 500, cursor: "pointer", paddingRight: 28 }}>
-            <option value="All">All Categories</option>
-            {wlCategories.map(c => <option key={c} value={c}>{c}</option>)}
-          </select>
+        {/* New list button */}
+        {!showNewWl && (
+          <button onClick={() => setShowNewWl(true)} style={{
+            width: "100%", textAlign: "left", padding: "9px 14px", borderRadius: 12,
+            border: "1.5px dashed #d8d2c8", background: "transparent", cursor: "pointer",
+            fontFamily: "'DM Sans', sans-serif", fontSize: 12, fontWeight: 600, color: "#aaa",
+            marginTop: 4, display: "flex", alignItems: "center", gap: 6,
+          }}>
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            New List
+          </button>
         )}
-        <div style={{ marginLeft: "auto", fontSize: 12, color: "#aaa", fontWeight: 500 }}>{sortedItems.length} item{sortedItems.length !== 1 ? "s" : ""}</div>
+
+        {/* Inline new list form */}
+        {showNewWl && (
+          <div style={{ background: "#fff", borderRadius: 14, border: "1px solid #ece8e0", padding: "12px 12px", marginTop: 4 }}>
+            <input value={newWlName} onChange={e => setNewWlName(e.target.value)} placeholder="List name…" autoFocus
+              onKeyDown={e => { if (e.key === "Enter" && newWlName.trim()) { const wl = { id: Date.now().toString(36), name: newWlName.trim(), notes: newWlNotes }; saveWishlistsMeta([...wishlistsDb, wl]); setNewWlName(""); setNewWlNotes(""); setShowNewWl(false); setActiveWishlistId(wl.id); }}}
+              style={{ width: "100%", padding: "7px 10px", border: "1px solid #e0dbd2", borderRadius: 8, fontFamily: "'DM Sans', sans-serif", fontSize: 12, fontWeight: 600, outline: "none", marginBottom: 6, boxSizing: "border-box" }} />
+            <textarea value={newWlNotes} onChange={e => setNewWlNotes(e.target.value)} placeholder="Notes (optional)" rows={2}
+              style={{ width: "100%", padding: "7px 10px", border: "1px solid #e0dbd2", borderRadius: 8, fontFamily: "'DM Sans', sans-serif", fontSize: 11, resize: "none", outline: "none", marginBottom: 8, boxSizing: "border-box" }} />
+            <div style={{ display: "flex", gap: 6 }}>
+              <button onClick={() => {
+                if (!newWlName.trim()) return;
+                const wl = { id: Date.now().toString(36), name: newWlName.trim(), notes: newWlNotes };
+                saveWishlistsMeta([...wishlistsDb, wl]);
+                setNewWlName(""); setNewWlNotes(""); setShowNewWl(false);
+                setActiveWishlistId(wl.id);
+              }} style={{ flex: 1, padding: "7px 0", background: "#1a1a1a", color: "#fff", border: "none", borderRadius: 8, cursor: "pointer", fontSize: 12, fontWeight: 700, fontFamily: "'DM Sans', sans-serif" }}>Create</button>
+              <button onClick={() => { setShowNewWl(false); setNewWlName(""); setNewWlNotes(""); }} style={{ padding: "7px 10px", background: "#f5f2ed", border: "none", borderRadius: 8, cursor: "pointer", fontSize: 11, color: "#888", fontFamily: "'DM Sans', sans-serif" }}>✕</button>
+            </div>
+          </div>
+        )}
+
+        {/* Edit/delete active named list */}
+        {activeWl && (
+          <div style={{ marginTop: 8, paddingTop: 8, borderTop: "1px solid #ece8e0" }}>
+            {editingWlId === activeWl.id ? (
+              <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                <input value={activeWl.name} onChange={e => saveWishlistsMeta(wishlistsDb.map(w => w.id === activeWl.id ? { ...w, name: e.target.value } : w))}
+                  style={{ width: "100%", padding: "6px 10px", border: "1px solid #e0dbd2", borderRadius: 8, fontFamily: "'DM Sans', sans-serif", fontSize: 12, fontWeight: 700, outline: "none", boxSizing: "border-box" }} />
+                <textarea value={activeWl.notes || ""} onChange={e => saveWishlistsMeta(wishlistsDb.map(w => w.id === activeWl.id ? { ...w, notes: e.target.value } : w))} rows={2}
+                  style={{ width: "100%", padding: "6px 10px", border: "1px solid #e0dbd2", borderRadius: 8, fontFamily: "'DM Sans', sans-serif", fontSize: 11, resize: "none", outline: "none", boxSizing: "border-box" }} />
+                <button onClick={() => setEditingWlId(null)} style={{ padding: "6px 0", background: "#1a1a1a", color: "#fff", border: "none", borderRadius: 8, cursor: "pointer", fontSize: 12, fontWeight: 700, fontFamily: "'DM Sans', sans-serif" }}>Done</button>
+              </div>
+            ) : (
+              <div style={{ display: "flex", gap: 6 }}>
+                <button onClick={() => setEditingWlId(activeWl.id)} style={{ flex: 1, padding: "6px 0", background: "#f5f2ed", border: "none", borderRadius: 8, cursor: "pointer", fontSize: 11, color: "#666", fontFamily: "'DM Sans', sans-serif", fontWeight: 600 }}>Edit</button>
+                <button onClick={() => { if (window.confirm("Delete this list? Items stay in All Items.")) { saveWishlistsMeta(wishlistsDb.filter(w => w.id !== activeWishlistId)); setActiveWishlistId(null); }}} style={{ flex: 1, padding: "6px 0", background: "#fef2f2", border: "none", borderRadius: 8, cursor: "pointer", fontSize: 11, color: "#e05555", fontFamily: "'DM Sans', sans-serif", fontWeight: 600 }}>Delete</button>
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
-      {sortedItems.length === 0 ? (
-        <div style={{ textAlign: "center", padding: "60px 0" }}>
-          <div style={{ marginBottom: 10 }}><SvgHeart size={36} color="#ddd" /></div>
-          <div style={{ fontSize: 14, fontWeight: 600, color: "#ccc" }}>{wishlistDb.rows.length === 0 ? "Your wishlist is empty" : "No items in this list"}</div>
-          <div style={{ fontSize: 12, color: "#ddd", marginTop: 4 }}>{wishlistDb.rows.length === 0 ? "Tap + to save items you want" : "Add items with the + button"}</div>
+      {/* ── Right: items area ── */}
+      <div style={{ flex: 1, minWidth: 0 }}>
+        {/* Sort + filter bar */}
+        <div style={{ display: "flex", gap: 8, marginBottom: 16, flexWrap: "wrap", alignItems: "center" }}>
+          <select value={wlSort} onChange={e => setWlSort(e.target.value)} className="pill-select" style={{}}>
+            <option value="priority">Priority</option>
+            <option value="store">Store</option>
+            <option value="category">Category</option>
+            <option value="price">Price ↓</option>
+          </select>
+          {wlCategories.length > 1 && (
+            <select value={wlSortCat} onChange={e => setWlSortCat(e.target.value)} className="pill-select" style={{}}>
+              <option value="All">All Categories</option>
+              {wlCategories.map(c => <option key={c} value={c}>{c}</option>)}
+            </select>
+          )}
+          <div style={{ marginLeft: "auto", fontSize: 12, color: "#aaa", fontWeight: 500 }}>{sortedItems.length} item{sortedItems.length !== 1 ? "s" : ""}</div>
         </div>
-      ) : (
-        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-          {sortedItems.map((item, i) => {
-            const pm = priorityMeta[item.priority] || null;
-            const wl = wishlistsDb.find(w => w.id === item.wishlistId);
-            return (
-              <div key={item.id} className="card fade-up" style={{
-                background: "#fff", borderRadius: 18, overflow: "hidden",
-                border: `1px solid ${pm ? pm.border : "#ece8e0"}`,
-                boxShadow: "0 2px 10px rgba(0,0,0,0.04)", animationDelay: `${i * 0.04}s`, opacity: 0, display: "flex", height: 160, alignItems: "stretch"
-              }}>
-                <div style={{ width: 160, flexShrink: 0, alignSelf: "stretch", background: item.image ? `url(${item.image}) center/contain no-repeat #f7f5f2` : "#f7f5f2", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                  {!item.image && <SvgHeart size={26} color="#ccc" style={{ opacity: 0.15 }} />}
-                </div>
-                <div style={{ padding: "13px 15px", flex: 1, minWidth: 0 }}>
-                  <div style={{ display: "flex", alignItems: "flex-start", gap: 8, marginBottom: 3 }}>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontSize: 14, fontWeight: 700, color: "#1a1a1a", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{item.name}</div>
-                      <div style={{ display: "flex", gap: 6, marginTop: 2, flexWrap: "wrap", alignItems: "center" }}>
-                        {item.brand && <span style={{ fontSize: 11, color: "#aaa" }}>{item.brand}</span>}
-                        {item.store && <span style={{ fontSize: 11, color: "#7c6fe0", fontWeight: 600, background: "#f5f0ff", padding: "1px 7px", borderRadius: 100 }}>{item.store}</span>}
-                        {item.category && <span style={{ fontSize: 11, color: "#888", background: "#f5f2ed", padding: "1px 7px", borderRadius: 100 }}>{item.category}</span>}
-                        {wl && !activeWishlistId && <span style={{ fontSize: 10, color: "#b0a898", fontStyle: "italic" }}>{wl.name}</span>}
-                      </div>
+
+        {sortedItems.length === 0 ? (
+          <div style={{ textAlign: "center", padding: "60px 0" }}>
+            <div style={{ marginBottom: 10 }}><SvgHeart size={36} color="#ddd" /></div>
+            <div style={{ fontSize: 14, fontWeight: 600, color: "#ccc" }}>{wishlistDb.rows.length === 0 ? "Your wishlist is empty" : "No items in this list"}</div>
+            <div style={{ fontSize: 12, color: "#ddd", marginTop: 4 }}>{wishlistDb.rows.length === 0 ? "Tap + to save items you want" : "Add items with the + button"}</div>
+          </div>
+        ) : (
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: 16 }}>
+            {sortedItems.map((item, i) => {
+              const pm = priorityMeta[item.priority] || null;
+              return (
+                <div key={item.id} className="item-card fade-up" onClick={() => onItemClick && onItemClick(item)} style={{
+                  animationDelay: `${i * 0.04}s`, opacity: 0,
+                  border: `1px solid ${pm ? pm.border : "#ece8e0"}`,
+                  position: "relative", cursor: "pointer",
+                }}>
+                  {/* Square image */}
+                  <div style={{ width: "100%", aspectRatio: "1/1", background: "#f7f5f2", overflow: "hidden", display: "flex", alignItems: "center", justifyContent: "center", position: "relative" }}>
+                    {item.image
+                      ? <img src={item.image} alt={item.name} style={{ width: "100%", height: "100%", objectFit: "contain", display: "block", padding: 6 }} />
+                      : <SvgHeart size={26} color="#ccc" style={{ opacity: 0.3 }} />
+                    }
+                    {pm && <div style={{ position: "absolute", top: 7, left: 7, fontSize: 9, fontWeight: 700, color: pm.color, background: pm.bg, border: `1px solid ${pm.border}`, borderRadius: 100, padding: "2px 7px" }}>{item.priority}</div>}
+                    <button onClick={e => { e.stopPropagation(); onEdit(item); }}
+                      style={{ position: "absolute", bottom: 7, right: 7, width: 28, height: 28, borderRadius: "50%", background: "rgba(255,255,255,0.92)", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", backdropFilter: "blur(4px)", boxShadow: "0 1px 4px rgba(0,0,0,0.1)", opacity: 0 }}
+                      className="item-card-edit-btn">
+                      <SvgEdit size={12} color="#555" />
+                    </button>
+                  </div>
+                  <div className="item-card-label">
+                    <div className="item-card-name">{item.name}</div>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 2 }}>
+                      {item.price
+                        ? <span style={{ fontSize: 11, fontWeight: 700, color: "#1a1a1a" }}>{/^\$/.test(item.price) ? item.price : `$${item.price}`}</span>
+                        : <span style={{ fontSize: 11, color: "#c0b8b0" }}>{item.brand || item.category || ""}</span>
+                      }
+                      {item.store && <span style={{ fontSize: 10, color: "#7c6fe0", fontWeight: 600 }}>{item.store}</span>}
                     </div>
-                    <select value={item.priority || ""} onChange={e => wishlistDb.update({ ...item, priority: e.target.value || undefined })}
-                      style={{ padding: "5px 28px 5px 12px", border: `1px solid ${pm ? pm.border : "#e0dbd2"}`, borderRadius: 100, fontSize: 10, fontWeight: 700, color: pm ? pm.color : "#aaa", background: `${pm ? pm.bg : "#fafaf8"} url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%23aaa' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E") no-repeat right 10px center`, fontFamily: "'DM Sans', sans-serif", cursor: "pointer", flexShrink: 0, appearance: "none", WebkitAppearance: "none" }}>
-                      <option value="">Priority</option>
-                      <option value="high">High</option>
-                      <option value="medium">Med</option>
-                      <option value="low">Low</option>
-                    </select>
-                  </div>
-                  {item.price && <div style={{ fontSize: 15, fontWeight: 700, color: "#1a1a1a", marginTop: 6, marginBottom: 8 }}>
-                    {/^\$/.test(item.price) ? item.price : `$${item.price}`}
-                  </div>}
-                  <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginTop: item.price ? 0 : 8 }}>
-                    {item.link && (
-                      <a href={item.link} target="_blank" rel="noreferrer"
-                        style={{ padding: "6px 14px", background: "#1a1a1a", color: "#fff", borderRadius: 100, fontSize: 11, fontWeight: 700, textDecoration: "none", fontFamily: "'DM Sans', sans-serif", display: "inline-flex", alignItems: "center", gap: 5 }}>
-                        Purchase
-                      </a>
-                    )}
-                    <button onClick={() => moveToCloset(item)} style={{ padding: "6px 12px", background: "#f0faf4", border: "none", borderRadius: 100, cursor: "pointer", fontSize: 11, fontWeight: 700, color: "#3aaa6e", fontFamily: "'DM Sans', sans-serif" }}><SvgCheck size={12} color="#3aaa6e" style={{marginRight:4}} />I bought it</button>
-                    <button onClick={() => onEdit(item)} style={{ padding: "6px 10px", background: "#f5f2ed", border: "none", borderRadius: 100, cursor: "pointer", fontSize: 11, fontWeight: 600, color: "#666", fontFamily: "'DM Sans', sans-serif" }}><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>
-                    <button onClick={() => wishlistDb.remove(item.id)} style={{ padding: "6px 10px", background: "#fef2f2", border: "none", borderRadius: 100, cursor: "pointer", fontSize: 11, fontWeight: 600, color: "#e05555", fontFamily: "'DM Sans', sans-serif" }}><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+                    <div style={{ display: "flex", gap: 4, marginTop: 8, flexWrap: "wrap" }}>
+                      {item.link && (
+                        <a href={item.link} target="_blank" rel="noreferrer" onClick={e => e.stopPropagation()}
+                          style={{ flex: 1, padding: "5px 8px", background: "#1a1a1a", color: "#fff", borderRadius: 8, fontSize: 10, fontWeight: 700, textDecoration: "none", fontFamily: "'DM Sans', sans-serif", display: "flex", alignItems: "center", justifyContent: "center", gap: 3 }}>
+                          <SvgShop size={10} color="#fff" />Buy
+                        </a>
+                      )}
+                      <button onClick={e => { e.stopPropagation(); moveToCloset(item); }}
+                        style={{ flex: 1, padding: "5px 8px", background: "#f0faf4", border: "none", borderRadius: 8, cursor: "pointer", fontSize: 10, fontWeight: 700, color: "#3aaa6e", fontFamily: "'DM Sans', sans-serif", display: "flex", alignItems: "center", justifyContent: "center", gap: 3 }}>
+                        <SvgCheck size={10} color="#3aaa6e" />Purchased
+                      </button>
+                      <button onClick={e => { e.stopPropagation(); wishlistDb.remove(item.id); }}
+                        style={{ width: 28, padding: "5px", background: "#fef2f2", border: "none", borderRadius: 8, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#e05555" strokeWidth="2.5" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                      </button>
+                    </div>
                   </div>
                 </div>
-              </div>
-            );
-          })}
-        </div>
-      )}
+              );
+            })}
+          </div>
+        )}
+      </div>
     </div>
   );
 }
@@ -3259,7 +3335,7 @@ function SellerDashboard({ itemsDb, onViewItem }) {
                       {/* Actions */}
                       <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginTop: 2 }}>
                         <button onClick={() => startEdit(item)} style={{ padding: "5px 12px", background: "#f5f2ed", border: "none", borderRadius: 8, cursor: "pointer", fontSize: 11, fontWeight: 700, color: "#555", fontFamily: "'DM Sans', sans-serif" }}><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg> Edit Listing</button>
-                        {status !== "sold" && <button onClick={() => markSold(item)} style={{ padding: "5px 12px", background: "#f5f0ff", border: "1.5px solid #c4b0f0", borderRadius: 8, cursor: "pointer", fontSize: 11, fontWeight: 700, color: "#7c6fe0", fontFamily: "'DM Sans', sans-serif" }}><SvgCheck size={11} color="#7c6fe0" style={{marginRight:4}} />Mark Sold</button>}
+                        {status !== "sold" && <button onClick={() => markSold(item)} style={{ padding: "5px 12px", background: "#f5f0ff", border: "1.5px solid #c4b0f0", borderRadius: 8, cursor: "pointer", fontSize: 11, fontWeight: 700, color: "#7c6fe0", fontFamily: "'DM Sans', sans-serif" }}><SvgCheck size={11} color="#7c6fe0" style={{marginRight:6}} />Mark Sold</button>}
                         <button onClick={() => moveBackToCloset(item)} style={{ padding: "5px 12px", background: "#fef2f2", border: "none", borderRadius: 8, cursor: "pointer", fontSize: 11, fontWeight: 700, color: "#e05555", fontFamily: "'DM Sans', sans-serif" }}>↩ Back to Closet</button>
                       </div>
                     </>
@@ -3299,18 +3375,43 @@ function MoodboardInfoPanel({ activeIdx, setActiveIdx }) {
   };
 
   const board = data[activeIdx] || null;
+  const [hexInput, setHexInput] = useState("");
+  const [editingColorIdx, setEditingColorIdx] = useState(null);
   if (!board) return null;
 
+  const palette = board.palette || [];
+
+  const updatePalette = (newPalette) => {
+    save(data.map((b, i) => i === activeIdx ? { ...b, palette: newPalette } : b));
+  };
+
+  const addColor = () => {
+    if (palette.length >= 10) return;
+    updatePalette([...palette, "#e8e4dc"]);
+  };
+
+  const removeColor = (idx) => {
+    updatePalette(palette.filter((_, i) => i !== idx));
+    if (editingColorIdx === idx) setEditingColorIdx(null);
+  };
+
+  const updateColor = (idx, val) => {
+    const updated = palette.map((c, i) => i === idx ? val : c);
+    updatePalette(updated);
+  };
+
+  const normalizeHex = (val) => {
+    const clean = val.replace(/[^0-9a-fA-F]/g, "");
+    if (clean.length === 3) return "#" + clean.split("").map(c => c + c).join("");
+    if (clean.length === 6) return "#" + clean;
+    return null;
+  };
+
   return (
+    <>
     <div className="right-card">
       <div className="right-card-title">Board Info</div>
       <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-        {data.length > 1 && (
-          <select value={activeIdx} onChange={e => setActiveIdx(Number(e.target.value))}
-            className="pill-select" style={{ width: "100%", fontSize: 12 }}>
-            {data.map((b, i) => <option key={b.id} value={i}>{b.name}</option>)}
-          </select>
-        )}
         <div>
           <label style={{ display: "block", fontSize: 10, fontWeight: 700, color: "#aaa", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 5 }}>Name</label>
           <input value={board.name || ""} onChange={e => save(data.map((b, i) => i === activeIdx ? { ...b, name: e.target.value } : b))}
@@ -3320,12 +3421,92 @@ function MoodboardInfoPanel({ activeIdx, setActiveIdx }) {
         <div>
           <label style={{ display: "block", fontSize: 10, fontWeight: 700, color: "#aaa", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 5 }}>Notes</label>
           <textarea value={board.notes || ""} onChange={e => save(data.map((b, i) => i === activeIdx ? { ...b, notes: e.target.value } : b))}
-            placeholder="Mood, theme, inspiration…" rows={4}
+            placeholder="Mood, theme, inspiration…" rows={3}
             style={{ width: "100%", padding: "7px 10px", border: "1px solid #e0dbd2", borderRadius: 10, fontFamily: "'DM Sans', sans-serif", fontSize: 12, outline: "none", background: "#fafaf8", resize: "none", lineHeight: 1.5, boxSizing: "border-box" }} />
         </div>
         <div style={{ fontSize: 11, color: "#bbb", fontWeight: 500 }}>{(board.items || []).length} item{(board.items || []).length !== 1 ? "s" : ""} on board</div>
       </div>
     </div>
+
+    {/* Color Palette card */}
+    <div className="right-card" style={{ marginTop: 12 }}>
+      <div className="right-card-title">Color Palette</div>
+
+      {/* Color swatches row */}
+      <div style={{ display: "flex", gap: 3, flexWrap: "wrap", marginBottom: 12 }}>
+        {palette.map((color, idx) => (
+          <div key={idx} style={{ position: "relative" }}>
+            <div
+              onClick={() => setEditingColorIdx(editingColorIdx === idx ? null : idx)}
+              style={{
+                width: 52, height: 52, borderRadius: 12,
+                background: color,
+                border: editingColorIdx === idx ? "2px solid #1a1a1a" : "2px solid transparent",
+                boxShadow: "0 1px 4px rgba(0,0,0,0.12)",
+                cursor: "pointer", flexShrink: 0,
+                outline: "1.5px solid rgba(0,0,0,0.08)",
+                outlineOffset: 1,
+              }}
+            />
+            <button onClick={() => removeColor(idx)} style={{
+              position: "absolute", top: -6, right: -6,
+              width: 16, height: 16, borderRadius: "50%",
+              background: "#1a1a1a", border: "none", cursor: "pointer",
+              display: "flex", alignItems: "center", justifyContent: "center",
+              opacity: 0, transition: "opacity 0.15s",
+            }}
+              className="palette-del-btn"
+            style={{ top: -7, right: -7, width: 18, height: 18 }}>
+              <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+            </button>
+          </div>
+        ))}
+        {palette.length < 10 && (
+          <button onClick={addColor} style={{
+            width: 52, height: 52, borderRadius: 12,
+            background: "#f5f3ef", border: "1.5px dashed #d0cac0",
+            cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
+            color: "#bbb", fontSize: 20, fontWeight: 300, lineHeight: 1,
+          }}>+</button>
+        )}
+      </div>
+
+      {/* Hex editor for selected swatch */}
+      {editingColorIdx !== null && palette[editingColorIdx] !== undefined && (
+        <div style={{ display: "flex", gap: 8, alignItems: "center", padding: "10px 12px", background: "#f9f8f6", borderRadius: 12, border: "1px solid #e8e4dc" }}>
+          <input
+            type="color"
+            value={palette[editingColorIdx]}
+            onChange={e => updateColor(editingColorIdx, e.target.value)}
+            style={{ width: 32, height: 32, border: "none", borderRadius: 8, cursor: "pointer", padding: 0, background: "none", flexShrink: 0 }}
+          />
+          <input
+            value={hexInput !== "" ? hexInput : palette[editingColorIdx]}
+            onChange={e => {
+              setHexInput(e.target.value);
+              const normalized = normalizeHex(e.target.value);
+              if (normalized) updateColor(editingColorIdx, normalized);
+            }}
+            onFocus={() => setHexInput(palette[editingColorIdx])}
+            onBlur={() => setHexInput("")}
+            placeholder="#000000"
+            maxLength={7}
+            style={{
+              flex: 1, padding: "6px 10px", border: "1px solid #e0dbd2",
+              borderRadius: 8, fontFamily: "'DM Sans', sans-serif",
+              fontSize: 12, fontWeight: 600, outline: "none",
+              background: "#fff", color: "#1a1a1a", letterSpacing: "0.05em",
+              textTransform: "uppercase", boxSizing: "border-box",
+            }}
+          />
+        </div>
+      )}
+
+      {palette.length === 0 && (
+        <div style={{ fontSize: 11, color: "#ccc", textAlign: "center", padding: "8px 0" }}>Tap + to build your palette</div>
+      )}
+    </div>
+    </>
   );
 }
 
@@ -3579,10 +3760,10 @@ function Moodboard({ closetItems = [], activeIdx, setActiveIdx }) {
       {/* Toolbar */}
       <div style={{ display: "flex", gap: 8, marginBottom: 10, flexWrap: "wrap", alignItems: "center" }}>
         <input ref={fileRef} type="file" accept="image/*" multiple style={{ display: "none" }} onChange={e => { importImages(e.target.files); e.target.value = ""; }} />
-        <button onClick={() => fileRef.current.click()} style={{ padding: "8px 16px", background: "#1a1a1a", color: "#fff", border: "none", borderRadius: 10, cursor: "pointer", fontFamily: "'DM Sans', sans-serif", fontSize: 12, fontWeight: 700 }}><SvgCamera size={13} color="#fff" style={{marginRight:5}} />Import Images</button>
-        <button onClick={addTextNote} style={{ padding: "8px 16px", background: "#fff9e6", border: "1.5px solid #f0e0a0", borderRadius: 10, cursor: "pointer", fontFamily: "'DM Sans', sans-serif", fontSize: 12, fontWeight: 700, color: "#7a6000" }}><SvgEdit size={13} color="#7a6000" style={{marginRight:5}} />Add Text</button>
-        <button onClick={() => setShowUrlImport(u => !u)} style={{ padding: "8px 14px", background: showUrlImport ? "#f0f4ff" : "#f5f3ef", border: showUrlImport ? "1.5px solid #a0b4f0" : "none", borderRadius: 10, cursor: "pointer", fontFamily: "'DM Sans', sans-serif", fontSize: 12, fontWeight: 700, color: showUrlImport ? "#3a5fe0" : "#666" }}><SvgLink size={13} color="currentColor" style={{marginRight:5}} />URL</button>
-        <button onClick={() => setShowClosetPicker(p => !p)} style={{ padding: "8px 14px", background: showClosetPicker ? "#f0faf4" : "#f5f3ef", border: showClosetPicker ? "1.5px solid #b6e8c8" : "none", borderRadius: 10, cursor: "pointer", fontFamily: "'DM Sans', sans-serif", fontSize: 12, fontWeight: 700, color: showClosetPicker ? "#2d6a3f" : "#666" }}><SvgHanger size={13} color="currentColor" style={{marginRight:5}} />From Closet</button>
+        <button onClick={() => fileRef.current.click()} style={{ padding: "8px 16px", background: "#1a1a1a", color: "#fff", border: "none", borderRadius: 10, cursor: "pointer", fontFamily: "'DM Sans', sans-serif", fontSize: 12, fontWeight: 700 }}><SvgCamera size={13} color="#fff" style={{marginRight:6}} />Import Images</button>
+        <button onClick={addTextNote} style={{ padding: "8px 16px", background: "#fff9e6", border: "1.5px solid #f0e0a0", borderRadius: 10, cursor: "pointer", fontFamily: "'DM Sans', sans-serif", fontSize: 12, fontWeight: 700, color: "#7a6000" }}><SvgEdit size={13} color="#7a6000" style={{marginRight:6}} />Add Text</button>
+        <button onClick={() => setShowUrlImport(u => !u)} style={{ padding: "8px 14px", background: showUrlImport ? "#f0f4ff" : "#f5f3ef", border: showUrlImport ? "1.5px solid #a0b4f0" : "none", borderRadius: 10, cursor: "pointer", fontFamily: "'DM Sans', sans-serif", fontSize: 12, fontWeight: 700, color: showUrlImport ? "#3a5fe0" : "#666" }}><SvgLink size={13} color="currentColor" style={{marginRight:6}} />URL</button>
+        <button onClick={() => setShowClosetPicker(p => !p)} style={{ padding: "8px 14px", background: showClosetPicker ? "#f0faf4" : "#f5f3ef", border: showClosetPicker ? "1.5px solid #b6e8c8" : "none", borderRadius: 10, cursor: "pointer", fontFamily: "'DM Sans', sans-serif", fontSize: 12, fontWeight: 700, color: showClosetPicker ? "#2d6a3f" : "#666" }}><SvgHanger size={13} color="currentColor" style={{marginRight:6}} />From Closet</button>
         {/* BG colors */}
         <div style={{ display: "flex", gap: 5, alignItems: "center", marginLeft: 4 }}>
           <span style={{ fontSize: 11, color: "#aaa", fontWeight: 600 }}>BG:</span>
@@ -3590,7 +3771,7 @@ function Moodboard({ closetItems = [], activeIdx, setActiveIdx }) {
             <div key={c} onClick={() => setBoardBg(c)} style={{ width: 20, height: 20, borderRadius: "50%", background: c, border: (board?.bg || "#fff") === c ? "2px solid #2d6a3f" : "1.5px solid #ddd", cursor: "pointer", flexShrink: 0 }} />
           ))}
         </div>
-        <button onClick={exportCanvas} style={{ padding: "8px 14px", background: "#f5f2ed", border: "none", borderRadius: 10, cursor: "pointer", fontFamily: "'DM Sans', sans-serif", fontSize: 12, fontWeight: 700, color: "#666", marginLeft: "auto" }}><SvgDownload size={13} color="#666" style={{marginRight:5}} />Export JPG</button>
+        <button onClick={exportCanvas} style={{ padding: "8px 14px", background: "#f5f2ed", border: "none", borderRadius: 10, cursor: "pointer", fontFamily: "'DM Sans', sans-serif", fontSize: 12, fontWeight: 700, color: "#666", marginLeft: "auto" }}><SvgDownload size={13} color="#666" style={{marginRight:6}} />Export JPG</button>
       </div>
 
       {/* URL import bar */}
@@ -3626,9 +3807,9 @@ function Moodboard({ closetItems = [], activeIdx, setActiveIdx }) {
       {selectedItem && (
         <div style={{ display: "flex", gap: 8, marginBottom: 8, alignItems: "center", flexWrap: "wrap", padding: "8px 12px", background: "#faf9f6", borderRadius: 12, border: "1px solid #e8e4dc" }}>
           <span style={{ fontSize: 11, fontWeight: 700, color: "#aaa" }}>SELECTED:</span>
-          <button onClick={() => bringForward(selectedId)} style={{ padding: "5px 10px", fontSize: 11, background: "#f5f2ed", border: "none", borderRadius: 8, cursor: "pointer", fontWeight: 700, color: "#555", fontFamily: "'DM Sans', sans-serif" }}><SvgArrowUp size={12} color="#555" style={{marginRight:4}} />Forward</button>
-          <button onClick={() => sendBackward(selectedId)} style={{ padding: "5px 10px", fontSize: 11, background: "#f5f2ed", border: "none", borderRadius: 8, cursor: "pointer", fontWeight: 700, color: "#555", fontFamily: "'DM Sans', sans-serif" }}><SvgArrowDn size={12} color="#555" style={{marginRight:4}} />Back</button>
-          <button onClick={() => duplicateItem(selectedId)} style={{ padding: "5px 10px", fontSize: 11, background: "#f5f2ed", border: "none", borderRadius: 8, cursor: "pointer", fontWeight: 700, color: "#555", fontFamily: "'DM Sans', sans-serif" }}><SvgCopy size={12} color="#555" style={{marginRight:4}} />Duplicate</button>
+          <button onClick={() => bringForward(selectedId)} style={{ padding: "5px 10px", fontSize: 11, background: "#f5f2ed", border: "none", borderRadius: 8, cursor: "pointer", fontWeight: 700, color: "#555", fontFamily: "'DM Sans', sans-serif" }}><SvgArrowUp size={12} color="#555" style={{marginRight:6}} />Forward</button>
+          <button onClick={() => sendBackward(selectedId)} style={{ padding: "5px 10px", fontSize: 11, background: "#f5f2ed", border: "none", borderRadius: 8, cursor: "pointer", fontWeight: 700, color: "#555", fontFamily: "'DM Sans', sans-serif" }}><SvgArrowDn size={12} color="#555" style={{marginRight:6}} />Back</button>
+          <button onClick={() => duplicateItem(selectedId)} style={{ padding: "5px 10px", fontSize: 11, background: "#f5f2ed", border: "none", borderRadius: 8, cursor: "pointer", fontWeight: 700, color: "#555", fontFamily: "'DM Sans', sans-serif" }}><SvgCopy size={12} color="#555" style={{marginRight:6}} />Duplicate</button>
           {selectedItem.type !== "text" && (
             <>
               <label style={{ fontSize: 11, fontWeight: 700, color: "#aaa" }}>Opacity</label>
@@ -3661,7 +3842,7 @@ function Moodboard({ closetItems = [], activeIdx, setActiveIdx }) {
                 style={{ padding: "5px 10px", fontSize: 12, background: selectedItem.bold ? "#1a1a1a" : "#f5f3ef", color: selectedItem.bold ? "#fff" : "#555", border: "none", borderRadius: 8, cursor: "pointer", fontWeight: 800, fontFamily: "'DM Sans', sans-serif" }}>B</button>
             </>
           )}
-          <button onClick={() => removeItem(selectedId)} style={{ padding: "5px 10px", fontSize: 11, background: "#fef2f2", border: "none", borderRadius: 8, cursor: "pointer", fontWeight: 700, color: "#e05555", fontFamily: "'DM Sans', sans-serif", marginLeft: "auto" }}><SvgTrash size={12} color="#e05555" style={{marginRight:4}} />Remove</button>
+          <button onClick={() => removeItem(selectedId)} style={{ padding: "5px 10px", fontSize: 11, background: "#fef2f2", border: "none", borderRadius: 8, cursor: "pointer", fontWeight: 700, color: "#e05555", fontFamily: "'DM Sans', sans-serif", marginLeft: "auto" }}><SvgTrash size={12} color="#e05555" style={{marginRight:6}} />Remove</button>
         </div>
       )}
 
@@ -3947,8 +4128,8 @@ export default function App() {
     closet: (active) => <HangerIcon size={20} color={active ? "#fff" : "#888"} />,
     outfits: (active) => <SvgSparkle size={18} color={active ? "#fff" : "#888"} />,
     lookbooks: (active) => <SvgGrid size={18} color={active ? "#fff" : "#888"} />,
-    stats: (active) => <SvgStar size={18} color={active ? "#fff" : "#888"} />,
-    moodboard: (active) => <SvgPalette size={18} color={active ? "#fff" : "#888"} />,
+    stats: (active) => <SvgPalette size={18} color={active ? "#fff" : "#888"} />,
+    moodboard: (active) => <SvgPushPin size={18} color={active ? "#fff" : "#888"} />,
     seller: (active) => <SvgTag size={18} color={active ? "#fff" : "#888"} />,
     wishlist: (active) => <SvgHeart size={18} color={active ? "#fff" : "#888"} />,
   };
@@ -4126,8 +4307,8 @@ export default function App() {
                   {bulkMode && bulkSelected.size > 0 && (
                     <div style={{ display: "flex", gap: 8, marginBottom: 14, padding: "10px 14px", background: "#fff", borderRadius: 14, border: "1.5px solid #e8e4dc", flexWrap: "wrap", alignItems: "center" }}>
                       <span style={{ fontSize: 12, fontWeight: 700, color: "#555" }}>{bulkSelected.size} selected</span>
-                      <button onClick={async () => { for (const id of bulkSelected) { const item = itemsDb.rows.find(i => i.id === id); if (item) await itemsDb.update({ ...item, forSale: true, saleStatus: "listed" }); } setBulkSelected(new Set()); setBulkMode(false); setTab("seller"); }} style={{ padding: "6px 14px", background: "#fff8ee", border: "1.5px solid #f5c842", borderRadius: 10, cursor: "pointer", fontSize: 12, fontWeight: 700, color: "#a07000", fontFamily: "'DM Sans', sans-serif" }}><SvgTag size={12} color="currentColor" style={{marginRight:4}} />List for Sale</button>
-                      <button onClick={async () => { if (window.confirm(`Delete ${bulkSelected.size} items?`)) { for (const id of bulkSelected) await itemsDb.remove(id); setBulkSelected(new Set()); setBulkMode(false); }}} style={{ padding: "6px 14px", background: "#fef2f2", border: "none", borderRadius: 10, cursor: "pointer", fontSize: 12, fontWeight: 700, color: "#e05555", fontFamily: "'DM Sans', sans-serif" }}><SvgTrash size={13} color="#e05555" style={{marginRight:4}} />Delete</button>
+                      <button onClick={async () => { for (const id of bulkSelected) { const item = itemsDb.rows.find(i => i.id === id); if (item) await itemsDb.update({ ...item, forSale: true, saleStatus: "listed" }); } setBulkSelected(new Set()); setBulkMode(false); setTab("seller"); }} style={{ padding: "6px 14px", background: "#fff8ee", border: "1.5px solid #f5c842", borderRadius: 10, cursor: "pointer", fontSize: 12, fontWeight: 700, color: "#a07000", fontFamily: "'DM Sans', sans-serif" }}><SvgTag size={12} color="currentColor" style={{marginRight:6}} />List for Sale</button>
+                      <button onClick={async () => { if (window.confirm(`Delete ${bulkSelected.size} items?`)) { for (const id of bulkSelected) await itemsDb.remove(id); setBulkSelected(new Set()); setBulkMode(false); }}} style={{ padding: "6px 14px", background: "#fef2f2", border: "none", borderRadius: 10, cursor: "pointer", fontSize: 12, fontWeight: 700, color: "#e05555", fontFamily: "'DM Sans', sans-serif" }}><SvgTrash size={13} color="#e05555" style={{marginRight:6}} />Delete</button>
                       <button onClick={() => setBulkSelected(new Set(filteredItems.map(i => i.id)))} style={{ padding: "6px 14px", background: "#f5f2ed", border: "none", borderRadius: 10, cursor: "pointer", fontSize: 12, fontWeight: 700, color: "#666", fontFamily: "'DM Sans', sans-serif" }}>Select All</button>
                       <button onClick={() => setBulkSelected(new Set())} style={{ padding: "6px 14px", background: "#f5f2ed", border: "none", borderRadius: 10, cursor: "pointer", fontSize: 12, fontWeight: 700, color: "#666", fontFamily: "'DM Sans', sans-serif" }}>Deselect All</button>
                     </div>
@@ -4165,7 +4346,7 @@ export default function App() {
                 {/* Outfits toolbar: sort dropdown */}
                 <div style={{ display: "flex", gap: 10, marginBottom: 20, flexWrap: "wrap", alignItems: "center" }}>
                   <select value={outfitSort} onChange={e => setOutfitSort(e.target.value)}
-                    style={{ padding: "8px 14px", border: "1px solid #e0dbd2", borderRadius: 100, fontFamily: "'DM Sans', sans-serif", fontSize: 12, fontWeight: 600, background: "#fff", color: "#444", cursor: "pointer", paddingRight: 28 }}>
+className="pill-select" style={{}}>
                     <option value="default">Sort: Default</option>
                     <option value="az">Sort: A – Z</option>
                     <option value="newest">Sort: Newest</option>
@@ -4306,12 +4487,12 @@ export default function App() {
                               </div>
                             )}
                             <div style={{ padding: "12px 14px 14px" }}>
-                              <div style={{ fontSize: 15, fontWeight: 700, color: "#1a1a1a", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{lb.name}</div>
+                              <div style={{ fontSize: 15, fontWeight: 700, color: "#1a1a1a", lineHeight: 1.3 }}>{lb.name}</div>
                               <div style={{ display: "flex", gap: 8, marginTop: 4, alignItems: "center", flexWrap: "wrap" }}>
                                 <span style={{ fontSize: 11, color: "#aaa", fontWeight: 600 }}>{lbOutfits.length} outfit{lbOutfits.length !== 1 ? "s" : ""}</span>
                                 {totalVal > 0 && <span style={{ fontSize: 11, color: "#aaa" }}>· ${totalVal.toFixed(0)} total</span>}
                               </div>
-                              {dateStr && <div style={{ fontSize: 11, color: "#b0a898", marginTop: 4, fontWeight: 600 }}><SvgCalendar size={11} color="#b0a898" style={{marginRight:3, verticalAlign:"middle"}} />{dateStr}</div>}
+                              {dateStr && <div style={{ fontSize: 11, color: "#b0a898", marginTop: 4, fontWeight: 600 }}><SvgCalendar size={11} color="#b0a898" style={{marginRight:6, verticalAlign:"middle"}} />{dateStr}</div>}
                             </div>
                           </div>
                         );
@@ -4342,6 +4523,7 @@ export default function App() {
               wlSortCat={wlSortCat} setWlSortCat={setWlSortCat}
               moveToCloset={moveToCloset}
               onEdit={(item) => { setEditItem(item); setWishlistDest(true); setModal("item"); }}
+              onItemClick={(item) => setItemDetail(item)}
             />}
 
             </>
@@ -4477,8 +4659,10 @@ export default function App() {
           editMode={editItem ? "manual" : null}
           initialDest={wishlistDest ? "wishlist" : undefined}
           onSave={saveItem}
-          onSaveWish={(form) => saveWishItem({ ...form, wishlistId: activeWishlistId || undefined })}
+          onSaveWish={(form, listId) => saveWishItem({ ...form, wishlistId: listId || undefined })}
           onCancel={closeModal}
+          wishlistsDb={wishlistsDb}
+          saveWishlistsMeta={saveWishlistsMeta}
         />
       </Modal>
 
@@ -4548,19 +4732,24 @@ export default function App() {
       </Modal>
 
       {/* Item Detail Popup */}
-      {itemDetail && (
-        <ItemDetailPopup
-          item={itemDetail}
-          onClose={() => setItemDetail(null)}
-          onEdit={() => { setEditItem(itemDetail); setModal("item"); setItemDetail(null); }}
-          onDelete={() => { itemsDb.remove(itemDetail.id); setItemDetail(null); }}
-          onWorn={() => markWorn(itemDetail)}
-          onCreateOutfit={() => { setEditingOutfit(null); setOutfitSeedItem(itemDetail); setOutfitBuilder(true); setItemDetail(null); }}
-          onListForSale={() => { itemsDb.update({ ...itemDetail, forSale: true, saleStatus: "listed" }); setItemDetail(null); setTab("seller"); }}
-          outfits={outfitsDb.rows}
-          lookbooks={lookbooksDb.rows}
-        />
-      )}
+      {itemDetail && (() => {
+        const isWishlistItem = wishlistDb.rows.some(w => w.id === itemDetail.id);
+        return (
+          <ItemDetailPopup
+            item={itemDetail}
+            onClose={() => setItemDetail(null)}
+            onEdit={() => { setEditItem(itemDetail); setWishlistDest(isWishlistItem); setModal("item"); setItemDetail(null); }}
+            onDelete={() => { isWishlistItem ? wishlistDb.remove(itemDetail.id) : itemsDb.remove(itemDetail.id); setItemDetail(null); }}
+            onWorn={isWishlistItem ? null : () => markWorn(itemDetail)}
+            onMoveToCloset={isWishlistItem ? () => { moveToCloset(itemDetail); setItemDetail(null); } : null}
+            onCreateOutfit={isWishlistItem ? null : () => { setEditingOutfit(null); setOutfitSeedItem(itemDetail); setOutfitBuilder(true); setItemDetail(null); }}
+            onListForSale={isWishlistItem ? null : () => { itemsDb.update({ ...itemDetail, forSale: true, saleStatus: "listed" }); setItemDetail(null); setTab("seller"); }}
+            outfits={outfitsDb.rows}
+            lookbooks={lookbooksDb.rows}
+            isWishlist={isWishlistItem}
+          />
+        );
+      })()}
 
       {/* Outfit Detail Popup */}
       {outfitPopup && (

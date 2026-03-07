@@ -84,6 +84,7 @@ const globalStyles = `
   @keyframes slideLeft { from { opacity: 0; transform: translateX(40px); } to { opacity: 1; transform: translateX(0); } }
   @keyframes slideRight { from { opacity: 0; transform: translateX(-40px); } to { opacity: 1; transform: translateX(0); } }
   @keyframes shimmer { 0%,100% { opacity: 0.6 } 50% { opacity: 1 } }
+  @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
   .fade-up { animation: fadeUp 0.35s cubic-bezier(0.22,1,0.36,1) forwards; }
   .fade-in { animation: fadeIn 0.2s ease forwards; }
   .slide-enter-left { animation: slideLeft 0.25s ease forwards; }
@@ -934,7 +935,144 @@ function AddItemModal({ onSave, onSaveWish, onCancel, initial, editMode, initial
   });
   const [showDrafts, setShowDrafts] = useState(false);
   const [drafts, setDrafts] = useState(loadDrafts);
+  const [urlInput, setUrlInput] = useState("");
+  const [urlLoading, setUrlLoading] = useState(false);
+  const [urlError, setUrlError] = useState("");
+  const [urlSuccess, setUrlSuccess] = useState(false);
   const set = k => e => setForm(f => ({ ...f, [k]: e.target.value }));
+
+  const extractFromUrl = async () => {
+    const url = urlInput.trim();
+    if (!url || !url.startsWith("http")) { setUrlError("Please enter a valid URL"); return; }
+    setUrlLoading(true); setUrlError(""); setUrlSuccess(false);
+    try {
+      // Try multiple CORS proxies in sequence
+      let html = "";
+      const proxies = [
+        "https://api.allorigins.win/get?url=" + encodeURIComponent(url),
+        "https://corsproxy.io/?" + encodeURIComponent(url),
+        "https://api.codetabs.com/v1/proxy?quest=" + encodeURIComponent(url),
+      ];
+      for (const proxyUrl of proxies) {
+        try {
+          const controller = new AbortController();
+          const timer = setTimeout(() => controller.abort(), 8000);
+          const res = await fetch(proxyUrl, { signal: controller.signal });
+          clearTimeout(timer);
+          if (!res.ok) continue;
+          const ct = res.headers.get("content-type") || "";
+          if (ct.includes("json")) {
+            const json = await res.json();
+            html = json.contents || json.data || "";
+          } else {
+            html = await res.text();
+          }
+          if (html.length > 500) break;
+        } catch(e) { continue; }
+      }
+      // Extract meta tags using simple string parsing (no RegExp constructor)
+      const getTag = (prop) => {
+        const lh = html.toLowerCase();
+        const lp = prop.toLowerCase();
+        // Find a meta tag containing this property/name
+        let idx = 0;
+        while (idx < lh.length) {
+          const metaIdx = lh.indexOf("<meta", idx);
+          if (metaIdx === -1) break;
+          const closeIdx = lh.indexOf(">", metaIdx);
+          if (closeIdx === -1) break;
+          const tag = html.slice(metaIdx, closeIdx + 1);
+          const tl = tag.toLowerCase();
+          if ((tl.includes('property="' + lp + '"') || tl.includes("property='" + lp + "'") ||
+               tl.includes('name="' + lp + '"') || tl.includes("name='" + lp + "'")) ) {
+            const cm = tag.match(/content=["']([^"']+)["']/i);
+            if (cm) return cm[1];
+          }
+          idx = closeIdx + 1;
+        }
+        return "";
+      };
+      const title = getTag("og:title") || getTag("twitter:title") || (html.match(/<title[^>]*>([^<]+)<\/title>/i)||[])[1] || "";
+      const description = getTag("og:description") || getTag("description") || "";
+      const imageUrl = getTag("og:image") || getTag("twitter:image") || "";
+      const siteName = getTag("og:site_name") || "";
+      const jsonLdMatches = html.match(/<script[^>]+type=["\']application\/ld\+json["\'][^>]*>([\s\S]*?)<\/script>/gi) || [];
+      let jsonLdText = "";
+      for (const block of jsonLdMatches) {
+        const inner = block.replace(/<script[^>]*>/, "").replace(/<\/script>/, "");
+        if (inner.includes("Product") || inner.includes("price") || inner.includes("offers")) { jsonLdText = inner.slice(0, 3000); break; }
+      }
+      // Extract info from URL slug as fallback signal
+      const urlSlug = url.replace(/https?:\/\/[^/]+/, "").replace(/[?#].*/, "").replace(/[-_/]+/g, " ").trim();
+      const hostname = (url.match(/https?:\/\/([^/]+)/) || [])[1] || "";
+      const promptText = [
+        "Extract product info from this fashion retailer webpage and return ONLY a JSON object with these exact fields:",
+        "name, brand, category (must be one of: Accessories, Activewear, Bags, Denim, Dresses, Intimates, Jewelry, Knits, Loungewear, Outerwear, Shoes, Shorts + Skirts, Sleepwear, Socks + Tights, Sweaters, Swim, Tops, Trousers), price (number only no $ sign, or null), color (main color as a single common word, or null), notes (one sentence description, or null).",
+        "",
+        "URL: " + url,
+        "URL path (use to infer product name if nothing else available): " + urlSlug,
+        "Retailer domain: " + hostname,
+        "Page title: " + (title || "none"),
+        "Site: " + (siteName || "none"),
+        "Description: " + (description.slice(0, 400) || "none"),
+        "Structured product data: " + (jsonLdText.slice(0, 2000) || "none"),
+        "",
+        "Use all available signals. The URL slug is especially useful — e.g. 'bra-free-rib-90s-cami' means the product is a cami top. Return ONLY valid JSON, no markdown."
+      ].join("\n");
+      let extracted = {};
+      try {
+        const apiKey = process.env.REACT_APP_ANTHROPIC_KEY || "";
+        if (!apiKey) throw new Error("NO_KEY");
+        const apiRes = await fetch("https://api.anthropic.com/v1/messages", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "x-api-key": apiKey, "anthropic-version": "2023-06-01", "anthropic-dangerous-direct-browser-access": "true" },
+          body: JSON.stringify({ model: "claude-sonnet-4-20250514", max_tokens: 600, messages: [{ role: "user", content: promptText }] })
+        });
+        const apiData = await apiRes.json();
+        if (!apiRes.ok) throw new Error("API_" + apiRes.status + ": " + (apiData.error && apiData.error.message || "unknown"));
+        const text = (apiData.content || []).map(b => b.text || "").join("");
+        const clean = text.replace(/```json|```/g, "").trim();
+        const jsonMatch = clean.match(/\{[\s\S]*\}/);
+        extracted = jsonMatch ? JSON.parse(jsonMatch[0]) : {};
+      } catch(apiErr) {
+        const msg = apiErr && apiErr.message || "";
+        if (msg === "NO_KEY") {
+          setForm(f => ({ ...f, link: url }));
+          setUrlError("API key not configured — add REACT_APP_ANTHROPIC_KEY to Vercel env vars. Link saved.");
+          setUrlLoading(false);
+          return;
+        }
+        // Other API failure — still try to set link
+        extracted = {};
+      }
+      // Check if we got anything useful back
+      const gotFields = extracted.name || extracted.brand || extracted.category;
+      setForm(f => ({
+        ...f,
+        ...(extracted.name ? { name: extracted.name } : {}),
+        ...(extracted.brand ? { brand: extracted.brand } : {}),
+        ...(extracted.category ? { category: extracted.category } : {}),
+        ...(extracted.price ? { price: String(extracted.price) } : {}),
+        ...(extracted.color ? { color: extracted.color, colors: [extracted.color] } : {}),
+        ...(extracted.notes ? { notes: extracted.notes } : {}),
+        link: url,
+        ...(imageUrl && !f.image ? { image: imageUrl } : {}),
+      }));
+      if (dest === "wishlist") setForm(f => ({ ...f, store: extracted.brand || siteName || f.store || "" }));
+      if (gotFields) {
+        setUrlSuccess(true);
+        setUrlInput("");
+      } else {
+        // Link was saved but nothing else filled — tell the user
+        setUrlError("Link saved — couldn't auto-fill details. Try filling in manually.");
+      }
+    } catch (e) {
+      setForm(f => ({ ...f, link: url }));
+      setUrlError("Link saved — couldn't auto-fill details. Try filling in manually.");
+    } finally {
+      setUrlLoading(false);
+    }
+  };
 
   const refreshDrafts = () => setDrafts(loadDrafts());
 
@@ -1032,6 +1170,35 @@ function AddItemModal({ onSave, onSaveWish, onCancel, initial, editMode, initial
           <SvgBox size={16} color="#888" />
           {drafts.length > 0 && <span style={{ position: "absolute", top: 4, right: 4, width: 14, height: 14, borderRadius: "50%", background: "#e05588", color: "#fff", fontSize: 9, fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center" }}>{drafts.length}</span>}
         </button>
+      </div>
+
+      {/* URL Import Bar */}
+      <div style={{ marginBottom: 16 }}>
+        <label style={{ display: "block", fontSize: 11, fontWeight: 600, color: "#999", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 6 }}>Import from URL</label>
+        <div style={{ display: "flex", gap: 8 }}>
+          <input
+            value={urlInput}
+            onChange={e => { setUrlInput(e.target.value); setUrlError(""); setUrlSuccess(false); }}
+            onKeyDown={e => e.key === "Enter" && extractFromUrl()}
+            placeholder="Paste a product link to auto-fill…"
+            style={{ flex: 1, padding: "9px 14px", border: "1.5px solid #e0dbd2", borderRadius: 12, fontFamily: "'DM Sans', sans-serif", fontSize: 12, outline: "none", background: "#fafaf8" }}
+          />
+          <button onClick={extractFromUrl} disabled={urlLoading || !urlInput.trim()} style={{
+            padding: "9px 16px", borderRadius: 12, border: "none",
+            background: urlLoading ? "#e8e4dc" : "#1a1a1a", color: urlLoading ? "#aaa" : "#fff",
+            cursor: urlLoading || !urlInput.trim() ? "not-allowed" : "pointer",
+            fontFamily: "'DM Sans', sans-serif", fontSize: 12, fontWeight: 700,
+            display: "flex", alignItems: "center", gap: 6, flexShrink: 0,
+          }}>
+            {urlLoading ? (
+              <><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" style={{ animation: "spin 0.8s linear infinite" }}><path d="M21 12a9 9 0 11-6.219-8.56"/></svg>Fetching…</>
+            ) : (
+              <><SvgLink size={12} color="#fff" />Import</>
+            )}
+          </button>
+        </div>
+        {urlError && <div style={{ marginTop: 6, fontSize: 11, color: "#e05555", fontWeight: 600 }}>{urlError}</div>}
+        {urlSuccess && <div style={{ marginTop: 6, fontSize: 11, color: "#2d6a3f", fontWeight: 600, display: "flex", alignItems: "center", gap: 4 }}><SvgCheck size={11} color="#2d6a3f" />Fields auto-filled — review and adjust below</div>}
       </div>
 
       {/* Photo */}
@@ -1156,14 +1323,16 @@ function ItemCard({ item, onClick, onEdit }) {
 }
 
 // ── Item Detail Popup ────────────────────────────────────────────────────────
-function ItemDetailPopup({ item, onClose, onEdit, onDelete, onWorn, onCreateOutfit, onListForSale, onMoveToCloset, outfits, lookbooks, isWishlist }) {
+function ItemDetailPopup({ item, onClose, onEdit, onDelete, onWorn, onCreateOutfit, onListForSale, onMoveToCloset, onAddToCapsule, outfits, lookbooks, isWishlist, capsules }) {
   const priceNum = parseFloat((item.price || "").replace(/[^0-9.]/g, "")) || 0;
   const spentNum = parseFloat((item.spent || "").replace(/[^0-9.]/g, "")) || 0;
   const worn = item.wornCount || 0;
   const cpw = worn > 0 && (spentNum || priceNum) > 0 ? ((spentNum || priceNum) / worn).toFixed(2) : null;
+  const [featuredView, setFeaturedView] = useState("outfits"); // "outfits" | "lookbooks"
   const featuredOutfits = (outfits || []).filter(o => (o.layers || o.itemIds || []).includes(item.id));
   const featuredOutfitIds = new Set(featuredOutfits.map(o => o.id));
-  const featuredLookbookCount = (lookbooks || []).filter(lb => (lb.outfitIds || []).some(oid => featuredOutfitIds.has(oid))).length;
+  const featuredLookbooks = (lookbooks || []).filter(lb => (lb.outfitIds || []).some(oid => featuredOutfitIds.has(oid)));
+  const featuredLookbookCount = featuredLookbooks.length;
 
   const chip = (label, bg = "#f5f3ef", color = "#666") => (
     <span style={{ background: bg, color, borderRadius: 20, padding: "4px 12px", fontSize: 12, fontWeight: 700 }}>{label}</span>
@@ -1172,7 +1341,7 @@ function ItemDetailPopup({ item, onClose, onEdit, onDelete, onWorn, onCreateOutf
   return (
     <div className="item-detail-overlay fade-in" onClick={onClose}>
       <div className="fade-up" onClick={e => e.stopPropagation()} style={{
-        background: "#fff", borderRadius: 24, width: "100%", maxWidth: 860,
+        background: "#fff", borderRadius: 24, width: "100%", maxWidth: 1020,
         maxHeight: "90vh", overflow: "hidden", boxShadow: "0 30px 80px rgba(0,0,0,0.2)",
         display: "flex", flexDirection: "row"
       }}>
@@ -1194,12 +1363,35 @@ function ItemDetailPopup({ item, onClose, onEdit, onDelete, onWorn, onCreateOutf
             {item.brand && <div style={{ fontSize: 13, color: "#aaa", marginBottom: 12 }}>{item.brand}</div>}
 
             {/* Tags */}
-            <div style={{ display: "flex", gap: 5, flexWrap: "wrap", marginBottom: 14 }}>
+            <div style={{ display: "flex", gap: 5, flexWrap: "wrap", marginBottom: 10 }}>
               {item.category && chip(item.category)}
               {item.size && chip(item.size)}
               {(item.colors?.length ? item.colors : item.color ? [item.color] : []).map(c => chip(c))}
               {(item.seasons?.length ? item.seasons : item.season ? [item.season] : []).map(s => chip(s, "#f0fbff", "#2bafd4"))}
             </div>
+            {/* Color swatches */}
+            {(item.colors?.length ? item.colors : item.color ? [item.color] : []).length > 0 && (() => {
+              const colorMap = { black: "#1a1a1a", white: "#fff", cream: "#f5f0e8", beige: "#e8dcc8", brown: "#8b5e3c", tan: "#d2a679", camel: "#c19a6b", grey: "#9e9e9e", gray: "#9e9e9e", navy: "#1a2a4a", blue: "#2979c4", "light blue": "#7eb8e8", red: "#e03535", pink: "#f48fb1", blush: "#f4c2c2", purple: "#9c27b0", lavender: "#ce93d8", green: "#388e3c", sage: "#87a878", olive: "#6d7c43", yellow: "#f9d71c", orange: "#f57c00", gold: "#c9a96e", silver: "#aaa", multicolor: "linear-gradient(135deg,#f00,#ff0,#0f0,#0ff,#00f,#f0f)" };
+              const cols = item.colors?.length ? item.colors : [item.color];
+              return (
+                <div style={{ display: "flex", gap: 6, marginBottom: 14, flexWrap: "wrap" }}>
+                  {cols.map((c, i) => {
+                    const key = (c||"").toLowerCase();
+                    const bg = colorMap[key] || c;
+                    const isGradient = bg.startsWith("linear");
+                    return (
+                      <div key={i} title={c} style={{
+                        width: 22, height: 22, borderRadius: "50%",
+                        background: bg,
+                        border: "2px solid rgba(0,0,0,0.1)",
+                        boxShadow: "0 1px 3px rgba(0,0,0,0.12)",
+                        flexShrink: 0,
+                      }} />
+                    );
+                  })}
+                </div>
+              );
+            })()}
 
             {/* Stats */}
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 14 }}>
@@ -1220,15 +1412,6 @@ function ItemDetailPopup({ item, onClose, onEdit, onDelete, onWorn, onCreateOutf
               ))}
             </div>
 
-            {!isWishlist && (
-              <button onClick={onWorn} style={{
-                width: "100%", padding: "10px", marginBottom: 10,
-                background: "#f0faf4", border: "1.5px solid #b6e8c8", borderRadius: 12,
-                cursor: "pointer", fontSize: 13, fontWeight: 700, color: "#2d6a3f",
-                fontFamily: "'DM Sans', sans-serif"
-              }}><SvgHanger size={13} color="currentColor" style={{marginRight:6}} />Mark as Worn{worn > 0 ? ` (${worn}×)` : ""}</button>
-            )}
-
             {item.purchaseDate && (
               <div style={{ fontSize: 11, color: "#bbb", marginBottom: 10, textAlign: "center" }}>
                 Purchased {new Date(item.purchaseDate + "T00:00:00").toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}
@@ -1241,58 +1424,94 @@ function ItemDetailPopup({ item, onClose, onEdit, onDelete, onWorn, onCreateOutf
           </div>
         </div>
 
-        {/* ── RIGHT: outfits grid ── */}
+        {/* ── RIGHT: featured in ── */}
         <div style={{ flex: 1, borderLeft: "1px solid #e8e4dc", display: "flex", flexDirection: "column", minWidth: 0 }}>
-          {/* Header */}
-          <div style={{ padding: "14px 18px", display: "flex", alignItems: "center", justifyContent: "space-between", borderBottom: "1px solid #e8e4dc", flexShrink: 0, gap: 10, flexWrap: "wrap" }}>
-            <div>
-              <div style={{ fontSize: 15, fontWeight: 800, color: "#1a1a1a" }}>Featured In</div>
-              <div style={{ fontSize: 11, color: "#bbb", marginTop: 1 }}>{featuredOutfits.length} outfit{featuredOutfits.length !== 1 ? "s" : ""}</div>
-            </div>
-            <div style={{ display: "flex", gap: 7, alignItems: "center" }}>
-              {/* Worn badge — closet only */}
-              {!isWishlist && worn > 0 && (
-                <div style={{ padding: "6px 12px", background: "#f0faf4", borderRadius: 10, fontSize: 12, fontWeight: 700, color: "#2d6a3f" }}><SvgHanger size={12} color="#2d6a3f" style={{marginRight:6}} />{worn}×</div>
+          {/* Header: single row of action buttons + × at end */}
+          <div style={{ padding: "12px 16px", borderBottom: "1px solid #e8e4dc", flexShrink: 0 }}>
+            <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "nowrap", overflowX: "auto" }}>
+              {/* Worn — clickable */}
+              {!isWishlist && (
+                <button onClick={onWorn} title="Add a wear" style={{
+                  padding: "6px 11px", background: "#f0faf4", border: "1.5px solid #b6e8c8",
+                  borderRadius: 10, fontSize: 12, fontWeight: 700, color: "#2d6a3f", whiteSpace: "nowrap",
+                  cursor: "pointer", display: "flex", alignItems: "center", gap: 5, fontFamily: "'DM Sans', sans-serif", flexShrink: 0
+                }}><SvgHanger size={12} color="#2d6a3f" />{worn}×</button>
               )}
-              {/* Edit */}
-              <button onClick={onEdit} title="Edit" style={{ width: 34, height: 34, borderRadius: "50%", background: "#f5f2ed", border: "none", cursor: "pointer", fontSize: 15, color: "#444", display: "flex", alignItems: "center", justifyContent: "center" }}><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>
-              {/* Delete */}
-              <button onClick={onDelete} title="Delete" style={{ width: 34, height: 34, borderRadius: "50%", background: "#fef2f2", border: "none", cursor: "pointer", fontSize: 15, color: "#e05555", display: "flex", alignItems: "center", justifyContent: "center" }}><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4h6v2"/></svg></button>
-              {/* Wishlist: Buy + Purchased | Closet: List for Sale + Create Outfit */}
+              {!isWishlist && onAddToCapsule && (
+                <button onClick={onAddToCapsule} style={{ padding: "6px 11px", background: "#f5f2ed", border: "1px solid #e0dbd2", borderRadius: 10, cursor: "pointer", fontSize: 12, fontWeight: 700, color: "#555", fontFamily: "'DM Sans', sans-serif", display: "flex", alignItems: "center", gap: 5, flexShrink: 0, whiteSpace: "nowrap" }}>
+                  <SvgBox size={12} color="#888" />Capsule
+                </button>
+              )}
+              <button onClick={onEdit} title="Edit" style={{ width: 32, height: 32, borderRadius: "50%", background: "#f5f2ed", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>
+              <button onClick={onDelete} title="Delete" style={{ width: 32, height: 32, borderRadius: "50%", background: "#fef2f2", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", color: "#e05555", flexShrink: 0 }}><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4h6v2"/></svg></button>
               {isWishlist ? (<>
-                {item.link && <a href={item.link} target="_blank" rel="noreferrer" style={{ padding: "8px 14px", background: "#1a1a1a", borderRadius: 12, fontSize: 12, fontWeight: 700, color: "#fff", fontFamily: "'DM Sans', sans-serif", display: "flex", alignItems: "center", gap: 6, textDecoration: "none" }}><SvgShop size={13} color="#fff" style={{marginRight:6}} />Buy</a>}
-                <button onClick={onMoveToCloset} style={{ padding: "8px 14px", background: "#f0faf4", border: "1.5px solid #b6e8c8", borderRadius: 12, cursor: "pointer", fontSize: 12, fontWeight: 700, color: "#2d6a3f", fontFamily: "'DM Sans', sans-serif", display: "flex", alignItems: "center", gap: 6 }}><SvgCheck size={13} color="currentColor" style={{marginRight:6}} />Purchased</button>
+                {item.link && <a href={item.link} target="_blank" rel="noreferrer" style={{ padding: "6px 11px", background: "#1a1a1a", borderRadius: 10, fontSize: 12, fontWeight: 700, color: "#fff", fontFamily: "'DM Sans', sans-serif", display: "flex", alignItems: "center", gap: 5, textDecoration: "none", flexShrink: 0, whiteSpace: "nowrap" }}><SvgShop size={12} color="#fff" />Buy</a>}
+                <button onClick={onMoveToCloset} style={{ padding: "6px 11px", background: "#f0faf4", border: "1.5px solid #b6e8c8", borderRadius: 10, cursor: "pointer", fontSize: 12, fontWeight: 700, color: "#2d6a3f", fontFamily: "'DM Sans', sans-serif", display: "flex", alignItems: "center", gap: 5, flexShrink: 0, whiteSpace: "nowrap" }}><SvgCheck size={12} color="currentColor" />Purchased</button>
               </>) : (<>
-                <button onClick={onListForSale} title="List for Sale" style={{ padding: "6px 12px", background: "#fff8ee", border: "1.5px solid #f5c842", borderRadius: 12, cursor: "pointer", fontSize: 12, fontWeight: 700, color: "#a07000", fontFamily: "'DM Sans', sans-serif", display: "flex", alignItems: "center", gap: 5 }}><SvgTag size={12} color="currentColor" style={{marginRight:6}} />List for Sale</button>
-                <button onClick={onCreateOutfit} style={{ padding: "8px 14px", background: "#1a1a1a", border: "none", borderRadius: 12, cursor: "pointer", fontSize: 12, fontWeight: 700, color: "#fff", fontFamily: "'DM Sans', sans-serif", display: "flex", alignItems: "center", gap: 6 }}><SvgSparkle size={13} color="currentColor" style={{marginRight:6}} />Create Outfit</button>
+                <button onClick={onListForSale} style={{ padding: "6px 11px", background: "#fff8ee", border: "1.5px solid #f5c842", borderRadius: 10, cursor: "pointer", fontSize: 12, fontWeight: 700, color: "#a07000", fontFamily: "'DM Sans', sans-serif", display: "flex", alignItems: "center", gap: 5, flexShrink: 0, whiteSpace: "nowrap" }}><SvgTag size={12} color="currentColor" />List for Sale</button>
+                <button onClick={onCreateOutfit} style={{ padding: "6px 11px", background: "#1a1a1a", border: "none", borderRadius: 10, cursor: "pointer", fontSize: 12, fontWeight: 700, color: "#fff", fontFamily: "'DM Sans', sans-serif", display: "flex", alignItems: "center", gap: 5, flexShrink: 0, whiteSpace: "nowrap" }}><SvgSparkle size={12} color="currentColor" />Create Outfit</button>
               </>)}
+              {/* Spacer */}
+              <div style={{ flex: 1 }} />
+              {/* Toggle: Outfits / Lookbooks */}
+              <div style={{ display: "flex", gap: 0, background: "#f5f2ed", borderRadius: 10, padding: 3, flexShrink: 0 }}>
+                {[["outfits", "Outfits", featuredOutfits.length], ["lookbooks", "Lookbooks", featuredLookbookCount]].map(([id, lbl, cnt]) => (
+                  <button key={id} onClick={() => setFeaturedView(id)} style={{
+                    padding: "5px 12px", borderRadius: 8, border: "none", cursor: "pointer",
+                    background: featuredView === id ? "#fff" : "transparent",
+                    color: featuredView === id ? "#1a1a1a" : "#aaa",
+                    fontFamily: "'DM Sans', sans-serif", fontSize: 12, fontWeight: 700,
+                    boxShadow: featuredView === id ? "0 1px 4px rgba(0,0,0,0.08)" : "none",
+                    transition: "all 0.15s", whiteSpace: "nowrap",
+                  }}>{lbl} <span style={{ fontSize: 10, opacity: 0.6 }}>({cnt})</span></button>
+                ))}
+              </div>
               {/* Close */}
-              <button onClick={onClose} style={{ width: 34, height: 34, borderRadius: "50%", background: "#f5f2ed", border: "none", cursor: "pointer", fontSize: 15, color: "#888", display: "flex", alignItems: "center", justifyContent: "center" }}><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+              <button onClick={onClose} style={{ width: 30, height: 30, borderRadius: "50%", background: "#f5f2ed", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+              </button>
             </div>
           </div>
 
-          {/* Outfit grid */}
+          {/* Content grid */}
           <div style={{ flex: 1, overflowY: "auto", padding: 16 }}>
-            {featuredOutfits.length === 0 ? (
-              <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", height: "100%", color: "#ccc", gap: 10, paddingTop: 40 }}>
-                <div><SvgSparkle size={40} color="#ddd" /></div>
-                <div style={{ fontSize: 13, fontWeight: 600 }}>Not in any outfits yet</div>
-                <div style={{ fontSize: 12 }}>Click Create Outfit to style it</div>
-              </div>
-            ) : (
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(140px, 1fr))", gap: 10 }}>
-                {featuredOutfits.map(outfit => (
-                  <div key={outfit.id} style={{ borderRadius: 14, overflow: "hidden", background: "#f5f2ed", aspectRatio: "3/4", display: "flex", alignItems: "center", justifyContent: "center", position: "relative" }}>
-                    {outfit.previewImage
-                      ? <img src={outfit.previewImage} alt={outfit.name} style={{ width: "100%", height: "100%", objectFit: "contain" }} />
-                      : <HangerIcon size={28} color="#ddd" />
-                    }
-                    <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, background: "linear-gradient(transparent, rgba(0,0,0,0.55))", padding: "18px 8px 8px" }}>
-                      <div style={{ fontSize: 11, fontWeight: 700, color: "#fff", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{outfit.name}</div>
+            {featuredView === "outfits" ? (
+              featuredOutfits.length === 0 ? (
+                <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", height: "100%", color: "#ccc", gap: 10, paddingTop: 40 }}>
+                  <SvgSparkle size={40} color="#ddd" />
+                  <div style={{ fontSize: 13, fontWeight: 600 }}>Not in any outfits yet</div>
+                  {!isWishlist && <div style={{ fontSize: 12 }}>Click Create Outfit to style it</div>}
+                </div>
+              ) : (
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(140px, 1fr))", gap: 10 }}>
+                  {featuredOutfits.map(outfit => (
+                    <div key={outfit.id} style={{ borderRadius: 14, overflow: "hidden", background: "#f5f2ed", aspectRatio: "3/4", display: "flex", alignItems: "center", justifyContent: "center", position: "relative" }}>
+                      {outfit.previewImage ? <img src={outfit.previewImage} alt={outfit.name} style={{ width: "100%", height: "100%", objectFit: "contain" }} /> : <HangerIcon size={28} color="#ddd" />}
+                      <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, background: "linear-gradient(transparent, rgba(0,0,0,0.55))", padding: "18px 8px 8px" }}>
+                        <div style={{ fontSize: 11, fontWeight: 700, color: "#fff", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{outfit.name}</div>
+                      </div>
                     </div>
-                  </div>
-                ))}
-              </div>
+                  ))}
+                </div>
+              )
+            ) : (
+              featuredLookbooks.length === 0 ? (
+                <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", height: "100%", color: "#ccc", gap: 10, paddingTop: 40 }}>
+                  <SvgGrid size={40} color="#ddd" />
+                  <div style={{ fontSize: 13, fontWeight: 600 }}>Not in any lookbooks yet</div>
+                </div>
+              ) : (
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(140px, 1fr))", gap: 10 }}>
+                  {featuredLookbooks.map(lb => (
+                    <div key={lb.id} style={{ borderRadius: 14, overflow: "hidden", background: "#f5f2ed", aspectRatio: "3/4", display: "flex", alignItems: "center", justifyContent: "center", position: "relative" }}>
+                      {lb.coverImage ? <img src={lb.coverImage} alt={lb.name} style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : <SvgGrid size={28} color="#ddd" />}
+                      <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, background: "linear-gradient(transparent, rgba(0,0,0,0.55))", padding: "18px 8px 8px" }}>
+                        <div style={{ fontSize: 11, fontWeight: 700, color: "#fff", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{lb.name}</div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )
             )}
           </div>
         </div>
@@ -1452,7 +1671,7 @@ function OutfitDetailPopup({ outfit, allItems, lookbooks, onClose, onEdit, onDel
   return (
     <div className="item-detail-overlay fade-in" onClick={onClose}>
       <div className="fade-up" onClick={e => e.stopPropagation()} style={{
-        background: "#fff", borderRadius: 24, width: "100%", maxWidth: 860,
+        background: "#fff", borderRadius: 24, width: "100%", maxWidth: 1020,
         maxHeight: "90vh", overflow: "hidden", boxShadow: "0 30px 80px rgba(0,0,0,0.2)",
         display: "flex", flexDirection: "row"
       }}>
@@ -4147,6 +4366,15 @@ export default function App() {
   const [tab, setTab] = useState("closet");
   const [modal, setModal] = useState(null);
   const [catFilter, setCatFilter] = useState("All");
+  const [catFilters, setCatFilters] = useState([]); // multi-select categories
+  const [closetZoom, setClosetZoom] = useState(148); // card min-width in px
+  const [showNewOnly, setShowNewOnly] = useState(false); // "What's New" filter
+  const [capsules, setCapsules] = useState(() => { try { return JSON.parse(localStorage.getItem("wardrobe_capsules_v1") || "[]"); } catch { return []; } });
+  const [activeCapsule, setActiveCapsule] = useState(null);
+  const [showCapsuleModal, setShowCapsuleModal] = useState(false);
+  const [capsuleName, setCapsuleName] = useState("");
+  const [capsulePreselect, setCapsulePreselect] = useState(null); // item ids to preselect in capsule modal
+  const [capsuleEditId, setCapsuleEditId] = useState(null); // id of capsule being edited
   const [editItem, setEditItem] = useState(null);
   const [outfitBuilder, setOutfitBuilder] = useState(false);
   const [editingOutfit, setEditingOutfit] = useState(null);
@@ -4266,12 +4494,16 @@ export default function App() {
 
   const filteredItems = (() => {
     const q = closetSearch.trim().toLowerCase();
+    const threeMonthsAgo = new Date(); threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3);
+    const capsuleItemIds = activeCapsule ? new Set((capsules.find(c => c.id === activeCapsule)?.itemIds || [])) : null;
     let rows = itemsDb.rows.filter(i => {
-      if (i.forSale) return false; // moved to seller tab
-      const matchCat = catFilter === "All" || i.category === catFilter;
+      if (i.forSale) return false;
+      const matchCat = catFilters.length === 0 || catFilters.includes(i.category);
       const matchSearch = !q || i.name.toLowerCase().includes(q) || (i.brand||"").toLowerCase().includes(q) || (i.color||"").toLowerCase().includes(q) || (i.category||"").toLowerCase().includes(q);
       const matchSeason = closetSeasonFilter === "All" || (i.seasons || []).includes(closetSeasonFilter) || i.season === closetSeasonFilter;
-      return matchCat && matchSearch && matchSeason;
+      const matchNew = !showNewOnly || (i.purchaseDate && new Date(i.purchaseDate) >= threeMonthsAgo);
+      const matchCapsule = !capsuleItemIds || capsuleItemIds.has(i.id);
+      return matchCat && matchSearch && matchSeason && matchNew && matchCapsule;
     });
     if (closetSort === "az") rows = [...rows].sort((a, b) => a.name.localeCompare(b.name));
     else if (closetSort === "price") rows = [...rows].sort((a, b) => (parseFloat((b.price||"").replace(/[^0-9.]/g,""))||0) - (parseFloat((a.price||"").replace(/[^0-9.]/g,""))||0));
@@ -4279,6 +4511,11 @@ export default function App() {
     else if (closetSort === "newest") rows = [...rows].sort((a, b) => (b.purchaseDate||"").localeCompare(a.purchaseDate||""));
     return rows;
   })();
+  const saveCapsules = (updated) => {
+    setCapsules(updated);
+    try { localStorage.setItem("wardrobe_capsules_v1", JSON.stringify(updated)); } catch {}
+  };
+
   const filteredOutfits = (() => {
     const q = outfitSearch.trim().toLowerCase();
     let rows = outfitsDb.rows.filter(o => {
@@ -4435,11 +4672,21 @@ export default function App() {
                   </div>
                 </div>
                 <div className="sidebar-section">
-                  <div className="sidebar-label">Category</div>
-                  {CATEGORIES.map(cat => (
-                    <button key={cat} className={"sidebar-btn" + (catFilter === cat ? " active" : "")} onClick={() => setCatFilter(cat)}>{cat}</button>
-                  ))}
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
+                    <div className="sidebar-label" style={{ marginBottom: 0 }}>Category</div>
+                    {catFilters.length > 0 && <button onClick={() => setCatFilters([])} style={{ fontSize: 10, color: "#aaa", background: "none", border: "none", cursor: "pointer", fontFamily: "'DM Sans', sans-serif", fontWeight: 600 }}>Clear</button>}
+                  </div>
+                  {CATEGORIES.slice(1).map(cat => {
+                    const active = catFilters.includes(cat);
+                    return (
+                      <button key={cat} className={"sidebar-btn" + (active ? " active" : "")}
+                        onClick={() => setCatFilters(prev => active ? prev.filter(c => c !== cat) : [...prev, cat])}>
+                        {cat}
+                      </button>
+                    );
+                  })}
                 </div>
+
               </>)}
               {tab === "outfits" && (<>
                 <div className="sidebar-section">
@@ -4476,6 +4723,15 @@ export default function App() {
                 <div className="fade-up">
                   {/* Closet toolbar: sort + season dropdowns */}
                   <div style={{ display: "flex", gap: 10, marginBottom: 20, flexWrap: "wrap", alignItems: "center" }}>
+                    {/* What's New filter — first */}
+                    <button onClick={() => setShowNewOnly(n => !n)} style={{
+                      padding: "7px 14px", borderRadius: 100, border: showNewOnly ? "1.5px solid #b6e8c8" : "1px solid #e0dbd2",
+                      background: showNewOnly ? "#f0faf4" : "#fff", color: showNewOnly ? "#2d6a3f" : "#666",
+                      fontFamily: "'DM Sans', sans-serif", fontSize: 12, fontWeight: 600, cursor: "pointer",
+                      display: "flex", alignItems: "center", gap: 6,
+                    }}>
+                      <SvgStar size={12} color={showNewOnly ? "#2d6a3f" : "#aaa"} />What's New
+                    </button>
                     <select value={closetSort} onChange={e => setClosetSort(e.target.value)} className="pill-select" style={{}}>
                       <option value="default">Sort: Default</option>
                       <option value="az">Sort: A – Z</option>
@@ -4486,6 +4742,13 @@ export default function App() {
                     <select value={closetSeasonFilter} onChange={e => setClosetSeasonFilter(e.target.value)} className="pill-select" style={{}}>
                       {["All", ...SEASONS].map(s => <option key={s} value={s}>{s === "All" ? "All Seasons" : s}</option>)}
                     </select>
+                    {/* Zoom slider */}
+                    <div style={{ display: "flex", alignItems: "center", gap: 8, marginLeft: "auto" }}>
+                      <SvgBox size={12} color="#bbb" />
+                      <input type="range" min={110} max={220} step={10} value={closetZoom} onChange={e => setClosetZoom(Number(e.target.value))}
+                        style={{ width: 80, accentColor: "#1a1a1a", cursor: "pointer" }} />
+                      <SvgBox size={16} color="#bbb" />
+                    </div>
                   </div>
                   {/* Bulk action bar */}
                   {bulkMode && bulkSelected.size > 0 && (
@@ -4506,7 +4769,7 @@ export default function App() {
                       {!closetSearch && catFilter === "All" && <div style={{ fontSize: 12, color: "#ddd", marginTop: 4 }}>Tap + to add your first piece</div>}
                     </div>
                   ) : (
-                    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(148px, 1fr))", gap: 12 }}>
+                    <div style={{ display: "grid", gridTemplateColumns: `repeat(auto-fill, minmax(${closetZoom}px, 1fr))`, gap: 12 }}>
                       {filteredItems.map((item, i) => (
                         <div key={item.id} className="fade-up" style={{ animationDelay: `${i * 0.02}s`, opacity: 0, position: "relative" }}
                           onClick={bulkMode ? () => setBulkSelected(s => { const n = new Set(s); n.has(item.id) ? n.delete(item.id) : n.add(item.id); return n; }) : undefined}
@@ -4767,69 +5030,45 @@ className="pill-select" style={{}}>
 
           {/* Season filter moved to top toolbar for closet */}
 
-          {/* Wardrobe stats card */}
-          {tab !== "wishlist" && tab !== "lookbooks" && tab !== "moodboard" && tab !== "settings" && itemsDb.rows.length > 0 && (() => {
-            const items = itemsDb.rows;
-            const totalValue = items.reduce((s, i) => s + (parseFloat((i.price || "").replace(/[^0-9.]/g, "")) || 0), 0);
-            const avgValue = totalValue / items.length;
-            const neverWorn = items.filter(i => !(i.wornCount || 0)).length;
-            const mostWorn = [...items].filter(i => (i.wornCount||0) > 0).sort((a,b) => (b.wornCount||0)-(a.wornCount||0))[0];
-            return (
-              <div className="right-card">
-                <div className="right-card-title">Wardrobe Stats</div>
-                <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-                  {[
-                    { lbl: "Total Value", val: `$${totalValue.toFixed(0)}` },
-                    { lbl: "Avg. Item Value", val: `$${avgValue.toFixed(0)}` },
-                    { lbl: "Items Unworn", val: neverWorn, color: neverWorn > 0 ? "#e07e30" : "#3aaa6e" },
-                  ].map(s => (
-                    <div key={s.lbl} style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                      <span style={{ fontSize: 12, color: "#999", fontWeight: 600 }}>{s.lbl}</span>
-                      <span style={{ fontSize: 15, fontWeight: 800, color: s.color || "#1a1a1a" }}>{s.val}</span>
-                    </div>
-                  ))}
-                  {mostWorn && (
-                    <div style={{ borderTop: "1px solid #e8e4dc", paddingTop: 12 }}>
-                      <div style={{ fontSize: 10, fontWeight: 700, color: "#aaa", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 8 }}>Most Worn</div>
-                      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                        <div style={{ width: 36, height: 36, borderRadius: 8, overflow: "hidden", background: mostWorn.image ? "transparent" : "#f5f3ef", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>
-                          {mostWorn.image ? <img src={mostWorn.image} style={{ width: "100%", height: "100%", objectFit: "cover" }} alt="" /> : <HangerIcon size={14} color="#ccc" />}
-                        </div>
-                        <div style={{ flex: 1, minWidth: 0 }}>
-                          <div style={{ fontSize: 12, fontWeight: 700, color: "#1a1a1a", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{mostWorn.name}</div>
-                          <div style={{ fontSize: 11, color: "#aaa" }}>{mostWorn.wornCount}x worn</div>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-                </div>
+          {/* Capsules right card — closet tab only */}
+          {tab === "closet" && (
+            <div className="right-card">
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
+                <div className="right-card-title" style={{ marginBottom: 0 }}>Capsules</div>
+                <button onClick={() => { setCapsuleName(""); setShowCapsuleModal(true); }} style={{
+                  width: 26, height: 26, borderRadius: "50%", background: "#f5f2ed", border: "none",
+                  cursor: "pointer", fontSize: 18, fontWeight: 300, color: "#888", display: "flex", alignItems: "center", justifyContent: "center"
+                }}>+</button>
               </div>
-            );
-          })()}
+              {capsules.length === 0 ? (
+                <div style={{ fontSize: 12, color: "#ccc", textAlign: "center", padding: "14px 0" }}>
+                  <div style={{ marginBottom: 6 }}><SvgBox size={24} color="#ddd" /></div>
+                  No capsules yet — click + to create one
+                </div>
+              ) : (
+                <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                  <button className={"sidebar-btn" + (!activeCapsule ? " active" : "")} onClick={() => setActiveCapsule(null)} style={{ textAlign: "left" }}>All Items</button>
+                  {capsules.map(c => {
+                    const count = (c.itemIds || []).length;
+                    return (
+                      <div key={c.id} style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                        <button className={"sidebar-btn" + (activeCapsule === c.id ? " active" : "")}
+                          onClick={() => setActiveCapsule(activeCapsule === c.id ? null : c.id)}
+                          style={{ flex: 1, textAlign: "left", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                          <span>{c.name}</span>
+                          <span style={{ fontSize: 10, opacity: 0.55, fontWeight: 600 }}>{count}</span>
+                        </button>
+                        <button onClick={() => { if (window.confirm("Delete capsule?")) saveCapsules(capsules.filter(x => x.id !== c.id)); if (activeCapsule === c.id) setActiveCapsule(null); }}
+                          style={{ background: "none", border: "none", cursor: "pointer", color: "#ddd", fontSize: 16, padding: "2px 4px", flexShrink: 0, lineHeight: 1 }}>×</button>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          )}
 
-          {/* Category breakdown */}
-          {tab !== "wishlist" && tab !== "lookbooks" && tab !== "moodboard" && tab !== "settings" && itemsDb.rows.length > 0 && (() => {
-            const byCat = CATEGORIES.slice(1).map(cat => ({ cat, count: itemsDb.rows.filter(i => i.category === cat).length })).filter(c => c.count > 0);
-            const maxC = Math.max(...byCat.map(c => c.count), 1);
-            return (
-              <div className="right-card">
-                <div className="right-card-title">By Category</div>
-                <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                  {byCat.map(({ cat, count }) => (
-                    <div key={cat}>
-                      <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 3 }}>
-                        <span style={{ fontSize: 11, fontWeight: 600, color: "#666" }}>{cat}</span>
-                        <span style={{ fontSize: 11, color: "#aaa", fontWeight: 600 }}>{count}</span>
-                      </div>
-                      <div style={{ height: 5, background: "#f0ece4", borderRadius: 3, overflow: "hidden" }}>
-                        <div style={{ height: "100%", width: `${(count / maxC) * 100}%`, background: CAT_COLORS[cat] || "#ccc", borderRadius: 3 }} />
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            );
-          })()}
+
 
 
 
@@ -4918,6 +5157,118 @@ className="pill-select" style={{}}>
         </div>
       </Modal>
 
+      {/* Capsule Modal */}
+      {showCapsuleModal && (() => {
+        const CapsuleModal = () => {
+          const [capName, setCapName] = useState(capsuleName || "");
+          const [selIds, setSelIds] = useState(new Set(capsulePreselect || []));
+          const [capCatF, setCapCatF] = useState("All");
+          const [capColF, setCapColF] = useState("All");
+          const [capSeaF, setCapSeaF] = useState("All");
+          const allColors = [...new Set(itemsDb.rows.flatMap(i => i.colors || (i.color ? [i.color] : [])).filter(Boolean))].sort();
+          const visItems = itemsDb.rows.filter(i => !i.forSale
+            && (capCatF === "All" || i.category === capCatF)
+            && (capColF === "All" || (i.colors || [i.color]).includes(capColF))
+            && (capSeaF === "All" || (i.season || []).includes(capSeaF))
+          );
+          const toggle = id => setSelIds(s => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n; });
+          const save = () => {
+            if (!capName.trim()) return;
+            const itemIds = [...selIds];
+            if (capsuleEditId) {
+              saveCapsules(capsules.map(c => c.id === capsuleEditId ? { ...c, name: capName.trim(), itemIds } : c));
+            } else {
+              const nc = { id: Date.now().toString(), name: capName.trim(), itemIds };
+              saveCapsules([...capsules, nc]);
+              setActiveCapsule(nc.id);
+            }
+            setShowCapsuleModal(false);
+            setCapsulePreselect(null);
+            setCapsuleEditId(null);
+          };
+          const selPill = (val, cur, set) => (
+            <button onClick={() => set(v => v === val ? "All" : val)} style={{
+              padding: "4px 10px", borderRadius: 100, border: cur === val ? "1.5px solid #1a1a1a" : "1px solid #e0dbd2",
+              background: cur === val ? "#1a1a1a" : "#fff", color: cur === val ? "#fff" : "#666",
+              fontSize: 11, fontWeight: 600, cursor: "pointer", fontFamily: "'DM Sans', sans-serif", whiteSpace: "nowrap"
+            }}>{val}</button>
+          );
+          return (
+            <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.45)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 600 }} onClick={() => { setShowCapsuleModal(false); setCapsulePreselect(null); setCapsuleEditId(null); }}>
+              <div style={{ background: "#fff", borderRadius: 20, padding: "24px 24px 20px", width: "min(780px, 96vw)", maxHeight: "88vh", display: "flex", flexDirection: "column" }} onClick={e => e.stopPropagation()}>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
+                  <div style={{ fontSize: 16, fontWeight: 800 }}>{capsuleEditId ? "Edit Capsule" : capsulePreselect ? "Add to Capsule" : "New Capsule"}</div>
+                  <button onClick={() => { setShowCapsuleModal(false); setCapsulePreselect(null); setCapsuleEditId(null); }} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 20, color: "#aaa", lineHeight: 1 }}>×</button>
+                </div>
+                {capsulePreselect && capsules.length > 0 && (
+                  <div style={{ marginBottom: 12 }}>
+                    <div style={{ fontSize: 11, fontWeight: 700, color: "#aaa", textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: 7 }}>Add to existing</div>
+                    <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                      {capsules.map(c => (
+                        <button key={c.id} onClick={() => {
+                          const updated = capsules.map(x => x.id === c.id ? { ...x, itemIds: [...new Set([...(x.itemIds||[]), ...(capsulePreselect||[])])] } : x);
+                          saveCapsules(updated);
+                          setShowCapsuleModal(false); setCapsulePreselect(null);
+                        }} style={{ padding: "5px 12px", borderRadius: 100, border: "1.5px solid #e0dbd2", background: "#fafaf8", fontSize: 12, fontWeight: 700, color: "#555", cursor: "pointer", fontFamily: "'DM Sans', sans-serif" }}>{c.name}</button>
+                      ))}
+                    </div>
+                    <div style={{ fontSize: 11, color: "#ccc", textAlign: "center", margin: "10px 0 0" }}>— or create new —</div>
+                  </div>
+                )}
+                <input value={capName} onChange={e => setCapName(e.target.value)} placeholder="New capsule name…"
+                  style={{ padding: "9px 14px", border: "1.5px solid #e0dbd2", borderRadius: 12, fontFamily: "'DM Sans', sans-serif", fontSize: 13, marginBottom: 12, outline: "none" }} />
+                {/* Filter row */}
+                <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 10 }}>
+                  <select value={capCatF} onChange={e => setCapCatF(e.target.value)} className="pill-select" style={{ fontSize: 11, padding: "4px 28px 4px 10px" }}>
+                    <option value="All">All Categories</option>
+                    {CATEGORIES.slice(1).map(c => <option key={c} value={c}>{c}</option>)}
+                  </select>
+                  <select value={capSeaF} onChange={e => setCapSeaF(e.target.value)} className="pill-select" style={{ fontSize: 11, padding: "4px 28px 4px 10px" }}>
+                    <option value="All">All Seasons</option>
+                    {SEASONS.map(s => <option key={s} value={s}>{s}</option>)}
+                  </select>
+                  <select value={capColF} onChange={e => setCapColF(e.target.value)} className="pill-select" style={{ fontSize: 11, padding: "4px 28px 4px 10px" }}>
+                    <option value="All">All Colors</option>
+                    {allColors.map(c => <option key={c} value={c}>{c}</option>)}
+                  </select>
+                  {(capCatF !== "All" || capSeaF !== "All" || capColF !== "All") && (
+                    <button onClick={() => { setCapCatF("All"); setCapSeaF("All"); setCapColF("All"); }} style={{ padding: "4px 10px", borderRadius: 100, border: "none", background: "#f5f2ed", color: "#888", fontSize: 11, fontWeight: 600, cursor: "pointer", fontFamily: "'DM Sans', sans-serif" }}>Clear</button>
+                  )}
+                </div>
+                <div style={{ fontSize: 11, fontWeight: 700, color: "#aaa", textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: 8 }}>
+                  {selIds.size > 0 ? selIds.size + " selected" : "Select items"}
+                  {visItems.length !== itemsDb.rows.filter(i => !i.forSale).length && " (filtered: " + visItems.length + ")"}
+                </div>
+                <div style={{ overflowY: "auto", flex: 1, display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(82px, 1fr))", gap: 8, marginBottom: 14 }}>
+                  {visItems.map(item => {
+                    const on = selIds.has(item.id);
+                    return (
+                      <div key={item.id} onClick={() => toggle(item.id)} style={{
+                        position: "relative", cursor: "pointer", borderRadius: 10, overflow: "hidden",
+                        border: on ? "2.5px solid #1a1a1a" : "2px solid #e8e4dc",
+                        boxShadow: on ? "0 0 0 2px rgba(0,0,0,0.08)" : "none",
+                        transition: "border-color 0.12s"
+                      }}>
+                        {on && <div style={{ position: "absolute", top: 5, right: 5, zIndex: 2, width: 18, height: 18, borderRadius: "50%", background: "#1a1a1a", display: "flex", alignItems: "center", justifyContent: "center" }}><SvgCheck size={10} color="#fff" /></div>}
+                        <div style={{ aspectRatio: "1/1", background: item.image ? "transparent" : "#f5f2ed", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                          {item.image ? <img src={item.image} alt="" style={{ width: "100%", height: "100%", objectFit: "contain" }} /> : <SvgHanger size={20} color="#ccc" />}
+                        </div>
+                        <div style={{ fontSize: 10, fontWeight: 600, color: "#555", padding: "3px 5px", textOverflow: "ellipsis", overflow: "hidden", whiteSpace: "nowrap", textAlign: "center", background: on ? "#f5f2ed" : "#fff" }}>{item.name}</div>
+                      </div>
+                    );
+                  })}
+                </div>
+                <div style={{ display: "flex", gap: 10 }}>
+                  <button onClick={() => { setShowCapsuleModal(false); setCapsulePreselect(null); setCapsuleEditId(null); }} style={{ flex: 1, padding: "10px", borderRadius: 12, border: "1px solid #e0dbd2", background: "#fafaf8", cursor: "pointer", fontWeight: 600, fontFamily: "'DM Sans', sans-serif" }}>Cancel</button>
+                  <button onClick={save} disabled={!capName.trim()} style={{ flex: 1, padding: "10px", borderRadius: 12, border: "none", background: capName.trim() ? "#1a1a1a" : "#e0dbd2", color: "#fff", cursor: capName.trim() ? "pointer" : "default", fontWeight: 700, fontFamily: "'DM Sans', sans-serif" }}>{capsuleEditId ? "Save Changes" : "Create Capsule"}</button>
+                </div>
+              </div>
+            </div>
+          );
+        };
+        return <CapsuleModal key="capsule-modal" />;
+      })()}
+
       {/* Item Detail Popup */}
       {itemDetail && (() => {
         const isWishlistItem = wishlistDb.rows.some(w => w.id === itemDetail.id);
@@ -4931,8 +5282,10 @@ className="pill-select" style={{}}>
             onMoveToCloset={isWishlistItem ? () => { moveToCloset(itemDetail); setItemDetail(null); } : null}
             onCreateOutfit={isWishlistItem ? null : () => { setEditingOutfit(null); setOutfitSeedItem(itemDetail); setOutfitBuilder(true); setItemDetail(null); }}
             onListForSale={isWishlistItem ? null : () => { itemsDb.update({ ...itemDetail, forSale: true, saleStatus: "listed" }); setItemDetail(null); setTab("seller"); }}
+            onAddToCapsule={isWishlistItem ? null : () => { setCapsulePreselect([itemDetail.id]); setCapsuleName(""); setShowCapsuleModal(true); }}
             outfits={outfitsDb.rows}
             lookbooks={lookbooksDb.rows}
+            capsules={capsules}
             isWishlist={isWishlistItem}
           />
         );

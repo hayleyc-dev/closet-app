@@ -281,7 +281,6 @@ function useSupabaseTable(table) {
   const update = async (item) => {
     let { error } = await supabase.from(table).update({ data: item }).eq("id", item.id);
     if (error) {
-      // Fallback: flat schema (no data column)
       const { id, ...rest } = item;
       ({ error } = await supabase.from(table).update(rest).eq("id", id));
     }
@@ -299,6 +298,98 @@ function useSupabaseTable(table) {
     setLoading(false);
   };
   return { rows, loading, add, update, remove, refresh };
+}
+
+// ── Moodboards — Supabase + localStorage mirror ───────────────────────────────
+function useMoodboardsDb() {
+  const TABLE = "moodboards";
+  const LS_KEY = "wardrobe_moodboards_v1";
+
+  const [boards, setBoards] = useState(() => {
+    try { return JSON.parse(localStorage.getItem(LS_KEY) || "[]"); } catch { return []; }
+  });
+  const [loaded, setLoaded] = useState(false);
+
+  // Mirror to localStorage whenever boards change
+  useEffect(() => {
+    try { localStorage.setItem(LS_KEY, JSON.stringify(boards)); } catch {}
+  }, [boards]);
+
+  // Load from Supabase on mount; merge with any localStorage-only boards
+  useEffect(() => {
+    (async () => {
+      let { data, error } = await supabase.from(TABLE).select("*").order("created_at");
+      if (error) ({ data, error } = await supabase.from(TABLE).select("*"));
+      if (!error && data && data.length > 0) {
+        const remote = data.map(r =>
+          r.data && typeof r.data === "object" ? { ...r.data, id: r.id } : r
+        ).filter(r => r.id);
+        // Merge: add any localStorage boards not yet in Supabase
+        const remoteIds = new Set(remote.map(b => b.id));
+        const lsBoards = (() => { try { return JSON.parse(localStorage.getItem(LS_KEY) || "[]"); } catch { return []; } })();
+        const localOnly = lsBoards.filter(b => b.id && !remoteIds.has(b.id));
+        // Upload local-only boards to Supabase
+        for (const b of localOnly) {
+          await supabase.from(TABLE).insert({ id: b.id, data: b }).then(({ error: e }) => {
+            if (e) supabase.from(TABLE).insert(b);
+          });
+        }
+        setBoards([...remote, ...localOnly]);
+      } else if (!error && data && data.length === 0) {
+        // Table exists but empty — upload any localStorage boards
+        const lsBoards = (() => { try { return JSON.parse(localStorage.getItem(LS_KEY) || "[]"); } catch { return []; } })();
+        for (const b of lsBoards) {
+          if (b.id) await supabase.from(TABLE).insert({ id: b.id, data: b }).then(({ error: e }) => {
+            if (e) supabase.from(TABLE).insert(b);
+          });
+        }
+      }
+      setLoaded(true);
+    })();
+  }, []);
+
+  const persist = async (updated) => {
+    setBoards(updated);
+  };
+
+  const saveBoard = async (board) => {
+    // Upsert to Supabase
+    const { error } = await supabase.from(TABLE).upsert({ id: board.id, data: board });
+    if (error) await supabase.from(TABLE).upsert(board);
+  };
+
+  const deleteBoard = async (id) => {
+    await supabase.from(TABLE).delete().eq("id", id);
+  };
+
+  const updateBoards = (updaterOrArray) => {
+    setBoards(prev => {
+      const next = typeof updaterOrArray === "function" ? updaterOrArray(prev) : updaterOrArray;
+      // Async-persist changed/new boards
+      next.forEach(b => {
+        const old = prev.find(p => p.id === b.id);
+        if (!old || JSON.stringify(old) !== JSON.stringify(b)) saveBoard(b);
+      });
+      return next;
+    });
+  };
+
+  // Safe single-board patch — always reads latest state, never stale
+  const updateBoardById = (id, patch) => {
+    setBoards(prev => {
+      const next = prev.map(b => b.id === id ? { ...b, ...patch } : b);
+      const changed = next.find(b => b.id === id);
+      if (changed) saveBoard(changed);
+      return next;
+    });
+  };
+
+  const removeBoardById = (id) => {
+    setBoards(prev => prev.filter(b => b.id !== id));
+    deleteBoard(id);
+  };
+
+  return { boards, updateBoards, updateBoardById, removeBoardById, loaded };
 }
 
 // ── Shared UI ────────────────────────────────────────────────────────────────
@@ -1985,9 +2076,9 @@ function OutfitDetailPopup({ outfit, allItems, allOutfits, lookbooks, onClose, o
 }
 
 // ── Lookbook Viewer ──────────────────────────────────────────────────────────
-function LookbookViewer({ lookbook, outfits, allItems, closetItems, onClose, onUpdate, onOpenOutfit, markOutfitWorn }) {
+function LookbookViewer({ lookbook, outfits, allItems, closetItems, onClose, onUpdate, onOpenOutfit, markOutfitWorn, moodboardsProp, moodboardsUpdateBoards, initialView }) {
   const LB_TAGS = ["Travel","Work Week","Event","Disney","Sport","Weekend","Vacation"];
-  const [view, setView] = useState("editorial"); // "editorial" | "grid"
+  const [view, setView] = useState(initialView || "editorial"); // "editorial" | "grid"
   const [idx, setIdx] = useState(0);
   const [slideDir, setSlideDir] = useState("left");
   const [notes, setNotes] = useState(lookbook.notes || "");
@@ -1997,6 +2088,11 @@ function LookbookViewer({ lookbook, outfits, allItems, closetItems, onClose, onU
   const [lookMeta, setLookMeta] = useState(lookbook.lookMeta || {});
   const [reordering, setReordering] = useState(false);
   const [addingOutfit, setAddingOutfit] = useState(false);
+  const [showAddLooks, setShowAddLooks] = useState(false);
+  const [outfitSearch, setOutfitSearch] = useState("");
+  const [outfitTagFilter, setOutfitTagFilter] = useState("");
+  const [lbDateStart, setLbDateStart] = useState(lookbook.dateStart || "");
+  const [lbDateEnd, setLbDateEnd] = useState(lookbook.dateEnd || "");
   const [exportingPdf, setExportingPdf] = useState(false);
   const [shareToast, setShareToast] = useState("");
   const [showPackList, setShowPackList] = useState(false);
@@ -2009,34 +2105,30 @@ function LookbookViewer({ lookbook, outfits, allItems, closetItems, onClose, onU
   const [wxLoading, setWxLoading] = useState(false);
   const [coverImage, setCoverImage] = useState(lookbook.coverImage || "");
   const [wornToast, setWornToast] = useState("");
-  // Moodboard — store by stable ID, derive index reactively
+  // Moodboard — use prop from App (Supabase-backed), fall back to localStorage poll
   const MOODBOARD_KEY = "wardrobe_moodboards_v1";
-  const [moodboards, setMoodboards] = useState(() => {
+  const [moodboardsLocal, setMoodboardsLocal] = useState(() => {
     try { return JSON.parse(localStorage.getItem("wardrobe_moodboards_v1") || "[]"); } catch { return []; }
   });
-  // Poll for moodboard changes (canvas is in same session)
   useEffect(() => {
+    if (moodboardsProp) return; // don't poll if prop provided
     const iv = setInterval(() => {
-      try { setMoodboards(JSON.parse(localStorage.getItem("wardrobe_moodboards_v1") || "[]")); } catch {}
+      try { setMoodboardsLocal(JSON.parse(localStorage.getItem("wardrobe_moodboards_v1") || "[]")); } catch {}
     }, 600);
     return () => clearInterval(iv);
-  }, []);
-  // Stable linked moodboard ID — updated when lookbook prop changes too
-  const [linkedMoodboardId, setLinkedMoodboardId] = useState(
-    lookbook.moodboardId || null
-  );
-  useEffect(() => {
-    if (lookbook.moodboardId && lookbook.moodboardId !== linkedMoodboardId) {
-      setLinkedMoodboardId(lookbook.moodboardId);
-    }
-  }, [lookbook.moodboardId]);
-  // Derive index reactively from ID + boards array
+  }, [moodboardsProp]);
+  const moodboards = (moodboardsProp && moodboardsProp.length > 0) ? moodboardsProp : moodboardsLocal;
+  const linkedMoodboardId = lookbook.moodboardId || null;
   const linkedMoodboardIdx = linkedMoodboardId
     ? moodboards.findIndex(b => b.id === linkedMoodboardId)
-    : (lookbook.linkedMoodboardIdx !== undefined ? lookbook.linkedMoodboardIdx : null);
+    : null;
+  console.log("[LookbookViewer] moodboardId:", linkedMoodboardId, "boards:", moodboards.map(b=>b.id), "idx:", linkedMoodboardIdx);
+  const setLinkedMoodboardId = (id) => {
+    onUpdate({ ...lookbook, moodboardId: id });
+  };
   const setLinkedMoodboardIdx = (idx) => {
     const board = moodboards[idx];
-    if (board) { setLinkedMoodboardId(board.id); }
+    if (board) setLinkedMoodboardId(board.id);
   };
   const [moodboardView, setMoodboardView] = useState(false);
   // Trip details
@@ -2056,10 +2148,13 @@ function LookbookViewer({ lookbook, outfits, allItems, closetItems, onClose, onU
     ? [fmtDate(lookbook.dateStart), fmtDate(lookbook.dateEnd)].filter(Boolean).join(" \u2013 ")
     : null;
 
-  // Days / outfits ratio
-  const tripDays = (lookbook.dateStart && lookbook.dateEnd)
+  // Days / nights
+  const tripDays = (lbDateStart && lbDateEnd)
+    ? Math.max(1, Math.round((new Date(lbDateEnd) - new Date(lbDateStart)) / 86400000) + 1)
+    : (lookbook.dateStart && lookbook.dateEnd)
     ? Math.max(1, Math.round((new Date(lookbook.dateEnd) - new Date(lookbook.dateStart)) / 86400000) + 1)
     : null;
+  const tripNights = tripDays ? Math.max(0, tripDays - 1) : null;
 
   const totalVal = looks.flatMap(o => (o.layers || o.itemIds || []).map(id => allItems.find(x => x.id === id)).filter(Boolean))
     .reduce((s, it) => s + (parseFloat((it.price || "").replace(/[^0-9.]/g, "")) || 0), 0);
@@ -2069,10 +2164,15 @@ function LookbookViewer({ lookbook, outfits, allItems, closetItems, onClose, onU
     setIdx(i => Math.max(0, Math.min(looks.length - 1, i + dir)));
   };
 
-  const save = (overrides = {}) => onUpdate({
-    ...lookbook, name: lbName, notes, outfitIds: lookIds, lookMeta,
-    tags: lbTags, city: lbCity, coverImage, moodboardId: linkedMoodboardId, tripDetails, ...overrides
-  });
+  const save = (overrides = {}) => {
+    try {
+      onUpdate({
+        ...lookbook, name: lbName, notes, outfitIds: lookIds, lookMeta,
+        tags: lbTags, city: lbCity, coverImage, moodboardId: linkedMoodboardId,
+        tripDetails, dateStart: lbDateStart, dateEnd: lbDateEnd, ...overrides
+      });
+    } catch(e) { console.error("save error:", e); }
+  };
 
   const saveTripDetails = (patch) => {
     const next = { ...tripDetails, ...patch };
@@ -2122,11 +2222,13 @@ function LookbookViewer({ lookbook, outfits, allItems, closetItems, onClose, onU
     const city = lbCity.trim();
     if (!city) return;
     setWxLoading(true);
+    // Strip ", State" suffix for better API compatibility (e.g. "Orlando, FL" → "Orlando")
+    const cityQuery = city.split(",")[0].trim();
     try {
-      const geoRes = await fetch("https://geocoding-api.open-meteo.com/v1/search?name=" + encodeURIComponent(city) + "&count=1&language=en&format=json");
+      const geoRes = await fetch("https://geocoding-api.open-meteo.com/v1/search?name=" + encodeURIComponent(cityQuery) + "&count=1&language=en&format=json");
       const geo = await geoRes.json();
       const loc = geo.results?.[0];
-      if (!loc) { setLbWeather({ error: "City not found" }); setWxLoading(false); return; }
+      if (!loc) { setLbWeather({ error: "City not found — try just the city name" }); setWxLoading(false); return; }
       const wRes = await fetch("https://api.open-meteo.com/v1/forecast?latitude=" + loc.latitude + "&longitude=" + loc.longitude + "&daily=temperature_2m_max,temperature_2m_min,weathercode&temperature_unit=fahrenheit&timezone=auto&forecast_days=16");
       const w = await wRes.json();
       const days = (w.daily?.time || []).map((d, i) => ({
@@ -2251,7 +2353,7 @@ function LookbookViewer({ lookbook, outfits, allItems, closetItems, onClose, onU
 
       {/* Top bar */}
       <div className="lookbook-topbar">
-        <button onClick={() => { save(); onClose(); }} style={{ background: "none", border: "none", cursor: "pointer", display: "flex", alignItems: "center", gap: 6, color: "#aaa" }}>
+        <button onClick={() => { try { save(); } catch(e) {} onClose(); }} style={{ background: "none", border: "none", cursor: "pointer", display: "flex", alignItems: "center", gap: 6, color: "#aaa" }}>
           <SvgArrowL size={18} color="#aaa" />
         </button>
         <div style={{ flex: 1, display: "flex", flexDirection: "column", paddingLeft: 10 }}>
@@ -2285,7 +2387,7 @@ function LookbookViewer({ lookbook, outfits, allItems, closetItems, onClose, onU
           <button onClick={handleExport} disabled={exportingPdf} style={{ ...btnBase, padding: "7px 14px", background: "#f5f3ef", color: "#555", fontSize: 12 }}>
             {exportingPdf ? "Exporting\u2026" : "Export PDF"}
           </button>
-          <button onClick={() => { save(); onClose(); }} style={{ ...btnBase, padding: "7px 18px", background: "#1a1a1a", color: "#fff", fontSize: 13 }}>Save</button>
+          <button onClick={() => { save(); onClose(); }} style={{ ...btnBase, padding: "7px 18px", background: "#1a1a1a", color: "#fff", fontSize: 13 }}>Save &amp; Close</button>
         </div>
       </div>
 
@@ -2396,7 +2498,13 @@ function LookbookViewer({ lookbook, outfits, allItems, closetItems, onClose, onU
               {linkedMoodboardIdx !== null && linkedMoodboardIdx >= 0 && moodboards[linkedMoodboardIdx] ? (
                 /* Fully editable moodboard canvas */
                 <div style={{ flex: 1, overflow: "auto", padding: "20px 20px 0" }}>
-                  <Moodboard closetItems={closetItems || []} activeIdx={linkedMoodboardIdx} setActiveIdx={setLinkedMoodboardIdx} />
+                  <Moodboard
+                    closetItems={closetItems || []}
+                    activeIdx={linkedMoodboardIdx}
+                    setActiveIdx={setLinkedMoodboardIdx}
+                    boards={moodboardsProp}
+                    updateBoards={moodboardsUpdateBoards}
+                  />
                 </div>
               ) : (
                 /* Empty state — show board list immediately if boards exist */
@@ -2404,16 +2512,16 @@ function LookbookViewer({ lookbook, outfits, allItems, closetItems, onClose, onU
                   <SvgSparkle size={40} color="#ddd" />
                   <div style={{ fontSize: 16, fontWeight: 800, color: "#1a1a1a" }}>No moodboard linked</div>
                   <div style={{ fontSize: 13, color: "#aaa", textAlign: "center", maxWidth: 280 }}>
-                    {moodboards.length > 0 ? "Choose an existing board or create a new one." : "Create a new moodboard to get started."}
+                    {moodboards.length > 0 ? `Choose one of your ${moodboards.length} boards:` : "No boards found — create one in the Moodboard tab first."}
                   </div>
 
                   {moodboards.length > 0 && (
                     <div style={{ display: "flex", flexDirection: "column", gap: 8, width: "100%", maxWidth: 360 }}>
-                      <div style={{ fontSize: 11, fontWeight: 700, color: "#bbb", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 2 }}>Your boards</div>
                       {moodboards.map((mb, i) => (
                         <button key={mb.id || i} onClick={() => {
-                          setLinkedMoodboardId(mb.id);
-                          onUpdate({ ...lookbook, name: lbName, notes, outfitIds: lookIds, lookMeta, tags: lbTags, city: lbCity, coverImage, moodboardId: mb.id, tripDetails });
+                          try {
+                            onUpdate({ ...lookbook, name: lbName, notes, outfitIds: lookIds, lookMeta, tags: lbTags, city: lbCity, coverImage, moodboardId: mb.id, tripDetails });
+                          } catch(e) { console.error("link error:", e); }
                         }} style={{
                           padding: "12px 16px", background: "#fff", border: "1.5px solid #e0dbd2", borderRadius: 12,
                           cursor: "pointer", fontFamily: "'DM Sans',sans-serif", fontSize: 13, fontWeight: 700,
@@ -2431,13 +2539,12 @@ function LookbookViewer({ lookbook, outfits, allItems, closetItems, onClose, onU
                   )}
 
                   <button onClick={() => {
-                    const boards = (() => { try { return JSON.parse(localStorage.getItem("wardrobe_moodboards_v1") || "[]"); } catch { return []; } })();
                     const newBoard = { id: uid(), name: lbName + " Board", items: [], bg: "#ffffff" };
-                    const updated = [...boards, newBoard];
+                    const existing = (() => { try { return JSON.parse(localStorage.getItem("wardrobe_moodboards_v1") || "[]"); } catch { return []; } })();
+                    const updated = [...existing, newBoard];
                     try { localStorage.setItem("wardrobe_moodboards_v1", JSON.stringify(updated)); } catch {}
-                    setMoodboards(updated);
+                    if (!moodboardsProp) setMoodboardsLocal(updated);
                     setLinkedMoodboardId(newBoard.id);
-                    onUpdate({ ...lookbook, name: lbName, notes, outfitIds: lookIds, lookMeta, tags: lbTags, city: lbCity, coverImage, moodboardId: newBoard.id, tripDetails });
                   }} style={{
                     padding: "10px 24px", background: "#1a1a1a", border: "none", borderRadius: 12,
                     cursor: "pointer", fontFamily: "'DM Sans',sans-serif", fontSize: 13, fontWeight: 700,
@@ -2501,10 +2608,11 @@ function LookbookViewer({ lookbook, outfits, allItems, closetItems, onClose, onU
               { label: "Looks", value: looks.length },
               { label: "Pieces", value: packItems.length },
               { label: "Value", value: totalVal > 0 ? "$" + totalVal.toFixed(0) : "\u2014" },
-              tripDays ? { label: "Days", value: tripDays + (looks.length > 0 ? " / " + looks.length + " looks" : ""), small: true } : null,
+              tripDays ? { label: "Days", value: tripDays } : null,
+              tripNights !== null ? { label: "Nights", value: tripNights } : null,
             ].filter(Boolean).map(s => (
               <div key={s.label} style={{ background: "#faf9f6", borderRadius: 10, padding: "10px", textAlign: "center" }}>
-                <div style={{ fontSize: s.small ? 12 : 16, fontWeight: 800, color: "#1a1a1a", lineHeight: 1.2 }}>{s.value}</div>
+                <div style={{ fontSize: 16, fontWeight: 800, color: "#1a1a1a", lineHeight: 1.2 }}>{s.value}</div>
                 <div style={{ fontSize: 10, color: "#aaa", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.06em", marginTop: 2 }}>{s.label}</div>
               </div>
             ))}
@@ -2602,28 +2710,8 @@ function LookbookViewer({ lookbook, outfits, allItems, closetItems, onClose, onU
           <div>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
               <div style={{ fontSize: 11, fontWeight: 700, color: "#aaa", textTransform: "uppercase", letterSpacing: "0.08em" }}>Looks</div>
-              <button onClick={() => setAddingOutfit(a => !a)} style={{ fontSize: 11, fontWeight: 700, color: addingOutfit ? "#2d6a3f" : "#888", background: "none", border: "none", cursor: "pointer", fontFamily: "'DM Sans', sans-serif" }}>
-                {addingOutfit ? "Cancel" : "+ Add"}
-              </button>
+              <button onClick={() => setShowAddLooks(true)} style={{ fontSize: 11, fontWeight: 700, color: "#888", background: "none", border: "none", cursor: "pointer", fontFamily: "'DM Sans', sans-serif" }}>+ Add</button>
             </div>
-
-            {addingOutfit && (
-              <div style={{ marginBottom: 10, maxHeight: 160, overflowY: "auto", display: "flex", flexDirection: "column", gap: 5 }}>
-                {availableToAdd.length === 0 ? (
-                  <div style={{ fontSize: 12, color: "#aaa", padding: "8px 0" }}>All outfits already added</div>
-                ) : availableToAdd.map(o => (
-                  <button key={o.id} onClick={() => addLook(o.id)} style={{
-                    display: "flex", alignItems: "center", gap: 8, padding: "8px 10px",
-                    background: "#faf9f6", border: "1.5px solid #e8e4dc", borderRadius: 10,
-                    cursor: "pointer", fontFamily: "'DM Sans', sans-serif", textAlign: "left", width: "100%"
-                  }}>
-                    {o.previewImage && <img src={o.previewImage} alt="" style={{ width: 28, height: 28, objectFit: "contain", borderRadius: 6, background: "#f0ece4" }} />}
-                    <span style={{ fontSize: 12, fontWeight: 700, color: "#1a1a1a", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1 }}>{o.name}</span>
-                    <span style={{ fontSize: 11, color: "#2d6a3f", fontWeight: 700 }}>+ Add</span>
-                  </button>
-                ))}
-              </div>
-            )}
 
             {/* Draggable looks list */}
             <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
@@ -2659,6 +2747,30 @@ function LookbookViewer({ lookbook, outfits, allItems, closetItems, onClose, onU
                   </div>
                 );
               })}
+            </div>
+          </div>
+
+          {/* Lookbook Details */}
+          <div>
+            <div style={{ fontSize: 11, fontWeight: 700, color: "#aaa", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 8 }}>Lookbook Details</div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+              <div>
+                <div style={{ fontSize: 10, fontWeight: 700, color: "#bbb", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 4 }}>Name</div>
+                <input value={lbName} onChange={e => setLbName(e.target.value)} onBlur={() => save()}
+                  style={{ width: "100%", padding: "7px 10px", border: "1.5px solid #e8e4dc", borderRadius: 10, fontFamily: "'DM Sans', sans-serif", fontSize: 12, outline: "none", boxSizing: "border-box" }} />
+              </div>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+                <div>
+                  <div style={{ fontSize: 10, fontWeight: 700, color: "#bbb", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 4 }}>Start</div>
+                  <input type="date" value={lbDateStart} onChange={e => setLbDateStart(e.target.value)} onBlur={() => save()}
+                    style={{ width: "100%", padding: "7px 8px", border: "1.5px solid #e8e4dc", borderRadius: 10, fontFamily: "'DM Sans', sans-serif", fontSize: 11, outline: "none", boxSizing: "border-box" }} />
+                </div>
+                <div>
+                  <div style={{ fontSize: 10, fontWeight: 700, color: "#bbb", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 4 }}>End</div>
+                  <input type="date" value={lbDateEnd} onChange={e => setLbDateEnd(e.target.value)} onBlur={() => save()}
+                    style={{ width: "100%", padding: "7px 8px", border: "1.5px solid #e8e4dc", borderRadius: 10, fontFamily: "'DM Sans', sans-serif", fontSize: 11, outline: "none", boxSizing: "border-box" }} />
+                </div>
+              </div>
             </div>
           </div>
 
@@ -2708,10 +2820,66 @@ function LookbookViewer({ lookbook, outfits, allItems, closetItems, onClose, onU
 
         </div>
       </div>
+
+      {/* ── ADD LOOKS MODAL ── */}
+      {showAddLooks && (() => {
+        const allTags = [...new Set(outfits.flatMap(o => o.tags || []))].sort();
+        const filtered = outfits.filter(o => {
+          if (lookIds.includes(o.id)) return false;
+          if (outfitSearch && !o.name?.toLowerCase().includes(outfitSearch.toLowerCase())) return false;
+          if (outfitTagFilter && !(o.tags || []).includes(outfitTagFilter)) return false;
+          return true;
+        });
+        return (
+          <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.45)", zIndex: 9999, display: "flex", alignItems: "center", justifyContent: "center" }}
+            onClick={() => setShowAddLooks(false)}>
+            <div onClick={e => e.stopPropagation()} style={{ background: "#fff", borderRadius: 20, width: "min(680px, 92vw)", maxHeight: "80vh", display: "flex", flexDirection: "column", overflow: "hidden", boxShadow: "0 24px 80px rgba(0,0,0,0.18)" }}>
+              <div style={{ padding: "20px 24px 16px", borderBottom: "1.5px solid #f0ece4", display: "flex", alignItems: "flex-start", gap: 12 }}>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: 16, fontWeight: 800, color: "#1a1a1a", marginBottom: 10 }}>Add Looks</div>
+                  <div style={{ display: "flex", gap: 8 }}>
+                    <input value={outfitSearch} onChange={e => setOutfitSearch(e.target.value)}
+                      placeholder="Search outfits…" autoFocus
+                      style={{ flex: 1, padding: "8px 12px", border: "1.5px solid #e8e4dc", borderRadius: 10, fontFamily: "'DM Sans', sans-serif", fontSize: 13, outline: "none" }} />
+                    <select value={outfitTagFilter} onChange={e => setOutfitTagFilter(e.target.value)}
+                      style={{ padding: "8px 10px", border: "1.5px solid #e8e4dc", borderRadius: 10, fontFamily: "'DM Sans', sans-serif", fontSize: 12, background: "#fff", outline: "none", minWidth: 120 }}>
+                      <option value="">All tags</option>
+                      {allTags.map(t => <option key={t} value={t}>{t}</option>)}
+                    </select>
+                  </div>
+                </div>
+                <button onClick={() => setShowAddLooks(false)} style={{ background: "#f5f2ed", border: "none", borderRadius: "50%", width: 32, height: 32, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, marginTop: 2 }}>
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                </button>
+              </div>
+              <div style={{ overflowY: "auto", padding: 20, display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(150px, 1fr))", gap: 12 }}>
+                {filtered.length === 0 ? (
+                  <div style={{ gridColumn: "1/-1", textAlign: "center", padding: "40px 0", color: "#bbb", fontSize: 13, fontWeight: 600 }}>
+                    {outfits.length === lookIds.length ? "All outfits already added" : "No outfits match"}
+                  </div>
+                ) : filtered.map(o => (
+                  <div key={o.id} onClick={() => addLook(o.id)} style={{ borderRadius: 14, border: "1.5px solid #e8e4dc", overflow: "hidden", cursor: "pointer", background: "#faf9f6" }}
+                    onMouseEnter={e => e.currentTarget.style.borderColor = "#1a1a1a"}
+                    onMouseLeave={e => e.currentTarget.style.borderColor = "#e8e4dc"}>
+                    <div style={{ aspectRatio: "3/4", background: "#f0ece4", display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden" }}>
+                      {o.previewImage ? <img src={o.previewImage} alt={o.name} style={{ width: "100%", height: "100%", objectFit: "contain" }} /> : <HangerIcon size={28} color="#ddd" />}
+                    </div>
+                    <div style={{ padding: "8px 10px 10px" }}>
+                      <div style={{ fontSize: 12, fontWeight: 700, color: "#1a1a1a", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{o.name}</div>
+                      {(o.tags || []).length > 0 && <div style={{ fontSize: 10, color: "#aaa", marginTop: 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{o.tags.slice(0, 3).join(", ")}</div>}
+                      <div style={{ marginTop: 6, padding: "4px 0", textAlign: "center", background: "#1a1a1a", borderRadius: 8, fontSize: 11, fontWeight: 700, color: "#fff" }}>+ Add</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 }
-// ── BoardSizer — measures available space and renders a 4:5 white board ──────
+// BoardSizer — measures available space and renders a 4:5 white board
 function BoardSizer({ boardRef: _ignored, children }) {
   const containerRef = useRef(null);
   const [dims, setDims] = useState({ w: 0, h: 0 });
@@ -4771,31 +4939,11 @@ function SellerDashboard({ itemsDb, onViewItem }) {
 
 // ── Moodboard ─────────────────────────────────────────────────────────────────
 // ── MoodboardInfoPanel — reads active board from Moodboard via localStorage ──
-function MoodboardInfoPanel({ activeIdx, setActiveIdx, lookbooksDb, createLookbook, addMoodboardToLookbook, onGoToLookbook }) {
-  const STORAGE_KEY = "wardrobe_moodboards_v1";
+function MoodboardInfoPanel({ activeIdx, setActiveIdx, boards: boardsProp, updateBoards, updateBoardById, removeBoardById, lookbooksDb, createLookbook, addMoodboardToLookbook, onGoToLookbook }) {
   const ARCHIVE_KEY = "wardrobe_moodboards_archived_v1";
 
-  const [data, setData] = useState(() => {
-    try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]"); } catch { return []; }
-  });
-
-  const suppressPoll = useRef(false);
-  useEffect(() => {
-    const interval = setInterval(() => {
-      if (suppressPoll.current) return;
-      try { setData(JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]")); } catch {}
-    }, 500);
-    return () => clearInterval(interval);
-  }, []);
-
-  const save = (updated) => {
-    suppressPoll.current = true;
-    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(updated)); } catch {}
-    setData(updated);
-    setTimeout(() => { suppressPoll.current = false; }, 800);
-  };
-
-  const board = data[activeIdx] || null;
+  const data = boardsProp || [];
+  const save = (updated) => { if (updateBoards) updateBoards(updated); };
 
   const [hexInput, setHexInput] = useState("");
   const [editingColorIdx, setEditingColorIdx] = useState(null);
@@ -4803,16 +4951,19 @@ function MoodboardInfoPanel({ activeIdx, setActiveIdx, lookbooksDb, createLookbo
   const [lbAction, setLbAction] = useState(null); // "add" | "create"
   const [selectedLbId, setSelectedLbId] = useState("");
   const [lbFeedback, setLbFeedback] = useState(null);
-  const [linkedLb, setLinkedLb] = useState(null); // full lookbook object once linked
   const [confirmArchive, setConfirmArchive] = useState(false);
 
-  // Reset linked lookbook when switching boards
-  useEffect(() => { setLinkedLb(null); setLbAction(null); }, [activeIdx]);
+  // Reset UI state when switching boards
+  useEffect(() => { setLbAction(null); setSelectedLbId(""); }, [activeIdx]);
 
+  const board = data[activeIdx] || null;
   const palette = board?.palette || [];
 
-  // Reset linked lookbook when switching boards
-  useEffect(() => { setLinkedLb(null); setLbAction(null); }, [activeIdx]);
+  // linkedLb derived from board — persisted via updateBoardById to avoid stale closures
+  const linkedLb = board?.linkedLb || null;
+  const setLinkedLb = (lb) => {
+    if (board?.id && updateBoardById) updateBoardById(board.id, { linkedLb: lb });
+  };
 
   const updatePalette = (p) => save(data.map((b,i) => i===activeIdx ? {...b, palette:p} : b));
   const addColor = () => { if (palette.length >= 10) return; updatePalette([...palette, "#e8e4dc"]); };
@@ -4832,8 +4983,8 @@ function MoodboardInfoPanel({ activeIdx, setActiveIdx, lookbooksDb, createLookbo
       archived.push({ ...board, archivedAt: new Date().toISOString() });
       localStorage.setItem(ARCHIVE_KEY, JSON.stringify(archived));
     } catch {}
-    const updated = data.filter((_,i) => i !== activeIdx);
-    save(updated);
+    if (removeBoardById) removeBoardById(board.id);
+    else save(data.filter((_,i) => i !== activeIdx));
     setActiveIdx(Math.max(0, activeIdx - 1));
     setConfirmArchive(false);
   };
@@ -4844,12 +4995,11 @@ function MoodboardInfoPanel({ activeIdx, setActiveIdx, lookbooksDb, createLookbo
       if (!newLbNameInput.trim()) return;
       const newId = uid();
       await createLookbook({ id: newId, name: newLbNameInput.trim(), moodboardId: board.id });
-      // Set a placeholder immediately; it'll be replaced once lookbooksDb refreshes
-      setLinkedLb({ id: newId, name: newLbNameInput.trim() });
+      setLinkedLb({ id: newId, name: newLbNameInput.trim(), moodboardId: board.id });
     } else if (lbAction === "add" && selectedLbId) {
       const lb = (lookbooksDb||[]).find(l => l.id === selectedLbId);
       await addMoodboardToLookbook(selectedLbId, board);
-      setLinkedLb(lb || { id: selectedLbId, name: "Lookbook" });
+      setLinkedLb({ ...(lb || { id: selectedLbId, name: "Lookbook" }), moodboardId: board.id });
     }
     setLbAction(null); setSelectedLbId(""); setNewLbNameInput("");
   };
@@ -5069,12 +5219,23 @@ function MoodboardInfoPanel({ activeIdx, setActiveIdx, lookbooksDb, createLookbo
 }
 
 
-function Moodboard({ closetItems = [], activeIdx, setActiveIdx }) {
+function Moodboard({ closetItems = [], activeIdx, setActiveIdx, boards: boardsProp, updateBoards, removeBoardById }) {
   const closetItemsForMoodboard = closetItems;
+  // Use prop-based boards (Supabase-backed) if provided, else fall back to localStorage
   const STORAGE_KEY = "wardrobe_moodboards_v1";
-  const [boards, setBoards] = useState(() => {
+  const [boardsLocal, setBoardsLocal] = useState(() => {
     try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]"); } catch { return []; }
   });
+  const boards = boardsProp !== undefined ? boardsProp : boardsLocal;
+  const setBoards = boardsProp !== undefined
+    ? updateBoards
+    : (updater) => {
+        setBoardsLocal(prev => {
+          const next = typeof updater === "function" ? updater(prev) : updater;
+          try { localStorage.setItem(STORAGE_KEY, JSON.stringify(next)); } catch {}
+          return next;
+        });
+      };
   const [selectedId, setSelectedId] = useState(null);
   const canvasRef = useRef(null);
   const dragging = useRef(null);
@@ -5096,11 +5257,6 @@ function Moodboard({ closetItems = [], activeIdx, setActiveIdx }) {
 
   const board = boards[activeIdx] || null;
   const items = board?.items || [];
-
-  // Persist on every change
-  useEffect(() => {
-    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(boards)); } catch(e) {}
-  }, [boards]);
 
   const pushHistory = (snapshot) => {
     if (skipHistory.current) return;
@@ -6647,6 +6803,7 @@ export default function App() {
   const wishlistDb = useSupabaseTable("wishlist");
   const outfitsDb = useSupabaseTable("outfits");
   const lookbooksDb = useSupabaseTable("lookbooks");
+  const moodboardsDb = useMoodboardsDb();
 
   const [tab, setTab] = useState("closet");
   const [modal, setModal] = useState(null);
@@ -6701,6 +6858,7 @@ export default function App() {
   }, [itemsDb.rows]);
   const [closetSearch, setClosetSearch] = useState("");
   const [activeLookbook, setActiveLookbook] = useState(null);
+  const [activeLookbookView, setActiveLookbookView] = useState("editorial");
   const [moodboardActiveIdx, setMoodboardActiveIdx] = useState(0);
   const [lbSearch, setLbSearch] = useState("");
   const [lbSort, setLbSort] = useState("newest");
@@ -6791,7 +6949,13 @@ export default function App() {
   };
 
   const updateLookbook = async (lb) => {
-    await lookbooksDb.update(lb);
+    try {
+      await lookbooksDb.update(lb);
+      setActiveLookbook(lb);
+    } catch(e) {
+      console.error("updateLookbook error:", e);
+      setActiveLookbook(lb); // still update local state
+    }
   };
 
   const markOutfitWorn = async (outfit, dateStr) => {
@@ -7436,7 +7600,7 @@ export default function App() {
             {tab === "seller" && <SellerDashboard itemsDb={itemsDb} onViewItem={(item) => setItemDetail(item)} />}
 
             {/* MOODBOARD */}
-            {tab === "moodboard" && <Moodboard closetItems={itemsDb.rows.filter(i => !i.forSale)} activeIdx={moodboardActiveIdx} setActiveIdx={setMoodboardActiveIdx} />}
+            {tab === "moodboard" && <Moodboard closetItems={itemsDb.rows.filter(i => !i.forSale)} activeIdx={moodboardActiveIdx} setActiveIdx={setMoodboardActiveIdx} boards={moodboardsDb.boards} updateBoards={moodboardsDb.updateBoards} removeBoardById={moodboardsDb.removeBoardById} />}
 
             {/* SETTINGS */}
             {tab === "settings" && <SettingsTab
@@ -7481,6 +7645,7 @@ export default function App() {
           {/* Moodboard board info */}
           {tab === "moodboard" && <MoodboardInfoPanel
             activeIdx={moodboardActiveIdx} setActiveIdx={setMoodboardActiveIdx}
+            boards={moodboardsDb.boards} updateBoards={moodboardsDb.updateBoards} updateBoardById={moodboardsDb.updateBoardById} removeBoardById={moodboardsDb.removeBoardById}
             lookbooksDb={lookbooksDb.rows}
             createLookbook={async ({id: newId, name, moodboardId}) => {
               const lbId = newId || uid();
@@ -7492,10 +7657,19 @@ export default function App() {
             addMoodboardToLookbook={async (lookbookId, board) => {
               const lb = lookbooksDb.rows.find(l => l.id === lookbookId);
               if (!lb) return;
-              await lookbooksDb.update({ ...lb, moodboardId: board.id });
-              await lookbooksDb.refresh();
+              const updated = { ...lb, moodboardId: board.id };
+              await lookbooksDb.update(updated);
+              // Set immediately — don't wait for refresh
+              setActiveLookbook(updated);
             }}
-            onGoToLookbook={(lb) => { setTab("lookbooks"); setActiveLookbook(lb); }}
+            onGoToLookbook={(lb) => {
+              // lb already has moodboardId set by setLinkedLb
+              const fresh = lookbooksDb.rows.find(r => r.id === lb.id);
+              const withMb = { ...(fresh || lb), moodboardId: lb.moodboardId || fresh?.moodboardId };
+              setActiveLookbookView("moodboard");
+              setTab("lookbooks");
+              setActiveLookbook(withMb);
+            }}
           />}
 
           {tab === "outfits" && (() => {
@@ -7853,14 +8027,18 @@ export default function App() {
       {/* Lookbook Viewer */}
       {activeLookbook && (
         <LookbookViewer
+          key={activeLookbook.id + "_" + activeLookbookView}
           lookbook={activeLookbook}
           outfits={outfitsDb.rows}
           markOutfitWorn={markOutfitWorn}
           allItems={allItems}
           closetItems={itemsDb.rows}
-          onClose={() => setActiveLookbook(null)}
+          moodboardsProp={moodboardsDb.boards}
+          moodboardsUpdateBoards={moodboardsDb.updateBoards}
+          initialView={activeLookbookView}
+          onClose={() => { setActiveLookbook(null); setActiveLookbookView("editorial"); }}
           onUpdate={updateLookbook}
-          onOpenOutfit={(outfit) => { setActiveLookbook(null); setOutfitPopup(outfit); }}
+          onOpenOutfit={(outfit) => { setActiveLookbook(null); setActiveLookbookView("editorial"); setOutfitPopup(outfit); }}
         />
       )}
     </div>

@@ -1473,16 +1473,24 @@ function ItemDetailPopup({ item, onClose, onEdit, onDelete, onWorn, onCreateOutf
   const worn = item.wornCount || 0;
   const cpw = worn > 0 && (spentNum || priceNum) > 0 ? ((spentNum || priceNum) / worn).toFixed(2) : null;
   const [featuredView, setFeaturedView] = useState("outfits"); // "outfits" | "lookbooks"
+  const [showPurchasedModal, setShowPurchasedModal] = useState(false);
+  const [purchasedDate, setPurchasedDate] = useState(new Date().toISOString().slice(0, 10));
   const featuredOutfits = (outfits || []).filter(o => (o.layers || o.itemIds || []).includes(item.id));
   const featuredOutfitIds = new Set(featuredOutfits.map(o => o.id));
   const featuredLookbooks = (lookbooks || []).filter(lb => (lb.outfitIds || []).some(oid => featuredOutfitIds.has(oid)));
   const featuredLookbookCount = featuredLookbooks.length;
+
+  // Days since added (for wishlist)
+  const daysSinceAdded = isWishlist && item.addedAt
+    ? Math.floor((Date.now() - new Date(item.addedAt).getTime()) / 86400000)
+    : null;
 
   const chip = (label, bg = "#f5f3ef", color = "#666") => (
     <span style={{ background: bg, color, borderRadius: 20, padding: "4px 12px", fontSize: 12, fontWeight: 700 }}>{label}</span>
   );
 
   return (
+    <>
     <div className="item-detail-overlay fade-in" onClick={onClose}>
       <div className="fade-up" onClick={e => e.stopPropagation()} style={{
         background: "#fff", borderRadius: 24, width: "min(1200px, 96vw)",  maxWidth: 1200,
@@ -1562,6 +1570,12 @@ function ItemDetailPopup({ item, onClose, onEdit, onDelete, onWorn, onCreateOutf
               </div>
             )}
 
+            {isWishlist && daysSinceAdded !== null && (
+              <div style={{ fontSize: 11, color: "#aaa", marginBottom: 10, textAlign: "center", fontStyle: "italic" }}>
+                Added {daysSinceAdded === 0 ? "today" : `${daysSinceAdded} day${daysSinceAdded !== 1 ? "s" : ""} ago`}
+              </div>
+            )}
+
             {item.notes && (
               <div style={{ background: "#faf9f6", borderRadius: 10, padding: "10px 12px", fontSize: 12, color: "#555", lineHeight: 1.6 }}>{item.notes}</div>
             )}
@@ -1590,7 +1604,7 @@ function ItemDetailPopup({ item, onClose, onEdit, onDelete, onWorn, onCreateOutf
               <button onClick={onDelete} title="Delete" style={{ width: 32, height: 32, borderRadius: "50%", background: "#fef2f2", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", color: "#e05555", flexShrink: 0 }}><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4h6v2"/></svg></button>
               {isWishlist ? (<>
                 {item.link && <a href={item.link} target="_blank" rel="noreferrer" style={{ padding: "6px 11px", background: "#1a1a1a", borderRadius: 10, fontSize: 12, fontWeight: 700, color: "#fff", fontFamily: "'DM Sans', sans-serif", display: "flex", alignItems: "center", gap: 5, textDecoration: "none", flexShrink: 0, whiteSpace: "nowrap" }}><SvgShop size={12} color="#fff" />Buy</a>}
-                <button onClick={onMoveToCloset} style={{ padding: "6px 11px", background: "#f0faf4", border: "1.5px solid #b6e8c8", borderRadius: 10, cursor: "pointer", fontSize: 12, fontWeight: 700, color: "#2d6a3f", fontFamily: "'DM Sans', sans-serif", display: "flex", alignItems: "center", gap: 5, flexShrink: 0, whiteSpace: "nowrap" }}><SvgCheck size={12} color="currentColor" />Purchased</button>
+                <button onClick={() => setShowPurchasedModal(true)} style={{ padding: "6px 11px", background: "#f0faf4", border: "1.5px solid #b6e8c8", borderRadius: 10, cursor: "pointer", fontSize: 12, fontWeight: 700, color: "#2d6a3f", fontFamily: "'DM Sans', sans-serif", display: "flex", alignItems: "center", gap: 5, flexShrink: 0, whiteSpace: "nowrap" }}><SvgCheck size={12} color="currentColor" />Purchased</button>
               </>) : (<>
                 <button onClick={onListForSale} style={{ padding: "6px 11px", background: "#fff8ee", border: "1.5px solid #f5c842", borderRadius: 10, cursor: "pointer", fontSize: 12, fontWeight: 700, color: "#a07000", fontFamily: "'DM Sans', sans-serif", display: "flex", alignItems: "center", gap: 5, flexShrink: 0, whiteSpace: "nowrap" }}><SvgTag size={12} color="currentColor" />List for Sale</button>
                 <button onClick={onCreateOutfit} style={{ padding: "6px 11px", background: "#1a1a1a", border: "none", borderRadius: 10, cursor: "pointer", fontSize: 12, fontWeight: 700, color: "#fff", fontFamily: "'DM Sans', sans-serif", display: "flex", alignItems: "center", gap: 5, flexShrink: 0, whiteSpace: "nowrap" }}><SvgSparkle size={12} color="currentColor" />Create Outfit</button>
@@ -1662,6 +1676,30 @@ function ItemDetailPopup({ item, onClose, onEdit, onDelete, onWorn, onCreateOutf
 
       </div>
     </div>
+
+      {/* Purchase date modal */}
+      {showPurchasedModal && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", zIndex: 99999, display: "flex", alignItems: "center", justifyContent: "center" }}
+          onClick={() => setShowPurchasedModal(false)}>
+          <div onClick={e => e.stopPropagation()} style={{ background: "#fff", borderRadius: 20, padding: "28px 28px 24px", width: 320, boxShadow: "0 20px 60px rgba(0,0,0,0.2)", fontFamily: "'DM Sans', sans-serif" }}>
+            <div style={{ fontSize: 16, fontWeight: 800, color: "#1a1a1a", marginBottom: 6 }}>🎉 Mark as Purchased</div>
+            <div style={{ fontSize: 13, color: "#888", marginBottom: 18 }}>When did you buy <strong>{item.name}</strong>?</div>
+            <input type="date" value={purchasedDate} onChange={e => setPurchasedDate(e.target.value)}
+              style={{ width: "100%", padding: "9px 12px", border: "1.5px solid #e8e4dc", borderRadius: 10, fontFamily: "'DM Sans', sans-serif", fontSize: 13, outline: "none", boxSizing: "border-box", marginBottom: 16 }} />
+            <div style={{ display: "flex", gap: 8 }}>
+              <button onClick={() => { onMoveToCloset(purchasedDate); setShowPurchasedModal(false); }}
+                style={{ flex: 1, padding: "10px", background: "#2d6a3f", color: "#fff", border: "none", borderRadius: 12, cursor: "pointer", fontSize: 13, fontWeight: 700, fontFamily: "'DM Sans', sans-serif" }}>
+                Move to Closet
+              </button>
+              <button onClick={() => setShowPurchasedModal(false)}
+                style={{ padding: "10px 16px", background: "#f5f3ef", color: "#888", border: "none", borderRadius: 12, cursor: "pointer", fontSize: 13, fontWeight: 700, fontFamily: "'DM Sans', sans-serif" }}>
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
   );
 }
 
@@ -2076,7 +2114,7 @@ function OutfitDetailPopup({ outfit, allItems, allOutfits, lookbooks, onClose, o
 }
 
 // ── Lookbook Viewer ──────────────────────────────────────────────────────────
-function LookbookViewer({ lookbook, outfits, allItems, closetItems, onClose, onUpdate, onOpenOutfit, markOutfitWorn, moodboardsProp, moodboardsUpdateBoards, initialView }) {
+function LookbookViewer({ lookbook, outfits, allItems, closetItems, onClose, onUpdate, onArchive, onOpenOutfit, markOutfitWorn, moodboardsProp, moodboardsUpdateBoards, initialView }) {
   const LB_TAGS = ["Travel","Work Week","Event","Disney","Sport","Weekend","Vacation"];
   const [view, setView] = useState(initialView || "editorial"); // "editorial" | "grid"
   const [idx, setIdx] = useState(0);
@@ -2097,6 +2135,17 @@ function LookbookViewer({ lookbook, outfits, allItems, closetItems, onClose, onU
   const [shareToast, setShareToast] = useState("");
   const [showPackList, setShowPackList] = useState(false);
   const [checkedPack, setCheckedPack] = useState({});
+  const [packingListView, setPackingListView] = useState(() => {
+    // Check if opened from right panel packing list shortcut
+    try {
+      const sig = localStorage.getItem("wardrobe_open_packing_v1");
+      if (sig === lookbook.id) {
+        localStorage.removeItem("wardrobe_open_packing_v1");
+        return true;
+      }
+    } catch {}
+    return false;
+  }); // full-screen packing grid
   const [dragIdx, setDragIdx] = useState(null);
   const [dragOver2, setDragOver2] = useState(null);
   const [lbTags, setLbTags] = useState(lookbook.tags || []);
@@ -2118,13 +2167,16 @@ function LookbookViewer({ lookbook, outfits, allItems, closetItems, onClose, onU
     return () => clearInterval(iv);
   }, [moodboardsProp]);
   const moodboards = (moodboardsProp && moodboardsProp.length > 0) ? moodboardsProp : moodboardsLocal;
-  const linkedMoodboardId = lookbook.moodboardId || null;
+  const [linkedMoodboardId, setLinkedMoodboardIdState] = useState(lookbook.moodboardId || null);
   const linkedMoodboardIdx = linkedMoodboardId
     ? moodboards.findIndex(b => b.id === linkedMoodboardId)
-    : null;
-  console.log("[LookbookViewer] moodboardId:", linkedMoodboardId, "boards:", moodboards.map(b=>b.id), "idx:", linkedMoodboardIdx);
+    : -1;
+  const [showLinkModal, setShowLinkModal] = useState(false);
   const setLinkedMoodboardId = (id) => {
-    onUpdate({ ...lookbook, moodboardId: id });
+    setLinkedMoodboardIdState(id);
+    try {
+      onUpdate({ ...lookbook, moodboardId: id });
+    } catch(e) { console.error("setLinkedMoodboardId error:", e); }
   };
   const setLinkedMoodboardIdx = (idx) => {
     const board = moodboards[idx];
@@ -2351,9 +2403,66 @@ function LookbookViewer({ lookbook, outfits, allItems, closetItems, onClose, onU
         </div>
       )}
 
+      {/* ── PACKING LIST FULL VIEW ── */}
+      {packingListView && (
+        <div style={{ position: "fixed", inset: 0, background: "#f7f5f2", zIndex: 9998, display: "flex", flexDirection: "column", fontFamily: "'DM Sans', sans-serif" }}>
+          {/* Header */}
+          <div style={{ height: 56, background: "#fff", borderBottom: "1.5px solid #e8e4dc", display: "flex", alignItems: "center", padding: "0 20px", gap: 14, flexShrink: 0 }}>
+            <button onClick={() => setPackingListView(false)} style={{ background: "none", border: "none", cursor: "pointer", display: "flex", alignItems: "center", gap: 6, color: "#aaa" }}>
+              <SvgArrowL size={18} color="#aaa" />
+            </button>
+            <div style={{ flex: 1 }}>
+              <div style={{ fontSize: 16, fontWeight: 800, color: "#1a1a1a" }}>Packing List — {lbName}</div>
+              <div style={{ fontSize: 11, color: "#aaa" }}>{packItems.filter(i => checkedPack[i.id]).length} of {packItems.length} packed</div>
+            </div>
+            {/* Progress bar inline */}
+            <div style={{ width: 140, height: 6, borderRadius: 6, background: "#e8e4dc", overflow: "hidden" }}>
+              <div style={{ height: "100%", borderRadius: 6, background: "#2d6a3f", width: (packItems.length > 0 ? (packItems.filter(i => checkedPack[i.id]).length / packItems.length * 100) : 0) + "%", transition: "width 0.3s" }} />
+            </div>
+            <button onClick={() => setCheckedPack({})} style={{ fontSize: 11, fontWeight: 700, color: "#aaa", background: "#f5f3ef", border: "none", borderRadius: 8, padding: "6px 12px", cursor: "pointer", fontFamily: "'DM Sans', sans-serif" }}>Reset</button>
+          </div>
+          {/* Grid of items */}
+          <div style={{ flex: 1, overflowY: "auto", padding: "24px 28px" }}>
+            {packItems.length === 0 ? (
+              <div style={{ textAlign: "center", paddingTop: 80, color: "#bbb", fontSize: 14 }}>No items in this lookbook yet</div>
+            ) : (
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))", gap: 16 }}>
+                {packItems.map(item => {
+                  const packed = !!checkedPack[item.id];
+                  return (
+                    <div key={item.id} onClick={() => setCheckedPack(c => ({ ...c, [item.id]: !c[item.id] }))}
+                      style={{ borderRadius: 16, overflow: "hidden", cursor: "pointer", border: `2px solid ${packed ? "#2d6a3f" : "#e8e4dc"}`, background: packed ? "#f0faf4" : "#fff", transition: "all 0.15s", position: "relative" }}>
+                      {/* Check badge */}
+                      <div style={{ position: "absolute", top: 8, right: 8, width: 24, height: 24, borderRadius: "50%", background: packed ? "#2d6a3f" : "rgba(255,255,255,0.9)", border: packed ? "none" : "2px solid #ccc", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 2, transition: "all 0.15s" }}>
+                        {packed && <SvgCheck size={12} color="#fff" />}
+                      </div>
+                      {/* Image */}
+                      <div style={{ width: "100%", aspectRatio: "1/1", background: "#f7f5f2", display: "flex", alignItems: "center", justifyContent: "center", opacity: packed ? 0.45 : 1, transition: "opacity 0.15s" }}>
+                        {item.image
+                          ? <img src={item.image} alt={item.name} style={{ width: "100%", height: "100%", objectFit: "contain", padding: 8 }} />
+                          : <HangerIcon size={32} color="#ddd" />
+                        }
+                      </div>
+                      {/* Label */}
+                      <div style={{ padding: "8px 10px", opacity: packed ? 0.5 : 1 }}>
+                        <div style={{ fontSize: 12, fontWeight: 700, color: "#1a1a1a", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", textDecoration: packed ? "line-through" : "none" }}>{item.name}</div>
+                        {item.category && <div style={{ fontSize: 10, color: "#aaa", marginTop: 2 }}>{item.category}</div>}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Top bar */}
       <div className="lookbook-topbar">
-        <button onClick={() => { try { save(); } catch(e) {} onClose(); }} style={{ background: "none", border: "none", cursor: "pointer", display: "flex", alignItems: "center", gap: 6, color: "#aaa" }}>
+        <button onClick={() => {
+          const finalLb = { ...lookbook, name: lbName, notes, outfitIds: lookIds, lookMeta, tags: lbTags, city: lbCity, coverImage, moodboardId: linkedMoodboardId, tripDetails, dateStart: lbDateStart, dateEnd: lbDateEnd };
+          onClose(finalLb);
+        }} style={{ background: "none", border: "none", cursor: "pointer", display: "flex", alignItems: "center", gap: 6, color: "#aaa" }}>
           <SvgArrowL size={18} color="#aaa" />
         </button>
         <div style={{ flex: 1, display: "flex", flexDirection: "column", paddingLeft: 10 }}>
@@ -2381,13 +2490,38 @@ function LookbookViewer({ lookbook, outfits, allItems, closetItems, onClose, onU
               }}>{v.label}</button>
             ))}
           </div>
-          <button onClick={handleShare} style={{ ...btnBase, padding: "7px 14px", background: "#f5f3ef", color: "#555", fontSize: 12 }}>
-            Share
+          {/* Link Moodboard button */}
+          <button onClick={() => setShowLinkModal(true)} style={{ ...btnBase, padding: "7px 14px", fontSize: 12, display: "flex", alignItems: "center", gap: 6,
+            background: linkedMoodboardId ? "#f0faf4" : "#f5f3ef",
+            color: linkedMoodboardId ? "#2d6a3f" : "#555",
+            border: linkedMoodboardId ? "1.5px solid #b6e8c8" : "1.5px solid transparent"
+          }}>
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>
+            {linkedMoodboardId && linkedMoodboardIdx >= 0 && moodboards[linkedMoodboardIdx]
+              ? moodboards[linkedMoodboardIdx].name || "Linked Board"
+              : "Link Moodboard"}
+          </button>
+          <button onClick={handleShare} style={{ ...btnBase, padding: "7px 14px", background: "#f5f3ef", color: "#555", fontSize: 12 }}>Share</button>
+          <button onClick={() => setPackingListView(true)} style={{ ...btnBase, padding: "7px 14px", background: "#f0faf4", color: "#2d6a3f", fontSize: 12, border: "1.5px solid #b6e8c8" }}>
+            <SvgLuggage size={12} color="#2d6a3f" style={{ marginRight: 5 }} />Pack List
           </button>
           <button onClick={handleExport} disabled={exportingPdf} style={{ ...btnBase, padding: "7px 14px", background: "#f5f3ef", color: "#555", fontSize: 12 }}>
             {exportingPdf ? "Exporting\u2026" : "Export PDF"}
           </button>
-          <button onClick={() => { save(); onClose(); }} style={{ ...btnBase, padding: "7px 18px", background: "#1a1a1a", color: "#fff", fontSize: 13 }}>Save &amp; Close</button>
+          {onArchive && (
+            <button onClick={() => {
+              if (window.confirm(`Archive "${lbName}"? You can restore it from Settings → Data.`)) {
+                const finalLb = { ...lookbook, name: lbName, notes, outfitIds: lookIds, lookMeta, tags: lbTags, city: lbCity, coverImage, moodboardId: linkedMoodboardId, tripDetails, dateStart: lbDateStart, dateEnd: lbDateEnd };
+                onArchive(finalLb);
+              }
+            }} style={{ ...btnBase, padding: "7px 14px", background: "#fff8f8", color: "#e05555", fontSize: 12, border: "1.5px solid #ffd0d0" }}>
+              Archive
+            </button>
+          )}
+          <button onClick={() => {
+            const finalLb = { ...lookbook, name: lbName, notes, outfitIds: lookIds, lookMeta, tags: lbTags, city: lbCity, coverImage, moodboardId: linkedMoodboardId, tripDetails, dateStart: lbDateStart, dateEnd: lbDateEnd };
+            onClose(finalLb);
+          }} style={{ ...btnBase, padding: "7px 18px", background: "#1a1a1a", color: "#fff", fontSize: 13 }}>Save &amp; Close</button>
         </div>
       </div>
 
@@ -2395,11 +2529,34 @@ function LookbookViewer({ lookbook, outfits, allItems, closetItems, onClose, onU
         {/* ── MAIN CONTENT ── */}
         <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
 
-          {looks.length === 0 ? (
+          {view === "moodboard" ? (
+            /* ── MOODBOARD VIEW — always show, regardless of looks count ── */
+            <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden", background: "#faf9f6" }}>
+              {linkedMoodboardIdx >= 0 && moodboards[linkedMoodboardIdx] ? (
+                <div style={{ flex: 1, overflow: "auto" }}>
+                  <Moodboard
+                    closetItems={closetItems || []}
+                    activeIdx={linkedMoodboardIdx}
+                    setActiveIdx={setLinkedMoodboardIdx}
+                    boards={moodboardsProp}
+                    updateBoards={moodboardsUpdateBoards}
+                  />
+                </div>
+              ) : (
+                <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 14 }}>
+                  <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#ddd" strokeWidth="1.5" strokeLinecap="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>
+                  <div style={{ fontSize: 15, fontWeight: 800, color: "#1a1a1a" }}>No moodboard linked</div>
+                  <div style={{ fontSize: 13, color: "#aaa" }}>Use the Link Moodboard button above to connect one.</div>
+                  <button onClick={() => setShowLinkModal(true)} style={{ ...btnBase, padding: "10px 22px", background: "#1a1a1a", color: "#fff", fontSize: 13 }}>+ Link Moodboard</button>
+                </div>
+              )}
+            </div>
+
+          ) : looks.length === 0 ? (
             <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", color: "#ccc", gap: 12 }}>
               <SvgGrid size={36} color="#ddd" />
               <div style={{ fontSize: 14, fontWeight: 600 }}>No looks yet</div>
-              <button onClick={() => setAddingOutfit(true)} style={{ ...btnBase, padding: "10px 22px", background: "#1a1a1a", color: "#fff", fontSize: 13 }}>+ Add Outfits</button>
+              <button onClick={() => setShowAddLooks(true)} style={{ ...btnBase, padding: "10px 22px", background: "#1a1a1a", color: "#fff", fontSize: 13 }}>+ Add Outfits</button>
             </div>
 
           ) : view === "editorial" ? (
@@ -2492,71 +2649,6 @@ function LookbookViewer({ lookbook, outfits, allItems, closetItems, onClose, onU
               )}
             </div>
 
-          ) : view === "moodboard" ? (
-            /* ── MOODBOARD VIEW ── */
-            <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden", background: "#faf9f6" }}>
-              {linkedMoodboardIdx !== null && linkedMoodboardIdx >= 0 && moodboards[linkedMoodboardIdx] ? (
-                /* Fully editable moodboard canvas */
-                <div style={{ flex: 1, overflow: "auto", padding: "20px 20px 0" }}>
-                  <Moodboard
-                    closetItems={closetItems || []}
-                    activeIdx={linkedMoodboardIdx}
-                    setActiveIdx={setLinkedMoodboardIdx}
-                    boards={moodboardsProp}
-                    updateBoards={moodboardsUpdateBoards}
-                  />
-                </div>
-              ) : (
-                /* Empty state — show board list immediately if boards exist */
-                <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 16, padding: 32 }}>
-                  <SvgSparkle size={40} color="#ddd" />
-                  <div style={{ fontSize: 16, fontWeight: 800, color: "#1a1a1a" }}>No moodboard linked</div>
-                  <div style={{ fontSize: 13, color: "#aaa", textAlign: "center", maxWidth: 280 }}>
-                    {moodboards.length > 0 ? `Choose one of your ${moodboards.length} boards:` : "No boards found — create one in the Moodboard tab first."}
-                  </div>
-
-                  {moodboards.length > 0 && (
-                    <div style={{ display: "flex", flexDirection: "column", gap: 8, width: "100%", maxWidth: 360 }}>
-                      {moodboards.map((mb, i) => (
-                        <button key={mb.id || i} onClick={() => {
-                          try {
-                            onUpdate({ ...lookbook, name: lbName, notes, outfitIds: lookIds, lookMeta, tags: lbTags, city: lbCity, coverImage, moodboardId: mb.id, tripDetails });
-                          } catch(e) { console.error("link error:", e); }
-                        }} style={{
-                          padding: "12px 16px", background: "#fff", border: "1.5px solid #e0dbd2", borderRadius: 12,
-                          cursor: "pointer", fontFamily: "'DM Sans',sans-serif", fontSize: 13, fontWeight: 700,
-                          color: "#1a1a1a", textAlign: "left", display: "flex", alignItems: "center", gap: 10,
-                        }}
-                          onMouseEnter={e => { e.currentTarget.style.borderColor = "#1a1a1a"; }}
-                          onMouseLeave={e => { e.currentTarget.style.borderColor = "#e0dbd2"; }}
-                        >
-                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><rect x="3" y="3" width="18" height="18" rx="2"/></svg>
-                          <span style={{ flex: 1 }}>{mb.name || "Board " + (i + 1)}</span>
-                          <span style={{ fontSize: 11, color: "#bbb", fontWeight: 500 }}>{(mb.items || []).length} items</span>
-                        </button>
-                      ))}
-                    </div>
-                  )}
-
-                  <button onClick={() => {
-                    const newBoard = { id: uid(), name: lbName + " Board", items: [], bg: "#ffffff" };
-                    const existing = (() => { try { return JSON.parse(localStorage.getItem("wardrobe_moodboards_v1") || "[]"); } catch { return []; } })();
-                    const updated = [...existing, newBoard];
-                    try { localStorage.setItem("wardrobe_moodboards_v1", JSON.stringify(updated)); } catch {}
-                    if (!moodboardsProp) setMoodboardsLocal(updated);
-                    setLinkedMoodboardId(newBoard.id);
-                  }} style={{
-                    padding: "10px 24px", background: "#1a1a1a", border: "none", borderRadius: 12,
-                    cursor: "pointer", fontFamily: "'DM Sans',sans-serif", fontSize: 13, fontWeight: 700,
-                    color: "#fff", display: "flex", alignItems: "center", gap: 8,
-                  }}>
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-                    New Board
-                  </button>
-                </div>
-              )}
-            </div>
-
           ) : (
             /* ── GRID VIEW ── */
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: 14, padding: 20, overflowY: "auto", flex: 1 }}>
@@ -2607,7 +2699,6 @@ function LookbookViewer({ lookbook, outfits, allItems, closetItems, onClose, onU
             {[
               { label: "Looks", value: looks.length },
               { label: "Pieces", value: packItems.length },
-              { label: "Value", value: totalVal > 0 ? "$" + totalVal.toFixed(0) : "\u2014" },
               tripDays ? { label: "Days", value: tripDays } : null,
               tripNights !== null ? { label: "Nights", value: tripNights } : null,
             ].filter(Boolean).map(s => (
@@ -2831,7 +2922,7 @@ function LookbookViewer({ lookbook, outfits, allItems, closetItems, onClose, onU
           return true;
         });
         return (
-          <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.45)", zIndex: 9999, display: "flex", alignItems: "center", justifyContent: "center" }}
+          <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.45)", zIndex: 99999, display: "flex", alignItems: "center", justifyContent: "center" }}
             onClick={() => setShowAddLooks(false)}>
             <div onClick={e => e.stopPropagation()} style={{ background: "#fff", borderRadius: 20, width: "min(680px, 92vw)", maxHeight: "80vh", display: "flex", flexDirection: "column", overflow: "hidden", boxShadow: "0 24px 80px rgba(0,0,0,0.18)" }}>
               <div style={{ padding: "20px 24px 16px", borderBottom: "1.5px solid #f0ece4", display: "flex", alignItems: "flex-start", gap: 12 }}>
@@ -2858,10 +2949,10 @@ function LookbookViewer({ lookbook, outfits, allItems, closetItems, onClose, onU
                     {outfits.length === lookIds.length ? "All outfits already added" : "No outfits match"}
                   </div>
                 ) : filtered.map(o => (
-                  <div key={o.id} onClick={() => addLook(o.id)} style={{ borderRadius: 14, border: "1.5px solid #e8e4dc", overflow: "hidden", cursor: "pointer", background: "#faf9f6" }}
+                  <div key={o.id} onClick={() => addLook(o.id)} style={{ borderRadius: 14, border: "1.5px solid #e8e4dc", overflow: "hidden", cursor: "pointer", background: "#fff" }}
                     onMouseEnter={e => e.currentTarget.style.borderColor = "#1a1a1a"}
                     onMouseLeave={e => e.currentTarget.style.borderColor = "#e8e4dc"}>
-                    <div style={{ aspectRatio: "3/4", background: "#f0ece4", display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden" }}>
+                    <div style={{ aspectRatio: "3/4", background: "#fff", display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden" }}>
                       {o.previewImage ? <img src={o.previewImage} alt={o.name} style={{ width: "100%", height: "100%", objectFit: "contain" }} /> : <HangerIcon size={28} color="#ddd" />}
                     </div>
                     <div style={{ padding: "8px 10px 10px" }}>
@@ -2876,6 +2967,59 @@ function LookbookViewer({ lookbook, outfits, allItems, closetItems, onClose, onU
           </div>
         );
       })()}
+
+      {/* ── LINK MOODBOARD MODAL ── */}
+      {showLinkModal && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.45)", zIndex: 99999, display: "flex", alignItems: "center", justifyContent: "center" }}
+          onClick={() => setShowLinkModal(false)}>
+          <div onClick={e => e.stopPropagation()} style={{ background: "#fff", borderRadius: 20, width: "min(520px, 92vw)", maxHeight: "80vh", display: "flex", flexDirection: "column", overflow: "hidden", boxShadow: "0 24px 80px rgba(0,0,0,0.18)" }}>
+            <div style={{ padding: "20px 24px 16px", borderBottom: "1.5px solid #f0ece4", display: "flex", alignItems: "center", gap: 12 }}>
+              <div style={{ fontSize: 16, fontWeight: 800, color: "#1a1a1a", flex: 1 }}>Link Moodboard</div>
+              {linkedMoodboardId && (
+                <button onClick={() => { setLinkedMoodboardId(null); setShowLinkModal(false); }} style={{ padding: "5px 12px", background: "#fef2f2", border: "none", borderRadius: 8, cursor: "pointer", fontSize: 11, fontWeight: 700, color: "#e05555", fontFamily: "'DM Sans',sans-serif" }}>
+                  Unlink
+                </button>
+              )}
+              <button onClick={() => setShowLinkModal(false)} style={{ background: "#f5f2ed", border: "none", borderRadius: "50%", width: 32, height: 32, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+              </button>
+            </div>
+            <div style={{ overflowY: "auto", padding: "16px 20px", display: "flex", flexDirection: "column", gap: 8 }}>
+              {moodboards.length === 0 ? (
+                <div style={{ textAlign: "center", padding: "32px 0", color: "#bbb", fontSize: 13 }}>
+                  No moodboards yet — create one in the Moodboard tab first.
+                </div>
+              ) : moodboards.map((mb, i) => {
+                const isLinked = linkedMoodboardId === mb.id;
+                return (
+                  <div key={mb.id} onClick={() => { setLinkedMoodboardId(mb.id); setView("moodboard"); setShowLinkModal(false); }}
+                    style={{ display: "flex", alignItems: "center", gap: 14, padding: "14px 16px", borderRadius: 14, border: "1.5px solid", cursor: "pointer",
+                      borderColor: isLinked ? "#3aaa6e" : "#e0dbd2", background: isLinked ? "#f0faf4" : "#faf9f6" }}
+                    onMouseEnter={e => { if (!isLinked) e.currentTarget.style.borderColor = "#1a1a1a"; }}
+                    onMouseLeave={e => { if (!isLinked) e.currentTarget.style.borderColor = "#e0dbd2"; }}>
+                    <div style={{ width: 48, height: 48, borderRadius: 10, background: mb.bg || "#f5f2ed", border: "1px solid #e8e4dc", overflow: "hidden", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                      {(mb.items || []).filter(it => it.src).slice(0, 1).map(it => (
+                        <img key={it.id} src={it.src} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                      ))}
+                      {!(mb.items || []).some(it => it.src) && (
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#ccc" strokeWidth="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>
+                      )}
+                    </div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: 14, fontWeight: 700, color: "#1a1a1a" }}>{mb.name || "Board " + (i + 1)}</div>
+                      <div style={{ fontSize: 11, color: "#aaa", marginTop: 2 }}>{(mb.items || []).length} items</div>
+                    </div>
+                    {isLinked
+                      ? <div style={{ fontSize: 11, fontWeight: 700, color: "#2d6a3f", background: "#d4f5e2", padding: "3px 10px", borderRadius: 20 }}>Linked ✓</div>
+                      : <div style={{ fontSize: 11, fontWeight: 600, color: "#aaa" }}>Select →</div>
+                    }
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -4508,27 +4652,72 @@ function StatsTab({ itemsDb, outfitsDb, lookbooksDb, wishlistDb, outfitCalendar,
 }
 
 // ── Wishlist Tab ──────────────────────────────────────────────────────────────
-function WishlistTab({ wishlistDb, wishlistsDb, saveWishlistsMeta, activeWishlistId, setActiveWishlistId, wlSort, setWlSort, wlSortCat, setWlSortCat, moveToCloset, onEdit, onItemClick }) {
+function WishlistTab({ wishlistDb, wishlistsDb, saveWishlistsMeta, activeWishlistId, setActiveWishlistId, wlSort, setWlSort, wlSortCat, setWlSortCat, wlZoom, setWlZoom, moveToCloset, onEdit, onItemClick }) {
   const [showNewWl, setShowNewWl] = useState(false);
   const [newWlName, setNewWlName] = useState("");
   const [newWlNotes, setNewWlNotes] = useState("");
   const [editingWlId, setEditingWlId] = useState(null);
+  const [dragItemId, setDragItemId] = useState(null);
+  const [dragOverItemId, setDragOverItemId] = useState(null);
+  const [customOrder, setCustomOrder] = useState({}); // listId -> [itemIds]
+  const [wlStoreFilter, setWlStoreFilter] = useState("All");
 
   const priorityMeta = { high: { label: "High", bg: "#fff0f0", color: "#e05555", border: "#ffc5c5" }, medium: { label: "Medium", bg: "#fff8ee", color: "#a07000", border: "#f5c842" }, low: { label: "Low", bg: "#f5f3ef", color: "#aaa", border: "#e0dbd0" } };
 
   const visibleItems = wishlistDb.rows.filter(i =>
     !activeWishlistId || i.wishlistId === activeWishlistId
   );
-  const sortedItems = [...visibleItems].sort((a, b) => {
+
+  // Separate saved-for-later
+  const activeItems = visibleItems.filter(i => !i.savedForLater);
+  const savedLaterItems = visibleItems.filter(i => i.savedForLater);
+
+  const applySort = (items) => {
     const po = { high: 0, medium: 1, low: 2 };
-    if (wlSort === "priority") return (po[a.priority] ?? 1) - (po[b.priority] ?? 1);
-    if (wlSort === "store") return (a.store || "").localeCompare(b.store || "");
-    if (wlSort === "category") return (a.category || "").localeCompare(b.category || "");
-    if (wlSort === "price") return (parseFloat((b.price||"").replace(/[^0-9.]/g,""))||0) - (parseFloat((a.price||"").replace(/[^0-9.]/g,""))||0);
-    return 0;
-  }).filter(i => wlSortCat === "All" || i.category === wlSortCat);
+    let sorted = [...items].sort((a, b) => {
+      if (wlSort === "priority") return (po[a.priority] ?? 1) - (po[b.priority] ?? 1);
+      if (wlSort === "store") return (a.store || "").localeCompare(b.store || "");
+      if (wlSort === "category") return (a.category || "").localeCompare(b.category || "");
+      if (wlSort === "price") return (parseFloat((b.price||"").replace(/[^0-9.]/g,""))||0) - (parseFloat((a.price||"").replace(/[^0-9.]/g,""))||0);
+      return 0;
+    }).filter(i => wlSortCat === "All" || i.category === wlSortCat)
+      .filter(i => wlStoreFilter === "All" || (i.store || "") === wlStoreFilter);
+
+    // Apply custom order if set
+    const orderKey = activeWishlistId || "all";
+    const order = customOrder[orderKey];
+    if (order && order.length) {
+      sorted = [...sorted].sort((a, b) => {
+        const ai = order.indexOf(a.id), bi = order.indexOf(b.id);
+        if (ai === -1 && bi === -1) return 0;
+        if (ai === -1) return 1;
+        if (bi === -1) return -1;
+        return ai - bi;
+      });
+    }
+    return sorted;
+  };
+
+  const sortedItems = applySort(activeItems);
+
+  const handleDragStart = (id) => setDragItemId(id);
+  const handleDragEnter = (id) => setDragOverItemId(id);
+  const handleDrop = () => {
+    if (!dragItemId || !dragOverItemId || dragItemId === dragOverItemId) { setDragItemId(null); setDragOverItemId(null); return; }
+    const orderKey = activeWishlistId || "all";
+    const ids = sortedItems.map(i => i.id);
+    const fromIdx = ids.indexOf(dragItemId);
+    const toIdx = ids.indexOf(dragOverItemId);
+    if (fromIdx === -1 || toIdx === -1) { setDragItemId(null); setDragOverItemId(null); return; }
+    const next = [...ids];
+    next.splice(fromIdx, 1);
+    next.splice(toIdx, 0, dragItemId);
+    setCustomOrder(o => ({ ...o, [orderKey]: next }));
+    setDragItemId(null); setDragOverItemId(null);
+  };
 
   const wlCategories = [...new Set(wishlistDb.rows.map(i => i.category).filter(Boolean))];
+  const wlStores = [...new Set(wishlistDb.rows.map(i => i.store).filter(Boolean))];
   const activeWl = wishlistsDb.find(w => w.id === activeWishlistId) || null;
 
   return (
@@ -4637,7 +4826,18 @@ function WishlistTab({ wishlistDb, wishlistsDb, saveWishlistsMeta, activeWishlis
               {wlCategories.map(c => <option key={c} value={c}>{c}</option>)}
             </select>
           )}
-          <div style={{ marginLeft: "auto", fontSize: 12, color: "#aaa", fontWeight: 500 }}>{sortedItems.length} item{sortedItems.length !== 1 ? "s" : ""}</div>
+          {wlStores.length > 0 && (
+            <select value={wlStoreFilter} onChange={e => setWlStoreFilter(e.target.value)} className="pill-select">
+              <option value="All">All Stores</option>
+              {wlStores.map(s => <option key={s} value={s}>{s}</option>)}
+            </select>
+          )}
+          <div style={{ display: "flex", alignItems: "center", gap: 6, marginLeft: "auto" }}>
+            <SvgBox size={11} color="#bbb" />
+            <input type="range" min={160} max={300} step={10} value={wlZoom || 210} onChange={e => setWlZoom && setWlZoom(Number(e.target.value))}
+              style={{ width: 72, accentColor: "#1a1a1a", cursor: "pointer" }} />
+            <SvgBox size={16} color="#bbb" />
+          </div>
         </div>
 
         {sortedItems.length === 0 ? (
@@ -4664,14 +4864,22 @@ function WishlistTab({ wishlistDb, wishlistsDb, saveWishlistsMeta, activeWishlis
             )}
           </div>
         ) : (
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: 16 }}>
+          <>
+          <div style={{ display: "grid", gridTemplateColumns: `repeat(auto-fill, minmax(${wlZoom || 210}px, 1fr))`, gap: 16 }}>
             {sortedItems.map((item, i) => {
               const pm = priorityMeta[item.priority] || null;
+              const isDraggingOver = dragOverItemId === item.id;
               return (
-                <div key={item.id} className="item-card fade-up" onClick={() => onItemClick && onItemClick(item)} style={{
+                <div key={item.id}
+                  draggable
+                  onDragStart={() => handleDragStart(item.id)}
+                  onDragEnter={() => handleDragEnter(item.id)}
+                  onDragEnd={handleDrop}
+                  onDragOver={e => e.preventDefault()}
+                  className="item-card fade-up" onClick={() => onItemClick && onItemClick(item)} style={{
                   animationDelay: `${i * 0.04}s`, opacity: 0,
-                  border: `1px solid ${pm ? pm.border : "#ece8e0"}`,
-                  position: "relative", cursor: "pointer",
+                  border: isDraggingOver ? "2px dashed #888" : `1px solid ${pm ? pm.border : "#ece8e0"}`,
+                  position: "relative", cursor: "grab", transform: isDraggingOver ? "scale(1.02)" : "scale(1)", transition: "transform 0.1s",
                 }}>
                   {/* Square image */}
                   <div style={{ width: "100%", aspectRatio: "1/1", background: "#f7f5f2", overflow: "hidden", display: "flex", alignItems: "center", justifyContent: "center", position: "relative" }}>
@@ -4702,9 +4910,20 @@ function WishlistTab({ wishlistDb, wishlistsDb, saveWishlistsMeta, activeWishlis
                           <SvgShop size={10} color="#fff" />Buy
                         </a>
                       )}
-                      <button onClick={e => { e.stopPropagation(); moveToCloset(item); }}
+                      <button onClick={e => {
+                        e.stopPropagation();
+                        const today = new Date().toISOString().slice(0,10);
+                        const d = window.prompt("Purchase date?", today);
+                        if (d === null) return;
+                        moveToCloset(item, d || today);
+                      }}
                         style={{ flex: 1, padding: "5px 8px", background: "#f0faf4", border: "none", borderRadius: 8, cursor: "pointer", fontSize: 10, fontWeight: 700, color: "#3aaa6e", fontFamily: "'DM Sans', sans-serif", display: "flex", alignItems: "center", justifyContent: "center", gap: 3 }}>
                         <SvgCheck size={10} color="#3aaa6e" />Purchased
+                      </button>
+                      <button onClick={e => { e.stopPropagation(); wishlistDb.update({ ...item, savedForLater: true }); }}
+                        title="Save for later"
+                        style={{ width: 28, padding: "5px", background: "#f0f4ff", border: "none", borderRadius: 8, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#7c6fe0" strokeWidth="2.5" strokeLinecap="round"><path d="M19 21l-7-5-7 5V5a2 2 0 012-2h10a2 2 0 012 2z"/></svg>
                       </button>
                       <button onClick={e => { e.stopPropagation(); wishlistDb.remove(item.id); }}
                         style={{ width: 28, padding: "5px", background: "#fef2f2", border: "none", borderRadius: 8, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
@@ -4716,6 +4935,48 @@ function WishlistTab({ wishlistDb, wishlistsDb, saveWishlistsMeta, activeWishlis
               );
             })}
           </div>
+
+          {/* Saved for Later */}
+          {savedLaterItems.length > 0 && (
+            <div style={{ marginTop: 32 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 14 }}>
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#7c6fe0" strokeWidth="2.5" strokeLinecap="round"><path d="M19 21l-7-5-7 5V5a2 2 0 012-2h10a2 2 0 012 2z"/></svg>
+                <span style={{ fontSize: 12, fontWeight: 800, color: "#7c6fe0", textTransform: "uppercase", letterSpacing: "0.07em" }}>Saved for Later</span>
+                <span style={{ fontSize: 11, color: "#bbb", fontWeight: 600 }}>({savedLaterItems.length})</span>
+              </div>
+              <div style={{ display: "grid", gridTemplateColumns: `repeat(auto-fill, minmax(${wlZoom || 210}px, 1fr))`, gap: 16, opacity: 0.75 }}>
+                {savedLaterItems.map((item, i) => {
+                  const pm = priorityMeta[item.priority] || null;
+                  return (
+                    <div key={item.id} className="item-card" onClick={() => onItemClick && onItemClick(item)}
+                      style={{ border: `1px solid #e8e4dc`, position: "relative", cursor: "pointer" }}>
+                      <div style={{ width: "100%", aspectRatio: "1/1", background: "#f7f5f2", overflow: "hidden", display: "flex", alignItems: "center", justifyContent: "center", position: "relative" }}>
+                        {item.image
+                          ? <img src={item.image} alt={item.name} style={{ width: "100%", height: "100%", objectFit: "contain", display: "block", padding: 6 }} />
+                          : <SvgHeart size={26} color="#ccc" style={{ opacity: 0.3 }} />
+                        }
+                        <div style={{ position: "absolute", top: 7, left: 7, fontSize: 9, fontWeight: 700, color: "#7c6fe0", background: "#f0f4ff", border: "1px solid #c4b0f0", borderRadius: 100, padding: "2px 7px" }}>Saved</div>
+                      </div>
+                      <div className="item-card-label">
+                        <div className="item-card-name">{item.name}</div>
+                        <div style={{ display: "flex", gap: 4, marginTop: 8 }}>
+                          <button onClick={e => { e.stopPropagation(); wishlistDb.update({ ...item, savedForLater: false }); }}
+                            style={{ flex: 1, padding: "5px 8px", background: "#f5f2ed", border: "none", borderRadius: 8, cursor: "pointer", fontSize: 10, fontWeight: 700, color: "#555", fontFamily: "'DM Sans', sans-serif" }}>
+                            Move Back
+                          </button>
+                          <button onClick={e => { e.stopPropagation(); wishlistDb.remove(item.id); }}
+                            style={{ width: 28, padding: "5px", background: "#fef2f2", border: "none", borderRadius: 8, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#e05555" strokeWidth="2.5" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+          </>
         )}
       </div>
     </div>
@@ -4723,20 +4984,34 @@ function WishlistTab({ wishlistDb, wishlistsDb, saveWishlistsMeta, activeWishlis
 }
 
 // ── Seller Dashboard ──────────────────────────────────────────────────────────
-const SALE_STATUSES = ["listed", "pending", "sold", "archived"];
+const SALE_STATUSES = ["draft", "listed", "pending", "sold", "archived"];
 const SALE_STATUS_META = {
+  draft:    { label: "Draft",    bg: "#f5f3ef", color: "#888",    border: "#e0dbd0" },
   listed:   { label: "Listed",   bg: "#f0faf4", color: "#2d6a3f", border: "#b6e8c8" },
   pending:  { label: "Pending",  bg: "#fff8ee", color: "#a07000", border: "#f5c842" },
   sold:     { label: "Sold",     bg: "#f5f0ff", color: "#7c6fe0", border: "#c4b0f0" },
   archived: { label: "Archived", bg: "#f5f3ef", color: "#aaa",    border: "#e0dbd0" },
 };
 
-function SellerDashboard({ itemsDb, onViewItem }) {
+function SellerDashboard({ itemsDb, allClosetItems, onViewItem }) {
   const forSaleItems = itemsDb.rows.filter(i => i.forSale);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [editingId, setEditingId] = useState(null);
   const [editVals, setEditVals] = useState({});
+  // Bulk list
+  const [showBulkModal, setShowBulkModal] = useState(false);
+  const [bulkSearch, setBulkSearch] = useState("");
+  const [bulkSelected, setBulkSelectedLocal] = useState(new Set());
+  const [bulkPlatform, setBulkPlatform] = useState("");
+  const [bulkCondition, setBulkCondition] = useState("");
+  const [bulkPrice, setBulkPrice] = useState("");
+  // Sold confirmation modal
+  const [soldConfirmItem, setSoldConfirmItem] = useState(null);
+  const [soldPrice, setSoldPrice] = useState("");
+  const [soldPlatform, setSoldPlatform] = useState("");
+  const [soldShipping, setSoldShipping] = useState("");
+  const [soldDate, setSoldDate] = useState(new Date().toISOString().slice(0, 10));
 
   const updateItem = (item, patch) => itemsDb.update({ ...item, ...patch });
 
@@ -4744,7 +5019,28 @@ function SellerDashboard({ itemsDb, onViewItem }) {
     itemsDb.update({ ...item, forSale: false, saleStatus: undefined, salePrice: undefined, salePlatform: undefined, saleNotes: undefined });
   };
 
-  const markSold = (item) => updateItem(item, { saleStatus: "sold", soldDate: new Date().toISOString().slice(0, 10) });
+  const openSoldConfirm = (item) => {
+    setSoldConfirmItem(item);
+    setSoldPrice(item.salePrice || "");
+    setSoldPlatform(item.salePlatform || "");
+    setSoldShipping("");
+    setSoldDate(new Date().toISOString().slice(0, 10));
+  };
+
+  const confirmSold = () => {
+    if (!soldConfirmItem) return;
+    updateItem(soldConfirmItem, {
+      saleStatus: "sold",
+      soldDate: soldDate,
+      salePrice: soldPrice,
+      salePlatform: soldPlatform,
+      shippingCost: soldShipping,
+      netRevenue: soldPrice && soldShipping
+        ? String((parseFloat(soldPrice)||0) - (parseFloat(soldShipping)||0))
+        : soldPrice,
+    });
+    setSoldConfirmItem(null);
+  };
 
   const startEdit = (item) => {
     setEditingId(item.id);
@@ -4757,36 +5053,68 @@ function SellerDashboard({ itemsDb, onViewItem }) {
   };
 
   const filtered = forSaleItems.filter(i => {
-    const matchStatus = statusFilter === "all" || i.saleStatus === statusFilter;
+    const matchStatus = statusFilter === "all" || (i.saleStatus || "listed") === statusFilter;
     const q = search.trim().toLowerCase();
     const matchSearch = !q || i.name.toLowerCase().includes(q) || (i.brand || "").toLowerCase().includes(q);
     return matchStatus && matchSearch;
   });
 
+  const PLATFORMS = ["Depop", "Poshmark", "eBay", "Mercari", "ThredUp", "Facebook", "Instagram", "Vinted", "Other"];
+
   // Stats
   const listed = forSaleItems.filter(i => i.saleStatus === "listed" || !i.saleStatus).length;
   const pending = forSaleItems.filter(i => i.saleStatus === "pending").length;
+  const drafts = forSaleItems.filter(i => i.saleStatus === "draft").length;
   const sold = forSaleItems.filter(i => i.saleStatus === "sold").length;
   const totalEarned = forSaleItems.filter(i => i.saleStatus === "sold")
-    .reduce((s, i) => s + (parseFloat((i.salePrice || "").replace(/[^0-9.]/g, "")) || 0), 0);
+    .reduce((s, i) => s + (parseFloat((i.netRevenue || i.salePrice || "").replace(/[^0-9.]/g, "")) || 0), 0);
   const potentialEarnings = forSaleItems.filter(i => i.saleStatus !== "sold")
     .reduce((s, i) => s + (parseFloat((i.salePrice || "").replace(/[^0-9.]/g, "")) || 0), 0);
+  // Earned vs spent
+  const totalSpent = itemsDb.rows.reduce((s, i) => s + (parseFloat((i.price||"").replace(/[^0-9.]/g,""))||0), 0);
+  const earnedPct = totalSpent > 0 ? Math.min(100, (totalEarned / totalSpent) * 100) : 0;
+  // Time to sell
+  const soldWithDates = forSaleItems.filter(i => i.saleStatus === "sold" && i.soldDate && i.listedDate);
+  const avgDaysToSell = soldWithDates.length > 0
+    ? Math.round(soldWithDates.reduce((s, i) => s + Math.max(0, (new Date(i.soldDate) - new Date(i.listedDate)) / 86400000), 0) / soldWithDates.length)
+    : null;
 
-  const PLATFORMS = ["Depop", "Poshmark", "eBay", "Mercari", "ThredUp", "Facebook", "Instagram", "Other"];
+  // Bulk list closet items
+  const closetOnlyItems = (allClosetItems || itemsDb.rows).filter(i => !i.forSale);
+  const bulkFiltered = closetOnlyItems.filter(i => !bulkSearch || i.name.toLowerCase().includes(bulkSearch.toLowerCase()));
+
+  const applyBulkList = () => {
+    if (bulkSelected.size === 0) return;
+    const today = new Date().toISOString().slice(0, 10);
+    bulkSelected.forEach(id => {
+      const item = closetOnlyItems.find(i => i.id === id);
+      if (item) itemsDb.update({ ...item, forSale: true, saleStatus: "listed", listedDate: today, salePlatform: bulkPlatform || undefined, saleCondition: bulkCondition || undefined, salePrice: bulkPrice || undefined });
+    });
+    setShowBulkModal(false); setBulkSelectedLocal(new Set()); setBulkSearch(""); setBulkPlatform(""); setBulkCondition(""); setBulkPrice("");
+  };
 
   if (forSaleItems.length === 0) return (
-    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "80px 0", gap: 14 }}>
-      <div><SvgTag size={40} color="#ddd" /></div>
-      <div style={{ fontSize: 18, fontWeight: 800, color: "#1a1a1a" }}>No items listed for sale</div>
-      <div style={{ fontSize: 13, color: "#aaa", textAlign: "center", maxWidth: 280 }}>Open any item in your closet and tap "List for Sale" to move it here</div>
+    <div className="fade-up">
+      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "60px 0 40px", gap: 14 }}>
+        <div><SvgTag size={40} color="#ddd" /></div>
+        <div style={{ fontSize: 18, fontWeight: 800, color: "#1a1a1a" }}>No items listed for sale</div>
+        <div style={{ fontSize: 13, color: "#aaa", textAlign: "center", maxWidth: 280 }}>Open any item in your closet and tap "List for Sale" to move it here</div>
+      </div>
+      <div style={{ display: "flex", justifyContent: "center" }}>
+        <button onClick={() => setShowBulkModal(true)} style={{ padding: "10px 22px", background: "#1a1a1a", color: "#fff", border: "none", borderRadius: 12, cursor: "pointer", fontFamily: "'DM Sans', sans-serif", fontSize: 13, fontWeight: 700 }}>
+          + Bulk List from Closet
+        </button>
+      </div>
+      {showBulkModal && <BulkListModal items={bulkFiltered} search={bulkSearch} setSearch={setBulkSearch} selected={bulkSelected} setSelected={setBulkSelectedLocal} platform={bulkPlatform} setPlatform={setBulkPlatform} condition={bulkCondition} setCondition={setBulkCondition} price={bulkPrice} setPrice={setBulkPrice} platforms={PLATFORMS} onApply={applyBulkList} onClose={() => setShowBulkModal(false)} />}
     </div>
   );
 
   return (
     <div className="fade-up">
       {/* Stats row */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(130px, 1fr))", gap: 10, marginBottom: 20 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(120px, 1fr))", gap: 10, marginBottom: 20 }}>
         {[
+          { label: "Drafts", value: drafts, bg: "#f5f3ef", color: "#888" },
           { label: "Listed", value: listed, bg: "#f0faf4", color: "#2d6a3f" },
           { label: "Pending", value: pending, bg: "#fff8ee", color: "#a07000" },
           { label: "Sold", value: sold, bg: "#f5f0ff", color: "#7c6fe0" },
@@ -4800,6 +5128,28 @@ function SellerDashboard({ itemsDb, onViewItem }) {
         ))}
       </div>
 
+      {/* Earned vs spent bar */}
+      {totalSpent > 0 && (
+        <div style={{ background: "#fff", borderRadius: 16, border: "1.5px solid #e8e4dc", padding: "16px 18px", marginBottom: 14 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 10 }}>
+            <span style={{ fontSize: 13, fontWeight: 800, color: "#1a1a1a" }}>Wardrobe Payback</span>
+            <span style={{ fontSize: 13, fontWeight: 800, color: "#7c6fe0" }}>{earnedPct.toFixed(1)}% recouped</span>
+          </div>
+          <div style={{ height: 8, borderRadius: 8, background: "#e8e4dc", overflow: "hidden", marginBottom: 8 }}>
+            <div style={{ height: "100%", borderRadius: 8, background: "linear-gradient(90deg, #7c6fe0, #3aaa6e)", width: earnedPct + "%", transition: "width 0.5s" }} />
+          </div>
+          <div style={{ display: "flex", justifyContent: "space-between" }}>
+            <span style={{ fontSize: 11, color: "#aaa" }}>Sold: <strong style={{ color: "#2d6a3f" }}>${totalEarned.toFixed(0)}</strong></span>
+            <span style={{ fontSize: 11, color: "#aaa" }}>Total spent: <strong style={{ color: "#1a1a1a" }}>${totalSpent.toFixed(0)}</strong></span>
+          </div>
+          {avgDaysToSell !== null && (
+            <div style={{ marginTop: 10, paddingTop: 10, borderTop: "1px solid #f0ece4", fontSize: 12, color: "#888" }}>
+              ⏱ Avg time to sell: <strong style={{ color: "#1a1a1a" }}>{avgDaysToSell} days</strong>
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Sold history chart */}
       {sold > 0 && (() => {
         const soldItems = forSaleItems.filter(i => i.saleStatus === "sold" && i.soldDate);
@@ -4808,7 +5158,7 @@ function SellerDashboard({ itemsDb, onViewItem }) {
           const m = i.soldDate.slice(0, 7);
           if (!byMonth[m]) byMonth[m] = { count: 0, revenue: 0 };
           byMonth[m].count++;
-          byMonth[m].revenue += parseFloat((i.salePrice||"").replace(/[^0-9.]/g,""))||0;
+          byMonth[m].revenue += parseFloat((i.netRevenue || i.salePrice||"").replace(/[^0-9.]/g,""))||0;
         });
         const months = Object.keys(byMonth).sort().slice(-6);
         const maxRev = Math.max(...months.map(m => byMonth[m].revenue), 1);
@@ -4828,21 +5178,18 @@ function SellerDashboard({ itemsDb, onViewItem }) {
                 );
               })}
             </div>
-            <div style={{ display: "flex", gap: 16, marginTop: 12, paddingTop: 10, borderTop: "1px solid #e8e4dc" }}>
-              <div><span style={{ fontSize: 16, fontWeight: 800, color: "#7c6fe0" }}>${totalEarned.toFixed(0)}</span><span style={{ fontSize: 11, color: "#aaa", marginLeft: 4 }}>total earned</span></div>
-              <div><span style={{ fontSize: 16, fontWeight: 800, color: "#1a1a1a" }}>{sold}</span><span style={{ fontSize: 11, color: "#aaa", marginLeft: 4 }}>items sold</span></div>
-            </div>
           </div>
         );
       })()}
-      {/* Filters */}
+
+      {/* Toolbar */}
       <div style={{ display: "flex", gap: 8, marginBottom: 16, flexWrap: "wrap", alignItems: "center" }}>
         <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search listings…"
           style={{ flex: "1 1 160px", padding: "8px 14px", border: "1.5px solid #e8e4dc", borderRadius: 12, fontFamily: "'DM Sans', sans-serif", fontSize: 13, outline: "none", background: "#faf9f6" }} />
         <div style={{ display: "flex", background: "#f5f2ed", borderRadius: 10, padding: 3, gap: 2 }}>
           {[["all", "All"], ...SALE_STATUSES.map(s => [s, SALE_STATUS_META[s].label])].map(([val, lbl]) => (
             <button key={val} onClick={() => setStatusFilter(val)} style={{
-              padding: "5px 12px", border: "none", borderRadius: 8, cursor: "pointer",
+              padding: "5px 10px", border: "none", borderRadius: 8, cursor: "pointer",
               background: statusFilter === val ? "#fff" : "transparent",
               color: statusFilter === val ? "#1a1a1a" : "#aaa",
               fontFamily: "'DM Sans', sans-serif", fontSize: 11, fontWeight: 700,
@@ -4850,6 +5197,9 @@ function SellerDashboard({ itemsDb, onViewItem }) {
             }}>{lbl}</button>
           ))}
         </div>
+        <button onClick={() => setShowBulkModal(true)} style={{ padding: "8px 14px", background: "#fff8ee", border: "1.5px solid #f5c842", borderRadius: 10, cursor: "pointer", fontFamily: "'DM Sans', sans-serif", fontSize: 12, fontWeight: 700, color: "#a07000", whiteSpace: "nowrap" }}>
+          + Bulk List
+        </button>
       </div>
 
       {/* Listings */}
@@ -4877,8 +5227,10 @@ function SellerDashboard({ itemsDb, onViewItem }) {
                       <div style={{ fontSize: 14, fontWeight: 800, color: "#1a1a1a", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{item.name}</div>
                       {item.brand && <div style={{ fontSize: 12, color: "#aaa", marginTop: 1 }}>{item.brand}</div>}
                     </div>
-                    {/* Status pill */}
-                    <select value={status} onChange={e => updateItem(item, { saleStatus: e.target.value })}
+                    <select value={status} onChange={e => {
+                      if (e.target.value === "sold") { openSoldConfirm(item); }
+                      else updateItem(item, { saleStatus: e.target.value, ...(e.target.value === "listed" ? { listedDate: item.listedDate || new Date().toISOString().slice(0,10) } : {}) });
+                    }}
                       style={{ padding: "4px 10px", background: meta.bg, border: `1.5px solid ${meta.border}`, borderRadius: 20, color: meta.color, fontSize: 11, fontWeight: 700, fontFamily: "'DM Sans', sans-serif", cursor: "pointer", flexShrink: 0 }}>
                       {SALE_STATUSES.map(s => <option key={s} value={s}>{SALE_STATUS_META[s].label}</option>)}
                     </select>
@@ -4892,6 +5244,7 @@ function SellerDashboard({ itemsDb, onViewItem }) {
                     {origPrice > 0 && salePrice > 0 && origPrice > salePrice && (
                       <span style={{ fontSize: 11, color: "#e05555", fontWeight: 700 }}>-{Math.round((1 - salePrice/origPrice)*100)}%</span>
                     )}
+                    {item.shippingCost && <span style={{ fontSize: 11, color: "#aaa" }}>ship: ${item.shippingCost}</span>}
                   </div>
 
                   {/* Edit form */}
@@ -4918,11 +5271,20 @@ function SellerDashboard({ itemsDb, onViewItem }) {
                   ) : (
                     <>
                       {item.saleNotes && <div style={{ fontSize: 11, color: "#888", fontStyle: "italic" }}>{item.saleNotes}</div>}
-                      {item.soldDate && <div style={{ fontSize: 11, color: "#7c6fe0", fontWeight: 600 }}>Sold {new Date(item.soldDate + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}</div>}
+                      {item.soldDate && <div style={{ fontSize: 11, color: "#7c6fe0", fontWeight: 600 }}>Sold {new Date(item.soldDate + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}{item.netRevenue ? ` · Net $${parseFloat(item.netRevenue).toFixed(0)}` : ""}</div>}
                       {/* Actions */}
                       <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginTop: 2 }}>
-                        <button onClick={() => startEdit(item)} style={{ padding: "5px 12px", background: "#f5f2ed", border: "none", borderRadius: 8, cursor: "pointer", fontSize: 11, fontWeight: 700, color: "#555", fontFamily: "'DM Sans', sans-serif" }}><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg> Edit Listing</button>
-                        {status !== "sold" && <button onClick={() => markSold(item)} style={{ padding: "5px 12px", background: "#f5f0ff", border: "1.5px solid #c4b0f0", borderRadius: 8, cursor: "pointer", fontSize: 11, fontWeight: 700, color: "#7c6fe0", fontFamily: "'DM Sans', sans-serif" }}><SvgCheck size={11} color="#7c6fe0" style={{marginRight:6}} />Mark Sold</button>}
+                        <button onClick={() => startEdit(item)} style={{ padding: "5px 12px", background: "#f5f2ed", border: "none", borderRadius: 8, cursor: "pointer", fontSize: 11, fontWeight: 700, color: "#555", fontFamily: "'DM Sans', sans-serif" }}>✏ Edit</button>
+                        {status !== "sold" && (
+                          <button onClick={() => openSoldConfirm(item)} style={{ padding: "5px 12px", background: "#f5f0ff", border: "1.5px solid #c4b0f0", borderRadius: 8, cursor: "pointer", fontSize: 11, fontWeight: 700, color: "#7c6fe0", fontFamily: "'DM Sans', sans-serif" }}>
+                            <SvgCheck size={11} color="#7c6fe0" style={{marginRight:4}} />Mark Sold
+                          </button>
+                        )}
+                        {status === "draft" && (
+                          <button onClick={() => updateItem(item, { saleStatus: "listed", listedDate: new Date().toISOString().slice(0,10) })} style={{ padding: "5px 12px", background: "#f0faf4", border: "1.5px solid #b6e8c8", borderRadius: 8, cursor: "pointer", fontSize: 11, fontWeight: 700, color: "#2d6a3f", fontFamily: "'DM Sans', sans-serif" }}>
+                            → List Now
+                          </button>
+                        )}
                         <button onClick={() => moveBackToCloset(item)} style={{ padding: "5px 12px", background: "#fef2f2", border: "none", borderRadius: 8, cursor: "pointer", fontSize: 11, fontWeight: 700, color: "#e05555", fontFamily: "'DM Sans', sans-serif" }}>↩ Back to Closet</button>
                       </div>
                     </>
@@ -4933,6 +5295,123 @@ function SellerDashboard({ itemsDb, onViewItem }) {
           })}
         </div>
       )}
+
+      {/* Bulk List Modal */}
+      {showBulkModal && <BulkListModal items={bulkFiltered} search={bulkSearch} setSearch={setBulkSearch} selected={bulkSelected} setSelected={setBulkSelectedLocal} platform={bulkPlatform} setPlatform={setBulkPlatform} condition={bulkCondition} setCondition={setBulkCondition} price={bulkPrice} setPrice={setBulkPrice} platforms={PLATFORMS} onApply={applyBulkList} onClose={() => setShowBulkModal(false)} />}
+
+      {/* Sold Confirmation Modal */}
+      {soldConfirmItem && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", zIndex: 99999, display: "flex", alignItems: "center", justifyContent: "center" }}
+          onClick={() => setSoldConfirmItem(null)}>
+          <div onClick={e => e.stopPropagation()} style={{ background: "#fff", borderRadius: 22, padding: "28px", width: 360, boxShadow: "0 20px 60px rgba(0,0,0,0.2)", fontFamily: "'DM Sans', sans-serif" }}>
+            <div style={{ fontSize: 17, fontWeight: 800, color: "#1a1a1a", marginBottom: 4 }}>🎉 Mark as Sold</div>
+            <div style={{ fontSize: 13, color: "#888", marginBottom: 20 }}>{soldConfirmItem.name}</div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 20 }}>
+              <div>
+                <label style={{ fontSize: 11, fontWeight: 700, color: "#aaa", textTransform: "uppercase", letterSpacing: "0.07em", display: "block", marginBottom: 4 }}>Final Sale Price</label>
+                <input value={soldPrice} onChange={e => setSoldPrice(e.target.value)} placeholder="e.g. 35"
+                  style={{ width: "100%", padding: "9px 12px", border: "1.5px solid #e8e4dc", borderRadius: 10, fontFamily: "'DM Sans', sans-serif", fontSize: 13, outline: "none", boxSizing: "border-box" }} />
+              </div>
+              <div>
+                <label style={{ fontSize: 11, fontWeight: 700, color: "#aaa", textTransform: "uppercase", letterSpacing: "0.07em", display: "block", marginBottom: 4 }}>Platform</label>
+                <select value={soldPlatform} onChange={e => setSoldPlatform(e.target.value)}
+                  style={{ width: "100%", padding: "9px 12px", border: "1.5px solid #e8e4dc", borderRadius: 10, fontFamily: "'DM Sans', sans-serif", fontSize: 13, outline: "none" }}>
+                  <option value="">Select platform…</option>
+                  {["Depop", "Poshmark", "eBay", "Mercari", "ThredUp", "Facebook", "Instagram", "Vinted", "Other"].map(p => <option key={p} value={p}>{p}</option>)}
+                </select>
+              </div>
+              <div>
+                <label style={{ fontSize: 11, fontWeight: 700, color: "#aaa", textTransform: "uppercase", letterSpacing: "0.07em", display: "block", marginBottom: 4 }}>Shipping Cost (optional)</label>
+                <input value={soldShipping} onChange={e => setSoldShipping(e.target.value)} placeholder="e.g. 4.50"
+                  style={{ width: "100%", padding: "9px 12px", border: "1.5px solid #e8e4dc", borderRadius: 10, fontFamily: "'DM Sans', sans-serif", fontSize: 13, outline: "none", boxSizing: "border-box" }} />
+              </div>
+              <div>
+                <label style={{ fontSize: 11, fontWeight: 700, color: "#aaa", textTransform: "uppercase", letterSpacing: "0.07em", display: "block", marginBottom: 4 }}>Date Sold</label>
+                <input type="date" value={soldDate} onChange={e => setSoldDate(e.target.value)}
+                  style={{ width: "100%", padding: "9px 12px", border: "1.5px solid #e8e4dc", borderRadius: 10, fontFamily: "'DM Sans', sans-serif", fontSize: 13, outline: "none", boxSizing: "border-box" }} />
+              </div>
+              {soldPrice && soldShipping && (
+                <div style={{ background: "#f0faf4", borderRadius: 10, padding: "10px 14px", fontSize: 13, color: "#2d6a3f", fontWeight: 700 }}>
+                  Net: ${(parseFloat(soldPrice||0) - parseFloat(soldShipping||0)).toFixed(2)} after shipping
+                </div>
+              )}
+            </div>
+            <div style={{ display: "flex", gap: 8 }}>
+              <button onClick={confirmSold} style={{ flex: 1, padding: "11px", background: "#7c6fe0", color: "#fff", border: "none", borderRadius: 12, cursor: "pointer", fontSize: 13, fontWeight: 700 }}>Confirm Sale</button>
+              <button onClick={() => setSoldConfirmItem(null)} style={{ padding: "11px 18px", background: "#f5f3ef", color: "#888", border: "none", borderRadius: 12, cursor: "pointer", fontSize: 13, fontWeight: 700 }}>Cancel</button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function BulkListModal({ items, search, setSearch, selected, setSelected, platform, setPlatform, condition, setCondition, price, setPrice, platforms, onApply, onClose }) {
+  const toggle = (id) => {
+    const next = new Set(selected);
+    if (next.has(id)) next.delete(id); else next.add(id);
+    setSelected(next);
+  };
+  return (
+    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", zIndex: 99999, display: "flex", alignItems: "center", justifyContent: "center" }}
+      onClick={onClose}>
+      <div onClick={e => e.stopPropagation()} style={{ background: "#fff", borderRadius: 22, width: "min(720px, 95vw)", maxHeight: "86vh", display: "flex", flexDirection: "column", boxShadow: "0 20px 60px rgba(0,0,0,0.2)", fontFamily: "'DM Sans', sans-serif" }}>
+        {/* Header */}
+        <div style={{ padding: "22px 24px 16px", borderBottom: "1px solid #e8e4dc" }}>
+          <div style={{ fontSize: 17, fontWeight: 800, marginBottom: 2 }}>Bulk List from Closet</div>
+          <div style={{ fontSize: 13, color: "#aaa", marginBottom: 14 }}>Select items to list, then apply shared settings.</div>
+          <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search closet…"
+            style={{ width: "100%", padding: "8px 12px", border: "1.5px solid #e8e4dc", borderRadius: 10, fontFamily: "'DM Sans', sans-serif", fontSize: 13, outline: "none", boxSizing: "border-box" }} />
+        </div>
+        {/* Item grid */}
+        <div style={{ flex: 1, overflowY: "auto", padding: "16px 24px" }}>
+          {items.length === 0 ? (
+            <div style={{ textAlign: "center", padding: "40px 0", color: "#bbb" }}>No closet items found</div>
+          ) : (
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(130px, 1fr))", gap: 10 }}>
+              {items.map(item => {
+                const isSelected = selected.has(item.id);
+                return (
+                  <div key={item.id} onClick={() => toggle(item.id)} style={{ border: `2px solid ${isSelected ? "#7c6fe0" : "#e8e4dc"}`, borderRadius: 14, overflow: "hidden", cursor: "pointer", background: isSelected ? "#f5f0ff" : "#fff", transition: "all 0.1s", position: "relative" }}>
+                    {isSelected && <div style={{ position: "absolute", top: 6, right: 6, width: 20, height: 20, borderRadius: "50%", background: "#7c6fe0", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1 }}><SvgCheck size={10} color="#fff" /></div>}
+                    <div style={{ width: "100%", aspectRatio: "1/1", background: "#f7f5f2", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                      {item.image ? <img src={item.image} alt={item.name} style={{ width: "100%", height: "100%", objectFit: "contain", padding: 4 }} /> : <HangerIcon size={22} color="#ddd" />}
+                    </div>
+                    <div style={{ padding: "6px 8px" }}>
+                      <div style={{ fontSize: 11, fontWeight: 700, color: "#1a1a1a", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{item.name}</div>
+                      {item.price && <div style={{ fontSize: 10, color: "#aaa" }}>{item.price}</div>}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+        {/* Shared settings + apply */}
+        <div style={{ padding: "16px 24px", borderTop: "1px solid #e8e4dc" }}>
+          <div style={{ fontSize: 12, fontWeight: 700, color: "#aaa", textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: 10 }}>Shared Settings (optional)</div>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 14 }}>
+            <select value={platform} onChange={e => setPlatform(e.target.value)} style={{ flex: 1, minWidth: 120, padding: "8px 10px", border: "1.5px solid #e8e4dc", borderRadius: 10, fontFamily: "'DM Sans', sans-serif", fontSize: 12 }}>
+              <option value="">Platform…</option>
+              {platforms.map(p => <option key={p} value={p}>{p}</option>)}
+            </select>
+            <select value={condition} onChange={e => setCondition(e.target.value)} style={{ flex: 1, minWidth: 120, padding: "8px 10px", border: "1.5px solid #e8e4dc", borderRadius: 10, fontFamily: "'DM Sans', sans-serif", fontSize: 12 }}>
+              <option value="">Condition…</option>
+              {["New with tags", "Like new", "Good", "Fair", "Poor"].map(c => <option key={c} value={c}>{c}</option>)}
+            </select>
+            <input value={price} onChange={e => setPrice(e.target.value)} placeholder="Default price…"
+              style={{ flex: 1, minWidth: 100, padding: "8px 10px", border: "1.5px solid #e8e4dc", borderRadius: 10, fontFamily: "'DM Sans', sans-serif", fontSize: 12, outline: "none" }} />
+          </div>
+          <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+            <span style={{ fontSize: 13, color: "#888", flex: 1 }}>{selected.size} item{selected.size !== 1 ? "s" : ""} selected</span>
+            <button onClick={onClose} style={{ padding: "9px 18px", background: "#f5f3ef", border: "none", borderRadius: 10, cursor: "pointer", fontSize: 13, fontWeight: 700, color: "#888" }}>Cancel</button>
+            <button onClick={onApply} disabled={selected.size === 0} style={{ padding: "9px 22px", background: selected.size > 0 ? "#1a1a1a" : "#e0dbd2", color: "#fff", border: "none", borderRadius: 10, cursor: selected.size > 0 ? "pointer" : "not-allowed", fontSize: 13, fontWeight: 700 }}>
+              List {selected.size > 0 ? selected.size : ""} Item{selected.size !== 1 ? "s" : ""}
+            </button>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
@@ -5316,7 +5795,7 @@ function Moodboard({ closetItems = [], activeIdx, setActiveIdx, boards: boardsPr
           const canvas=canvasRef.current;
           const cx=canvas?canvas.offsetWidth/2-w/2+(Math.random()-0.5)*80:100;
           const cy=canvas?canvas.offsetHeight/2-h/2+(Math.random()-0.5)*80:100;
-          const newItem={id:uid(),src:e.target.result,x:Math.max(0,cx),y:Math.max(0,cy),w:Math.round(w),h:Math.round(h),rotation:(Math.random()-0.5)*6,zIndex:Date.now(),opacity:1,label:"",showLabel:false,flipH:false};
+          const newItem={id:uid(),src:e.target.result,x:Math.max(0,cx),y:Math.max(0,cy),w:Math.round(w),h:Math.round(h),rotation:(Math.random()-0.5)*6,zIndex:Math.floor(Date.now()/1000000),opacity:1,label:"",showLabel:false,flipH:false};
           updateBoard(items => [...items, newItem]);
           setSelectedId(newItem.id);
         };
@@ -5331,7 +5810,7 @@ function Moodboard({ closetItems = [], activeIdx, setActiveIdx, boards: boardsPr
     const newItem = {
       id:uid(), type:"text", text:"Double-click to edit",
       x:canvas?canvas.offsetWidth/2-80:120, y:canvas?canvas.offsetHeight/2-30:120,
-      w:180, h:60, rotation:0, zIndex:Date.now(),
+      w:180, h:60, rotation:0, zIndex:Math.floor(Date.now()/1000000),
       fontSize:14, color:"#1a1a1a", bg:"#fff9e6", bold:false,
     };
     updateBoard(items => [...items, newItem]);
@@ -5342,7 +5821,7 @@ function Moodboard({ closetItems = [], activeIdx, setActiveIdx, boards: boardsPr
   const bringForward = (id) => { const maxZ=Math.max(...items.map(i=>i.zIndex||0)); updateBoard(items=>items.map(i=>i.id===id?{...i,zIndex:maxZ+1}:i)); };
   const sendBackward = (id) => { const minZ=Math.min(...items.map(i=>i.zIndex||0)); updateBoard(items=>items.map(i=>i.id===id?{...i,zIndex:minZ-1}:i)); };
   const updateItem = (id, patch) => { updateBoard(items=>items.map(i=>i.id===id?{...i,...patch}:i)); };
-  const duplicateItem = (id) => { const item=items.find(i=>i.id===id); if(!item)return; const copy={...item,id:uid(),x:item.x+20,y:item.y+20,zIndex:Date.now()}; updateBoard(items=>[...items,copy]); setSelectedId(copy.id); };
+  const duplicateItem = (id) => { const item=items.find(i=>i.id===id); if(!item)return; const copy={...item,id:uid(),x:item.x+20,y:item.y+20,zIndex:Math.floor(Date.now()/1000000)}; updateBoard(items=>[...items,copy]); setSelectedId(copy.id); };
 
   // ── Keyboard shortcuts ──
   useEffect(() => {
@@ -5451,7 +5930,7 @@ function Moodboard({ closetItems = [], activeIdx, setActiveIdx, boards: boardsPr
       setUrlInput(""); setShowUrlImport(false);
     } catch {
       const canvas=canvasRef.current;
-      const newItem={id:uid(),src:urlInput.trim(),x:canvas?canvas.offsetWidth/2-130:80,y:canvas?canvas.offsetHeight/2-100:80,w:260,h:200,rotation:0,zIndex:Date.now(),opacity:1,flipH:false};
+      const newItem={id:uid(),src:urlInput.trim(),x:canvas?canvas.offsetWidth/2-130:80,y:canvas?canvas.offsetHeight/2-100:80,w:260,h:200,rotation:0,zIndex:Math.floor(Date.now()/1000000),opacity:1,flipH:false};
       updateBoard(items=>[...items,newItem]);
       setSelectedId(newItem.id);
       setUrlInput(""); setShowUrlImport(false);
@@ -5469,7 +5948,7 @@ function Moodboard({ closetItems = [], activeIdx, setActiveIdx, boards: boardsPr
   );
 
   return (
-    <div style={{display:"flex",flexDirection:"column",height:"calc(100vh - 160px)",userSelect:"none"}}>
+    <div style={{display:"flex",flexDirection:"column",height:"calc(100vh - 160px)",userSelect:"none",padding:"0 4px"}}>
 
       {/* Toolbar */}
       <div style={{display:"flex",gap:8,marginBottom:10,flexWrap:"wrap",alignItems:"center"}}>
@@ -5486,6 +5965,19 @@ function Moodboard({ closetItems = [], activeIdx, setActiveIdx, boards: boardsPr
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><path d="M21 7v6h-6"/><path d="M3 17a9 9 0 019-9 9 9 0 016 2.3l3 2.7"/></svg>
           </button>
           <button onClick={exportCanvas} style={{padding:"8px 14px",background:"#f5f2ed",border:"none",borderRadius:10,cursor:"pointer",fontFamily:"'DM Sans',sans-serif",fontSize:12,fontWeight:700,color:"#666",display:"flex",alignItems:"center",gap:8}}><SvgDownload size={13} color="#666" />Export JPG</button>
+          <button onClick={() => {
+            if (!board) return;
+            if (window.confirm(`Delete "${board.name || "this board"}"? This cannot be undone.`)) {
+              if (removeBoardById) {
+                removeBoardById(board.id);
+              } else {
+                setBoards(bs => bs.filter((_, i) => i !== activeIdx));
+              }
+              if (setActiveIdx) setActiveIdx(Math.max(0, activeIdx - 1));
+            }
+          }} title="Delete this board" style={{padding:"7px 10px",background:"#fef2f2",border:"none",borderRadius:8,cursor:"pointer",fontSize:11,color:"#e05555",fontFamily:"'DM Sans',sans-serif",display:"flex",alignItems:"center",gap:5}}>
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 011-1h4a1 1 0 011 1v2"/></svg>
+          </button>
         </div>
       </div>
 
@@ -5507,7 +5999,7 @@ function Moodboard({ closetItems = [], activeIdx, setActiveIdx, boards: boardsPr
             {(closetItemsForMoodboard||[]).filter(i=>i.image).map(item=>(
               <div key={item.id} onClick={()=>{
                 const canvas=canvasRef.current;
-                const newItem={id:uid(),src:item.image,x:canvas?canvas.offsetWidth/2-80+Math.random()*60-30:80,y:canvas?canvas.offsetHeight/2-100+Math.random()*60-30:80,w:160,h:200,rotation:(Math.random()-0.5)*4,zIndex:Date.now(),opacity:1,label:item.name,transparent:true,flipH:false};
+                const newItem={id:uid(),src:item.image,x:canvas?canvas.offsetWidth/2-80+Math.random()*60-30:80,y:canvas?canvas.offsetHeight/2-100+Math.random()*60-30:80,w:160,h:200,rotation:(Math.random()-0.5)*4,zIndex:Math.floor(Date.now()/1000000),opacity:1,label:item.name,transparent:true,flipH:false};
                 updateBoard(items=>[...items,newItem]);
                 setSelectedId(newItem.id);
                 setShowClosetPicker(false);
@@ -5766,6 +6258,7 @@ function SettingsTab({
   lastSynced, allItemsForExport,
   monthlyBudget, setMonthlyBudget,
   annualBudget, setAnnualBudget,
+  restoreLookbook,
 }) {
   const [settingsTab, setSettingsTab] = useState("appearance");
   const [themeId, setThemeId] = useState(() => { try { return localStorage.getItem(THEME_KEY) || "parchment"; } catch { return "parchment"; } });
@@ -5791,6 +6284,10 @@ function SettingsTab({
   const MB_ARCHIVE_KEY = "wardrobe_moodboards_archived_v1";
   const MB_ACTIVE_KEY  = "wardrobe_moodboards_v1";
   const [archivedBoards, setArchivedBoards] = useState(() => { try { return JSON.parse(localStorage.getItem("wardrobe_moodboards_archived_v1") || "[]"); } catch { return []; } });
+
+  // Archived lookbooks
+  const LB_ARCHIVE_KEY = "wardrobe_lookbooks_archived_v1";
+  const [archivedLookbooks, setArchivedLookbooks] = useState(() => { try { return JSON.parse(localStorage.getItem("wardrobe_lookbooks_archived_v1") || "[]"); } catch { return []; } });
 
   useEffect(() => {
     setWornItems(itemsDb.rows.filter(i => (i.wornCount || 0) >= 0).sort((a,b) => (b.wornCount||0)-(a.wornCount||0)));
@@ -6198,6 +6695,37 @@ function SettingsTab({
                       const updated = archivedBoards.filter((_,idx)=>idx!==i);
                       localStorage.setItem(MB_ARCHIVE_KEY, JSON.stringify(updated));
                       setArchivedBoards(updated);
+                    }
+                  }} style={{ padding:"6px 10px", background:"#fff8f8", border:"1px solid #ffd0d0", borderRadius:8, cursor:"pointer", fontFamily:"'DM Sans',sans-serif", fontSize:11, fontWeight:700, color:"#e05555", flexShrink:0 }}>Delete</button>
+                </div>
+              ))}
+            </div>
+          </Card>
+        )}
+
+        {/* Archived Lookbooks */}
+        {archivedLookbooks.length > 0 && (
+          <Card>
+            <SectionLabel>Archived Lookbooks</SectionLabel>
+            <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
+              {archivedLookbooks.map((lb, i) => (
+                <div key={lb.id||i} style={{ display:"flex", alignItems:"center", gap:10, padding:"10px 12px", background:"#fafaf8", borderRadius:12, border:"1px solid #ece8e0" }}>
+                  <div style={{ flex:1, minWidth:0 }}>
+                    <div style={{ fontSize:13, fontWeight:700, color:"#1a1a1a", overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{lb.name||"Unnamed Lookbook"}</div>
+                    <div style={{ fontSize:11, color:"#bbb", marginTop:1 }}>{(lb.outfitIds||[]).length} looks · archived {lb.archivedAt ? new Date(lb.archivedAt).toLocaleDateString("en-US",{month:"short",day:"numeric",year:"numeric"}) : ""}</div>
+                  </div>
+                  <button onClick={async () => {
+                    const restored = { ...lb }; delete restored.archivedAt;
+                    if (restoreLookbook) await restoreLookbook(restored);
+                    const updated = archivedLookbooks.filter((_,idx)=>idx!==i);
+                    localStorage.setItem(LB_ARCHIVE_KEY, JSON.stringify(updated));
+                    setArchivedLookbooks(updated);
+                  }} style={{ padding:"6px 12px", background:"#f0faf4", border:"1px solid #b6e8c8", borderRadius:8, cursor:"pointer", fontFamily:"'DM Sans',sans-serif", fontSize:11, fontWeight:700, color:"#2d6a3f", flexShrink:0 }}>Restore</button>
+                  <button onClick={() => {
+                    if (window.confirm(`Permanently delete "${lb.name||"this lookbook"}"?`)) {
+                      const updated = archivedLookbooks.filter((_,idx)=>idx!==i);
+                      localStorage.setItem(LB_ARCHIVE_KEY, JSON.stringify(updated));
+                      setArchivedLookbooks(updated);
                     }
                   }} style={{ padding:"6px 10px", background:"#fff8f8", border:"1px solid #ffd0d0", borderRadius:8, cursor:"pointer", fontFamily:"'DM Sans',sans-serif", fontSize:11, fontWeight:700, color:"#e05555", flexShrink:0 }}>Delete</button>
                 </div>
@@ -6868,6 +7396,7 @@ export default function App() {
   const [wishlistDest, setWishlistDest] = useState(false);
   const [wlSort, setWlSort] = useState("priority");
   const [wlSortCat, setWlSortCat] = useState("All");
+  const [wlZoom, setWlZoom] = useState(180);
   const [activeWishlistId, setActiveWishlistId] = useState(null); // null = "All"
   const [wishlistsDb, setWishlistsLocal] = useState(() => { try { return JSON.parse(localStorage.getItem("wardrobe_wishlists_v1") || "[]"); } catch { return []; } });
   const [bulkSelected, setBulkSelected] = useState(new Set());
@@ -6897,11 +7426,15 @@ export default function App() {
 
   const saveWishItem = async (form) => {
     if (editItem) await wishlistDb.update({ ...form, id: editItem.id });
-    else await wishlistDb.add({ ...form, id: uid() });
+    else await wishlistDb.add({ ...form, id: uid(), addedAt: new Date().toISOString() });
     closeModal();
   };
 
-  const moveToCloset = async (wish) => { await itemsDb.add({ ...wish }); await wishlistDb.remove(wish.id); };
+  const moveToCloset = async (wish, purchasedDate) => {
+    const today = purchasedDate || new Date().toISOString().slice(0, 10);
+    await itemsDb.add({ ...wish, purchaseDate: today, forSale: false, saleStatus: undefined });
+    await wishlistDb.remove(wish.id);
+  };
 
   const openNewOutfit = () => { setEditingOutfit(null); setOutfitSeedItem(null); setOutfitBuilder(true); };
   const duplicateOutfit = async (outfit) => {
@@ -6951,11 +7484,30 @@ export default function App() {
   const updateLookbook = async (lb) => {
     try {
       await lookbooksDb.update(lb);
-      setActiveLookbook(lb);
     } catch(e) {
       console.error("updateLookbook error:", e);
-      setActiveLookbook(lb); // still update local state
     }
+    // Don't call setActiveLookbook here — it re-keys the viewer and resets all state
+  };
+
+  const closeAndSaveLookbook = (lb) => {
+    if (lb) {
+      try { lookbooksDb.update(lb); } catch(e) {}
+    }
+    setActiveLookbook(null);
+    setActiveLookbookView("editorial");
+  };
+
+  const LB_ARCHIVE_KEY = "wardrobe_lookbooks_archived_v1";
+  const archiveLookbook = (lb) => {
+    try {
+      const archived = JSON.parse(localStorage.getItem(LB_ARCHIVE_KEY) || "[]");
+      archived.push({ ...lb, archivedAt: new Date().toISOString() });
+      localStorage.setItem(LB_ARCHIVE_KEY, JSON.stringify(archived));
+    } catch {}
+    try { lookbooksDb.remove(lb.id); } catch(e) {}
+    setActiveLookbook(null);
+    setActiveLookbookView("editorial");
   };
 
   const markOutfitWorn = async (outfit, dateStr) => {
@@ -7462,35 +8014,36 @@ export default function App() {
             {/* LOOKBOOKS */}
             {tab === "lookbooks" && (
               <div className="fade-up">
-                {/* Toolbar */}
-                <div style={{ display: "flex", gap: 10, marginBottom: 10, flexWrap: "wrap", alignItems: "center" }}>
+                {/* Toolbar: tags · search · sort · zoom */}
+                <div style={{ display: "flex", gap: 8, marginBottom: 18, alignItems: "center", flexWrap: "wrap" }}>
+                  {/* Tag pills — first */}
+                  <div style={{ display: "flex", gap: 5, flexWrap: "nowrap", overflowX: "auto" }}>
+                    {["All","Travel","Work Week","Event","Disney","Sport","Weekend","Vacation"].map(t => (
+                      <button key={t} onClick={() => setLbTagFilter(t)} style={{
+                        padding: "5px 12px", borderRadius: 100, border: "1px solid", whiteSpace: "nowrap",
+                        borderColor: lbTagFilter === t ? "#1a1a1a" : "#e0dbd2",
+                        background: lbTagFilter === t ? "#1a1a1a" : "#fff",
+                        color: lbTagFilter === t ? "#fff" : "#666",
+                        fontFamily: "'DM Sans', sans-serif", fontSize: 11, fontWeight: 600, cursor: "pointer"
+                      }}>{t}</button>
+                    ))}
+                  </div>
+                  {/* Search */}
                   <input value={lbSearch} onChange={e => setLbSearch(e.target.value)} placeholder="Search lookbooks…"
-                    style={{ flex: "1 1 180px", padding: "9px 14px", border: "1.5px solid #e8e4dc", borderRadius: 12, fontFamily: "'DM Sans', sans-serif", fontSize: 13, outline: "none", background: "#faf9f6" }} />
+                    style={{ flex: "1 1 160px", padding: "9px 14px", border: "1.5px solid #e8e4dc", borderRadius: 12, fontFamily: "'DM Sans', sans-serif", fontSize: 13, outline: "none", background: "#faf9f6" }} />
+                  {/* Sort */}
                   <select value={lbSort} onChange={e => setLbSort(e.target.value)} className="pill-select">
                     <option value="newest">Newest</option>
                     <option value="az">A – Z</option>
                     <option value="most">Most Outfits</option>
                   </select>
                   {/* Zoom slider */}
-                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                    <SvgBox size={12} color="#bbb" />
+                  <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                    <SvgBox size={11} color="#bbb" />
                     <input type="range" min={160} max={340} step={10} value={lbZoom} onChange={e => setLbZoom(Number(e.target.value))}
-                      style={{ width: 80, accentColor: "#1a1a1a", cursor: "pointer" }} />
-                    <SvgBox size={17} color="#bbb" />
+                      style={{ width: 72, accentColor: "#1a1a1a", cursor: "pointer" }} />
+                    <SvgBox size={16} color="#bbb" />
                   </div>
-
-                </div>
-                {/* Tag filter row */}
-                <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 18 }}>
-                  {["All","Travel","Work Week","Event","Disney","Sport","Weekend","Vacation"].map(t => (
-                    <button key={t} onClick={() => setLbTagFilter(t)} style={{
-                      padding: "5px 13px", borderRadius: 100, border: "1px solid",
-                      borderColor: lbTagFilter === t ? "#1a1a1a" : "#e0dbd2",
-                      background: lbTagFilter === t ? "#1a1a1a" : "#fff",
-                      color: lbTagFilter === t ? "#fff" : "#666",
-                      fontFamily: "'DM Sans', sans-serif", fontSize: 12, fontWeight: 600, cursor: "pointer"
-                    }}>{t}</button>
-                  ))}
                 </div>
 
                 {(() => {
@@ -7558,7 +8111,11 @@ export default function App() {
                             boxShadow: "0 2px 12px rgba(0,0,0,0.04)", cursor: "pointer",
                             animationDelay: `${i * 0.06}s`, opacity: 0, position: "relative"
                           }}>
-                            {/* Delete button */}
+                            {/* Archive + Delete buttons */}
+                            <button onClick={e => { e.stopPropagation(); if (window.confirm(`Archive "${lb.name}"? Restore from Settings → Data.`)) { archiveLookbook(lb); } }} title="Archive lookbook"
+                              style={{ position: "absolute", top: 8, right: 40, zIndex: 2, width: 26, height: 26, borderRadius: "50%", background: "rgba(255,255,255,0.92)", border: "none", cursor: "pointer", fontSize: 13, color: "#aaa", display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 1px 4px rgba(0,0,0,0.1)" }}>
+                              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><polyline points="21 8 21 21 3 21 3 8"/><rect x="1" y="3" width="22" height="5"/><line x1="10" y1="12" x2="14" y2="12"/></svg>
+                            </button>
                             <button onClick={e => { e.stopPropagation(); lookbooksDb.remove(lb.id); }} title="Delete lookbook"
                               style={{ position: "absolute", top: 8, right: 8, zIndex: 2, width: 26, height: 26, borderRadius: "50%", background: "rgba(255,255,255,0.92)", border: "none", cursor: "pointer", fontSize: 13, color: "#e05555", display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 1px 4px rgba(0,0,0,0.1)" }}><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4h6v2"/></svg></button>
                             {/* Cover */}
@@ -7597,7 +8154,7 @@ export default function App() {
             {tab === "stats" && <StatsTab itemsDb={itemsDb} outfitsDb={outfitsDb} lookbooksDb={lookbooksDb} wishlistDb={wishlistDb} outfitCalendar={outfitCalendar} onViewItem={item => setItemDetail(item)} monthlyBudget={monthlyBudget} annualBudget={annualBudget} />}
 
             {/* SELLER DASHBOARD */}
-            {tab === "seller" && <SellerDashboard itemsDb={itemsDb} onViewItem={(item) => setItemDetail(item)} />}
+            {tab === "seller" && <SellerDashboard itemsDb={itemsDb} allClosetItems={itemsDb.rows.filter(i => !i.forSale)} onViewItem={(item) => setItemDetail(item)} />}
 
             {/* MOODBOARD */}
             {tab === "moodboard" && <Moodboard closetItems={itemsDb.rows.filter(i => !i.forSale)} activeIdx={moodboardActiveIdx} setActiveIdx={setMoodboardActiveIdx} boards={moodboardsDb.boards} updateBoards={moodboardsDb.updateBoards} removeBoardById={moodboardsDb.removeBoardById} />}
@@ -7617,6 +8174,13 @@ export default function App() {
                 allItemsForExport={itemsDb.rows}
                 monthlyBudget={monthlyBudget} setMonthlyBudget={setMonthlyBudget}
                 annualBudget={annualBudget} setAnnualBudget={setAnnualBudget}
+                restoreLookbook={async (lb) => {
+                  try {
+                    let { error } = await supabase.from("lookbooks").insert({ id: lb.id, data: lb });
+                    if (error) ({ error } = await supabase.from("lookbooks").insert(lb));
+                    await lookbooksDb.refresh();
+                  } catch(e) { console.error("restore lookbook error", e); }
+                }}
               />}
 
             {/* WISHLIST */}
@@ -7628,6 +8192,7 @@ export default function App() {
               setActiveWishlistId={setActiveWishlistId}
               wlSort={wlSort} setWlSort={setWlSort}
               wlSortCat={wlSortCat} setWlSortCat={setWlSortCat}
+              wlZoom={wlZoom} setWlZoom={setWlZoom}
               moveToCloset={moveToCloset}
               onEdit={(item) => { setEditItem(item); setWishlistDest(true); setModal("item"); }}
               onItemClick={(item) => setItemDetail(item)}
@@ -7755,6 +8320,63 @@ export default function App() {
 
 
         </div>}
+
+        {/* ── RIGHT PANEL (lookbooks tab) — packing lists ── */}
+        {tab === "lookbooks" && (() => {
+          const lbsWithPacking = lookbooksDb.rows.filter(lb => {
+            const lbOutfits = (lb.outfitIds || []).map(id => outfitsDb.rows.find(o => o.id === id)).filter(Boolean);
+            const allLayerIds = lbOutfits.flatMap(o => o.layers || o.itemIds || []);
+            return allLayerIds.length > 0;
+          });
+          if (lbsWithPacking.length === 0) return null;
+          return (
+            <div className="app-right-panel" style={{ top: 24 }}>
+              <div className="right-card">
+                <div className="right-card-title" style={{ marginBottom: 12 }}>Packing Lists</div>
+                <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                  {lbsWithPacking.map(lb => {
+                    const lbOutfits = (lb.outfitIds || []).map(id => outfitsDb.rows.find(o => o.id === id)).filter(Boolean);
+                    const allLayerIds = [...new Set(lbOutfits.flatMap(o => o.layers || o.itemIds || []))];
+                    const packItems = allLayerIds.map(id => allItems.find(x => x.id === id)).filter(Boolean);
+                    return (
+                      <button key={lb.id} onClick={() => {
+                        setActiveLookbook(lb);
+                        setActiveLookbookView("editorial");
+                        // slight delay then open packing list view
+                        setTimeout(() => {
+                          // signal to open packing list immediately
+                          localStorage.setItem("wardrobe_open_packing_v1", lb.id);
+                        }, 50);
+                      }} style={{
+                        display: "flex", alignItems: "center", gap: 10, padding: "9px 10px",
+                        background: "#faf9f6", border: "1.5px solid #e8e4dc", borderRadius: 12,
+                        cursor: "pointer", textAlign: "left", fontFamily: "'DM Sans', sans-serif",
+                        transition: "border-color 0.15s"
+                      }}
+                        onMouseEnter={e => e.currentTarget.style.borderColor = "#1a1a1a"}
+                        onMouseLeave={e => e.currentTarget.style.borderColor = "#e8e4dc"}
+                      >
+                        {lb.coverImage ? (
+                          <div style={{ width: 36, height: 36, borderRadius: 8, background: `url(${lb.coverImage}) center/cover no-repeat`, flexShrink: 0 }} />
+                        ) : (
+                          <div style={{ width: 36, height: 36, borderRadius: 8, background: "#f0ece4", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#bbb" strokeWidth="2" strokeLinecap="round"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2"/></svg>
+                          </div>
+                        )}
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ fontSize: 12, fontWeight: 700, color: "#1a1a1a", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{lb.name}</div>
+                          <div style={{ fontSize: 11, color: "#aaa", marginTop: 1 }}>{packItems.length} item{packItems.length !== 1 ? "s" : ""}</div>
+                        </div>
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#ccc" strokeWidth="2.5" strokeLinecap="round"><path d="M9 18l6-6-6-6"/></svg>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+          );
+        })()}
+
           </div>{/* end app-layout */}
         </div>{/* end app-main-area */}
         {/* ── RIGHT RAIL (stats/sort/etc) ── */}
@@ -7980,9 +8602,9 @@ export default function App() {
             onEdit={() => { setEditItem(itemDetail); setWishlistDest(isWishlistItem); setModal("item"); setItemDetail(null); }}
             onDelete={() => { isWishlistItem ? wishlistDb.remove(itemDetail.id) : itemsDb.remove(itemDetail.id); setItemDetail(null); }}
             onWorn={isWishlistItem ? null : () => markWorn(itemDetail)}
-            onMoveToCloset={isWishlistItem ? () => { moveToCloset(itemDetail); setItemDetail(null); } : null}
+            onMoveToCloset={isWishlistItem ? (date) => { moveToCloset(itemDetail, date); setItemDetail(null); } : null}
             onCreateOutfit={isWishlistItem ? null : () => { setEditingOutfit(null); setOutfitSeedItem(itemDetail); setOutfitBuilder(true); setItemDetail(null); }}
-            onListForSale={isWishlistItem ? null : () => { itemsDb.update({ ...itemDetail, forSale: true, saleStatus: "listed" }); setItemDetail(null); setTab("seller"); }}
+            onListForSale={isWishlistItem ? null : () => { itemsDb.update({ ...itemDetail, forSale: true, saleStatus: "listed", listedDate: new Date().toISOString().slice(0,10) }); setItemDetail(null); setTab("seller"); }}
             onAddToCapsule={isWishlistItem ? null : () => { setCapsulePreselect([itemDetail.id]); setCapsuleName(""); setShowCapsuleModal(true); }}
             outfits={outfitsDb.rows}
             lookbooks={lookbooksDb.rows}
@@ -8027,7 +8649,7 @@ export default function App() {
       {/* Lookbook Viewer */}
       {activeLookbook && (
         <LookbookViewer
-          key={activeLookbook.id + "_" + activeLookbookView}
+          key={activeLookbook.id}
           lookbook={activeLookbook}
           outfits={outfitsDb.rows}
           markOutfitWorn={markOutfitWorn}
@@ -8036,7 +8658,8 @@ export default function App() {
           moodboardsProp={moodboardsDb.boards}
           moodboardsUpdateBoards={moodboardsDb.updateBoards}
           initialView={activeLookbookView}
-          onClose={() => { setActiveLookbook(null); setActiveLookbookView("editorial"); }}
+          onClose={(finalLb) => closeAndSaveLookbook(finalLb)}
+          onArchive={(finalLb) => archiveLookbook(finalLb)}
           onUpdate={updateLookbook}
           onOpenOutfit={(outfit) => { setActiveLookbook(null); setActiveLookbookView("editorial"); setOutfitPopup(outfit); }}
         />

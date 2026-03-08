@@ -3066,7 +3066,7 @@ function OutfitBuilder({ itemsDb, wishlistDb, onSave, onClose, initial, seedItem
   });
   const [activeId, setActiveId] = useState(null);
   const [search, setSearch] = useState("");
-  const [panelTab, setPanelTab] = useState("closet");
+  const [panelTab, setPanelTab] = useState("home");
   const [filterCat, setFilterCat] = useState("All");
   const [filterColor, setFilterColor] = useState("");
   const [filterSeason, setFilterSeason] = useState("");
@@ -7323,6 +7323,167 @@ function OutfitCalendar({ outfits, calendar, onSaveCalendar, month, onMonthChang
       })()}
     </div>
   );
+}
+
+
+
+// ─────────────────────────────────────────
+// HOME VIEW COMPONENT
+// ─────────────────────────────────────────
+function HomeView({
+  items,
+  outfits,
+  lookbooks,
+  moodboards,
+  onGoCloset,
+  onGoOutfits,
+  onGoLookbooks,
+  onGoMoodboards,
+  onGoSeller,
+  onOpenLookbook
+}) {
+
+  const now = new Date()
+
+  const newItems = items.filter(i => {
+    const d = new Date(i.created_at || i.purchaseDate || 0)
+    return (now - d) < 1000 * 60 * 60 * 24 * 30
+  })
+
+  const pinnedLookbooks = (lookbooks || []).filter(l => l.pinned)
+  const pinnedMoodboards = (moodboards || []).filter(b => b.pinned)
+
+  return (
+    <div className="app-layout">
+
+      <div className="app-main">
+
+        <div className="right-card" style={{marginBottom:22}}>
+          <div className="right-card-title">This Week</div>
+          <div style={{
+            height:180,
+            border:"1px solid #ece8e0",
+            borderRadius:12,
+            display:"flex",
+            alignItems:"center",
+            justifyContent:"center",
+            fontSize:13,
+            color:"#999"
+          }}>
+            Weekly calendar
+          </div>
+        </div>
+
+        <div className="right-card" style={{marginBottom:22}}>
+          <div className="right-card-title">Upcoming Plans</div>
+
+          {(lookbooks || [])
+            .filter(l => l.startDate)
+            .sort((a,b)=>new Date(a.startDate)-new Date(b.startDate))
+            .slice(0,4)
+            .map(lb=>(
+              <div
+                key={lb.id}
+                style={{padding:"6px 0",fontSize:13,cursor:"pointer"}}
+                onClick={()=>onOpenLookbook?.(lb)}
+              >
+                {lb.name}
+              </div>
+            ))
+          }
+        </div>
+
+        <div className="right-card" style={{marginBottom:22}}>
+          <div className="right-card-title">Pinned</div>
+
+          <div style={{
+            display:"grid",
+            gridTemplateColumns:"repeat(3,1fr)",
+            gap:12
+          }}>
+
+            {pinnedLookbooks.map(lb=>(
+              <div key={lb.id} className="item-card">
+                {lb.cover && <img src={lb.cover} className="item-card-img"/>}
+                <div className="item-card-label">
+                  <div className="item-card-name">{lb.name}</div>
+                </div>
+              </div>
+            ))}
+
+            {pinnedMoodboards.map(m=>(
+              <div key={m.id} className="item-card">
+                <div className="item-card-label">
+                  <div className="item-card-name">{m.name}</div>
+                </div>
+              </div>
+            ))}
+
+          </div>
+        </div>
+
+        <div className="right-card">
+          <div className="right-card-title">New In</div>
+
+          <div style={{
+            display:"grid",
+            gridTemplateColumns:"repeat(5,1fr)",
+            gap:12
+          }}>
+
+            {newItems.slice(0,10).map(item=>(
+              <div key={item.id} className="item-card">
+
+                {item.image && (
+                  <img src={item.image} className="item-card-img"/>
+                )}
+
+                <div className="item-card-label">
+                  <div className="item-card-name">{item.name}</div>
+                  <div className="item-card-brand">{item.brand}</div>
+                </div>
+
+              </div>
+            ))}
+
+          </div>
+        </div>
+
+      </div>
+
+      <div className="app-right-panel">
+
+        <div className="right-card">
+          <div className="right-card-title">Overview</div>
+
+          <div style={{display:"flex",justifyContent:"space-between"}}>
+            <span>Closet</span>
+            <strong>{(items||[]).length}</strong>
+          </div>
+
+          <div style={{display:"flex",justifyContent:"space-between"}}>
+            <span>Outfits</span>
+            <strong>{(outfits||[]).length}</strong>
+          </div>
+
+          <div style={{display:"flex",justifyContent:"space-between"}}>
+            <span>Lookbooks</span>
+            <strong>{(lookbooks||[]).length}</strong>
+          </div>
+
+        </div>
+
+        <div className="right-card">
+          <div className="right-card-title">Seller Snapshot</div>
+          <div style={{fontSize:13,color:"#888"}}>
+            Seller stats coming soon
+          </div>
+        </div>
+
+      </div>
+
+    </div>
+  )
 }
 
 export default function App() {

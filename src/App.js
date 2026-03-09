@@ -7331,21 +7331,23 @@ function UpcomingEventsCard({ events, draftName, setDraftName, draftDate, setDra
   return (
     <div className="right-card">
       <div className="right-card-title">Upcoming Events</div>
-      <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
+      <div style={{ display: "flex", gap: 8, marginBottom: 12, width: "100%" }}>
         <input
           value={draftName}
           onChange={e => setDraftName(e.target.value)}
           onKeyDown={e => { if (e.key === "Enter") onAdd(); }}
           placeholder="Event name..."
-          style={{ flex: 1, padding: "8px 12px", border: "1.5px solid #e8e4dc", borderRadius: 12, fontFamily: "'DM Sans', sans-serif", fontSize: 12, outline: "none" }}
+          style={{ flex: 1, minWidth: 0, boxSizing: "border-box", padding: "8px 12px", border: "1.5px solid #e8e4dc", borderRadius: 12, fontFamily: "'DM Sans', sans-serif", fontSize: 12, outline: "none" }}
         />
         <input
           value={draftDate}
           onChange={e => setDraftDate(e.target.value)}
           onKeyDown={e => { if (e.key === "Enter") onAdd(); }}
-          placeholder="mm/dd/yyyy"
-          style={{ width: 108, padding: "8px 10px", border: "1.5px solid #e8e4dc", borderRadius: 12, fontFamily: "'DM Sans', sans-serif", fontSize: 12, outline: "none" }}
+          placeholder="mm/dd"
+          maxLength={5}
+          style={{ width: 76, flexShrink: 0, boxSizing: "border-box", padding: "8px 10px", border: "1.5px solid #e8e4dc", borderRadius: 12, fontFamily: "'DM Sans', sans-serif", fontSize: 12, outline: "none" }}
         />
+        <button onClick={onAdd} style={{ flexShrink: 0, padding: "8px 10px", borderRadius: 12, border: "none", background: "#1a1a1a", color: "#fff", fontFamily: "'DM Sans', sans-serif", fontSize: 11, fontWeight: 700, cursor: "pointer" }}>Add</button>
       </div>
       {events.length === 0 ? (
         <div style={{ fontSize: 12, color: "#ccc", textAlign: "center", padding: "8px 0 4px" }}>No events yet</div>
@@ -7570,6 +7572,8 @@ export default function App() {
     const name = eventDraftName.trim();
     const date = eventDraftDate.trim();
     if (!name || !date) return;
+    const mmdd = /^(0[1-9]|1[0-2])\\/(0[1-9]|[12][0-9]|3[01])$/;
+    if (!mmdd.test(date)) return;
     saveUpcomingEvents([{ id: uid(), name, date }, ...upcomingEvents]);
     setEventDraftName("");
     setEventDraftDate("");

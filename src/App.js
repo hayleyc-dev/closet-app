@@ -7327,7 +7327,7 @@ function OutfitCalendar({ outfits, calendar, onSaveCalendar, month, onMonthChang
 
 
 
-function UpcomingEventsCard({ events, draftName, setDraftName, draftDate, setDraftDate, onAdd, onRemove }) {
+function UpcomingEventsCard({ events, draftName, setDraftName, draftDate, setDraftDate, onAdd, onRemove, onSelect }) {
   return (
     <div className="right-card">
       <div className="right-card-title">Upcoming Events</div>
@@ -7354,12 +7354,12 @@ function UpcomingEventsCard({ events, draftName, setDraftName, draftDate, setDra
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
           {events.slice(0, 4).map(ev => (
-            <div key={ev.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, background: "#faf9f6", borderRadius: 10, padding: "7px 9px", border: "1px solid #f0ece4" }}>
+            <div key={ev.id} onClick={() => onSelect(ev)} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, background: "#faf9f6", borderRadius: 10, padding: "7px 9px", border: "1px solid #f0ece4", cursor: "pointer" }}>
               <div style={{ minWidth: 0 }}>
                 <div style={{ fontSize: 12, fontWeight: 700, color: "#1a1a1a", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{ev.name}</div>
                 <div style={{ fontSize: 11, color: "#aaa" }}>{ev.date}</div>
               </div>
-              <button onClick={() => onRemove(ev.id)} style={{ background: "none", border: "none", color: "#bbb", cursor: "pointer", fontSize: 16, lineHeight: 1 }}>×</button>
+              <button onClick={(e) => { e.stopPropagation(); onRemove(ev.id); }} style={{ background: "none", border: "none", color: "#bbb", cursor: "pointer", fontSize: 16, lineHeight: 1 }}>×</button>
             </div>
           ))}
         </div>
@@ -7552,6 +7552,7 @@ export default function App() {
   const [outfitBuilder, setOutfitBuilder] = useState(false);
   const [editingOutfit, setEditingOutfit] = useState(null);
   const [outfitSeedItem, setOutfitSeedItem] = useState(null);
+  const [outfitPrefillName, setOutfitPrefillName] = useState("");
   const [outfitTagFilter, setOutfitTagFilter] = useState("All");
   const [outfitSeasonFilter, setOutfitSeasonFilter] = useState("All");
   const [outfitSearch, setOutfitSearch] = useState("");
@@ -7568,18 +7569,43 @@ export default function App() {
     setUpcomingEvents(next);
     try { localStorage.setItem("wardrobe_upcoming_events_v1", JSON.stringify(next)); } catch {}
   };
+  const eventSortKey = (dateStr) => {
+    const m = /^\s*(\d{1,2})\/(\d{1,2})\s*$/.exec(dateStr || "");
+    if (!m) return Number.MAX_SAFE_INTEGER;
+    const month = Number(m[1]);
+    const day = Number(m[2]);
+    if (month < 1 || month > 12 || day < 1 || day > 31) return Number.MAX_SAFE_INTEGER;
+    const now = new Date();
+    const year = now.getFullYear();
+    const thisYear = new Date(year, month - 1, day);
+    const target = thisYear < new Date(year, now.getMonth(), now.getDate()) ? new Date(year + 1, month - 1, day) : thisYear;
+    return target.getTime();
+  };
+  const sortEventsByDate = (events) => [...events].sort((a, b) => eventSortKey(a.date) - eventSortKey(b.date));
   const addUpcomingEvent = () => {
     const name = eventDraftName.trim();
-    const date = eventDraftDate.trim();
-    if (!name || !date) return;
-    const mmdd = /^(0[1-9]|1[0-2])\/(0[1-9]|[12][0-9]|3[01])$/;
-    if (!mmdd.test(date)) return;
-    saveUpcomingEvents([{ id: uid(), name, date }, ...upcomingEvents]);
+    const rawDate = eventDraftDate.trim();
+    if (!name || !rawDate) return;
+    const m = /^(\d{1,2})\/(\d{1,2})$/.exec(rawDate);
+    if (!m) return;
+    const month = Number(m[1]);
+    const day = Number(m[2]);
+    if (month < 1 || month > 12 || day < 1 || day > 31) return;
+    const date = `${String(month).padStart(2, "0")}/${String(day).padStart(2, "0")}`;
+    saveUpcomingEvents(sortEventsByDate([{ id: uid(), name, date }, ...upcomingEvents]));
     setEventDraftName("");
     setEventDraftDate("");
   };
   const removeUpcomingEvent = (eventId) => {
     saveUpcomingEvents(upcomingEvents.filter(ev => ev.id !== eventId));
+  };
+  const startOutfitFromEvent = (event) => {
+    if (!event?.name) return;
+    setTab("outfits");
+    setEditingOutfit(null);
+    setOutfitSeedItem(null);
+    setOutfitPrefillName(event.name);
+    setOutfitBuilder(true);
   };
   const [calendarMonth, setCalendarMonth] = useState(() => { const n = new Date(); return { year: n.getFullYear(), month: n.getMonth() }; });
   const [calendarWeather, setCalendarWeather] = useState(null);
@@ -7658,7 +7684,7 @@ export default function App() {
     await wishlistDb.remove(wish.id);
   };
 
-  const openNewOutfit = () => { setEditingOutfit(null); setOutfitSeedItem(null); setOutfitBuilder(true); };
+  const openNewOutfit = (prefillName = "") => { setEditingOutfit(null); setOutfitSeedItem(null); setOutfitPrefillName(prefillName); setOutfitBuilder(true); };
   const duplicateOutfit = async (outfit) => {
     const copy = { ...outfit, id: uid(), name: outfit.name + " (copy)" };
     await outfitsDb.add(copy);
@@ -7668,7 +7694,7 @@ export default function App() {
   const saveOutfit = async (data) => {
     if (editingOutfit) await outfitsDb.update({ ...data, id: editingOutfit.id });
     else await outfitsDb.add({ ...data, id: uid() });
-    setOutfitBuilder(false); setEditingOutfit(null);
+    setOutfitBuilder(false); setEditingOutfit(null); setOutfitPrefillName("");
   };
 
   const createLookbook = async () => {
@@ -8499,13 +8525,14 @@ export default function App() {
 
           {tab === "outfits" && (
             <UpcomingEventsCard
-              events={upcomingEvents}
+              events={sortEventsByDate(upcomingEvents)}
               draftName={eventDraftName}
               setDraftName={setEventDraftName}
               draftDate={eventDraftDate}
               setDraftDate={setEventDraftDate}
               onAdd={addUpcomingEvent}
               onRemove={removeUpcomingEvent}
+              onSelect={startOutfitFromEvent}
             />
           )}
 
@@ -8873,10 +8900,10 @@ export default function App() {
           itemsDb={itemsDb}
           wishlistDb={wishlistDb}
           capsules={capsules}
-          initial={editingOutfit}
+          initial={editingOutfit || (outfitPrefillName ? { name: outfitPrefillName } : null)}
           seedItem={outfitSeedItem}
           onSave={saveOutfit}
-          onClose={() => { setOutfitBuilder(false); setEditingOutfit(null); setOutfitSeedItem(null); }}
+          onClose={() => { setOutfitBuilder(false); setEditingOutfit(null); setOutfitSeedItem(null); setOutfitPrefillName(""); }}
         />
       )}
 

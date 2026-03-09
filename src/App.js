@@ -7327,6 +7327,45 @@ function OutfitCalendar({ outfits, calendar, onSaveCalendar, month, onMonthChang
 
 
 
+function UpcomingEventsCard({ events, draftName, setDraftName, draftDate, setDraftDate, onAdd, onRemove }) {
+  return (
+    <div className="right-card">
+      <div className="right-card-title">Upcoming Events</div>
+      <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
+        <input
+          value={draftName}
+          onChange={e => setDraftName(e.target.value)}
+          onKeyDown={e => { if (e.key === "Enter") onAdd(); }}
+          placeholder="Event name..."
+          style={{ flex: 1, padding: "8px 12px", border: "1.5px solid #e8e4dc", borderRadius: 12, fontFamily: "'DM Sans', sans-serif", fontSize: 12, outline: "none" }}
+        />
+        <input
+          value={draftDate}
+          onChange={e => setDraftDate(e.target.value)}
+          onKeyDown={e => { if (e.key === "Enter") onAdd(); }}
+          placeholder="mm/dd/yyyy"
+          style={{ width: 108, padding: "8px 10px", border: "1.5px solid #e8e4dc", borderRadius: 12, fontFamily: "'DM Sans', sans-serif", fontSize: 12, outline: "none" }}
+        />
+      </div>
+      {events.length === 0 ? (
+        <div style={{ fontSize: 12, color: "#ccc", textAlign: "center", padding: "8px 0 4px" }}>No events yet</div>
+      ) : (
+        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+          {events.slice(0, 4).map(ev => (
+            <div key={ev.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, background: "#faf9f6", borderRadius: 10, padding: "7px 9px", border: "1px solid #f0ece4" }}>
+              <div style={{ minWidth: 0 }}>
+                <div style={{ fontSize: 12, fontWeight: 700, color: "#1a1a1a", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{ev.name}</div>
+                <div style={{ fontSize: 11, color: "#aaa" }}>{ev.date}</div>
+              </div>
+              <button onClick={() => onRemove(ev.id)} style={{ background: "none", border: "none", color: "#bbb", cursor: "pointer", fontSize: 16, lineHeight: 1 }}>×</button>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─────────────────────────────────────────
 // HOME VIEW COMPONENT
 // ─────────────────────────────────────────
@@ -7515,11 +7554,29 @@ export default function App() {
   const [outfitSeasonFilter, setOutfitSeasonFilter] = useState("All");
   const [outfitSearch, setOutfitSearch] = useState("");
   const [outfitSort, setOutfitSort] = useState("default");
+  const [upcomingEvents, setUpcomingEvents] = useState(() => { try { return JSON.parse(localStorage.getItem("wardrobe_upcoming_events_v1") || "[]"); } catch { return []; } });
+  const [eventDraftName, setEventDraftName] = useState("");
+  const [eventDraftDate, setEventDraftDate] = useState("");
   const [outfitPopup, setOutfitPopup] = useState(null); // outfit object
   const [outfitsView, setOutfitsView] = useState("grid"); // "grid" | "calendar"
   const OUTFIT_CALENDAR_KEY = "wardrobe_outfit_calendar_v1";
   const [outfitCalendar, setOutfitCalendar] = useState(() => { try { return JSON.parse(localStorage.getItem("wardrobe_outfit_calendar_v1") || "{}"); } catch { return {}; } });
   const saveOutfitCalendar = (cal) => { setOutfitCalendar(cal); localStorage.setItem("wardrobe_outfit_calendar_v1", JSON.stringify(cal)); };
+  const saveUpcomingEvents = (next) => {
+    setUpcomingEvents(next);
+    try { localStorage.setItem("wardrobe_upcoming_events_v1", JSON.stringify(next)); } catch {}
+  };
+  const addUpcomingEvent = () => {
+    const name = eventDraftName.trim();
+    const date = eventDraftDate.trim();
+    if (!name || !date) return;
+    saveUpcomingEvents([{ id: uid(), name, date }, ...upcomingEvents]);
+    setEventDraftName("");
+    setEventDraftDate("");
+  };
+  const removeUpcomingEvent = (eventId) => {
+    saveUpcomingEvents(upcomingEvents.filter(ev => ev.id !== eventId));
+  };
   const [calendarMonth, setCalendarMonth] = useState(() => { const n = new Date(); return { year: n.getFullYear(), month: n.getMonth() }; });
   const [calendarWeather, setCalendarWeather] = useState(null);
   const [itemDetail, setItemDetail] = useState(null); // closet item detail popup
@@ -8435,6 +8492,18 @@ export default function App() {
               </div>
             );
           })()}
+
+          {tab === "outfits" && (
+            <UpcomingEventsCard
+              events={upcomingEvents}
+              draftName={eventDraftName}
+              setDraftName={setEventDraftName}
+              draftDate={eventDraftDate}
+              setDraftDate={setEventDraftDate}
+              onAdd={addUpcomingEvent}
+              onRemove={removeUpcomingEvent}
+            />
+          )}
 
           {/* Season filter moved to top toolbar for closet */}
 

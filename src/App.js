@@ -7572,7 +7572,7 @@ export default function App() {
     const name = eventDraftName.trim();
     const date = eventDraftDate.trim();
     if (!name || !date) return;
-    const mmdd = /^(0[1-9]|1[0-2])\\/(0[1-9]|[12][0-9]|3[01])$/;
+    const mmdd = /^(0[1-9]|1[0-2])\/(0[1-9]|[12][0-9]|3[01])$/;
     if (!mmdd.test(date)) return;
     saveUpcomingEvents([{ id: uid(), name, date }, ...upcomingEvents]);
     setEventDraftName("");

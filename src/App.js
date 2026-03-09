@@ -436,7 +436,7 @@ const Modal = ({ open, onClose, title, children }) => {
   );
 };
 
-const BLANK = { name: "", brand: "", category: "", color: "", colors: [], size: "", season: "", seasons: [], price: "", spent: "", notes: "", image: "", purchaseDate: "", wornCount: 0, link: "" };
+const BLANK = { name: "", brand: "", category: "", color: "", colors: [], size: "", season: "", seasons: [], price: "", spent: "", notes: "", image: "", purchaseDate: "", wornCount: 0, link: "", needsStyling: false };
 const BLANK_WISH = { name: "", brand: "", price: "", image: "", link: "" };
 
 // ── Shared image helpers ─────────────────────────────────────────────────────
@@ -1467,18 +1467,28 @@ function ItemCard({ item, onClick, onEdit }) {
 }
 
 // ── Item Detail Popup ────────────────────────────────────────────────────────
-function ItemDetailPopup({ item, onClose, onEdit, onDelete, onWorn, onCreateOutfit, onListForSale, onMoveToCloset, onAddToCapsule, outfits, lookbooks, isWishlist, capsules }) {
+function ItemDetailPopup({ item, onClose, onEdit, onDelete, onWorn, onDuplicate, onToggleNeedsStyling, onCreateOutfit, onListForSale, onMoveToCloset, onAddToCapsule, onOpenItem, outfits, lookbooks, isWishlist, capsules, allItems }) {
   const priceNum = parseFloat((item.price || "").replace(/[^0-9.]/g, "")) || 0;
   const spentNum = parseFloat((item.spent || "").replace(/[^0-9.]/g, "")) || 0;
   const worn = item.wornCount || 0;
   const cpw = worn > 0 && (spentNum || priceNum) > 0 ? ((spentNum || priceNum) / worn).toFixed(2) : null;
-  const [featuredView, setFeaturedView] = useState("outfits"); // "outfits" | "lookbooks"
+  const [featuredView, setFeaturedView] = useState("outfits"); // "outfits" | "lookbooks" | "wornWith"
   const [showPurchasedModal, setShowPurchasedModal] = useState(false);
   const [purchasedDate, setPurchasedDate] = useState(new Date().toISOString().slice(0, 10));
   const featuredOutfits = (outfits || []).filter(o => (o.layers || o.itemIds || []).includes(item.id));
   const featuredOutfitIds = new Set(featuredOutfits.map(o => o.id));
   const featuredLookbooks = (lookbooks || []).filter(lb => (lb.outfitIds || []).some(oid => featuredOutfitIds.has(oid)));
   const featuredLookbookCount = featuredLookbooks.length;
+  const wornWithCounts = featuredOutfits.reduce((acc, outfit) => {
+    (outfit.layers || outfit.itemIds || []).forEach(id => {
+      if (id !== item.id) acc[id] = (acc[id] || 0) + 1;
+    });
+    return acc;
+  }, {});
+  const wornWithItems = Object.entries(wornWithCounts)
+    .map(([id, count]) => ({ item: (allItems || []).find(i => i.id === id), count }))
+    .filter(entry => entry.item)
+    .sort((a, b) => b.count - a.count);
 
   // Days since added (for wishlist)
   const daysSinceAdded = isWishlist && item.addedAt
@@ -1520,6 +1530,7 @@ function ItemDetailPopup({ item, onClose, onEdit, onDelete, onWorn, onCreateOutf
               {item.size && chip(item.size)}
               {(item.colors?.length ? item.colors : item.color ? [item.color] : []).map(c => chip(c))}
               {(item.seasons?.length ? item.seasons : item.season ? [item.season] : []).map(s => chip(s, "#f0fbff", "#2bafd4"))}
+              {item.needsStyling && chip("Needs styling", "#fff0f6", "#b64b78")}
             </div>
             {/* Color swatches */}
             {(item.colors?.length ? item.colors : item.color ? [item.color] : []).length > 0 && (() => {
@@ -1587,7 +1598,9 @@ function ItemDetailPopup({ item, onClose, onEdit, onDelete, onWorn, onCreateOutf
           {/* Header: single row of action buttons + × at end */}
           <div style={{ padding: "12px 16px", borderBottom: "1px solid #e8e4dc", flexShrink: 0 }}>
             <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "nowrap", overflowX: "auto" }}>
-              {/* Worn — clickable */}
+              {!isWishlist && (
+                <button onClick={onEdit} title="Edit" style={{ width: 32, height: 32, borderRadius: "50%", background: "#f5f2ed", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>
+              )}
               {!isWishlist && (
                 <button onClick={onWorn} title="Add a wear" style={{
                   padding: "6px 11px", background: "#f0faf4", border: "1.5px solid #b6e8c8",
@@ -1600,20 +1613,22 @@ function ItemDetailPopup({ item, onClose, onEdit, onDelete, onWorn, onCreateOutf
                   <SvgBox size={12} color="#888" />Capsule
                 </button>
               )}
-              <button onClick={onEdit} title="Edit" style={{ width: 32, height: 32, borderRadius: "50%", background: "#f5f2ed", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>
-              <button onClick={onDelete} title="Delete" style={{ width: 32, height: 32, borderRadius: "50%", background: "#fef2f2", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", color: "#e05555", flexShrink: 0 }}><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4h6v2"/></svg></button>
+              {!isWishlist && onCreateOutfit && <button onClick={onCreateOutfit} style={{ padding: "6px 11px", background: "#1a1a1a", border: "none", borderRadius: 10, cursor: "pointer", fontSize: 12, fontWeight: 700, color: "#fff", fontFamily: "'DM Sans', sans-serif", display: "flex", alignItems: "center", gap: 5, flexShrink: 0, whiteSpace: "nowrap" }}><SvgSparkle size={12} color="currentColor" />Create Outfit</button>}
+              {!isWishlist && onListForSale && <button onClick={onListForSale} style={{ padding: "6px 11px", background: "#fff8ee", border: "1.5px solid #f5c842", borderRadius: 10, cursor: "pointer", fontSize: 12, fontWeight: 700, color: "#a07000", fontFamily: "'DM Sans', sans-serif", display: "flex", alignItems: "center", gap: 5, flexShrink: 0, whiteSpace: "nowrap" }}><SvgTag size={12} color="currentColor" />List for Sale</button>}
+              {!isWishlist && onDuplicate && <button onClick={onDuplicate} style={{ padding: "6px 11px", background: "#f5f2ed", border: "1px solid #e0dbd2", borderRadius: 10, cursor: "pointer", fontSize: 12, fontWeight: 700, color: "#555", fontFamily: "'DM Sans', sans-serif", display: "flex", alignItems: "center", gap: 5, flexShrink: 0, whiteSpace: "nowrap" }}><SvgCopy size={12} color="currentColor" />Duplicate</button>}
+              {!isWishlist && onToggleNeedsStyling && <button onClick={onToggleNeedsStyling} style={{ padding: "6px 11px", background: item.needsStyling ? "#fff0f6" : "#f5f2ed", border: item.needsStyling ? "1.5px solid #f3b4ce" : "1px solid #e0dbd2", borderRadius: 10, cursor: "pointer", fontSize: 12, fontWeight: 700, color: item.needsStyling ? "#b64b78" : "#666", fontFamily: "'DM Sans', sans-serif", display: "flex", alignItems: "center", gap: 5, flexShrink: 0, whiteSpace: "nowrap" }}><SvgTag size={12} color="currentColor" />Needs Styling</button>}
               {isWishlist ? (<>
                 {item.link && <a href={item.link} target="_blank" rel="noreferrer" style={{ padding: "6px 11px", background: "#1a1a1a", borderRadius: 10, fontSize: 12, fontWeight: 700, color: "#fff", fontFamily: "'DM Sans', sans-serif", display: "flex", alignItems: "center", gap: 5, textDecoration: "none", flexShrink: 0, whiteSpace: "nowrap" }}><SvgShop size={12} color="#fff" />Buy</a>}
                 <button onClick={() => setShowPurchasedModal(true)} style={{ padding: "6px 11px", background: "#f0faf4", border: "1.5px solid #b6e8c8", borderRadius: 10, cursor: "pointer", fontSize: 12, fontWeight: 700, color: "#2d6a3f", fontFamily: "'DM Sans', sans-serif", display: "flex", alignItems: "center", gap: 5, flexShrink: 0, whiteSpace: "nowrap" }}><SvgCheck size={12} color="currentColor" />Purchased</button>
+                <button onClick={onDelete} title="Delete" style={{ width: 32, height: 32, borderRadius: "50%", background: "#fef2f2", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", color: "#e05555", flexShrink: 0 }}><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4h6v2"/></svg></button>
               </>) : (<>
-                <button onClick={onListForSale} style={{ padding: "6px 11px", background: "#fff8ee", border: "1.5px solid #f5c842", borderRadius: 10, cursor: "pointer", fontSize: 12, fontWeight: 700, color: "#a07000", fontFamily: "'DM Sans', sans-serif", display: "flex", alignItems: "center", gap: 5, flexShrink: 0, whiteSpace: "nowrap" }}><SvgTag size={12} color="currentColor" />List for Sale</button>
-                <button onClick={onCreateOutfit} style={{ padding: "6px 11px", background: "#1a1a1a", border: "none", borderRadius: 10, cursor: "pointer", fontSize: 12, fontWeight: 700, color: "#fff", fontFamily: "'DM Sans', sans-serif", display: "flex", alignItems: "center", gap: 5, flexShrink: 0, whiteSpace: "nowrap" }}><SvgSparkle size={12} color="currentColor" />Create Outfit</button>
+                <button onClick={onDelete} title="Delete" style={{ width: 32, height: 32, borderRadius: "50%", background: "#fef2f2", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", color: "#e05555", flexShrink: 0 }}><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4h6v2"/></svg></button>
               </>)}
               {/* Spacer */}
               <div style={{ flex: 1 }} />
               {/* Toggle: Outfits / Lookbooks */}
               <div style={{ display: "flex", gap: 0, background: "#f5f2ed", borderRadius: 10, padding: 3, flexShrink: 0 }}>
-                {[["outfits", "Outfits", featuredOutfits.length], ["lookbooks", "Lookbooks", featuredLookbookCount]].map(([id, lbl, cnt]) => (
+                {[["outfits", "Outfits", featuredOutfits.length], ["lookbooks", "Lookbooks", featuredLookbookCount], ["wornWith", "Worn With", wornWithItems.length]].map(([id, lbl, cnt]) => (
                   <button key={id} onClick={() => setFeaturedView(id)} style={{
                     padding: "5px 12px", borderRadius: 8, border: "none", cursor: "pointer",
                     background: featuredView === id ? "#fff" : "transparent",
@@ -1652,7 +1667,7 @@ function ItemDetailPopup({ item, onClose, onEdit, onDelete, onWorn, onCreateOutf
                   ))}
                 </div>
               )
-            ) : (
+            ) : featuredView === "lookbooks" ? (
               featuredLookbooks.length === 0 ? (
                 <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", height: "100%", color: "#ccc", gap: 10, paddingTop: 40 }}>
                   <SvgGrid size={40} color="#ddd" />
@@ -1665,6 +1680,26 @@ function ItemDetailPopup({ item, onClose, onEdit, onDelete, onWorn, onCreateOutf
                       {lb.coverImage ? <img src={lb.coverImage} alt={lb.name} style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : <SvgGrid size={28} color="#ddd" />}
                       <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, background: "linear-gradient(transparent, rgba(0,0,0,0.55))", padding: "18px 8px 8px" }}>
                         <div style={{ fontSize: 11, fontWeight: 700, color: "#fff", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{lb.name}</div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )
+            ) : (
+              wornWithItems.length === 0 ? (
+                <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", height: "100%", color: "#ccc", gap: 10, paddingTop: 40 }}>
+                  <SvgHanger size={40} color="#ddd" />
+                  <div style={{ fontSize: 13, fontWeight: 600 }}>No worn-with relationships yet</div>
+                  <div style={{ fontSize: 12 }}>Wear this piece in more outfits to build links</div>
+                </div>
+              ) : (
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(140px, 1fr))", gap: 10 }}>
+                  {wornWithItems.map(({ item: relatedItem, count }) => (
+                    <div key={relatedItem.id} onClick={() => onOpenItem && onOpenItem(relatedItem)} style={{ borderRadius: 14, overflow: "hidden", background: "#f5f2ed", aspectRatio: "3/4", display: "flex", alignItems: "center", justifyContent: "center", position: "relative", cursor: "pointer" }}>
+                      {relatedItem.image ? <img src={relatedItem.image} alt={relatedItem.name} style={{ width: "100%", height: "100%", objectFit: "contain" }} /> : <HangerIcon size={28} color="#ddd" />}
+                      <div style={{ position: "absolute", top: 8, right: 8, background: "rgba(0,0,0,0.65)", color: "#fff", borderRadius: 999, padding: "4px 8px", fontSize: 10, fontWeight: 700 }}>{count}×</div>
+                      <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, background: "linear-gradient(transparent, rgba(0,0,0,0.55))", padding: "18px 8px 8px" }}>
+                        <div style={{ fontSize: 11, fontWeight: 700, color: "#fff", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{relatedItem.name}</div>
                       </div>
                     </div>
                   ))}
@@ -7501,6 +7536,7 @@ export default function App() {
   const [closetZoom, setClosetZoom] = useState(148); // card min-width in px
   const [outfitZoom, setOutfitZoom] = useState(200); // outfit card min-width in px
   const [showNewOnly, setShowNewOnly] = useState(false); // "What's New" filter
+  const [showNeedsStylingOnly, setShowNeedsStylingOnly] = useState(false);
   const [capsules, setCapsules] = useState(() => { try { return JSON.parse(localStorage.getItem("wardrobe_capsules_v1") || "[]"); } catch { return []; } });
   const [activeCapsule, setActiveCapsule] = useState(null);
   const [showCapsuleModal, setShowCapsuleModal] = useState(false);
@@ -7689,6 +7725,11 @@ export default function App() {
     if (itemDetail?.id === item.id) setItemDetail(updated);
   };
 
+  const duplicateItem = async (item) => {
+    const { id, ...rest } = item;
+    await itemsDb.insert({ ...rest, name: `${item.name} Copy` });
+  };
+
   const filteredItems = (() => {
     const q = closetSearch.trim().toLowerCase();
     const threeMonthsAgo = new Date(); threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3);
@@ -7699,8 +7740,9 @@ export default function App() {
       const matchSearch = !q || i.name.toLowerCase().includes(q) || (i.brand||"").toLowerCase().includes(q) || (i.color||"").toLowerCase().includes(q) || (i.category||"").toLowerCase().includes(q);
       const matchSeason = closetSeasonFilter === "All" || (i.seasons || []).includes(closetSeasonFilter) || i.season === closetSeasonFilter;
       const matchNew = !showNewOnly || (i.purchaseDate && new Date(i.purchaseDate) >= threeMonthsAgo);
+      const matchNeedsStyling = !showNeedsStylingOnly || !!i.needsStyling;
       const matchCapsule = !capsuleItemIds || capsuleItemIds.has(i.id);
-      return matchCat && matchSearch && matchSeason && matchNew && matchCapsule;
+      return matchCat && matchSearch && matchSeason && matchNew && matchNeedsStyling && matchCapsule;
     });
     if (closetSort === "az") rows = [...rows].sort((a, b) => a.name.localeCompare(b.name));
     else if (closetSort === "price") rows = [...rows].sort((a, b) => (parseFloat((b.price||"").replace(/[^0-9.]/g,""))||0) - (parseFloat((a.price||"").replace(/[^0-9.]/g,""))||0));
@@ -7919,6 +7961,11 @@ export default function App() {
                     );
                   })}
                 </div>
+                <div className="sidebar-section" style={{ marginTop: "auto" }}>
+                  <button className="sidebar-btn" onClick={() => { setCatFilters([]); setShowNeedsStylingOnly(false); setShowNewOnly(false); setActiveCapsule(null); setClosetSearch(""); setClosetSeasonFilter("All"); }}>
+                    All items
+                  </button>
+                </div>
 
               </>)}
               {tab === "outfits" && (<>
@@ -7958,6 +8005,14 @@ export default function App() {
                       display: "flex", alignItems: "center", gap: 6,
                     }}>
                       <SvgStar size={12} color={showNewOnly ? "#2d6a3f" : "#aaa"} />What's New
+                    </button>
+                    <button onClick={() => setShowNeedsStylingOnly(n => !n)} style={{
+                      padding: "7px 14px", borderRadius: 100, border: showNeedsStylingOnly ? "1.5px solid #f3b4ce" : "1px solid #e0dbd2",
+                      background: showNeedsStylingOnly ? "#fff0f6" : "#fff", color: showNeedsStylingOnly ? "#b64b78" : "#666",
+                      fontFamily: "'DM Sans', sans-serif", fontSize: 12, fontWeight: 600, cursor: "pointer",
+                      display: "flex", alignItems: "center", gap: 6,
+                    }}>
+                      <SvgTag size={12} color={showNeedsStylingOnly ? "#b64b78" : "#aaa"} />Needs Styling
                     </button>
                     <select value={closetSort} onChange={e => setClosetSort(e.target.value)} className="pill-select" style={{}}>
                       <option value="default">Sort: Default</option>
@@ -8763,14 +8818,22 @@ export default function App() {
             onEdit={() => { setEditItem(itemDetail); setWishlistDest(isWishlistItem); setModal("item"); setItemDetail(null); }}
             onDelete={() => { isWishlistItem ? wishlistDb.remove(itemDetail.id) : itemsDb.remove(itemDetail.id); setItemDetail(null); }}
             onWorn={isWishlistItem ? null : () => markWorn(itemDetail)}
+            onDuplicate={isWishlistItem ? null : async () => { await duplicateItem(itemDetail); setItemDetail(null); }}
+            onToggleNeedsStyling={isWishlistItem ? null : async () => {
+              const updated = { ...itemDetail, needsStyling: !itemDetail.needsStyling };
+              await itemsDb.update(updated);
+              setItemDetail(updated);
+            }}
             onMoveToCloset={isWishlistItem ? (date) => { moveToCloset(itemDetail, date); setItemDetail(null); } : null}
             onCreateOutfit={isWishlistItem ? null : () => { setEditingOutfit(null); setOutfitSeedItem(itemDetail); setOutfitBuilder(true); setItemDetail(null); }}
             onListForSale={isWishlistItem ? null : () => { itemsDb.update({ ...itemDetail, forSale: true, saleStatus: "listed", listedDate: new Date().toISOString().slice(0,10) }); setItemDetail(null); setTab("seller"); }}
             onAddToCapsule={isWishlistItem ? null : () => { setCapsulePreselect([itemDetail.id]); setCapsuleName(""); setShowCapsuleModal(true); }}
+            onOpenItem={(nextItem) => setItemDetail(nextItem)}
             outfits={outfitsDb.rows}
             lookbooks={lookbooksDb.rows}
             capsules={capsules}
             isWishlist={isWishlistItem}
+            allItems={allItems}
           />
         );
       })()}

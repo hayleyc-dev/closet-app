@@ -1658,12 +1658,12 @@ function ItemDetailPopup({ item, onClose, onEdit, onDelete, onWorn, onDuplicate,
               ) : (
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(140px, 1fr))", gap: 10 }}>
                   {featuredOutfits.map(outfit => (
-                    <div key={outfit.id} onClick={() => onOpenOutfit && onOpenOutfit(outfit)} style={{ borderRadius: 14, overflow: "hidden", background: "#fff", border: "1.5px solid #1a1a1a", aspectRatio: "3/4", display: "flex", flexDirection: "column", cursor: onOpenOutfit ? "pointer" : "default" }}>
-                      <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", padding: 8 }}>
+                    <div key={outfit.id} onClick={() => onOpenOutfit && onOpenOutfit(outfit)} style={{ borderRadius: 14, overflow: "hidden", background: "#fff", border: "1px solid #cfcfcf", aspectRatio: "3/4", display: "flex", flexDirection: "column", cursor: onOpenOutfit ? "pointer" : "default" }}>
+                      <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", padding: "14px 12px" }}>
                         {outfit.previewImage ? <img src={outfit.previewImage} alt={outfit.name} style={{ width: "100%", height: "100%", objectFit: "contain" }} /> : <HangerIcon size={28} color="#ddd" />}
                       </div>
-                      <div style={{ padding: "8px 10px", borderTop: "1px solid #1a1a1a", background: "#fff" }}>
-                        <div style={{ fontSize: 11, fontWeight: 700, color: "#1a1a1a", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{outfit.name}</div>
+                      <div style={{ padding: "9px 10px", borderTop: "1px solid #e5e5e5", background: "#fff", minHeight: 34, display: "flex", alignItems: "center" }}>
+                        <div style={{ fontSize: 11, fontWeight: 700, color: "#2b2b2b", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{outfit.name}</div>
                       </div>
                     </div>
                   ))}

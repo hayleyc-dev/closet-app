@@ -1891,6 +1891,7 @@ function OutfitDetailPopup({ outfit, allItems, allOutfits, lookbooks, onClose, o
   const nonMemberLookbooks = lookbooks.filter(lb => !(lb.outfitIds || []).includes(outfit.id));
   const totalValue = outfitItems.reduce((sum, item) => sum + (parseFloat((item.price || "").replace(/[^0-9.]/g, "")) || 0), 0);
   const totalSpent = outfitItems.reduce((sum, item) => sum + (parseFloat((item.spent || "").replace(/[^0-9.]/g, "")) || 0), 0);
+  const wornCount = (outfit.wornDates || []).length;
 
   return (
     <div className="item-detail-overlay fade-in" onClick={onClose}>
@@ -1957,22 +1958,6 @@ function OutfitDetailPopup({ outfit, allItems, allOutfits, lookbooks, onClose, o
               </div>
             )}
 
-            {/* Add to lookbook */}
-            {nonMemberLookbooks.length > 0 && (
-              addingToLb ? (
-                <div style={{ display: "flex", gap: 8 }}>
-                  <select value={selectedLb} onChange={e => setSelectedLb(e.target.value)}
-                    style={{ flex: 1, padding: "8px 10px", border: "1.5px solid #e8e4dc", borderRadius: 10, fontFamily: "'DM Sans', sans-serif", fontSize: 12 }}>
-                    <option value="">Choose lookbook…</option>
-                    {nonMemberLookbooks.map(lb => <option key={lb.id} value={lb.id}>{lb.name}</option>)}
-                  </select>
-                  <button onClick={() => { if (selectedLb) { onAddToLookbook(outfit.id, selectedLb); setAddingToLb(false); setSelectedLb(""); } }} style={{ padding: "8px 12px", background: "#2d6a3f", color: "#fff", border: "none", borderRadius: 10, cursor: "pointer", fontFamily: "'DM Sans', sans-serif", fontSize: 12, fontWeight: 700 }}>Add</button>
-                  <button onClick={() => setAddingToLb(false)} style={{ padding: "8px 10px", background: "#f5f2ed", border: "none", borderRadius: 10, cursor: "pointer", color: "#aaa", fontFamily: "'DM Sans', sans-serif", fontSize: 12 }}><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
-                </div>
-              ) : (
-                <button onClick={() => setAddingToLb(true)} style={{ padding: "8px 14px", background: "#f5f2ed", border: "none", borderRadius: 12, cursor: "pointer", fontSize: 12, fontWeight: 700, color: "#666", fontFamily: "'DM Sans', sans-serif" }}>+ Add to Lookbook</button>
-              )
-            )}
           </div>
         </div>
 
@@ -1980,25 +1965,30 @@ function OutfitDetailPopup({ outfit, allItems, allOutfits, lookbooks, onClose, o
         <div style={{ flex: 1, borderLeft: "1px solid #e8e4dc", display: "flex", flexDirection: "column", minWidth: 0 }}>
           {/* Header */}
           <div style={{ padding: "12px 16px", display: "flex", alignItems: "center", justifyContent: "space-between", borderBottom: "1px solid #e8e4dc", flexShrink: 0, gap: 8, flexWrap: "wrap" }}>
-            {/* Tab toggle */}
-            <div style={{ display: "flex", background: "#f5f2ed", borderRadius: 10, padding: 3, gap: 2 }}>
-              {[["pieces", `Pieces (${outfitItems.length})`], ["lookbooks", `Lookbooks (${memberLookbooks.length})`], ["history", "History"], ["similar", "Similar"]].map(([v, lbl]) => (
-                <button key={v} onClick={() => setRightTab(v)} style={{
-                  padding: "6px 14px", border: "none", borderRadius: 8, cursor: "pointer",
-                  background: rightTab === v ? "#fff" : "transparent",
-                  color: rightTab === v ? "#1a1a1a" : "#aaa",
-                  fontFamily: "'DM Sans', sans-serif", fontSize: 12, fontWeight: 700,
-                  boxShadow: rightTab === v ? "0 1px 4px rgba(0,0,0,0.08)" : "none", transition: "all 0.15s"
-                }}>{lbl}</button>
-              ))}
-            </div>
             {/* Action buttons */}
-            <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
-              <button onClick={handleMarkWorn} style={{ padding: "6px 12px", borderRadius: 10, background: wornFlash ? "#2d6a3f" : "#f0faf4", border: "1.5px solid #b6e8c8", cursor: "pointer", fontSize: 12, fontWeight: 700, color: wornFlash ? "#fff" : "#2d6a3f", fontFamily: "'DM Sans', sans-serif", transition: "all 0.2s" }}><SvgHanger size={12} color="currentColor" style={{marginRight:6}} />{wornFlash ? "Marked!" : "Worn"}</button>
-              <button onClick={onDuplicate} style={{ padding: "6px 12px", borderRadius: 10, background: "#f5f2ed", border: "none", cursor: "pointer", fontSize: 12, fontWeight: 700, color: "#666", fontFamily: "'DM Sans', sans-serif" }}><SvgCopy size={12} color="currentColor" style={{marginRight:6}} />Copy</button>
-              {outfit.previewImage && <button onClick={exportPreview} style={{ padding: "6px 12px", borderRadius: 10, background: exported ? "#f0faf4" : "#f5f3ef", border: "none", cursor: "pointer", fontSize: 12, fontWeight: 700, color: exported ? "#2d6a3f" : "#666", fontFamily: "'DM Sans', sans-serif" }}>{exported ? <><SvgCheck size={12} color="currentColor" style={{marginRight:6}} />Saved</> : <><SvgDownload size={12} color="currentColor" style={{marginRight:6}} />Export</>}</button>}
+            <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
               <button onClick={onEdit} style={{ width: 32, height: 32, borderRadius: "50%", background: "#f5f2ed", border: "none", cursor: "pointer", fontSize: 14, color: "#444", display: "flex", alignItems: "center", justifyContent: "center" }}><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>
+              <button onClick={handleMarkWorn} style={{ padding: "6px 12px", borderRadius: 10, background: wornFlash ? "#2d6a3f" : "#f0faf4", border: "1.5px solid #b6e8c8", cursor: "pointer", fontSize: 12, fontWeight: 700, color: wornFlash ? "#fff" : "#2d6a3f", fontFamily: "'DM Sans', sans-serif", transition: "all 0.2s", display: "flex", alignItems: "center" }}><SvgCheck size={12} color="currentColor" style={{marginRight:6}} />{wornFlash ? "Marked!" : `${wornCount}×`}</button>
+              {nonMemberLookbooks.length > 0 && (
+                <button onClick={() => { setRightTab("lookbooks"); setAddingToLb(true); }} style={{ width: 32, height: 32, borderRadius: "50%", background: "#f5f0ff", border: "1.5px solid #d8ccf5", cursor: "pointer", color: "#7c6fe0", display: "flex", alignItems: "center", justifyContent: "center" }} title="Add to lookbook"><SvgGrid size={13} color="currentColor" /></button>
+              )}
+              <button onClick={onDuplicate} style={{ width: 32, height: 32, borderRadius: "50%", background: "#f5f2ed", border: "none", cursor: "pointer", color: "#666", display: "flex", alignItems: "center", justifyContent: "center" }} title="Duplicate"><SvgCopy size={12} color="currentColor" /></button>
               <button onClick={onDelete} style={{ width: 32, height: 32, borderRadius: "50%", background: "#fef2f2", border: "none", cursor: "pointer", color: "#e05555", display: "flex", alignItems: "center", justifyContent: "center" }}><SvgTrash size={14} color="#e05555" /></button>
+              {outfit.previewImage && <button onClick={exportPreview} style={{ padding: "6px 12px", borderRadius: 10, background: exported ? "#f0faf4" : "#f5f3ef", border: "none", cursor: "pointer", fontSize: 12, fontWeight: 700, color: exported ? "#2d6a3f" : "#666", fontFamily: "'DM Sans', sans-serif" }}>{exported ? <><SvgCheck size={12} color="currentColor" style={{marginRight:6}} />Saved</> : <><SvgDownload size={12} color="currentColor" style={{marginRight:6}} />Export</>}</button>}
+            </div>
+            {/* Tab toggle */}
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <div style={{ display: "flex", background: "#f5f2ed", borderRadius: 10, padding: 3, gap: 2 }}>
+                {[["pieces", `Pieces (${outfitItems.length})`], ["lookbooks", `Lookbooks (${memberLookbooks.length})`], ["history", "History"], ["similar", "Similar"]].map(([v, lbl]) => (
+                  <button key={v} onClick={() => setRightTab(v)} style={{
+                    padding: "6px 14px", border: "none", borderRadius: 8, cursor: "pointer",
+                    background: rightTab === v ? "#fff" : "transparent",
+                    color: rightTab === v ? "#1a1a1a" : "#aaa",
+                    fontFamily: "'DM Sans', sans-serif", fontSize: 12, fontWeight: 700,
+                    boxShadow: rightTab === v ? "0 1px 4px rgba(0,0,0,0.08)" : "none", transition: "all 0.15s"
+                  }}>{lbl}</button>
+                ))}
+              </div>
               <button onClick={onClose} style={{ width: 32, height: 32, borderRadius: "50%", background: "#f5f2ed", border: "none", cursor: "pointer", fontSize: 14, color: "#888", display: "flex", alignItems: "center", justifyContent: "center" }}><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
             </div>
           </div>

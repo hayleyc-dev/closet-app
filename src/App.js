@@ -5989,6 +5989,24 @@ function Moodboard({ closetItems = [], activeIdx, setActiveIdx, boards: boardsPr
           <button onClick={exportCanvas} style={{padding:"8px 14px",background:"#f5f2ed",border:"none",borderRadius:10,cursor:"pointer",fontFamily:"'DM Sans',sans-serif",fontSize:12,fontWeight:700,color:"#666",display:"flex",alignItems:"center",gap:8}}><SvgDownload size={13} color="#666" />Export JPG</button>
           <button onClick={() => {
             if (!board) return;
+            if (window.confirm(`Archive "${board.name || "this board"}"? Restore from Settings → Data.`)) {
+              try {
+                const archived = JSON.parse(localStorage.getItem("wardrobe_moodboards_archived_v1") || "[]");
+                archived.push({ ...board, archivedAt: new Date().toISOString() });
+                localStorage.setItem("wardrobe_moodboards_archived_v1", JSON.stringify(archived));
+              } catch {}
+              if (removeBoardById) {
+                removeBoardById(board.id);
+              } else {
+                setBoards(bs => bs.filter((_, i) => i !== activeIdx));
+              }
+              if (setActiveIdx) setActiveIdx(Math.max(0, activeIdx - 1));
+            }
+          }} title="Archive this board" style={{padding:"7px 10px",background:"#f5f3ef",border:"none",borderRadius:8,cursor:"pointer",fontSize:11,color:"#777",fontFamily:"'DM Sans',sans-serif",display:"flex",alignItems:"center",gap:5}}>
+            <SvgArrowDn size={13} color="#777" />
+          </button>
+          <button onClick={() => {
+            if (!board) return;
             if (window.confirm(`Delete "${board.name || "this board"}"? This cannot be undone.`)) {
               if (removeBoardById) {
                 removeBoardById(board.id);
@@ -6281,6 +6299,7 @@ function SettingsTab({
   monthlyBudget, setMonthlyBudget,
   annualBudget, setAnnualBudget,
   restoreLookbook,
+  restoreOutfit,
 }) {
   const [settingsTab, setSettingsTab] = useState("appearance");
   const [themeId, setThemeId] = useState(() => { try { return localStorage.getItem(THEME_KEY) || "parchment"; } catch { return "parchment"; } });
@@ -6310,6 +6329,10 @@ function SettingsTab({
   // Archived lookbooks
   const LB_ARCHIVE_KEY = "wardrobe_lookbooks_archived_v1";
   const [archivedLookbooks, setArchivedLookbooks] = useState(() => { try { return JSON.parse(localStorage.getItem("wardrobe_lookbooks_archived_v1") || "[]"); } catch { return []; } });
+
+  // Archived outfits
+  const OUTFIT_ARCHIVE_KEY = "wardrobe_outfits_archived_v1";
+  const [archivedOutfits, setArchivedOutfits] = useState(() => { try { return JSON.parse(localStorage.getItem(OUTFIT_ARCHIVE_KEY) || "[]"); } catch { return []; } });
 
   useEffect(() => {
     setWornItems(itemsDb.rows.filter(i => (i.wornCount || 0) >= 0).sort((a,b) => (b.wornCount||0)-(a.wornCount||0)));
@@ -6748,6 +6771,37 @@ function SettingsTab({
                       const updated = archivedLookbooks.filter((_,idx)=>idx!==i);
                       localStorage.setItem(LB_ARCHIVE_KEY, JSON.stringify(updated));
                       setArchivedLookbooks(updated);
+                    }
+                  }} style={{ padding:"6px 10px", background:"#fff8f8", border:"1px solid #ffd0d0", borderRadius:8, cursor:"pointer", fontFamily:"'DM Sans',sans-serif", fontSize:11, fontWeight:700, color:"#e05555", flexShrink:0 }}>Delete</button>
+                </div>
+              ))}
+            </div>
+          </Card>
+        )}
+
+        {/* Archived Outfits */}
+        {archivedOutfits.length > 0 && (
+          <Card>
+            <SectionLabel>Archived Outfits</SectionLabel>
+            <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
+              {archivedOutfits.map((outfit, i) => (
+                <div key={outfit.id||i} style={{ display:"flex", alignItems:"center", gap:10, padding:"10px 12px", background:"#fafaf8", borderRadius:12, border:"1px solid #ece8e0" }}>
+                  <div style={{ flex:1, minWidth:0 }}>
+                    <div style={{ fontSize:13, fontWeight:700, color:"#1a1a1a", overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{outfit.name||"Unnamed Outfit"}</div>
+                    <div style={{ fontSize:11, color:"#bbb", marginTop:1 }}>{(outfit.layers||outfit.itemIds||[]).length} pieces · archived {outfit.archivedAt ? new Date(outfit.archivedAt).toLocaleDateString("en-US",{month:"short",day:"numeric",year:"numeric"}) : ""}</div>
+                  </div>
+                  <button onClick={async () => {
+                    const restored = { ...outfit }; delete restored.archivedAt;
+                    if (restoreOutfit) await restoreOutfit(restored);
+                    const updated = archivedOutfits.filter((_,idx)=>idx!==i);
+                    localStorage.setItem(OUTFIT_ARCHIVE_KEY, JSON.stringify(updated));
+                    setArchivedOutfits(updated);
+                  }} style={{ padding:"6px 12px", background:"#f0faf4", border:"1px solid #b6e8c8", borderRadius:8, cursor:"pointer", fontFamily:"'DM Sans',sans-serif", fontSize:11, fontWeight:700, color:"#2d6a3f", flexShrink:0 }}>Restore</button>
+                  <button onClick={() => {
+                    if (window.confirm(`Permanently delete "${outfit.name||"this outfit"}"?`)) {
+                      const updated = archivedOutfits.filter((_,idx)=>idx!==i);
+                      localStorage.setItem(OUTFIT_ARCHIVE_KEY, JSON.stringify(updated));
+                      setArchivedOutfits(updated);
                     }
                   }} style={{ padding:"6px 10px", background:"#fff8f8", border:"1px solid #ffd0d0", borderRadius:8, cursor:"pointer", fontFamily:"'DM Sans',sans-serif", fontSize:11, fontWeight:700, color:"#e05555", flexShrink:0 }}>Delete</button>
                 </div>
@@ -7669,6 +7723,7 @@ export default function App() {
   const [lbSort, setLbSort] = useState("newest");
   const [lbZoom, setLbZoom] = useState(210);
   const [lbTagFilter, setLbTagFilter] = useState("All");
+  const [lbTypeFilter, setLbTypeFilter] = useState("All");
   const [bulkMode, setBulkMode] = useState(false);
   const [wishlistDest, setWishlistDest] = useState(false);
   const [wlSort, setWlSort] = useState("priority");
@@ -7788,6 +7843,17 @@ export default function App() {
     try { lookbooksDb.remove(lb.id); } catch(e) {}
     setActiveLookbook(null);
     setActiveLookbookView("editorial");
+  };
+
+  const OUTFIT_ARCHIVE_KEY = "wardrobe_outfits_archived_v1";
+  const archiveOutfit = async (outfit) => {
+    try {
+      const archived = JSON.parse(localStorage.getItem(OUTFIT_ARCHIVE_KEY) || "[]");
+      archived.push({ ...outfit, archivedAt: new Date().toISOString() });
+      localStorage.setItem(OUTFIT_ARCHIVE_KEY, JSON.stringify(archived));
+    } catch {}
+    try { await outfitsDb.remove(outfit.id); } catch (e) {}
+    setOutfitPopup(null);
   };
 
   const markOutfitWorn = async (outfit, dateStr) => {
@@ -8288,7 +8354,6 @@ export default function App() {
                           {/* Preview: use saved previewImage if available, else item collage */}
                           {outfit.previewImage ? (
                             <div style={{ aspectRatio: "4/5", background: `url(${outfit.previewImage}) center/contain no-repeat #f5f3ef`, position: "relative" }}>
-                              <button onClick={e => { e.stopPropagation(); duplicateOutfit(outfit); }} title="Duplicate" style={{ position: "absolute", top: 8, right: 8, width: 28, height: 28, borderRadius: "50%", background: "rgba(255,255,255,0.9)", border: "none", cursor: "pointer", fontSize: 13, display: "flex", alignItems: "center", justifyContent: "center", backdropFilter: "blur(4px)", boxShadow: "0 1px 4px rgba(0,0,0,0.1)" }}>⧉</button>
             </div>
                           ) : (
                             <div style={{
@@ -8312,6 +8377,10 @@ export default function App() {
                               )}
                             </div>
                           )}
+                          <div style={{ position: "absolute", top: 8, right: 8, display: "flex", gap: 6, zIndex: 3 }}>
+                            <button onClick={e => { e.stopPropagation(); duplicateOutfit(outfit); }} title="Duplicate" style={{ width: 28, height: 28, borderRadius: "50%", background: "rgba(255,255,255,0.9)", border: "none", cursor: "pointer", fontSize: 13, display: "flex", alignItems: "center", justifyContent: "center", backdropFilter: "blur(4px)", boxShadow: "0 1px 4px rgba(0,0,0,0.1)" }}>⧉</button>
+                            <button onClick={e => { e.stopPropagation(); if (window.confirm(`Archive "${outfit.name}"? Restore from Settings → Data.`)) archiveOutfit(outfit); }} title="Archive outfit" style={{ width: 28, height: 28, borderRadius: "50%", background: "rgba(255,255,255,0.92)", border: "none", cursor: "pointer", color: "#888", display: "flex", alignItems: "center", justifyContent: "center", backdropFilter: "blur(4px)", boxShadow: "0 1px 4px rgba(0,0,0,0.1)" }}><SvgArrowDn size={12} color="#888" /></button>
+                          </div>
                           {/* Name overlay at bottom */}
                           <div style={{ padding: "10px 12px 12px" }}>
                             <div style={{ fontSize: 13, fontWeight: 700, color: "#1a1a1a", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{outfit.name}</div>
@@ -8327,17 +8396,26 @@ export default function App() {
             {/* LOOKBOOKS */}
             {tab === "lookbooks" && (
               <div className="fade-up">
-                <div style={{ display: "flex", gap: 8, marginBottom: 18, alignItems: "center", justifyContent: "flex-end", flexWrap: "wrap" }}>
-                  <select value={lbSort} onChange={e => setLbSort(e.target.value)} className="pill-select">
-                    <option value="newest">Newest</option>
-                    <option value="az">A – Z</option>
-                    <option value="most">Most Outfits</option>
-                  </select>
-                  <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                    <SvgBox size={11} color="#bbb" />
-                    <input type="range" min={160} max={340} step={10} value={lbZoom} onChange={e => setLbZoom(Number(e.target.value))}
-                      style={{ width: 72, accentColor: "#1a1a1a", cursor: "pointer" }} />
-                    <SvgBox size={16} color="#bbb" />
+                <div style={{ display: "flex", gap: 10, marginBottom: 18, alignItems: "center", justifyContent: "space-between", flexWrap: "wrap" }}>
+                  <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                    {["All", ...LOOKBOOK_TYPES.map(type => type[0].toUpperCase() + type.slice(1))].map(typeLabel => (
+                      <button key={typeLabel} className={"filter-pill" + (lbTypeFilter === typeLabel ? " active" : "")} onClick={() => setLbTypeFilter(typeLabel)}>
+                        {typeLabel}
+                      </button>
+                    ))}
+                  </div>
+                  <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+                    <select value={lbSort} onChange={e => setLbSort(e.target.value)} className="pill-select">
+                      <option value="newest">Newest</option>
+                      <option value="az">A – Z</option>
+                      <option value="most">Most Outfits</option>
+                    </select>
+                    <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                      <SvgBox size={11} color="#bbb" />
+                      <input type="range" min={160} max={340} step={10} value={lbZoom} onChange={e => setLbZoom(Number(e.target.value))}
+                        style={{ width: 72, accentColor: "#1a1a1a", cursor: "pointer" }} />
+                      <SvgBox size={16} color="#bbb" />
+                    </div>
                   </div>
                 </div>
 
@@ -8351,7 +8429,10 @@ export default function App() {
                     const matchSearch = !lbSearch || lb.name.toLowerCase().includes(lbSearch.toLowerCase());
                     const selectedOccasions = LOOKBOOK_OCCASION_ALIASES[lbTagFilter] || [lbTagFilter];
                     const matchTag = lbTagFilter === "All" || selectedOccasions.some(t => (lb.tags || []).includes(t));
-                    return matchSearch && matchTag;
+                    const typeLabel = (lb.type || "").toString();
+                    const normalizedTypeLabel = typeLabel ? typeLabel[0].toUpperCase() + typeLabel.slice(1) : "";
+                    const matchType = lbTypeFilter === "All" || normalizedTypeLabel === lbTypeFilter;
+                    return matchSearch && matchTag && matchType;
                   });
                   if (lbSort === "az") filtered = [...filtered].sort((a, b) => a.name.localeCompare(b.name));
                   else if (lbSort === "most") filtered = [...filtered].sort((a, b) => (b.outfitIds || []).length - (a.outfitIds || []).length);
@@ -8409,8 +8490,8 @@ export default function App() {
                           }}>
                             {/* Archive + Delete buttons */}
                             <button onClick={e => { e.stopPropagation(); if (window.confirm(`Archive "${lb.name}"? Restore from Settings → Data.`)) { archiveLookbook(lb); } }} title="Archive lookbook"
-                              style={{ position: "absolute", top: 8, right: 40, zIndex: 2, width: 26, height: 26, borderRadius: "50%", background: "rgba(255,255,255,0.92)", border: "none", cursor: "pointer", fontSize: 13, color: "#aaa", display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 1px 4px rgba(0,0,0,0.1)" }}>
-                              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><polyline points="21 8 21 21 3 21 3 8"/><rect x="1" y="3" width="22" height="5"/><line x1="10" y1="12" x2="14" y2="12"/></svg>
+                              style={{ position: "absolute", top: 8, right: 40, zIndex: 2, width: 26, height: 26, borderRadius: "50%", background: "rgba(255,255,255,0.92)", border: "none", cursor: "pointer", fontSize: 13, color: "#888", display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 1px 4px rgba(0,0,0,0.1)" }}>
+                              <SvgArrowDn size={12} color="#888" />
                             </button>
                             <button onClick={e => { e.stopPropagation(); lookbooksDb.remove(lb.id); }} title="Delete lookbook"
                               style={{ position: "absolute", top: 8, right: 8, zIndex: 2, width: 26, height: 26, borderRadius: "50%", background: "rgba(255,255,255,0.92)", border: "none", cursor: "pointer", fontSize: 13, color: "#e05555", display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 1px 4px rgba(0,0,0,0.1)" }}><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4h6v2"/></svg></button>
@@ -8476,6 +8557,13 @@ export default function App() {
                     if (error) ({ error } = await supabase.from("lookbooks").insert(lb));
                     await lookbooksDb.refresh();
                   } catch(e) { console.error("restore lookbook error", e); }
+                }}
+                restoreOutfit={async (outfit) => {
+                  try {
+                    let { error } = await supabase.from("outfits").insert({ id: outfit.id, data: outfit });
+                    if (error) ({ error } = await supabase.from("outfits").insert(outfit));
+                    await outfitsDb.refresh();
+                  } catch (e) { console.error("restore outfit error", e); }
                 }}
               />}
 
@@ -8948,7 +9036,7 @@ export default function App() {
           lookbooks={lookbooksDb.rows}
           onClose={() => setOutfitPopup(null)}
           onEdit={() => { openEditOutfit(outfitPopup); setOutfitPopup(null); }}
-          onDelete={() => { outfitsDb.remove(outfitPopup.id); setOutfitPopup(null); }}
+          onDelete={() => { archiveOutfit(outfitPopup); }}
           onMarkWorn={() => markOutfitWorn(outfitPopup)}
           onDuplicate={() => { duplicateOutfit(outfitPopup); setOutfitPopup(null); }}
           onAddToLookbook={addOutfitToLookbook}

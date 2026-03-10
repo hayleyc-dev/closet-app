@@ -598,162 +598,378 @@ function autoCropCanvas(dataUrl, padding = 12) {
 // Keeps the original image separately; erase brush makes alpha=0, restore brush paints original back.
 function MaskEditor({ current, original, onDone, onCancel }) {
   const canvasRef = useRef(null);
-  const [tool, setTool] = useState("erase");   // "erase" | "restore"
+  const [tool, setTool] = useState("erase"); // "erase" | "restore" | "lasso" | "clone"
   const [brushSize, setBrushSize] = useState(24);
   const [painting, setPainting] = useState(false);
+  const [lassoPoints, setLassoPoints] = useState([]);
+  const [lassoClosed, setLassoClosed] = useState(false);
   const lastPos = useRef(null);
-  // We keep two ImageData objects in refs so we don't re-render on every stroke
+  const cloneSourceRef = useRef(null);
+  const cloneStrokeStartRef = useRef(null);
+  const cloneSnapshotRef = useRef(null);
   const currentDataRef = useRef(null);
   const originalDataRef = useRef(null);
-  const scaleRef = useRef({ x: 1, y: 1 });
 
-  // Load both images onto hidden canvases to get pixel data
+  const redrawCanvas = () => {
+    const cur = currentDataRef.current;
+    const canvas = canvasRef.current;
+    if (!cur || !canvas) return;
+    const ctx = canvas.getContext("2d");
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    const tmp = document.createElement("canvas");
+    tmp.width = cur.width;
+    tmp.height = cur.height;
+    tmp.getContext("2d").putImageData(cur, 0, 0);
+    ctx.drawImage(tmp, 0, 0);
+
+    if (lassoPoints.length) {
+      ctx.save();
+      ctx.strokeStyle = "rgba(255,255,255,0.95)";
+      ctx.lineWidth = Math.max(1.5, cur.width / 320);
+      ctx.setLineDash([8, 6]);
+      ctx.beginPath();
+      ctx.moveTo(lassoPoints[0].x, lassoPoints[0].y);
+      for (let i = 1; i < lassoPoints.length; i++) ctx.lineTo(lassoPoints[i].x, lassoPoints[i].y);
+      if (lassoClosed) ctx.closePath();
+      ctx.stroke();
+      ctx.restore();
+    }
+
+    if (tool === "clone" && cloneSourceRef.current) {
+      const p = cloneSourceRef.current;
+      ctx.save();
+      ctx.strokeStyle = "#67b8ff";
+      ctx.lineWidth = Math.max(1.5, cur.width / 420);
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, Math.max(5, brushSize * 0.25), 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(p.x - 8, p.y);
+      ctx.lineTo(p.x + 8, p.y);
+      ctx.moveTo(p.x, p.y - 8);
+      ctx.lineTo(p.x, p.y + 8);
+      ctx.stroke();
+      ctx.restore();
+    }
+  };
+
   useEffect(() => {
     const load = (src) => new Promise((res, rej) => {
-      const img = new Image(); img.onload = () => res(img); img.onerror = rej; img.src = src;
+      const img = new Image();
+      img.onload = () => res(img);
+      img.onerror = rej;
+      img.src = src;
     });
+
     Promise.all([load(current), load(original)]).then(([cur, orig]) => {
-      const w = cur.width, h = cur.height;
-      // current (possibly already has transparency)
-      const c1 = document.createElement("canvas"); c1.width=w; c1.height=h;
-      c1.getContext("2d").drawImage(cur,0,0);
-      currentDataRef.current = c1.getContext("2d").getImageData(0,0,w,h);
-      // original (full colour, no transparency)
-      const c2 = document.createElement("canvas"); c2.width=w; c2.height=h;
-      c2.getContext("2d").drawImage(orig,0,0);
-      originalDataRef.current = c2.getContext("2d").getImageData(0,0,w,h);
-      // Draw current state to visible canvas — use image's natural dimensions
-      // CSS (maxWidth/maxHeight) will scale it visually without stretching
+      const w = cur.width;
+      const h = cur.height;
+      const c1 = document.createElement("canvas");
+      c1.width = w;
+      c1.height = h;
+      c1.getContext("2d").drawImage(cur, 0, 0);
+      currentDataRef.current = c1.getContext("2d").getImageData(0, 0, w, h);
+
+      const c2 = document.createElement("canvas");
+      c2.width = w;
+      c2.height = h;
+      c2.getContext("2d").drawImage(orig, 0, 0);
+      originalDataRef.current = c2.getContext("2d").getImageData(0, 0, w, h);
+
       const canvas = canvasRef.current;
       if (!canvas) return;
       canvas.width = w;
       canvas.height = h;
-      scaleRef.current = { x: 1, y: 1 }; // actual pixel coords handled via getBoundingClientRect in paintAt
-      const ctx = canvas.getContext("2d");
-      ctx.clearRect(0,0,w,h);
-      const tmp = document.createElement("canvas"); tmp.width=w; tmp.height=h;
-      tmp.getContext("2d").putImageData(currentDataRef.current,0,0);
-      ctx.drawImage(tmp, 0, 0);
+      redrawCanvas();
     });
-  }, []);  // eslint-disable-line
+  }, []); // eslint-disable-line
+
+  useEffect(() => {
+    redrawCanvas();
+  }, [lassoPoints, lassoClosed, tool, brushSize]);
 
   const getCanvasPos = (e) => {
+    const cur = currentDataRef.current;
     const canvas = canvasRef.current;
+    if (!cur || !canvas) return { x: 0, y: 0 };
     const rect = canvas.getBoundingClientRect();
     const clientX = e.touches ? e.touches[0].clientX : e.clientX;
     const clientY = e.touches ? e.touches[0].clientY : e.clientY;
-    return { x: clientX - rect.left, y: clientY - rect.top };
+    const x = (clientX - rect.left) * (cur.width / rect.width);
+    const y = (clientY - rect.top) * (cur.height / rect.height);
+    return { x: Math.max(0, Math.min(cur.width - 1, x)), y: Math.max(0, Math.min(cur.height - 1, y)) };
   };
 
   const paintAt = (x, y) => {
     const cur = currentDataRef.current;
     const orig = originalDataRef.current;
     if (!cur || !orig) return;
-    const canvas = canvasRef.current;
-    const rect = canvas.getBoundingClientRect();
-    const scaleX = cur.width / rect.width;
-    const scaleY = cur.height / rect.height;
-    const px = x * scaleX, py = y * scaleY;
-    const r = (brushSize / 2) * scaleX;
-    const data = cur.data, odata = orig.data;
+    const px = x;
+    const py = y;
+    const r = brushSize / 2;
+    const data = cur.data;
+    const odata = orig.data;
     const w = cur.width;
 
-    const minX = Math.max(0, Math.floor(px-r)), maxX = Math.min(w-1, Math.ceil(px+r));
-    const minY = Math.max(0, Math.floor(py-r)), maxY = Math.min(cur.height-1, Math.ceil(py+r));
-    for (let iy=minY; iy<=maxY; iy++) for (let ix=minX; ix<=maxX; ix++) {
-      const dist = Math.sqrt((ix-px)**2+(iy-py)**2);
+    const minX = Math.max(0, Math.floor(px - r));
+    const maxX = Math.min(w - 1, Math.ceil(px + r));
+    const minY = Math.max(0, Math.floor(py - r));
+    const maxY = Math.min(cur.height - 1, Math.ceil(py + r));
+    for (let iy = minY; iy <= maxY; iy++) for (let ix = minX; ix <= maxX; ix++) {
+      const dist = Math.sqrt((ix - px) ** 2 + (iy - py) ** 2);
       if (dist > r) continue;
-      // soft edge: full opacity at center, fades at edge
-      const strength = Math.max(0, 1 - (dist/r)**2);
-      const idx = (iy*w+ix)*4;
+      const strength = Math.max(0, 1 - (dist / r) ** 2);
+      const idx = (iy * w + ix) * 4;
       if (tool === "erase") {
-        data[idx+3] = Math.max(0, data[idx+3] - Math.round(strength * 255));
+        data[idx + 3] = Math.max(0, data[idx + 3] - Math.round(strength * 255));
       } else {
-        // restore: blend original alpha back in
-        const newA = Math.min(255, data[idx+3] + Math.round(strength * odata[idx+3]));
-        const t = strength;
-        data[idx]   = Math.round(data[idx]*(1-t)   + odata[idx]*t);
-        data[idx+1] = Math.round(data[idx+1]*(1-t) + odata[idx+1]*t);
-        data[idx+2] = Math.round(data[idx+2]*(1-t) + odata[idx+2]*t);
-        data[idx+3] = newA;
+        const newA = Math.min(255, data[idx + 3] + Math.round(strength * odata[idx + 3]));
+        data[idx] = Math.round(data[idx] * (1 - strength) + odata[idx] * strength);
+        data[idx + 1] = Math.round(data[idx + 1] * (1 - strength) + odata[idx + 1] * strength);
+        data[idx + 2] = Math.round(data[idx + 2] * (1 - strength) + odata[idx + 2] * strength);
+        data[idx + 3] = newA;
       }
     }
-    // Redraw canvas from updated pixel data
-    const ctx = canvas.getContext("2d");
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    const tmp = document.createElement("canvas"); tmp.width=cur.width; tmp.height=cur.height;
-    tmp.getContext("2d").putImageData(cur,0,0);
-    ctx.drawImage(tmp, 0, 0);
+    redrawCanvas();
+  };
+
+  const cloneAt = (x, y) => {
+    const cur = currentDataRef.current;
+    const source = cloneSourceRef.current;
+    const start = cloneStrokeStartRef.current;
+    const snapshot = cloneSnapshotRef.current;
+    if (!cur || !source || !start || !snapshot) return;
+
+    const data = cur.data;
+    const sdata = snapshot;
+    const w = cur.width;
+    const h = cur.height;
+    const r = brushSize / 2;
+    const offX = x - start.x;
+    const offY = y - start.y;
+    const srcCx = source.x + offX;
+    const srcCy = source.y + offY;
+
+    const minX = Math.max(0, Math.floor(x - r));
+    const maxX = Math.min(w - 1, Math.ceil(x + r));
+    const minY = Math.max(0, Math.floor(y - r));
+    const maxY = Math.min(h - 1, Math.ceil(y + r));
+
+    for (let iy = minY; iy <= maxY; iy++) for (let ix = minX; ix <= maxX; ix++) {
+      const dx = ix - x;
+      const dy = iy - y;
+      if ((dx * dx + dy * dy) > r * r) continue;
+      const sx = Math.round(srcCx + dx);
+      const sy = Math.round(srcCy + dy);
+      if (sx < 0 || sy < 0 || sx >= w || sy >= h) continue;
+      const di = (iy * w + ix) * 4;
+      const si = (sy * w + sx) * 4;
+      data[di] = sdata[si];
+      data[di + 1] = sdata[si + 1];
+      data[di + 2] = sdata[si + 2];
+      data[di + 3] = sdata[si + 3];
+    }
+    redrawCanvas();
   };
 
   const paintLine = (from, to) => {
-    const dist = Math.sqrt((to.x-from.x)**2+(to.y-from.y)**2);
+    const dist = Math.sqrt((to.x - from.x) ** 2 + (to.y - from.y) ** 2);
     const steps = Math.max(1, Math.ceil(dist / 4));
-    for (let i=0; i<=steps; i++) {
-      const t = i/steps;
-      paintAt(from.x*(1-t)+to.x*t, from.y*(1-t)+to.y*t);
+    for (let i = 0; i <= steps; i++) {
+      const t = i / steps;
+      const x = from.x * (1 - t) + to.x * t;
+      const y = from.y * (1 - t) + to.y * t;
+      if (tool === "clone") cloneAt(x, y);
+      else paintAt(x, y);
     }
   };
 
-  const onDown = (e) => { e.preventDefault(); setPainting(true); const p=getCanvasPos(e); lastPos.current=p; paintAt(p.x,p.y); };
-  const onMove = (e) => { e.preventDefault(); if (!painting) return; const p=getCanvasPos(e); paintLine(lastPos.current,p); lastPos.current=p; };
-  const onUp   = (e) => { e.preventDefault(); setPainting(false); lastPos.current=null; };
+  const closeLasso = () => {
+    if (lassoPoints.length >= 3) setLassoClosed(true);
+  };
+
+  const deleteLassoSelection = () => {
+    const cur = currentDataRef.current;
+    if (!cur || lassoPoints.length < 3 || !lassoClosed) return;
+    const data = cur.data;
+    const w = cur.width;
+    const h = cur.height;
+    let minX = w, minY = h, maxX = 0, maxY = 0;
+    lassoPoints.forEach(({ x, y }) => {
+      if (x < minX) minX = x;
+      if (y < minY) minY = y;
+      if (x > maxX) maxX = x;
+      if (y > maxY) maxY = y;
+    });
+    minX = Math.max(0, Math.floor(minX));
+    minY = Math.max(0, Math.floor(minY));
+    maxX = Math.min(w - 1, Math.ceil(maxX));
+    maxY = Math.min(h - 1, Math.ceil(maxY));
+
+    const inside = (x, y) => {
+      let hit = false;
+      for (let i = 0, j = lassoPoints.length - 1; i < lassoPoints.length; j = i++) {
+        const xi = lassoPoints[i].x;
+        const yi = lassoPoints[i].y;
+        const xj = lassoPoints[j].x;
+        const yj = lassoPoints[j].y;
+        const intersect = ((yi > y) !== (yj > y)) && (x < ((xj - xi) * (y - yi)) / ((yj - yi) || 1e-7) + xi);
+        if (intersect) hit = !hit;
+      }
+      return hit;
+    };
+
+    for (let y = minY; y <= maxY; y++) {
+      for (let x = minX; x <= maxX; x++) {
+        if (inside(x + 0.5, y + 0.5)) data[(y * w + x) * 4 + 3] = 0;
+      }
+    }
+    setLassoPoints([]);
+    setLassoClosed(false);
+    redrawCanvas();
+  };
+
+  const onDown = (e) => {
+    e.preventDefault();
+    const p = getCanvasPos(e);
+
+    if (tool === "lasso") {
+      if (lassoClosed) {
+        setLassoPoints([p]);
+        setLassoClosed(false);
+        return;
+      }
+      if (lassoPoints.length >= 2) {
+        const first = lassoPoints[0];
+        const dist = Math.sqrt((first.x - p.x) ** 2 + (first.y - p.y) ** 2);
+        if (dist < 14) {
+          closeLasso();
+          return;
+        }
+      }
+      setLassoPoints(prev => [...prev, p]);
+      return;
+    }
+
+    if (tool === "clone") {
+      if (e.altKey || e.button === 2 || !cloneSourceRef.current) {
+        cloneSourceRef.current = p;
+        redrawCanvas();
+        return;
+      }
+      cloneSnapshotRef.current = new Uint8ClampedArray(currentDataRef.current.data);
+      cloneStrokeStartRef.current = p;
+      setPainting(true);
+      lastPos.current = p;
+      cloneAt(p.x, p.y);
+      return;
+    }
+
+    setPainting(true);
+    lastPos.current = p;
+    paintAt(p.x, p.y);
+  };
+
+  const onMove = (e) => {
+    e.preventDefault();
+    if (!painting) return;
+    const p = getCanvasPos(e);
+    paintLine(lastPos.current, p);
+    lastPos.current = p;
+  };
+
+  const onUp = (e) => {
+    e.preventDefault();
+    setPainting(false);
+    cloneStrokeStartRef.current = null;
+    cloneSnapshotRef.current = null;
+    lastPos.current = null;
+  };
 
   const applyEdit = () => {
     const cur = currentDataRef.current;
     if (!cur) return;
     const out = document.createElement("canvas");
-    out.width=cur.width; out.height=cur.height;
-    out.getContext("2d").putImageData(cur,0,0);
+    out.width = cur.width;
+    out.height = cur.height;
+    out.getContext("2d").putImageData(cur, 0, 0);
     onDone(out.toDataURL("image/png"));
   };
 
   return (
-    <div style={{ position:"fixed", inset:0, zIndex:700, background:"rgba(0,0,0,0.85)", display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", padding:16 }}>
-      <div style={{ background:"#fff", borderRadius:20, overflow:"hidden", width:"100%", maxWidth:580, boxShadow:"0 30px 80px rgba(0,0,0,0.5)", display:"flex", flexDirection:"column" }}>
+    <div style={{ position: "fixed", inset: 0, zIndex: 700, background: "rgba(0,0,0,0.85)", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: 16 }}>
+      <div style={{ background: "#fff", borderRadius: 20, overflow: "hidden", width: "100%", maxWidth: 640, boxShadow: "0 30px 80px rgba(0,0,0,0.5)", display: "flex", flexDirection: "column" }}>
+        <div style={{ padding: "14px 18px", borderBottom: "1px solid #e8e4dc", display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+          <span style={{ fontSize: 14, fontWeight: 700, color: "#1a1a1a", marginRight: "auto" }}>Edit Mask</span>
 
-        {/* Header */}
-        <div style={{ padding:"14px 18px", borderBottom:"1px solid #e8e4dc", display:"flex", alignItems:"center", gap:12, flexWrap:"wrap" }}>
-          <span style={{ fontSize:14, fontWeight:700, color:"#1a1a1a", marginRight:"auto" }}>Edit Mask</span>
-
-          {/* Tool toggle */}
-          <div style={{ display:"flex", background:"#f5f3ef", borderRadius:9, padding:3, gap:0 }}>
-            {[["erase","Erase"],["restore","Restore"]].map(([id,lbl]) => (
-              <button key={id} onClick={() => setTool(id)} style={{
-                padding:"6px 14px", borderRadius:7, border:"none", cursor:"pointer",
-                background: tool===id ? "#1a1a1a" : "transparent",
-                color: tool===id ? "#fff" : "#aaa",
-                fontFamily:"'Nunito',sans-serif", fontSize:12, fontWeight:700, transition:"all 0.12s"
-              }}>{lbl}</button>
+          <div style={{ display: "flex", background: "#f5f3ef", borderRadius: 9, padding: 3, gap: 0 }}>
+            {[["erase", "Erase"], ["restore", "Restore"], ["lasso", "Lasso"], ["clone", "Clone Stamp"]].map(([id, lbl]) => (
+              <button
+                key={id}
+                onClick={() => setTool(id)}
+                style={{
+                  padding: "6px 12px",
+                  borderRadius: 7,
+                  border: "none",
+                  cursor: "pointer",
+                  background: tool === id ? "#1a1a1a" : "transparent",
+                  color: tool === id ? "#fff" : "#aaa",
+                  fontFamily: "'Nunito',sans-serif",
+                  fontSize: 12,
+                  fontWeight: 700,
+                  transition: "all 0.12s",
+                }}
+              >
+                {lbl}
+              </button>
             ))}
           </div>
 
-          {/* Brush size */}
-          <div style={{ display:"flex", alignItems:"center", gap:8 }}>
-            <span style={{ fontSize:11, fontWeight:700, color:"#bbb", textTransform:"uppercase" }}>Brush</span>
-            <input type="range" min={6} max={80} value={brushSize} onChange={e=>setBrushSize(+e.target.value)} style={{ width:80, accentColor:"#1a1a1a" }} />
-            <span style={{ fontSize:11, color:"#aaa", minWidth:20 }}>{brushSize}</span>
-          </div>
+          {tool !== "lasso" && (
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <span style={{ fontSize: 11, fontWeight: 700, color: "#bbb", textTransform: "uppercase" }}>Brush</span>
+              <input type="range" min={6} max={80} value={brushSize} onChange={e => setBrushSize(+e.target.value)} style={{ width: 80, accentColor: "#1a1a1a" }} />
+              <span style={{ fontSize: 11, color: "#aaa", minWidth: 20 }}>{brushSize}</span>
+            </div>
+          )}
+
+          {tool === "lasso" && (
+            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+              <button onClick={closeLasso} disabled={lassoPoints.length < 3 || lassoClosed} style={{ padding: "6px 10px", borderRadius: 8, border: "none", cursor: "pointer", background: "#f0ece4", color: "#555", fontSize: 11, fontWeight: 700 }}>Close</button>
+              <button onClick={deleteLassoSelection} disabled={!lassoClosed} style={{ padding: "6px 10px", borderRadius: 8, border: "none", cursor: "pointer", background: lassoClosed ? "#1a1a1a" : "#f0ece4", color: lassoClosed ? "#fff" : "#aaa", fontSize: 11, fontWeight: 700 }}>Delete</button>
+              <button onClick={() => { setLassoPoints([]); setLassoClosed(false); }} disabled={lassoPoints.length === 0} style={{ padding: "6px 10px", borderRadius: 8, border: "none", cursor: "pointer", background: "#f0ece4", color: "#666", fontSize: 11, fontWeight: 700 }}>Clear</button>
+            </div>
+          )}
         </div>
 
-        {/* Canvas — no forced height so image keeps its natural aspect ratio */}
-        <div style={{ position:"relative", background:"repeating-conic-gradient(#e8e4dc 0% 25%,#fff 0% 50%) 0 0/20px 20px", display:"flex", alignItems:"center", justifyContent:"center" }}>
+        <div style={{ position: "relative", background: "repeating-conic-gradient(#e8e4dc 0% 25%,#fff 0% 50%) 0 0/20px 20px", display: "flex", alignItems: "center", justifyContent: "center" }}>
           <canvas
             ref={canvasRef}
-            style={{ display:"block", maxWidth:"100%", maxHeight:"58vh", cursor: tool==="erase" ? "cell" : "crosshair", touchAction:"none" }}
-            onMouseDown={onDown} onMouseMove={onMove} onMouseUp={onUp} onMouseLeave={onUp}
-            onTouchStart={onDown} onTouchMove={onMove} onTouchEnd={onUp}
+            style={{ display: "block", maxWidth: "100%", maxHeight: "58vh", cursor: tool === "erase" ? "cell" : "crosshair", touchAction: "none" }}
+            onContextMenu={e => e.preventDefault()}
+            onMouseDown={onDown}
+            onMouseMove={onMove}
+            onMouseUp={onUp}
+            onMouseLeave={onUp}
+            onTouchStart={onDown}
+            onTouchMove={onMove}
+            onTouchEnd={onUp}
+            onDoubleClick={() => { if (tool === "lasso") closeLasso(); }}
           />
-          {/* Brush cursor hint */}
-          <div style={{ position:"absolute", bottom:10, left:10, fontSize:11, color:"rgba(255,255,255,0.7)", background:"rgba(0,0,0,0.4)", borderRadius:6, padding:"3px 8px", fontFamily:"'Nunito',sans-serif", fontWeight:600 }}>
-            {tool==="erase" ? "Paint to erase" : "Paint to restore"}
+          <div style={{ position: "absolute", bottom: 10, left: 10, fontSize: 11, color: "rgba(255,255,255,0.7)", background: "rgba(0,0,0,0.4)", borderRadius: 6, padding: "3px 8px", fontFamily: "'Nunito',sans-serif", fontWeight: 600 }}>
+            {tool === "erase"
+              ? "Paint to erase"
+              : tool === "restore"
+                ? "Paint to restore"
+                : tool === "lasso"
+                  ? "Click points, close path, then delete"
+                  : "Alt/Right-click to set source, then paint"}
           </div>
         </div>
 
-        {/* Footer */}
-        <div style={{ padding:"14px 18px", display:"flex", gap:10, justifyContent:"flex-end", borderTop:"1px solid #e8e4dc" }}>
-          <button onClick={onCancel} style={{ padding:"9px 18px", background:"none", border:"none", cursor:"pointer", color:"#aaa", fontFamily:"'Nunito',sans-serif", fontSize:13, fontWeight:600 }}>Cancel</button>
-          <button onClick={applyEdit} style={{ padding:"9px 22px", background:"#1a1a1a", border:"none", borderRadius:12, cursor:"pointer", fontFamily:"'Nunito',sans-serif", fontSize:13, fontWeight:700, color:"#fff" }}>Apply</button>
+        <div style={{ padding: "14px 18px", display: "flex", gap: 10, justifyContent: "flex-end", borderTop: "1px solid #e8e4dc" }}>
+          <button onClick={onCancel} style={{ padding: "9px 18px", background: "none", border: "none", cursor: "pointer", color: "#aaa", fontFamily: "'Nunito',sans-serif", fontSize: 13, fontWeight: 600 }}>Cancel</button>
+          <button onClick={applyEdit} style={{ padding: "9px 22px", background: "#1a1a1a", border: "none", borderRadius: 12, cursor: "pointer", fontFamily: "'Nunito',sans-serif", fontSize: 13, fontWeight: 700, color: "#fff" }}>Apply</button>
         </div>
       </div>
     </div>

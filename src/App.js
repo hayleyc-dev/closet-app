@@ -7723,6 +7723,7 @@ export default function App() {
   const [lbSort, setLbSort] = useState("newest");
   const [lbZoom, setLbZoom] = useState(210);
   const [lbTagFilter, setLbTagFilter] = useState("All");
+  const [lbTypeFilter, setLbTypeFilter] = useState("All");
   const [bulkMode, setBulkMode] = useState(false);
   const [wishlistDest, setWishlistDest] = useState(false);
   const [wlSort, setWlSort] = useState("priority");
@@ -8395,17 +8396,26 @@ export default function App() {
             {/* LOOKBOOKS */}
             {tab === "lookbooks" && (
               <div className="fade-up">
-                <div style={{ display: "flex", gap: 8, marginBottom: 18, alignItems: "center", justifyContent: "flex-end", flexWrap: "wrap" }}>
-                  <select value={lbSort} onChange={e => setLbSort(e.target.value)} className="pill-select">
-                    <option value="newest">Newest</option>
-                    <option value="az">A – Z</option>
-                    <option value="most">Most Outfits</option>
-                  </select>
-                  <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                    <SvgBox size={11} color="#bbb" />
-                    <input type="range" min={160} max={340} step={10} value={lbZoom} onChange={e => setLbZoom(Number(e.target.value))}
-                      style={{ width: 72, accentColor: "#1a1a1a", cursor: "pointer" }} />
-                    <SvgBox size={16} color="#bbb" />
+                <div style={{ display: "flex", gap: 10, marginBottom: 18, alignItems: "center", justifyContent: "space-between", flexWrap: "wrap" }}>
+                  <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                    {["All", ...LOOKBOOK_TYPES.map(type => type[0].toUpperCase() + type.slice(1))].map(typeLabel => (
+                      <button key={typeLabel} className={"filter-pill" + (lbTypeFilter === typeLabel ? " active" : "")} onClick={() => setLbTypeFilter(typeLabel)}>
+                        {typeLabel}
+                      </button>
+                    ))}
+                  </div>
+                  <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+                    <select value={lbSort} onChange={e => setLbSort(e.target.value)} className="pill-select">
+                      <option value="newest">Newest</option>
+                      <option value="az">A – Z</option>
+                      <option value="most">Most Outfits</option>
+                    </select>
+                    <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                      <SvgBox size={11} color="#bbb" />
+                      <input type="range" min={160} max={340} step={10} value={lbZoom} onChange={e => setLbZoom(Number(e.target.value))}
+                        style={{ width: 72, accentColor: "#1a1a1a", cursor: "pointer" }} />
+                      <SvgBox size={16} color="#bbb" />
+                    </div>
                   </div>
                 </div>
 
@@ -8419,7 +8429,10 @@ export default function App() {
                     const matchSearch = !lbSearch || lb.name.toLowerCase().includes(lbSearch.toLowerCase());
                     const selectedOccasions = LOOKBOOK_OCCASION_ALIASES[lbTagFilter] || [lbTagFilter];
                     const matchTag = lbTagFilter === "All" || selectedOccasions.some(t => (lb.tags || []).includes(t));
-                    return matchSearch && matchTag;
+                    const typeLabel = (lb.type || "").toString();
+                    const normalizedTypeLabel = typeLabel ? typeLabel[0].toUpperCase() + typeLabel.slice(1) : "";
+                    const matchType = lbTypeFilter === "All" || normalizedTypeLabel === lbTypeFilter;
+                    return matchSearch && matchTag && matchType;
                   });
                   if (lbSort === "az") filtered = [...filtered].sort((a, b) => a.name.localeCompare(b.name));
                   else if (lbSort === "most") filtered = [...filtered].sort((a, b) => (b.outfitIds || []).length - (a.outfitIds || []).length);

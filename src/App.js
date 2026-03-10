@@ -8028,8 +8028,8 @@ export default function App() {
           {/* Content — 2-column layout (left sidebar + main) */}
           <div className="app-layout">
 
-        {/* ── LEFT SIDEBAR (closet + outfits) ── */}
-        {(tab === "closet" || tab === "outfits") && (
+        {/* ── LEFT SIDEBAR (closet + outfits + lookbooks) ── */}
+        {(tab === "closet" || tab === "outfits" || tab === "lookbooks") && (
           <div className="app-left-sidebar">
             <div className="closet-sidebar" style={{ position: "sticky", top: 80 }}>
               {tab === "closet" && (<>
@@ -8072,6 +8072,20 @@ export default function App() {
                   <div className="sidebar-label">Occasion</div>
                   {["All", "WFH", "Disney", "Universal", "Date Night", "Travel", "Sport", "Weekend", "Occasion"].map(tag => (
                     <button key={tag} className={"sidebar-btn" + (outfitTagFilter === tag ? " active" : "")} onClick={() => setOutfitTagFilter(tag)}>{tag}</button>
+                  ))}
+                </div>
+              </>)}
+              {tab === "lookbooks" && (<>
+                <div className="sidebar-section">
+                  <div style={{ position: "relative" }}>
+                    <span style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)", pointerEvents: "none", display:"flex" }}><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#bbb" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{pointerEvents:"none"}}><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg></span>
+                    <input className="closet-search" value={lbSearch} onChange={e => setLbSearch(e.target.value)} placeholder="Search lookbooks…" />
+                  </div>
+                </div>
+                <div className="sidebar-section">
+                  <div className="sidebar-label">Occasion</div>
+                  {LOOKBOOK_OCCASIONS.map(tag => (
+                    <button key={tag} className={"sidebar-btn" + (lbTagFilter === tag ? " active" : "")} onClick={() => setLbTagFilter(tag)}>{tag}</button>
                   ))}
                 </div>
               </>)}
@@ -8323,40 +8337,19 @@ export default function App() {
             {/* LOOKBOOKS */}
             {tab === "lookbooks" && (
               <div className="fade-up">
-                <div style={{ display: "grid", gridTemplateColumns: "250px minmax(0,1fr)", gap: 16, alignItems: "start" }}>
-                  <div style={{ background: "#f5f4f2", border: "1px solid #ece8e0", borderRadius: 22, padding: 16, position: "sticky", top: 20, minHeight: 520 }}>
-                    <div style={{ position: "relative", marginBottom: 18 }}>
-                      <SvgSearch size={15} color="#b4b4b4" style={{ position: "absolute", left: 14, top: "50%", transform: "translateY(-50%)" }} />
-                      <input value={lbSearch} onChange={e => setLbSearch(e.target.value)} placeholder="Search outfits..."
-                        style={{ width: "100%", padding: "11px 14px 11px 42px", border: "2px solid #d5d1cb", borderRadius: 999, fontFamily: "'DM Sans', sans-serif", fontSize: 13, outline: "none", background: "#f8f7f5", color: "#666" }} />
-                    </div>
-                    <div style={{ fontSize: 11, fontWeight: 700, color: "#a9a39a", textTransform: "uppercase", letterSpacing: "0.14em", marginBottom: 10 }}>Occasion</div>
-                    <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                      {LOOKBOOK_OCCASIONS.map(t => (
-                        <button key={t} onClick={() => setLbTagFilter(t)} style={{
-                          padding: "10px 18px", borderRadius: 16, border: "none", whiteSpace: "nowrap", textAlign: "left",
-                          background: lbTagFilter === t ? "#171717" : "transparent",
-                          color: lbTagFilter === t ? "#fff" : "#737373",
-                          fontFamily: "'DM Sans', sans-serif", fontSize: 16, fontWeight: lbTagFilter === t ? 700 : 500, cursor: "pointer"
-                        }}>{t}</button>
-                      ))}
-                    </div>
+                <div style={{ display: "flex", gap: 8, marginBottom: 18, alignItems: "center", justifyContent: "flex-end", flexWrap: "wrap" }}>
+                  <select value={lbSort} onChange={e => setLbSort(e.target.value)} className="pill-select">
+                    <option value="newest">Newest</option>
+                    <option value="az">A – Z</option>
+                    <option value="most">Most Outfits</option>
+                  </select>
+                  <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                    <SvgBox size={11} color="#bbb" />
+                    <input type="range" min={160} max={340} step={10} value={lbZoom} onChange={e => setLbZoom(Number(e.target.value))}
+                      style={{ width: 72, accentColor: "#1a1a1a", cursor: "pointer" }} />
+                    <SvgBox size={16} color="#bbb" />
                   </div>
-
-                  <div>
-                    <div style={{ display: "flex", gap: 8, marginBottom: 18, alignItems: "center", justifyContent: "flex-end", flexWrap: "wrap" }}>
-                      <select value={lbSort} onChange={e => setLbSort(e.target.value)} className="pill-select">
-                        <option value="newest">Newest</option>
-                        <option value="az">A – Z</option>
-                        <option value="most">Most Outfits</option>
-                      </select>
-                      <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                        <SvgBox size={11} color="#bbb" />
-                        <input type="range" min={160} max={340} step={10} value={lbZoom} onChange={e => setLbZoom(Number(e.target.value))}
-                          style={{ width: 72, accentColor: "#1a1a1a", cursor: "pointer" }} />
-                        <SvgBox size={16} color="#bbb" />
-                      </div>
-                    </div>
+                </div>
 
                 {(() => {
                   const fmtDate = (d) => {
@@ -8460,8 +8453,6 @@ export default function App() {
                     </div>
                   );
                 })()}
-                  </div>
-                </div>
               </div>
             )}
 

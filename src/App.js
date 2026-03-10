@@ -1658,8 +1658,8 @@ function ItemDetailPopup({ item, onClose, onEdit, onDelete, onWorn, onDuplicate,
               ) : (
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(140px, 1fr))", gap: 10 }}>
                   {featuredOutfits.map(outfit => (
-                    <div key={outfit.id} onClick={() => onOpenOutfit && onOpenOutfit(outfit)} style={{ borderRadius: 14, overflow: "hidden", background: "#fff", border: "1px solid #cfcfcf", aspectRatio: "3/4", display: "flex", alignItems: "center", justifyContent: "center", padding: "14px 12px", cursor: onOpenOutfit ? "pointer" : "default" }}>
-                      {outfit.previewImage ? <img src={outfit.previewImage} alt={outfit.name} style={{ width: "100%", height: "100%", objectFit: "contain" }} /> : <HangerIcon size={28} color="#ddd" />}
+                    <div key={outfit.id} onClick={() => onOpenOutfit && onOpenOutfit(outfit)} style={{ borderRadius: 14, overflow: "hidden", background: "#fff", border: "1px solid #cfcfcf", aspectRatio: "3/4", display: "flex", alignItems: "center", justifyContent: "center", cursor: onOpenOutfit ? "pointer" : "default" }}>
+                      {outfit.previewImage ? <img src={outfit.previewImage} alt={outfit.name} style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : <HangerIcon size={28} color="#ddd" />}
                     </div>
                   ))}
                 </div>

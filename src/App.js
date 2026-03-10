@@ -7670,7 +7670,11 @@ export default function App() {
   const [activeLookbookView, setActiveLookbookView] = useState("editorial");
   const [moodboardActiveIdx, setMoodboardActiveIdx] = useState(0);
   const LOOKBOOK_TYPES = ["trip", "event", "season", "capsule", "inspiration"];
-  const LOOKBOOK_OCCASIONS = ["All","Travel","Work Week","Event","Disney","Sport","Weekend","Vacation"];
+  const LOOKBOOK_OCCASIONS = ["All", "WFH", "Disney", "Universal", "Date Night", "Travel", "Sport", "Weekend", "Occasion"];
+  const LOOKBOOK_OCCASION_ALIASES = {
+    "WFH": ["WFH", "Work Week", "Work"],
+    "Occasion": ["Occasion", "Event", "Vacation"],
+  };
   const [lbSearch, setLbSearch] = useState("");
   const [lbSort, setLbSort] = useState("newest");
   const [lbZoom, setLbZoom] = useState(210);
@@ -8319,19 +8323,21 @@ export default function App() {
             {/* LOOKBOOKS */}
             {tab === "lookbooks" && (
               <div className="fade-up">
-                <div style={{ display: "grid", gridTemplateColumns: "220px minmax(0,1fr)", gap: 16, alignItems: "start" }}>
-                  <div style={{ background: "#fff", border: "1px solid #ece8e0", borderRadius: 16, padding: 12, position: "sticky", top: 20 }}>
-                    <input value={lbSearch} onChange={e => setLbSearch(e.target.value)} placeholder="Search lookbooks…"
-                      style={{ width: "100%", padding: "7px 10px", border: "1.5px solid #e8e4dc", borderRadius: 10, fontFamily: "'DM Sans', sans-serif", fontSize: 12, outline: "none", background: "#faf9f6", marginBottom: 10 }} />
-                    <div style={{ fontSize: 10, fontWeight: 700, color: "#aaa", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 8 }}>Occasions</div>
+                <div style={{ display: "grid", gridTemplateColumns: "250px minmax(0,1fr)", gap: 16, alignItems: "start" }}>
+                  <div style={{ background: "#f5f4f2", border: "1px solid #ece8e0", borderRadius: 22, padding: 16, position: "sticky", top: 20, minHeight: 520 }}>
+                    <div style={{ position: "relative", marginBottom: 18 }}>
+                      <SvgSearch size={15} color="#b4b4b4" style={{ position: "absolute", left: 14, top: "50%", transform: "translateY(-50%)" }} />
+                      <input value={lbSearch} onChange={e => setLbSearch(e.target.value)} placeholder="Search outfits..."
+                        style={{ width: "100%", padding: "11px 14px 11px 42px", border: "2px solid #d5d1cb", borderRadius: 999, fontFamily: "'DM Sans', sans-serif", fontSize: 13, outline: "none", background: "#f8f7f5", color: "#666" }} />
+                    </div>
+                    <div style={{ fontSize: 11, fontWeight: 700, color: "#a9a39a", textTransform: "uppercase", letterSpacing: "0.14em", marginBottom: 10 }}>Occasion</div>
                     <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
                       {LOOKBOOK_OCCASIONS.map(t => (
                         <button key={t} onClick={() => setLbTagFilter(t)} style={{
-                          padding: "7px 10px", borderRadius: 10, border: "1px solid", whiteSpace: "nowrap", textAlign: "left",
-                          borderColor: lbTagFilter === t ? "#1a1a1a" : "#e0dbd2",
-                          background: lbTagFilter === t ? "#1a1a1a" : "#fff",
-                          color: lbTagFilter === t ? "#fff" : "#666",
-                          fontFamily: "'DM Sans', sans-serif", fontSize: 12, fontWeight: 600, cursor: "pointer"
+                          padding: "10px 18px", borderRadius: 16, border: "none", whiteSpace: "nowrap", textAlign: "left",
+                          background: lbTagFilter === t ? "#171717" : "transparent",
+                          color: lbTagFilter === t ? "#fff" : "#737373",
+                          fontFamily: "'DM Sans', sans-serif", fontSize: 16, fontWeight: lbTagFilter === t ? 700 : 500, cursor: "pointer"
                         }}>{t}</button>
                       ))}
                     </div>
@@ -8360,7 +8366,8 @@ export default function App() {
                   };
                   let filtered = lookbooksDb.rows.filter(lb => {
                     const matchSearch = !lbSearch || lb.name.toLowerCase().includes(lbSearch.toLowerCase());
-                    const matchTag = lbTagFilter === "All" || (lb.tags || []).includes(lbTagFilter);
+                    const selectedOccasions = LOOKBOOK_OCCASION_ALIASES[lbTagFilter] || [lbTagFilter];
+                    const matchTag = lbTagFilter === "All" || selectedOccasions.some(t => (lb.tags || []).includes(t));
                     return matchSearch && matchTag;
                   });
                   if (lbSort === "az") filtered = [...filtered].sort((a, b) => a.name.localeCompare(b.name));

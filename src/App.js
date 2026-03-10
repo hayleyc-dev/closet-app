@@ -603,6 +603,7 @@ function MaskEditor({ current, original, onDone, onCancel }) {
   const [painting, setPainting] = useState(false);
   const [lassoPoints, setLassoPoints] = useState([]);
   const [lassoClosed, setLassoClosed] = useState(false);
+  const lassoPointsRef = useRef([]);
   const lastPos = useRef(null);
   const cloneSourceRef = useRef(null);
   const cloneStrokeStartRef = useRef(null);
@@ -687,6 +688,10 @@ function MaskEditor({ current, original, onDone, onCancel }) {
   useEffect(() => {
     redrawCanvas();
   }, [lassoPoints, lassoClosed, tool, brushSize]);
+
+  useEffect(() => {
+    lassoPointsRef.current = lassoPoints;
+  }, [lassoPoints]);
 
   const getCanvasPos = (e) => {
     const cur = currentDataRef.current;
@@ -837,17 +842,9 @@ function MaskEditor({ current, original, onDone, onCancel }) {
       if (lassoClosed) {
         setLassoPoints([p]);
         setLassoClosed(false);
-        return;
       }
-      if (lassoPoints.length >= 2) {
-        const first = lassoPoints[0];
-        const dist = Math.sqrt((first.x - p.x) ** 2 + (first.y - p.y) ** 2);
-        if (dist < 14) {
-          closeLasso();
-          return;
-        }
-      }
-      setLassoPoints(prev => [...prev, p]);
+      setPainting(true);
+      setLassoPoints([p]);
       return;
     }
 
@@ -874,12 +871,27 @@ function MaskEditor({ current, original, onDone, onCancel }) {
     e.preventDefault();
     if (!painting) return;
     const p = getCanvasPos(e);
+    if (tool === "lasso") {
+      setLassoPoints(prev => {
+        if (prev.length === 0) return [p];
+        const last = prev[prev.length - 1];
+        const dist = Math.sqrt((last.x - p.x) ** 2 + (last.y - p.y) ** 2);
+        if (dist < 1.5) return prev;
+        return [...prev, p];
+      });
+      return;
+    }
     paintLine(lastPos.current, p);
     lastPos.current = p;
   };
 
   const onUp = (e) => {
     e.preventDefault();
+    if (tool === "lasso" && painting) {
+      if (lassoPointsRef.current.length >= 3) setLassoClosed(true);
+      setPainting(false);
+      return;
+    }
     setPainting(false);
     cloneStrokeStartRef.current = null;
     cloneSnapshotRef.current = null;
@@ -962,7 +974,7 @@ function MaskEditor({ current, original, onDone, onCancel }) {
               : tool === "restore"
                 ? "Paint to restore"
                 : tool === "lasso"
-                  ? "Click points, close path, then delete"
+                  ? "Draw selection, release, then delete"
                   : "Alt/Right-click to set source, then paint"}
           </div>
         </div>

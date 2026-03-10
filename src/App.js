@@ -7669,6 +7669,8 @@ export default function App() {
   const [activeLookbook, setActiveLookbook] = useState(null);
   const [activeLookbookView, setActiveLookbookView] = useState("editorial");
   const [moodboardActiveIdx, setMoodboardActiveIdx] = useState(0);
+  const LOOKBOOK_TYPES = ["trip", "event", "season", "capsule", "inspiration"];
+  const LOOKBOOK_OCCASIONS = ["All","Travel","Work Week","Event","Disney","Sport","Weekend","Vacation"];
   const [lbSearch, setLbSearch] = useState("");
   const [lbSort, setLbSort] = useState("newest");
   const [lbZoom, setLbZoom] = useState(210);
@@ -7689,6 +7691,7 @@ export default function App() {
   const [newLbCover, setNewLbCover] = useState(""); // base64 data URL
   const [newLbDateStart, setNewLbDateStart] = useState("");
   const [newLbTags, setNewLbTags] = useState([]);
+  const [newLbType, setNewLbType] = useState("trip");
   const [newLbCity, setNewLbCity] = useState("");
   const [newLbDateEnd, setNewLbDateEnd] = useState("");
   const [newLbSelected, setNewLbSelected] = useState([]);
@@ -7740,11 +7743,13 @@ export default function App() {
       dateStart: newLbDateStart,
       dateEnd: newLbDateEnd,
       outfitIds: newLbSelected,
+      type: newLbType,
+      tags: newLbTags,
       lookMeta: {},
     };
     setLookbookModal(false);
     setNewLbName(""); setNewLbNotes(""); setNewLbCover("");
-    setNewLbDateStart(""); setNewLbDateEnd(""); setNewLbSelected([]); setNewLbTags([]); setNewLbCity("");
+    setNewLbDateStart(""); setNewLbDateEnd(""); setNewLbSelected([]); setNewLbTags([]); setNewLbType("trip"); setNewLbCity("");
     // Try wrapped {id, data} schema first, fall back to flat insert
     let { error } = await supabase.from("lookbooks").insert({ id: newLb.id, data: newLb });
     if (error) {
@@ -8314,37 +8319,38 @@ export default function App() {
             {/* LOOKBOOKS */}
             {tab === "lookbooks" && (
               <div className="fade-up">
-                {/* Toolbar: tags · search · sort · zoom */}
-                <div style={{ display: "flex", gap: 8, marginBottom: 18, alignItems: "center", flexWrap: "wrap" }}>
-                  {/* Tag pills — first */}
-                  <div style={{ display: "flex", gap: 5, flexWrap: "nowrap", overflowX: "auto" }}>
-                    {["All","Travel","Work Week","Event","Disney","Sport","Weekend","Vacation"].map(t => (
-                      <button key={t} onClick={() => setLbTagFilter(t)} style={{
-                        padding: "5px 12px", borderRadius: 100, border: "1px solid", whiteSpace: "nowrap",
-                        borderColor: lbTagFilter === t ? "#1a1a1a" : "#e0dbd2",
-                        background: lbTagFilter === t ? "#1a1a1a" : "#fff",
-                        color: lbTagFilter === t ? "#fff" : "#666",
-                        fontFamily: "'DM Sans', sans-serif", fontSize: 11, fontWeight: 600, cursor: "pointer"
-                      }}>{t}</button>
-                    ))}
+                <div style={{ display: "grid", gridTemplateColumns: "220px minmax(0,1fr)", gap: 16, alignItems: "start" }}>
+                  <div style={{ background: "#fff", border: "1px solid #ece8e0", borderRadius: 16, padding: 12, position: "sticky", top: 20 }}>
+                    <input value={lbSearch} onChange={e => setLbSearch(e.target.value)} placeholder="Search lookbooks…"
+                      style={{ width: "100%", padding: "7px 10px", border: "1.5px solid #e8e4dc", borderRadius: 10, fontFamily: "'DM Sans', sans-serif", fontSize: 12, outline: "none", background: "#faf9f6", marginBottom: 10 }} />
+                    <div style={{ fontSize: 10, fontWeight: 700, color: "#aaa", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 8 }}>Occasions</div>
+                    <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                      {LOOKBOOK_OCCASIONS.map(t => (
+                        <button key={t} onClick={() => setLbTagFilter(t)} style={{
+                          padding: "7px 10px", borderRadius: 10, border: "1px solid", whiteSpace: "nowrap", textAlign: "left",
+                          borderColor: lbTagFilter === t ? "#1a1a1a" : "#e0dbd2",
+                          background: lbTagFilter === t ? "#1a1a1a" : "#fff",
+                          color: lbTagFilter === t ? "#fff" : "#666",
+                          fontFamily: "'DM Sans', sans-serif", fontSize: 12, fontWeight: 600, cursor: "pointer"
+                        }}>{t}</button>
+                      ))}
+                    </div>
                   </div>
-                  {/* Search */}
-                  <input value={lbSearch} onChange={e => setLbSearch(e.target.value)} placeholder="Search lookbooks…"
-                    style={{ flex: "1 1 160px", padding: "9px 14px", border: "1.5px solid #e8e4dc", borderRadius: 12, fontFamily: "'DM Sans', sans-serif", fontSize: 13, outline: "none", background: "#faf9f6" }} />
-                  {/* Sort */}
-                  <select value={lbSort} onChange={e => setLbSort(e.target.value)} className="pill-select">
-                    <option value="newest">Newest</option>
-                    <option value="az">A – Z</option>
-                    <option value="most">Most Outfits</option>
-                  </select>
-                  {/* Zoom slider */}
-                  <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                    <SvgBox size={11} color="#bbb" />
-                    <input type="range" min={160} max={340} step={10} value={lbZoom} onChange={e => setLbZoom(Number(e.target.value))}
-                      style={{ width: 72, accentColor: "#1a1a1a", cursor: "pointer" }} />
-                    <SvgBox size={16} color="#bbb" />
-                  </div>
-                </div>
+
+                  <div>
+                    <div style={{ display: "flex", gap: 8, marginBottom: 18, alignItems: "center", justifyContent: "flex-end", flexWrap: "wrap" }}>
+                      <select value={lbSort} onChange={e => setLbSort(e.target.value)} className="pill-select">
+                        <option value="newest">Newest</option>
+                        <option value="az">A – Z</option>
+                        <option value="most">Most Outfits</option>
+                      </select>
+                      <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                        <SvgBox size={11} color="#bbb" />
+                        <input type="range" min={160} max={340} step={10} value={lbZoom} onChange={e => setLbZoom(Number(e.target.value))}
+                          style={{ width: 72, accentColor: "#1a1a1a", cursor: "pointer" }} />
+                        <SvgBox size={16} color="#bbb" />
+                      </div>
+                    </div>
 
                 {(() => {
                   const fmtDate = (d) => {
@@ -8447,6 +8453,8 @@ export default function App() {
                     </div>
                   );
                 })()}
+                  </div>
+                </div>
               </div>
             )}
 
@@ -8753,9 +8761,15 @@ export default function App() {
           <input value={newLbCity} onChange={e => setNewLbCity(e.target.value)} placeholder="e.g. Orlando, FL" style={inputStyle} />
         </div>
         <div style={{ marginBottom: 14 }}>
+          <label style={{ display: "block", fontSize: 11, fontWeight: 600, color: "#999", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 6 }}>Lookbook Type</label>
+          <select value={newLbType} onChange={e => setNewLbType(e.target.value)} style={inputStyle}>
+            {LOOKBOOK_TYPES.map(type => <option key={type} value={type}>{type[0].toUpperCase() + type.slice(1)}</option>)}
+          </select>
+        </div>
+        <div style={{ marginBottom: 14 }}>
           <label style={{ display: "block", fontSize: 11, fontWeight: 600, color: "#999", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 8 }}>Tags</label>
           <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-            {["Travel","Work Week","Event","Disney","Sport","Weekend","Vacation"].map(t => {
+            {LOOKBOOK_OCCASIONS.filter(t => t !== "All").map(t => {
               const on = newLbTags.includes(t);
               return (
                 <button key={t} onClick={() => setNewLbTags(s => on ? s.filter(x => x !== t) : [...s, t])} style={{

@@ -7727,7 +7727,7 @@ export default function App() {
 
   const duplicateItem = async (item) => {
     const { id, ...rest } = item;
-    await itemsDb.insert({ ...rest, name: `${item.name} Copy` });
+    await itemsDb.add({ ...rest, id: uid(), name: `${item.name} Copy` });
   };
 
   const filteredItems = (() => {

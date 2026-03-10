@@ -7669,6 +7669,12 @@ export default function App() {
   const [activeLookbook, setActiveLookbook] = useState(null);
   const [activeLookbookView, setActiveLookbookView] = useState("editorial");
   const [moodboardActiveIdx, setMoodboardActiveIdx] = useState(0);
+  const LOOKBOOK_TYPES = ["trip", "event", "season", "capsule", "inspiration"];
+  const LOOKBOOK_OCCASIONS = ["All", "WFH", "Disney", "Universal", "Date Night", "Travel", "Sport", "Weekend", "Occasion"];
+  const LOOKBOOK_OCCASION_ALIASES = {
+    "WFH": ["WFH", "Work Week", "Work"],
+    "Occasion": ["Occasion", "Event", "Vacation"],
+  };
   const [lbSearch, setLbSearch] = useState("");
   const [lbSort, setLbSort] = useState("newest");
   const [lbZoom, setLbZoom] = useState(210);
@@ -7689,6 +7695,7 @@ export default function App() {
   const [newLbCover, setNewLbCover] = useState(""); // base64 data URL
   const [newLbDateStart, setNewLbDateStart] = useState("");
   const [newLbTags, setNewLbTags] = useState([]);
+  const [newLbType, setNewLbType] = useState("trip");
   const [newLbCity, setNewLbCity] = useState("");
   const [newLbDateEnd, setNewLbDateEnd] = useState("");
   const [newLbSelected, setNewLbSelected] = useState([]);
@@ -7740,11 +7747,13 @@ export default function App() {
       dateStart: newLbDateStart,
       dateEnd: newLbDateEnd,
       outfitIds: newLbSelected,
+      type: newLbType,
+      tags: newLbTags,
       lookMeta: {},
     };
     setLookbookModal(false);
     setNewLbName(""); setNewLbNotes(""); setNewLbCover("");
-    setNewLbDateStart(""); setNewLbDateEnd(""); setNewLbSelected([]); setNewLbTags([]); setNewLbCity("");
+    setNewLbDateStart(""); setNewLbDateEnd(""); setNewLbSelected([]); setNewLbTags([]); setNewLbType("trip"); setNewLbCity("");
     // Try wrapped {id, data} schema first, fall back to flat insert
     let { error } = await supabase.from("lookbooks").insert({ id: newLb.id, data: newLb });
     if (error) {
@@ -8019,8 +8028,8 @@ export default function App() {
           {/* Content — 2-column layout (left sidebar + main) */}
           <div className="app-layout">
 
-        {/* ── LEFT SIDEBAR (closet + outfits) ── */}
-        {(tab === "closet" || tab === "outfits") && (
+        {/* ── LEFT SIDEBAR (closet + outfits + lookbooks) ── */}
+        {(tab === "closet" || tab === "outfits" || tab === "lookbooks") && (
           <div className="app-left-sidebar">
             <div className="closet-sidebar" style={{ position: "sticky", top: 80 }}>
               {tab === "closet" && (<>
@@ -8063,6 +8072,20 @@ export default function App() {
                   <div className="sidebar-label">Occasion</div>
                   {["All", "WFH", "Disney", "Universal", "Date Night", "Travel", "Sport", "Weekend", "Occasion"].map(tag => (
                     <button key={tag} className={"sidebar-btn" + (outfitTagFilter === tag ? " active" : "")} onClick={() => setOutfitTagFilter(tag)}>{tag}</button>
+                  ))}
+                </div>
+              </>)}
+              {tab === "lookbooks" && (<>
+                <div className="sidebar-section">
+                  <div style={{ position: "relative" }}>
+                    <span style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)", pointerEvents: "none", display:"flex" }}><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#bbb" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{pointerEvents:"none"}}><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg></span>
+                    <input className="closet-search" value={lbSearch} onChange={e => setLbSearch(e.target.value)} placeholder="Search lookbooks…" />
+                  </div>
+                </div>
+                <div className="sidebar-section">
+                  <div className="sidebar-label">Occasion</div>
+                  {LOOKBOOK_OCCASIONS.map(tag => (
+                    <button key={tag} className={"sidebar-btn" + (lbTagFilter === tag ? " active" : "")} onClick={() => setLbTagFilter(tag)}>{tag}</button>
                   ))}
                 </div>
               </>)}
@@ -8314,30 +8337,12 @@ export default function App() {
             {/* LOOKBOOKS */}
             {tab === "lookbooks" && (
               <div className="fade-up">
-                {/* Toolbar: tags · search · sort · zoom */}
-                <div style={{ display: "flex", gap: 8, marginBottom: 18, alignItems: "center", flexWrap: "wrap" }}>
-                  {/* Tag pills — first */}
-                  <div style={{ display: "flex", gap: 5, flexWrap: "nowrap", overflowX: "auto" }}>
-                    {["All","Travel","Work Week","Event","Disney","Sport","Weekend","Vacation"].map(t => (
-                      <button key={t} onClick={() => setLbTagFilter(t)} style={{
-                        padding: "5px 12px", borderRadius: 100, border: "1px solid", whiteSpace: "nowrap",
-                        borderColor: lbTagFilter === t ? "#1a1a1a" : "#e0dbd2",
-                        background: lbTagFilter === t ? "#1a1a1a" : "#fff",
-                        color: lbTagFilter === t ? "#fff" : "#666",
-                        fontFamily: "'DM Sans', sans-serif", fontSize: 11, fontWeight: 600, cursor: "pointer"
-                      }}>{t}</button>
-                    ))}
-                  </div>
-                  {/* Search */}
-                  <input value={lbSearch} onChange={e => setLbSearch(e.target.value)} placeholder="Search lookbooks…"
-                    style={{ flex: "1 1 160px", padding: "9px 14px", border: "1.5px solid #e8e4dc", borderRadius: 12, fontFamily: "'DM Sans', sans-serif", fontSize: 13, outline: "none", background: "#faf9f6" }} />
-                  {/* Sort */}
+                <div style={{ display: "flex", gap: 8, marginBottom: 18, alignItems: "center", justifyContent: "flex-end", flexWrap: "wrap" }}>
                   <select value={lbSort} onChange={e => setLbSort(e.target.value)} className="pill-select">
                     <option value="newest">Newest</option>
                     <option value="az">A – Z</option>
                     <option value="most">Most Outfits</option>
                   </select>
-                  {/* Zoom slider */}
                   <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
                     <SvgBox size={11} color="#bbb" />
                     <input type="range" min={160} max={340} step={10} value={lbZoom} onChange={e => setLbZoom(Number(e.target.value))}
@@ -8354,7 +8359,8 @@ export default function App() {
                   };
                   let filtered = lookbooksDb.rows.filter(lb => {
                     const matchSearch = !lbSearch || lb.name.toLowerCase().includes(lbSearch.toLowerCase());
-                    const matchTag = lbTagFilter === "All" || (lb.tags || []).includes(lbTagFilter);
+                    const selectedOccasions = LOOKBOOK_OCCASION_ALIASES[lbTagFilter] || [lbTagFilter];
+                    const matchTag = lbTagFilter === "All" || selectedOccasions.some(t => (lb.tags || []).includes(t));
                     return matchSearch && matchTag;
                   });
                   if (lbSort === "az") filtered = [...filtered].sort((a, b) => a.name.localeCompare(b.name));
@@ -8753,9 +8759,15 @@ export default function App() {
           <input value={newLbCity} onChange={e => setNewLbCity(e.target.value)} placeholder="e.g. Orlando, FL" style={inputStyle} />
         </div>
         <div style={{ marginBottom: 14 }}>
+          <label style={{ display: "block", fontSize: 11, fontWeight: 600, color: "#999", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 6 }}>Lookbook Type</label>
+          <select value={newLbType} onChange={e => setNewLbType(e.target.value)} style={inputStyle}>
+            {LOOKBOOK_TYPES.map(type => <option key={type} value={type}>{type[0].toUpperCase() + type.slice(1)}</option>)}
+          </select>
+        </div>
+        <div style={{ marginBottom: 14 }}>
           <label style={{ display: "block", fontSize: 11, fontWeight: 600, color: "#999", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 8 }}>Tags</label>
           <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-            {["Travel","Work Week","Event","Disney","Sport","Weekend","Vacation"].map(t => {
+            {LOOKBOOK_OCCASIONS.filter(t => t !== "All").map(t => {
               const on = newLbTags.includes(t);
               return (
                 <button key={t} onClick={() => setNewLbTags(s => on ? s.filter(x => x !== t) : [...s, t])} style={{

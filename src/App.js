@@ -1467,7 +1467,7 @@ function ItemCard({ item, onClick, onEdit }) {
 }
 
 // ── Item Detail Popup ────────────────────────────────────────────────────────
-function ItemDetailPopup({ item, onClose, onEdit, onDelete, onWorn, onDuplicate, onToggleNeedsStyling, onCreateOutfit, onListForSale, onMoveToCloset, onAddToCapsule, onOpenItem, outfits, lookbooks, isWishlist, capsules, allItems }) {
+function ItemDetailPopup({ item, onClose, onEdit, onDelete, onWorn, onDuplicate, onToggleNeedsStyling, onCreateOutfit, onListForSale, onMoveToCloset, onAddToCapsule, onOpenItem, onOpenOutfit, onOpenLookbook, outfits, lookbooks, isWishlist, capsules, allItems }) {
   const priceNum = parseFloat((item.price || "").replace(/[^0-9.]/g, "")) || 0;
   const spentNum = parseFloat((item.spent || "").replace(/[^0-9.]/g, "")) || 0;
   const worn = item.wornCount || 0;
@@ -1658,7 +1658,7 @@ function ItemDetailPopup({ item, onClose, onEdit, onDelete, onWorn, onDuplicate,
               ) : (
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(140px, 1fr))", gap: 10 }}>
                   {featuredOutfits.map(outfit => (
-                    <div key={outfit.id} style={{ borderRadius: 14, overflow: "hidden", background: "#f5f2ed", aspectRatio: "3/4", display: "flex", alignItems: "center", justifyContent: "center", position: "relative" }}>
+                    <div key={outfit.id} onClick={() => onOpenOutfit && onOpenOutfit(outfit)} style={{ borderRadius: 14, overflow: "hidden", background: "#f5f2ed", aspectRatio: "3/4", display: "flex", alignItems: "center", justifyContent: "center", position: "relative", cursor: onOpenOutfit ? "pointer" : "default" }}>
                       {outfit.previewImage ? <img src={outfit.previewImage} alt={outfit.name} style={{ width: "100%", height: "100%", objectFit: "contain" }} /> : <HangerIcon size={28} color="#ddd" />}
                       <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, background: "linear-gradient(transparent, rgba(0,0,0,0.55))", padding: "18px 8px 8px" }}>
                         <div style={{ fontSize: 11, fontWeight: 700, color: "#fff", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{outfit.name}</div>
@@ -1676,7 +1676,7 @@ function ItemDetailPopup({ item, onClose, onEdit, onDelete, onWorn, onDuplicate,
               ) : (
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(140px, 1fr))", gap: 10 }}>
                   {featuredLookbooks.map(lb => (
-                    <div key={lb.id} style={{ borderRadius: 14, overflow: "hidden", background: "#f5f2ed", aspectRatio: "3/4", display: "flex", alignItems: "center", justifyContent: "center", position: "relative" }}>
+                    <div key={lb.id} onClick={() => onOpenLookbook && onOpenLookbook(lb)} style={{ borderRadius: 14, overflow: "hidden", background: "#f5f2ed", aspectRatio: "3/4", display: "flex", alignItems: "center", justifyContent: "center", position: "relative", cursor: onOpenLookbook ? "pointer" : "default" }}>
                       {lb.coverImage ? <img src={lb.coverImage} alt={lb.name} style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : <SvgGrid size={28} color="#ddd" />}
                       <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, background: "linear-gradient(transparent, rgba(0,0,0,0.55))", padding: "18px 8px 8px" }}>
                         <div style={{ fontSize: 11, fontWeight: 700, color: "#fff", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{lb.name}</div>
@@ -8829,6 +8829,8 @@ export default function App() {
             onListForSale={isWishlistItem ? null : () => { itemsDb.update({ ...itemDetail, forSale: true, saleStatus: "listed", listedDate: new Date().toISOString().slice(0,10) }); setItemDetail(null); setTab("seller"); }}
             onAddToCapsule={isWishlistItem ? null : () => { setCapsulePreselect([itemDetail.id]); setCapsuleName(""); setShowCapsuleModal(true); }}
             onOpenItem={(nextItem) => setItemDetail(nextItem)}
+            onOpenOutfit={(nextOutfit) => { setItemDetail(null); setOutfitPopup(nextOutfit); }}
+            onOpenLookbook={(nextLookbook) => { setItemDetail(null); setActiveLookbook(nextLookbook); }}
             outfits={outfitsDb.rows}
             lookbooks={lookbooksDb.rows}
             capsules={capsules}

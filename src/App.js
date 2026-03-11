@@ -8403,7 +8403,7 @@ export default function App() {
                       fontFamily: "'DM Sans', sans-serif", fontSize: 12, fontWeight: 600, cursor: "pointer",
                       display: "flex", alignItems: "center", gap: 6,
                     }}>
-                      <SvgTag size={12} color={showNeedsStylingOnly ? "#b64b78" : "#aaa"} />Needs Styling
+                      <SvgHanger size={12} color={showNeedsStylingOnly ? "#b64b78" : "#aaa"} />Needs Styling
                     </button>
                     <select value={closetSort} onChange={e => setClosetSort(e.target.value)} className="pill-select" style={{}}>
                       <option value="default">Sort: Default</option>

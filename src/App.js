@@ -1670,7 +1670,7 @@ function AddItemModal({ onSave, onSaveWish, onCancel, initial, editMode, initial
 }
 
 // Clean minimal card: photo dominant (3:4), name + brand + chips below
-function ItemCard({ item, onClick, onEdit }) {
+function ItemCard({ item, onClick, onCreateLook }) {
   return (
     <div className="item-card" onClick={onClick} style={{ position: "relative", cursor: "pointer", overflow: "hidden", borderRadius: 16 }}>
       <div style={{ width: "100%", aspectRatio: "1/1", background: "#fff", overflow: "hidden", display: "flex", alignItems: "center", justifyContent: "center", position: "relative" }}>
@@ -1679,7 +1679,7 @@ function ItemCard({ item, onClick, onEdit }) {
           : <HangerIcon size={36} color="#ddd" />
         }
         <button
-          onClick={e => { e.stopPropagation(); onEdit && onEdit(); }}
+          onClick={e => { e.stopPropagation(); onCreateLook && onCreateLook(); }}
           style={{
             position: "absolute", bottom: 7, right: 7,
             width: 28, height: 28, borderRadius: "50%",
@@ -1688,7 +1688,7 @@ function ItemCard({ item, onClick, onEdit }) {
             display: "flex", alignItems: "center", justifyContent: "center",
             backdropFilter: "blur(4px)", boxShadow: "0 1px 4px rgba(0,0,0,0.1)"
           }}
-        >&#9998;</button>
+        ><SvgHanger size={14} color="currentColor" /></button>
       </div>
     </div>
   );
@@ -8477,7 +8477,7 @@ export default function App() {
                               {bulkSelected.has(item.id) && <SvgCheck size={12} color="#fff" />}
                             </div>
                           )}
-                          <ItemCard item={item} onClick={bulkMode ? undefined : () => setItemDetail(item)} onEdit={bulkMode ? undefined : () => { setEditItem(item); setModal("item"); }} />
+                          <ItemCard item={item} onClick={bulkMode ? undefined : () => setItemDetail(item)} onCreateLook={bulkMode ? undefined : () => { setEditingOutfit(null); setOutfitSeedItem(item); setOutfitBuilder(true); }} />
                         </div>
                       ))}
                     </div>

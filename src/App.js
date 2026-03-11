@@ -1670,16 +1670,16 @@ function AddItemModal({ onSave, onSaveWish, onCancel, initial, editMode, initial
 }
 
 // Clean minimal card: photo dominant (3:4), name + brand + chips below
-function ItemCard({ item, onClick, onEdit }) {
+function ItemCard({ item, onClick, onCreateLook }) {
   return (
     <div className="item-card" onClick={onClick} style={{ position: "relative", cursor: "pointer", overflow: "hidden", borderRadius: 16 }}>
-      <div style={{ width: "100%", aspectRatio: "1/1", background: "#f5f2ed", overflow: "hidden", display: "flex", alignItems: "center", justifyContent: "center", position: "relative" }}>
+      <div style={{ width: "100%", aspectRatio: "1/1", background: "#fff", overflow: "hidden", display: "flex", alignItems: "center", justifyContent: "center", position: "relative" }}>
         {item.image
           ? <img src={item.image} alt={item.name} style={{ width: "100%", height: "100%", objectFit: "contain", display: "block", padding: 6 }} />
           : <HangerIcon size={36} color="#ddd" />
         }
         <button
-          onClick={e => { e.stopPropagation(); onEdit && onEdit(); }}
+          onClick={e => { e.stopPropagation(); onCreateLook && onCreateLook(); }}
           style={{
             position: "absolute", bottom: 7, right: 7,
             width: 28, height: 28, borderRadius: "50%",
@@ -1688,7 +1688,7 @@ function ItemCard({ item, onClick, onEdit }) {
             display: "flex", alignItems: "center", justifyContent: "center",
             backdropFilter: "blur(4px)", boxShadow: "0 1px 4px rgba(0,0,0,0.1)"
           }}
-        >&#9998;</button>
+        ><SvgHanger size={14} color="currentColor" /></button>
       </div>
     </div>
   );
@@ -8403,7 +8403,7 @@ export default function App() {
                       fontFamily: "'DM Sans', sans-serif", fontSize: 12, fontWeight: 600, cursor: "pointer",
                       display: "flex", alignItems: "center", gap: 6,
                     }}>
-                      <SvgTag size={12} color={showNeedsStylingOnly ? "#b64b78" : "#aaa"} />Needs Styling
+                      <SvgHanger size={12} color={showNeedsStylingOnly ? "#b64b78" : "#aaa"} />Needs Styling
                     </button>
                     <select value={closetSort} onChange={e => setClosetSort(e.target.value)} className="pill-select" style={{}}>
                       <option value="default">Sort: Default</option>
@@ -8477,7 +8477,7 @@ export default function App() {
                               {bulkSelected.has(item.id) && <SvgCheck size={12} color="#fff" />}
                             </div>
                           )}
-                          <ItemCard item={item} onClick={bulkMode ? undefined : () => setItemDetail(item)} onEdit={bulkMode ? undefined : () => { setEditItem(item); setModal("item"); }} />
+                          <ItemCard item={item} onClick={bulkMode ? undefined : () => setItemDetail(item)} onCreateLook={bulkMode ? undefined : () => { setEditingOutfit(null); setOutfitSeedItem(item); setOutfitBuilder(true); }} />
                         </div>
                       ))}
                     </div>

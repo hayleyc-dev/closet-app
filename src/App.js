@@ -1673,7 +1673,7 @@ function AddItemModal({ onSave, onSaveWish, onCancel, initial, editMode, initial
 function ItemCard({ item, onClick, onEdit }) {
   return (
     <div className="item-card" onClick={onClick} style={{ position: "relative", cursor: "pointer", overflow: "hidden", borderRadius: 16 }}>
-      <div style={{ width: "100%", aspectRatio: "1/1", background: "#f5f2ed", overflow: "hidden", display: "flex", alignItems: "center", justifyContent: "center", position: "relative" }}>
+      <div style={{ width: "100%", aspectRatio: "1/1", background: "#fff", overflow: "hidden", display: "flex", alignItems: "center", justifyContent: "center", position: "relative" }}>
         {item.image
           ? <img src={item.image} alt={item.name} style={{ width: "100%", height: "100%", objectFit: "contain", display: "block", padding: 6 }} />
           : <HangerIcon size={36} color="#ddd" />

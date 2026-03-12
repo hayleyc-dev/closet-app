@@ -25,6 +25,7 @@ const SvgArrowL   = ({size=16,color="currentColor"}) => <Ico size={size} color={
 const SvgArrowR   = ({size=16,color="currentColor"}) => <Ico size={size} color={color}><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></Ico>;
 const SvgCheck    = ({size=14,color="currentColor"}) => <Ico size={size} color={color}><polyline points="20 6 9 17 4 12"/></Ico>;
 const SvgStar     = ({size=16,color="currentColor"}) => <Ico size={size} color={color}><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></Ico>;
+const SvgCastle   = ({size=14,color="currentColor"}) => <Ico size={size} color={color}><path d="M4 21V10h16v11"/><path d="M2 10h20"/><path d="M6 10V5l2 1 2-1v5"/><path d="M14 10V5l2 1 2-1v5"/><path d="M10 21v-5h4v5"/></Ico>;
 const SvgGrid     = ({size=16,color="currentColor"}) => <Ico size={size} color={color}><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></Ico>;
 const SvgBox      = ({size=16,color="currentColor"}) => <Ico size={size} color={color}><path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></Ico>;
 const SvgShop     = ({size=14,color="currentColor"}) => <Ico size={size} color={color}><path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 01-8 0"/></Ico>;
@@ -7847,6 +7848,7 @@ export default function App() {
   const [outfitZoom, setOutfitZoom] = useState(200); // outfit card min-width in px
   const [showNewOnly, setShowNewOnly] = useState(false); // "What's New" filter
   const [showNeedsStylingOnly, setShowNeedsStylingOnly] = useState(false);
+  const [showDisneyOnly, setShowDisneyOnly] = useState(false);
   const [capsules, setCapsules] = useState(() => { try { return JSON.parse(localStorage.getItem("wardrobe_capsules_v1") || "[]"); } catch { return []; } });
   const [activeCapsule, setActiveCapsule] = useState(null);
   const [showCapsuleModal, setShowCapsuleModal] = useState(false);
@@ -8118,8 +8120,16 @@ export default function App() {
       const matchSeason = closetSeasonFilter === "All" || (i.seasons || []).includes(closetSeasonFilter) || i.season === closetSeasonFilter;
       const matchNew = !showNewOnly || (i.purchaseDate && new Date(i.purchaseDate) >= threeMonthsAgo);
       const matchNeedsStyling = !showNeedsStylingOnly || !!i.needsStyling;
+      const disneyTags = [
+        ...(i.tags || []),
+        ...(i.occasions || []),
+        ...(i.seasons || []),
+        i.occasion,
+        i.season,
+      ].filter(Boolean).map(v => String(v).toLowerCase());
+      const matchDisney = !showDisneyOnly || disneyTags.includes("disney");
       const matchCapsule = !capsuleItemIds || capsuleItemIds.has(i.id);
-      return matchCat && matchSearch && matchSeason && matchNew && matchNeedsStyling && matchCapsule;
+      return matchCat && matchSearch && matchSeason && matchNew && matchNeedsStyling && matchDisney && matchCapsule;
     });
     if (closetSort === "az") rows = [...rows].sort((a, b) => a.name.localeCompare(b.name));
     else if (closetSort === "price") rows = [...rows].sort((a, b) => (parseFloat((b.price||"").replace(/[^0-9.]/g,""))||0) - (parseFloat((a.price||"").replace(/[^0-9.]/g,""))||0));
@@ -8339,7 +8349,7 @@ export default function App() {
                   })}
                 </div>
                 <div className="sidebar-section" style={{ marginTop: "auto" }}>
-                  <button className="sidebar-btn" onClick={() => { setCatFilters([]); setShowNeedsStylingOnly(false); setShowNewOnly(false); setActiveCapsule(null); setClosetSearch(""); setClosetSeasonFilter("All"); }}>
+                  <button className="sidebar-btn" onClick={() => { setCatFilters([]); setShowNeedsStylingOnly(false); setShowNewOnly(false); setShowDisneyOnly(false); setActiveCapsule(null); setClosetSearch(""); setClosetSeasonFilter("All"); }}>
                     All items
                   </button>
                 </div>
@@ -8404,6 +8414,14 @@ export default function App() {
                       display: "flex", alignItems: "center", gap: 6,
                     }}>
                       <SvgHanger size={12} color={showNeedsStylingOnly ? "#b64b78" : "#aaa"} />Needs Styling
+                    </button>
+                    <button onClick={() => setShowDisneyOnly(n => !n)} style={{
+                      padding: "7px 14px", borderRadius: 100, border: showDisneyOnly ? "1.5px solid #f1c0e8" : "1px solid #e0dbd2",
+                      background: showDisneyOnly ? "#fff0fb" : "#fff", color: showDisneyOnly ? "#d040b0" : "#666",
+                      fontFamily: "'DM Sans', sans-serif", fontSize: 12, fontWeight: 600, cursor: "pointer",
+                      display: "flex", alignItems: "center", gap: 6,
+                    }}>
+                      <SvgCastle size={12} color={showDisneyOnly ? "#d040b0" : "#aaa"} />Disney
                     </button>
                     <select value={closetSort} onChange={e => setClosetSort(e.target.value)} className="pill-select" style={{}}>
                       <option value="default">Sort: Default</option>

@@ -274,10 +274,22 @@ function useSupabaseTable(table) {
   const [loading, setLoading] = useState(true);
 
   const parseRows = (data) => data.map((r, idx) => {
-    if (r.data && typeof r.data === "object") {
-      const rowId = r.id || r.data.id || r.data.item_id || r.data.uuid || `row-${idx}`;
-      return { ...r.data, id: rowId };
+    const payload = (() => {
+      if (r.data && typeof r.data === "object") return r.data;
+      if (typeof r.data === "string") {
+        try {
+          const parsed = JSON.parse(r.data);
+          if (parsed && typeof parsed === "object") return parsed;
+        } catch {}
+      }
+      return null;
+    })();
+
+    if (payload) {
+      const rowId = r.id || payload.id || payload.item_id || payload.uuid || `row-${idx}`;
+      return { ...payload, id: rowId };
     }
+
     const { id, created_at, ...rest } = r;
     const rowId = id || rest.id || rest.item_id || rest.uuid || `row-${idx}`;
     return { ...rest, id: rowId };
@@ -294,9 +306,12 @@ function useSupabaseTable(table) {
 
     if (!error && data) {
       const parsed = parseRows(data);
-      setter(parsed);
+      if (parsed.length > 0) {
+        setter(parsed);
+        return;
+      }
 
-      if (parsed.length === 0 && localKey) {
+      if (localKey) {
         const localRows = readLocalRows();
         if (localRows.length > 0) {
           setter(localRows);
@@ -308,8 +323,11 @@ function useSupabaseTable(table) {
               break;
             }
           }
+          return;
         }
       }
+
+      setter(prev => (prev.length > 0 ? prev : parsed));
       return;
     }
 

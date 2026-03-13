@@ -59,10 +59,27 @@ const SvgDress = ({size=16,color="currentColor",style}) => (
 const SvgSparkle  = ({size=16,color="currentColor"}) => <Ico size={size} color={color}><path d="M12 2l2.4 7.4H22l-6.2 4.5 2.4 7.4L12 17l-6.2 4.3 2.4-7.4L2 9.4h7.6z"/></Ico>;
 
 
-const SUPABASE_URL = process.env.REACT_APP_SUPABASE_URL || "https://gucqffnjwvbvycfqvtcw.supabase.co";
-const SUPABASE_ANON_KEY = process.env.REACT_APP_SUPABASE_ANON_KEY || "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imd1Y3FmZm5qd3ZidnljZnF2dGN3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI1MDAyMTQsImV4cCI6MjA4ODA3NjIxNH0.rXbJ1E2BKmn5T_3pm2zK1TFqeE5yogDjDjQyqNcepd4";
+const DEFAULT_SUPABASE_URL = "https://gucqffnjwvbvycfqvtcw.supabase.co";
+const DEFAULT_SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imd1Y3FmZm5qd3ZidnljZnF2dGN3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI1MDAyMTQsImV4cCI6MjA4ODA3NjIxNH0.rXbJ1E2BKmn5T_3pm2zK1TFqeE5yogDjDjQyqNcepd4";
+const SUPABASE_URL_OVERRIDE_KEY = "wardrobe_supabase_url_v1";
+const SUPABASE_ANON_OVERRIDE_KEY = "wardrobe_supabase_anon_key_v1";
 
-const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+const readSupabaseConfig = () => {
+  const envUrl = process.env.REACT_APP_SUPABASE_URL || DEFAULT_SUPABASE_URL;
+  const envAnonKey = process.env.REACT_APP_SUPABASE_ANON_KEY || DEFAULT_SUPABASE_ANON_KEY;
+  if (typeof window === "undefined") {
+    return { url: envUrl, anonKey: envAnonKey, source: "env" };
+  }
+  try {
+    const overrideUrl = localStorage.getItem(SUPABASE_URL_OVERRIDE_KEY);
+    const overrideAnon = localStorage.getItem(SUPABASE_ANON_OVERRIDE_KEY);
+    if (overrideUrl && overrideAnon) return { url: overrideUrl, anonKey: overrideAnon, source: "device-override" };
+  } catch {}
+  return { url: envUrl, anonKey: envAnonKey, source: "env" };
+};
+
+const SUPABASE_CONFIG = readSupabaseConfig();
+const supabase = createClient(SUPABASE_CONFIG.url, SUPABASE_CONFIG.anonKey);
 const TABLE_LOCAL_KEYS = {
   items: "wardrobe_items_v1",
   wishlist: "wardrobe_wishlist_v1",
@@ -308,7 +325,7 @@ function useSupabaseTable(table) {
       const parsed = parseRows(data);
       if (parsed.length > 0) {
         setter(parsed);
-        return;
+        return parsed;
       }
 
       if (localKey) {
@@ -323,16 +340,22 @@ function useSupabaseTable(table) {
               break;
             }
           }
-          return;
+          return localRows;
         }
       }
 
       setter(prev => (prev.length > 0 ? prev : parsed));
-      return;
+      return parsed;
     }
 
-    if (localKey) setter(readLocalRows());
+    if (localKey) {
+      const localRows = readLocalRows();
+      setter(localRows);
+      if (error) console.error("[" + table + "] fetch:", error.message);
+      return localRows;
+    }
     if (error) console.error("[" + table + "] fetch:", error.message);
+    return [];
   };
 
   useEffect(() => {
@@ -372,8 +395,9 @@ function useSupabaseTable(table) {
 
   const refresh = async () => {
     setLoading(true);
-    await fetchRows(setRows);
+    const latest = await fetchRows(setRows);
     setLoading(false);
+    return latest;
   };
 
   return { rows, loading, add, update, remove, refresh };
@@ -6630,6 +6654,13 @@ function SettingsTab({
   const importRef = useRef(null);
   const [manualSyncing, setManualSyncing] = useState(false);
   const [manualSyncMsg, setManualSyncMsg] = useState(null);
+  const [supabaseUrlInput, setSupabaseUrlInput] = useState(() => {
+    try { return localStorage.getItem(SUPABASE_URL_OVERRIDE_KEY) || SUPABASE_CONFIG.url || ""; } catch { return SUPABASE_CONFIG.url || ""; }
+  });
+  const [supabaseAnonInput, setSupabaseAnonInput] = useState(() => {
+    try { return localStorage.getItem(SUPABASE_ANON_OVERRIDE_KEY) || SUPABASE_CONFIG.anonKey || ""; } catch { return SUPABASE_CONFIG.anonKey || ""; }
+  });
+  const [supabaseConfigMsg, setSupabaseConfigMsg] = useState(null);
 
   // Archived moodboards
   const MB_ARCHIVE_KEY = "wardrobe_moodboards_archived_v1";
@@ -6782,6 +6813,32 @@ function SettingsTab({
     } finally {
       setManualSyncing(false);
       setTimeout(() => setManualSyncMsg(null), 2500);
+    }
+  };
+
+  const saveSupabaseConfig = () => {
+    if (!supabaseUrlInput || !supabaseAnonInput) {
+      setSupabaseConfigMsg("Enter both Supabase URL and anon key.");
+      return;
+    }
+    try {
+      localStorage.setItem(SUPABASE_URL_OVERRIDE_KEY, supabaseUrlInput.trim());
+      localStorage.setItem(SUPABASE_ANON_OVERRIDE_KEY, supabaseAnonInput.trim());
+      setSupabaseConfigMsg("Saved. Reloading...");
+      setTimeout(() => window.location.reload(), 400);
+    } catch {
+      setSupabaseConfigMsg("Could not save on this device.");
+    }
+  };
+
+  const resetSupabaseConfig = () => {
+    try {
+      localStorage.removeItem(SUPABASE_URL_OVERRIDE_KEY);
+      localStorage.removeItem(SUPABASE_ANON_OVERRIDE_KEY);
+      setSupabaseConfigMsg("Reset to env defaults. Reloading...");
+      setTimeout(() => window.location.reload(), 400);
+    } catch {
+      setSupabaseConfigMsg("Could not reset on this device.");
     }
   };
 
@@ -7059,6 +7116,18 @@ function SettingsTab({
                 {manualSyncMsg}
               </div>
             )}
+          </div>
+          <div style={{ marginTop: 12, paddingTop: 12, borderTop: "1px solid #e6efe8" }}>
+            <div style={{ fontSize: 11, color: "#7b8d80", marginBottom: 8 }}>Project: {SUPABASE_CONFIG.url}</div>
+            <input value={supabaseUrlInput} onChange={e => setSupabaseUrlInput(e.target.value)} placeholder="Supabase URL"
+              style={{ width:"100%", marginBottom:8, padding:"8px 10px", border:"1px solid #dcd6ce", borderRadius:8, fontFamily:"'DM Sans', sans-serif", fontSize:12 }} />
+            <input value={supabaseAnonInput} onChange={e => setSupabaseAnonInput(e.target.value)} placeholder="Supabase anon key"
+              style={{ width:"100%", marginBottom:8, padding:"8px 10px", border:"1px solid #dcd6ce", borderRadius:8, fontFamily:"'DM Sans', sans-serif", fontSize:12 }} />
+            <div style={{ display:"flex", gap:8 }}>
+              <button onClick={saveSupabaseConfig} style={{ padding:"7px 10px", borderRadius:8, border:"1px solid #c8e8d0", background:"#f0faf4", color:"#2d6a3f", fontWeight:700, fontSize:11, cursor:"pointer" }}>Save & reconnect</button>
+              <button onClick={resetSupabaseConfig} style={{ padding:"7px 10px", borderRadius:8, border:"1px solid #e0dbd2", background:"#fff", color:"#666", fontWeight:700, fontSize:11, cursor:"pointer" }}>Reset</button>
+            </div>
+            {supabaseConfigMsg && <div style={{ marginTop: 6, fontSize: 11, color: "#888" }}>{supabaseConfigMsg}</div>}
           </div>
         </Card>
 
@@ -8062,7 +8131,7 @@ export default function App() {
 
   const manualSyncAll = async () => {
     try {
-      await Promise.all([
+      const [items] = await Promise.all([
         itemsDb.refresh(),
         wishlistDb.refresh(),
         outfitsDb.refresh(),
@@ -8071,6 +8140,8 @@ export default function App() {
       const ts = new Date().toISOString();
       setLastSynced(ts);
       try { localStorage.setItem("wardrobe_last_synced_v1", ts); } catch {}
+      const itemCount = Array.isArray(items) ? items.length : itemsDb.rows.length;
+      if (itemCount === 0) return false;
       return true;
     } catch (e) {
       console.error("manual sync failed", e);

@@ -325,8 +325,22 @@ function useSupabaseTable(table) {
   }, [localKey, rows]);
 
   const fetchRows = async (setter) => {
-    let { data, error } = await supabase.from(remoteTable).select("*").order("created_at");
-    if (error) ({ data, error } = await supabase.from(remoteTable).select("*"));
+    const isTimeoutError = (err) => {
+      const msg = (err?.message || "").toLowerCase();
+      return msg.includes("statement timeout") || msg.includes("canceling statement");
+    };
+
+    const fetchRemoteRows = async () => {
+      let res = await supabase.from(remoteTable).select("id,data,created_at").order("created_at", { ascending: false }).limit(500);
+      if (!res.error) return res;
+      if (isTimeoutError(res.error)) {
+        res = await supabase.from(remoteTable).select("id,data").limit(500);
+        if (!res.error) return res;
+      }
+      return await supabase.from(remoteTable).select("*").limit(500);
+    };
+
+    const { data, error } = await fetchRemoteRows();
 
     if (!error && data) {
       const parsed = parseRows(data);

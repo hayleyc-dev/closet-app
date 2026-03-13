@@ -63,6 +63,7 @@ const DEFAULT_SUPABASE_URL = "https://gucqffnjwvbvycfqvtcw.supabase.co";
 const DEFAULT_SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imd1Y3FmZm5qd3ZidnljZnF2dGN3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI1MDAyMTQsImV4cCI6MjA4ODA3NjIxNH0.rXbJ1E2BKmn5T_3pm2zK1TFqeE5yogDjDjQyqNcepd4";
 const SUPABASE_URL_OVERRIDE_KEY = "wardrobe_supabase_url_v1";
 const SUPABASE_ANON_OVERRIDE_KEY = "wardrobe_supabase_anon_key_v1";
+const ITEMS_TABLE_OVERRIDE_KEY = "wardrobe_items_table_v1";
 
 const readSupabaseConfig = () => {
   const envUrl = process.env.REACT_APP_SUPABASE_URL || DEFAULT_SUPABASE_URL;
@@ -282,6 +283,11 @@ const globalStyles = `
 // ── Supabase hook ────────────────────────────────────────────────────────────
 function useSupabaseTable(table) {
   const localKey = TABLE_LOCAL_KEYS[table];
+  const remoteTable = (() => {
+    if (table !== "items") return table;
+    if (typeof window === "undefined") return table;
+    try { return localStorage.getItem(ITEMS_TABLE_OVERRIDE_KEY) || table; } catch { return table; }
+  })();
   const readLocalRows = () => {
     if (!localKey) return [];
     try { return JSON.parse(localStorage.getItem(localKey) || "[]"); } catch { return []; }
@@ -318,8 +324,8 @@ function useSupabaseTable(table) {
   }, [localKey, rows]);
 
   const fetchRows = async (setter) => {
-    let { data, error } = await supabase.from(table).select("*").order("created_at");
-    if (error) ({ data, error } = await supabase.from(table).select("*"));
+    let { data, error } = await supabase.from(remoteTable).select("*").order("created_at");
+    if (error) ({ data, error } = await supabase.from(remoteTable).select("*"));
 
     if (!error && data) {
       const parsed = parseRows(data);
@@ -334,9 +340,9 @@ function useSupabaseTable(table) {
           setter(localRows);
           for (const item of localRows) {
             if (!item?.id) continue;
-            const { error: upsertError } = await supabase.from(table).upsert({ id: item.id, data: item });
+            const { error: upsertError } = await supabase.from(remoteTable).upsert({ id: item.id, data: item });
             if (upsertError) {
-              console.error("[" + table + "] local sync:", upsertError.message);
+              console.error("[" + remoteTable + "] local sync:", upsertError.message);
               break;
             }
           }
@@ -351,44 +357,44 @@ function useSupabaseTable(table) {
     if (localKey) {
       const localRows = readLocalRows();
       setter(localRows);
-      if (error) console.error("[" + table + "] fetch:", error.message);
+      if (error) console.error("[" + remoteTable + "] fetch:", error.message);
       return localRows;
     }
-    if (error) console.error("[" + table + "] fetch:", error.message);
+    if (error) console.error("[" + remoteTable + "] fetch:", error.message);
     return [];
   };
 
   useEffect(() => {
     fetchRows(setRows).then(() => setLoading(false));
-  }, [table]);
+  }, [table, remoteTable]);
 
   const add = async (item) => {
-    const { error } = await supabase.from(table).insert({ id: item.id, data: item });
+    const { error } = await supabase.from(remoteTable).insert({ id: item.id, data: item });
     if (!error) setRows(r => [...r, item]);
     else {
-      console.error("[" + table + "] add:", error.message);
+      console.error("[" + remoteTable + "] add:", error.message);
       setRows(r => [...r, item]);
     }
   };
 
   const update = async (item) => {
-    let { error } = await supabase.from(table).update({ data: item }).eq("id", item.id);
+    let { error } = await supabase.from(remoteTable).update({ data: item }).eq("id", item.id);
     if (error) {
       const { id, ...rest } = item;
-      ({ error } = await supabase.from(table).update(rest).eq("id", id));
+      ({ error } = await supabase.from(remoteTable).update(rest).eq("id", id));
     }
     if (!error) setRows(r => r.map(i => i.id === item.id ? item : i));
     else {
-      console.error("[" + table + "] update:", error.message);
+      console.error("[" + remoteTable + "] update:", error.message);
       setRows(r => r.map(i => i.id === item.id ? item : i));
     }
   };
 
   const remove = async (id) => {
-    const { error } = await supabase.from(table).delete().eq("id", id);
+    const { error } = await supabase.from(remoteTable).delete().eq("id", id);
     if (!error) setRows(r => r.filter(i => i.id !== id));
     else {
-      console.error("[" + table + "] remove:", error.message);
+      console.error("[" + remoteTable + "] remove:", error.message);
       setRows(r => r.filter(i => i.id !== id));
     }
   };
@@ -6661,6 +6667,9 @@ function SettingsTab({
     try { return localStorage.getItem(SUPABASE_ANON_OVERRIDE_KEY) || SUPABASE_CONFIG.anonKey || ""; } catch { return SUPABASE_CONFIG.anonKey || ""; }
   });
   const [supabaseConfigMsg, setSupabaseConfigMsg] = useState(null);
+  const [itemsTableInput, setItemsTableInput] = useState(() => {
+    try { return localStorage.getItem(ITEMS_TABLE_OVERRIDE_KEY) || "items"; } catch { return "items"; }
+  });
 
   // Archived moodboards
   const MB_ARCHIVE_KEY = "wardrobe_moodboards_archived_v1";
@@ -6824,6 +6833,7 @@ function SettingsTab({
     try {
       localStorage.setItem(SUPABASE_URL_OVERRIDE_KEY, supabaseUrlInput.trim());
       localStorage.setItem(SUPABASE_ANON_OVERRIDE_KEY, supabaseAnonInput.trim());
+      localStorage.setItem(ITEMS_TABLE_OVERRIDE_KEY, (itemsTableInput || "items").trim() || "items");
       setSupabaseConfigMsg("Saved. Reloading...");
       setTimeout(() => window.location.reload(), 400);
     } catch {
@@ -6835,6 +6845,7 @@ function SettingsTab({
     try {
       localStorage.removeItem(SUPABASE_URL_OVERRIDE_KEY);
       localStorage.removeItem(SUPABASE_ANON_OVERRIDE_KEY);
+      localStorage.removeItem(ITEMS_TABLE_OVERRIDE_KEY);
       setSupabaseConfigMsg("Reset to env defaults. Reloading...");
       setTimeout(() => window.location.reload(), 400);
     } catch {
@@ -7122,6 +7133,8 @@ function SettingsTab({
             <input value={supabaseUrlInput} onChange={e => setSupabaseUrlInput(e.target.value)} placeholder="Supabase URL"
               style={{ width:"100%", marginBottom:8, padding:"8px 10px", border:"1px solid #dcd6ce", borderRadius:8, fontFamily:"'DM Sans', sans-serif", fontSize:12 }} />
             <input value={supabaseAnonInput} onChange={e => setSupabaseAnonInput(e.target.value)} placeholder="Supabase anon key"
+              style={{ width:"100%", marginBottom:8, padding:"8px 10px", border:"1px solid #dcd6ce", borderRadius:8, fontFamily:"'DM Sans', sans-serif", fontSize:12 }} />
+            <input value={itemsTableInput} onChange={e => setItemsTableInput(e.target.value)} placeholder="Items table name (default: items)"
               style={{ width:"100%", marginBottom:8, padding:"8px 10px", border:"1px solid #dcd6ce", borderRadius:8, fontFamily:"'DM Sans', sans-serif", fontSize:12 }} />
             <div style={{ display:"flex", gap:8 }}>
               <button onClick={saveSupabaseConfig} style={{ padding:"7px 10px", borderRadius:8, border:"1px solid #c8e8d0", background:"#f0faf4", color:"#2d6a3f", fontWeight:700, fontSize:11, cursor:"pointer" }}>Save & reconnect</button>

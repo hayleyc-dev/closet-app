@@ -6589,6 +6589,7 @@ function SettingsTab({
   annualBudget, setAnnualBudget,
   restoreLookbook,
   restoreOutfit,
+  onManualSync,
 }) {
   const [settingsTab, setSettingsTab] = useState("appearance");
   const [themeId, setThemeId] = useState(() => { try { return localStorage.getItem(THEME_KEY) || "parchment"; } catch { return "parchment"; } });
@@ -6609,6 +6610,8 @@ function SettingsTab({
   // Data & sync
   const [importMsg, setImportMsg] = useState(null);
   const importRef = useRef(null);
+  const [manualSyncing, setManualSyncing] = useState(false);
+  const [manualSyncMsg, setManualSyncMsg] = useState(null);
 
   // Archived moodboards
   const MB_ARCHIVE_KEY = "wardrobe_moodboards_archived_v1";
@@ -6748,6 +6751,21 @@ function SettingsTab({
   );
 
   const TABS = [["appearance","Appearance"],["preferences","Preferences"],["data","Data"]];
+
+  const handleManualSync = async () => {
+    if (!onManualSync || manualSyncing) return;
+    setManualSyncing(true);
+    setManualSyncMsg(null);
+    try {
+      const ok = await onManualSync();
+      setManualSyncMsg(ok === false ? "Sync failed" : "Synced successfully");
+    } catch {
+      setManualSyncMsg("Sync failed");
+    } finally {
+      setManualSyncing(false);
+      setTimeout(() => setManualSyncMsg(null), 2500);
+    }
+  };
 
   return (
     <div style={{ maxWidth:720, margin:"0 auto", padding:"4px 0 40px" }}>
@@ -6999,6 +7017,30 @@ function SettingsTab({
               </div>
             </div>
             <div style={{ textAlign:"right", fontSize:11, color:"#5aaa7e", fontWeight:600 }}>{itemsDb.rows.length} items</div>
+          </div>
+          <div style={{ marginTop: 10, display: "flex", alignItems: "center", gap: 10 }}>
+            <button
+              onClick={handleManualSync}
+              disabled={manualSyncing}
+              style={{
+                padding: "8px 12px",
+                borderRadius: 10,
+                border: "1px solid #b6e8c8",
+                background: manualSyncing ? "#eaf7ef" : "#f0faf4",
+                color: "#2d6a3f",
+                fontFamily: "'DM Sans',sans-serif",
+                fontSize: 12,
+                fontWeight: 700,
+                cursor: manualSyncing ? "default" : "pointer",
+              }}
+            >
+              {manualSyncing ? "Syncing…" : "Sync now"}
+            </button>
+            {manualSyncMsg && (
+              <div style={{ fontSize: 11, color: manualSyncMsg.includes("failed") ? "#e05555" : "#5aaa7e", fontWeight: 600 }}>
+                {manualSyncMsg}
+              </div>
+            )}
           </div>
         </Card>
 
@@ -7999,6 +8041,24 @@ export default function App() {
       try { localStorage.setItem("wardrobe_last_synced_v1", ts); } catch {}
     }
   }, [itemsDb.rows]);
+
+  const manualSyncAll = async () => {
+    try {
+      await Promise.all([
+        itemsDb.refresh(),
+        wishlistDb.refresh(),
+        outfitsDb.refresh(),
+        lookbooksDb.refresh(),
+      ]);
+      const ts = new Date().toISOString();
+      setLastSynced(ts);
+      try { localStorage.setItem("wardrobe_last_synced_v1", ts); } catch {}
+      return true;
+    } catch (e) {
+      console.error("manual sync failed", e);
+      return false;
+    }
+  };
   const [closetSearch, setClosetSearch] = useState("");
   const [activeLookbook, setActiveLookbook] = useState(null);
   const [activeLookbookView, setActiveLookbookView] = useState("editorial");
@@ -8857,6 +8917,7 @@ export default function App() {
                 allItemsForExport={itemsDb.rows}
                 monthlyBudget={monthlyBudget} setMonthlyBudget={setMonthlyBudget}
                 annualBudget={annualBudget} setAnnualBudget={setAnnualBudget}
+                onManualSync={manualSyncAll}
                 restoreLookbook={async (lb) => {
                   try {
                     let { error } = await supabase.from("lookbooks").insert({ id: lb.id, data: lb });

@@ -295,6 +295,7 @@ function useSupabaseTable(table) {
 
   const [rows, setRows] = useState(readLocalRows);
   const [loading, setLoading] = useState(true);
+  const [lastError, setLastError] = useState(null);
 
   const parseRows = (data) => data.map((r, idx) => {
     const payload = (() => {
@@ -330,6 +331,7 @@ function useSupabaseTable(table) {
     if (!error && data) {
       const parsed = parseRows(data);
       if (parsed.length > 0) {
+        setLastError(null);
         setter(parsed);
         return parsed;
       }
@@ -337,6 +339,7 @@ function useSupabaseTable(table) {
       if (localKey) {
         const localRows = readLocalRows();
         if (localRows.length > 0) {
+          setLastError(null);
           setter(localRows);
           for (const item of localRows) {
             if (!item?.id) continue;
@@ -350,6 +353,7 @@ function useSupabaseTable(table) {
         }
       }
 
+      setLastError(null);
       setter(prev => (prev.length > 0 ? prev : parsed));
       return parsed;
     }
@@ -357,10 +361,16 @@ function useSupabaseTable(table) {
     if (localKey) {
       const localRows = readLocalRows();
       setter(localRows);
-      if (error) console.error("[" + remoteTable + "] fetch:", error.message);
+      if (error) {
+        setLastError(error.message);
+        console.error("[" + remoteTable + "] fetch:", error.message);
+      }
       return localRows;
     }
-    if (error) console.error("[" + remoteTable + "] fetch:", error.message);
+    if (error) {
+      setLastError(error.message);
+      console.error("[" + remoteTable + "] fetch:", error.message);
+    }
     return [];
   };
 
@@ -370,8 +380,12 @@ function useSupabaseTable(table) {
 
   const add = async (item) => {
     const { error } = await supabase.from(remoteTable).insert({ id: item.id, data: item });
-    if (!error) setRows(r => [...r, item]);
+    if (!error) {
+      setLastError(null);
+      setRows(r => [...r, item]);
+    }
     else {
+      setLastError(error.message);
       console.error("[" + remoteTable + "] add:", error.message);
       setRows(r => [...r, item]);
     }
@@ -383,8 +397,12 @@ function useSupabaseTable(table) {
       const { id, ...rest } = item;
       ({ error } = await supabase.from(remoteTable).update(rest).eq("id", id));
     }
-    if (!error) setRows(r => r.map(i => i.id === item.id ? item : i));
+    if (!error) {
+      setLastError(null);
+      setRows(r => r.map(i => i.id === item.id ? item : i));
+    }
     else {
+      setLastError(error.message);
       console.error("[" + remoteTable + "] update:", error.message);
       setRows(r => r.map(i => i.id === item.id ? item : i));
     }
@@ -392,8 +410,12 @@ function useSupabaseTable(table) {
 
   const remove = async (id) => {
     const { error } = await supabase.from(remoteTable).delete().eq("id", id);
-    if (!error) setRows(r => r.filter(i => i.id !== id));
+    if (!error) {
+      setLastError(null);
+      setRows(r => r.filter(i => i.id !== id));
+    }
     else {
+      setLastError(error.message);
       console.error("[" + remoteTable + "] remove:", error.message);
       setRows(r => r.filter(i => i.id !== id));
     }
@@ -406,7 +428,7 @@ function useSupabaseTable(table) {
     return latest;
   };
 
-  return { rows, loading, add, update, remove, refresh };
+  return { rows, loading, add, update, remove, refresh, remoteTable, lastError };
 }
 
 // ── Moodboards — Supabase + localStorage mirror ───────────────────────────────
@@ -7129,7 +7151,9 @@ function SettingsTab({
             )}
           </div>
           <div style={{ marginTop: 12, paddingTop: 12, borderTop: "1px solid #e6efe8" }}>
-            <div style={{ fontSize: 11, color: "#7b8d80", marginBottom: 8 }}>Project: {SUPABASE_CONFIG.url}</div>
+            <div style={{ fontSize: 11, color: "#7b8d80", marginBottom: 4 }}>Project: {SUPABASE_CONFIG.url}</div>
+            <div style={{ fontSize: 11, color: "#7b8d80", marginBottom: 8 }}>Items table: {itemsDb.remoteTable || "items"}</div>
+            {itemsDb.lastError && <div style={{ fontSize: 11, color: "#c15656", marginBottom: 8 }}>Last sync error: {itemsDb.lastError}</div>}
             <input value={supabaseUrlInput} onChange={e => setSupabaseUrlInput(e.target.value)} placeholder="Supabase URL"
               style={{ width:"100%", marginBottom:8, padding:"8px 10px", border:"1px solid #dcd6ce", borderRadius:8, fontFamily:"'DM Sans', sans-serif", fontSize:12 }} />
             <input value={supabaseAnonInput} onChange={e => setSupabaseAnonInput(e.target.value)} placeholder="Supabase anon key"

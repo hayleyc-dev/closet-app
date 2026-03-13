@@ -59,10 +59,16 @@ const SvgDress = ({size=16,color="currentColor",style}) => (
 const SvgSparkle  = ({size=16,color="currentColor"}) => <Ico size={size} color={color}><path d="M12 2l2.4 7.4H22l-6.2 4.5 2.4 7.4L12 17l-6.2 4.3 2.4-7.4L2 9.4h7.6z"/></Ico>;
 
 
-const SUPABASE_URL = "https://gucqffnjwvbvycfqvtcw.supabase.co";
-const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imd1Y3FmZm5qd3ZidnljZnF2dGN3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI1MDAyMTQsImV4cCI6MjA4ODA3NjIxNH0.rXbJ1E2BKmn5T_3pm2zK1TFqeE5yogDjDjQyqNcepd4";
+const SUPABASE_URL = process.env.REACT_APP_SUPABASE_URL || "https://gucqffnjwvbvycfqvtcw.supabase.co";
+const SUPABASE_ANON_KEY = process.env.REACT_APP_SUPABASE_ANON_KEY || "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imd1Y3FmZm5qd3ZidnljZnF2dGN3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI1MDAyMTQsImV4cCI6MjA4ODA3NjIxNH0.rXbJ1E2BKmn5T_3pm2zK1TFqeE5yogDjDjQyqNcepd4";
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+const TABLE_LOCAL_KEYS = {
+  items: "wardrobe_items_v1",
+  wishlist: "wardrobe_wishlist_v1",
+  outfits: "wardrobe_outfits_v1",
+  lookbooks: "wardrobe_lookbooks_v1",
+};
 
 const CATEGORIES = ["All", "Accessories", "Activewear", "Bags", "Denim", "Dresses", "Intimates", "Jewelry", "Knits", "Loungewear", "Outerwear", "Shoes", "Shorts + Skirts", "Sleepwear", "Socks + Tights", "Sweaters", "Swim", "Tops", "Trousers"];
 const COLORS = ["Black", "Blue", "Brown", "Clear", "Cream", "Gold", "Green", "Grey", "Orange", "Pink", "Purple", "Red", "Silver", "Tan", "White", "Yellow"];
@@ -258,27 +264,68 @@ const globalStyles = `
 
 // ── Supabase hook ────────────────────────────────────────────────────────────
 function useSupabaseTable(table) {
-  const [rows, setRows] = useState([]);
+  const localKey = TABLE_LOCAL_KEYS[table];
+  const readLocalRows = () => {
+    if (!localKey) return [];
+    try { return JSON.parse(localStorage.getItem(localKey) || "[]"); } catch { return []; }
+  };
+
+  const [rows, setRows] = useState(readLocalRows);
   const [loading, setLoading] = useState(true);
+
   const parseRows = (data) => data.map(r => {
     if (r.data && typeof r.data === "object") return { ...r.data, id: r.id };
     const { id, created_at, ...rest } = r;
     return { ...rest, id };
   }).filter(r => r.id);
+
+  useEffect(() => {
+    if (!localKey) return;
+    try { localStorage.setItem(localKey, JSON.stringify(rows)); } catch {}
+  }, [localKey, rows]);
+
   const fetchRows = async (setter) => {
     let { data, error } = await supabase.from(table).select("*").order("created_at");
     if (error) ({ data, error } = await supabase.from(table).select("*"));
-    if (!error && data) setter(parseRows(data));
-    else if (error) console.error("[" + table + "] fetch:", error.message);
+
+    if (!error && data) {
+      const parsed = parseRows(data);
+      setter(parsed);
+
+      if (parsed.length === 0 && localKey) {
+        const localRows = readLocalRows();
+        if (localRows.length > 0) {
+          setter(localRows);
+          for (const item of localRows) {
+            if (!item?.id) continue;
+            const { error: upsertError } = await supabase.from(table).upsert({ id: item.id, data: item });
+            if (upsertError) {
+              console.error("[" + table + "] local sync:", upsertError.message);
+              break;
+            }
+          }
+        }
+      }
+      return;
+    }
+
+    if (localKey) setter(readLocalRows());
+    if (error) console.error("[" + table + "] fetch:", error.message);
   };
+
   useEffect(() => {
     fetchRows(setRows).then(() => setLoading(false));
   }, [table]);
+
   const add = async (item) => {
     const { error } = await supabase.from(table).insert({ id: item.id, data: item });
     if (!error) setRows(r => [...r, item]);
-    else console.error("[" + table + "] add:", error.message);
+    else {
+      console.error("[" + table + "] add:", error.message);
+      setRows(r => [...r, item]);
+    }
   };
+
   const update = async (item) => {
     let { error } = await supabase.from(table).update({ data: item }).eq("id", item.id);
     if (error) {
@@ -286,18 +333,27 @@ function useSupabaseTable(table) {
       ({ error } = await supabase.from(table).update(rest).eq("id", id));
     }
     if (!error) setRows(r => r.map(i => i.id === item.id ? item : i));
-    else console.error("[" + table + "] update:", error.message);
+    else {
+      console.error("[" + table + "] update:", error.message);
+      setRows(r => r.map(i => i.id === item.id ? item : i));
+    }
   };
+
   const remove = async (id) => {
     const { error } = await supabase.from(table).delete().eq("id", id);
     if (!error) setRows(r => r.filter(i => i.id !== id));
-    else console.error("[" + table + "] remove:", error.message);
+    else {
+      console.error("[" + table + "] remove:", error.message);
+      setRows(r => r.filter(i => i.id !== id));
+    }
   };
+
   const refresh = async () => {
     setLoading(true);
     await fetchRows(setRows);
     setLoading(false);
   };
+
   return { rows, loading, add, update, remove, refresh };
 }
 

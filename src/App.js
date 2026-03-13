@@ -273,11 +273,15 @@ function useSupabaseTable(table) {
   const [rows, setRows] = useState(readLocalRows);
   const [loading, setLoading] = useState(true);
 
-  const parseRows = (data) => data.map(r => {
-    if (r.data && typeof r.data === "object") return { ...r.data, id: r.id };
+  const parseRows = (data) => data.map((r, idx) => {
+    if (r.data && typeof r.data === "object") {
+      const rowId = r.id || r.data.id || r.data.item_id || r.data.uuid || `row-${idx}`;
+      return { ...r.data, id: rowId };
+    }
     const { id, created_at, ...rest } = r;
-    return { ...rest, id };
-  }).filter(r => r.id);
+    const rowId = id || rest.id || rest.item_id || rest.uuid || `row-${idx}`;
+    return { ...rest, id: rowId };
+  });
 
   useEffect(() => {
     if (!localKey) return;

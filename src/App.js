@@ -7832,7 +7832,129 @@ function HomeView({
   )
 }
 
+// ── Login / Auth ─────────────────────────────────────────────────────────────
+const PW_HASH_KEY = "wardrobe_pw_hash_v1";
+const SESSION_KEY = "wardrobe_authed_v1";
+
+async function sha256(str) {
+  const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(str));
+  return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, "0")).join("");
+}
+
+function LoginScreen({ onAuth }) {
+  const hasPassword = !!localStorage.getItem(PW_HASH_KEY);
+  const [mode, setMode] = useState(hasPassword ? "login" : "setup");
+  const [pw, setPw] = useState("");
+  const [confirm, setConfirm] = useState("");
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  const handleSetup = async (e) => {
+    e.preventDefault();
+    if (pw.length < 4) { setError("Password must be at least 4 characters."); return; }
+    if (pw !== confirm) { setError("Passwords don't match."); return; }
+    setLoading(true);
+    const hash = await sha256(pw);
+    localStorage.setItem(PW_HASH_KEY, hash);
+    sessionStorage.setItem(SESSION_KEY, "1");
+    onAuth();
+  };
+
+  const handleLogin = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+    const hash = await sha256(pw);
+    if (hash === localStorage.getItem(PW_HASH_KEY)) {
+      sessionStorage.setItem(SESSION_KEY, "1");
+      onAuth();
+    } else {
+      setError("Incorrect password.");
+      setPw("");
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div style={{
+      minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center",
+      background: "linear-gradient(135deg, #faf9f7 0%, #f3ede8 100%)",
+      fontFamily: "'DM Sans', sans-serif",
+    }}>
+      <div style={{
+        background: "#fff", borderRadius: 20, padding: "48px 40px", width: 360,
+        boxShadow: "0 8px 40px rgba(0,0,0,0.10)", display: "flex", flexDirection: "column", alignItems: "center", gap: 0,
+      }}>
+        {/* Monogram */}
+        <div style={{
+          width: 52, height: 52, borderRadius: 14, background: "#1a1a1a",
+          display: "flex", alignItems: "center", justifyContent: "center",
+          fontFamily: "'Cormorant Garamond', serif", fontStyle: "italic", fontWeight: 300,
+          fontSize: 22, color: "#fff", letterSpacing: 1, marginBottom: 20,
+        }}>HC</div>
+
+        <div style={{ fontFamily: "'Cormorant Garamond', serif", fontStyle: "italic", fontWeight: 300, fontSize: 26, color: "#1a1a1a", marginBottom: 6 }}>
+          {mode === "setup" ? "Create a password" : "Welcome back"}
+        </div>
+        <div style={{ fontSize: 13, color: "#888", marginBottom: 28, textAlign: "center" }}>
+          {mode === "setup" ? "Set a password to protect your wardrobe." : "Enter your password to continue."}
+        </div>
+
+        <form onSubmit={mode === "setup" ? handleSetup : handleLogin} style={{ width: "100%", display: "flex", flexDirection: "column", gap: 12 }}>
+          <input
+            type="password"
+            placeholder="Password"
+            value={pw}
+            onChange={e => { setPw(e.target.value); setError(""); }}
+            autoFocus
+            style={{
+              width: "100%", padding: "11px 14px", borderRadius: 10, border: "1.5px solid #e8e8e8",
+              fontSize: 14, outline: "none", boxSizing: "border-box",
+              fontFamily: "'DM Sans', sans-serif",
+            }}
+          />
+          {mode === "setup" && (
+            <input
+              type="password"
+              placeholder="Confirm password"
+              value={confirm}
+              onChange={e => { setConfirm(e.target.value); setError(""); }}
+              style={{
+                width: "100%", padding: "11px 14px", borderRadius: 10, border: "1.5px solid #e8e8e8",
+                fontSize: 14, outline: "none", boxSizing: "border-box",
+                fontFamily: "'DM Sans', sans-serif",
+              }}
+            />
+          )}
+          {error && <div style={{ fontSize: 12, color: "#c0392b", textAlign: "center" }}>{error}</div>}
+          <button
+            type="submit"
+            disabled={loading}
+            style={{
+              marginTop: 4, padding: "12px", borderRadius: 10, border: "none",
+              background: "#1a1a1a", color: "#fff", fontSize: 14, fontWeight: 500,
+              cursor: loading ? "not-allowed" : "pointer", opacity: loading ? 0.6 : 1,
+              fontFamily: "'DM Sans', sans-serif",
+            }}
+          >
+            {mode === "setup" ? "Set Password" : "Unlock"}
+          </button>
+        </form>
+
+        {mode === "login" && (
+          <button
+            onClick={() => { setMode("setup"); setPw(""); setConfirm(""); setError(""); localStorage.removeItem(PW_HASH_KEY); }}
+            style={{ marginTop: 16, background: "none", border: "none", fontSize: 12, color: "#aaa", cursor: "pointer" }}
+          >
+            Forgot password? Reset
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export default function App() {
+  const [isAuthenticated, setIsAuthenticated] = useState(() => sessionStorage.getItem(SESSION_KEY) === "1");
   const [activeTheme, setActiveTheme] = useState(() => getTheme());
   const itemsDb = useSupabaseTable("items");
   const wishlistDb = useSupabaseTable("wishlist");
@@ -8214,6 +8336,10 @@ export default function App() {
     wishlist: ["Wishlist", "Want it"],
     settings: ["Settings", "Customize your wardrobe"],
   };
+
+  if (!isAuthenticated) {
+    return <LoginScreen onAuth={() => setIsAuthenticated(true)} />;
+  }
 
   return (
     <div className={`density-${density}`} style={{ background: activeTheme.bg, minHeight: "100vh", color: activeTheme.text }}>

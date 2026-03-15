@@ -6927,6 +6927,9 @@ function SettingsTab({
       {/* ════════════ DATA & SYNC ════════════ */}
       {settingsTab === "data" && (<>
 
+        {/* App Password */}
+        <AppPasswordCard />
+
         {/* Supabase status */}
         <Card>
           <SectionLabel>Sync Status</SectionLabel>
@@ -7841,13 +7844,116 @@ async function sha256(str) {
   return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, "0")).join("");
 }
 
+function AppPasswordCard() {
+  const [pwMode, setPwMode] = useState("idle"); // "idle" | "change" | "remove"
+  const [hasAppPw, setHasAppPw] = useState(() => !!localStorage.getItem(PW_HASH_KEY));
+  const [oldPw, setOldPw] = useState("");
+  const [newPw, setNewPw] = useState("");
+  const [confirmPw, setConfirmPw] = useState("");
+  const [pwError, setPwError] = useState("");
+  const [pwSuccess, setPwSuccess] = useState("");
+
+  const resetForm = () => { setOldPw(""); setNewPw(""); setConfirmPw(""); setPwError(""); setPwSuccess(""); setPwMode("idle"); };
+
+  const handleSave = async () => {
+    setPwError(""); setPwSuccess("");
+    if (hasAppPw) {
+      const oldHash = await sha256(oldPw);
+      if (oldHash !== localStorage.getItem(PW_HASH_KEY)) { setPwError("Current password is incorrect."); return; }
+    }
+    if (newPw.length < 4) { setPwError("New password must be at least 4 characters."); return; }
+    if (newPw !== confirmPw) { setPwError("Passwords don't match."); return; }
+    localStorage.setItem(PW_HASH_KEY, await sha256(newPw));
+    setHasAppPw(true);
+    setPwSuccess("Password updated.");
+    setTimeout(resetForm, 1500);
+  };
+
+  const handleRemove = async () => {
+    setPwError(""); setPwSuccess("");
+    const oldHash = await sha256(oldPw);
+    if (oldHash !== localStorage.getItem(PW_HASH_KEY)) { setPwError("Current password is incorrect."); return; }
+    localStorage.removeItem(PW_HASH_KEY);
+    setHasAppPw(false);
+    setPwSuccess("Password removed.");
+    setTimeout(resetForm, 1500);
+  };
+
+  const inp = { width: "100%", padding: "9px 12px", borderRadius: 8, border: "1.5px solid #e8e8e8", fontSize: 13, outline: "none", boxSizing: "border-box", fontFamily: "'DM Sans', sans-serif" };
+
+  return (
+    <div style={{ background: "#fff", borderRadius: 16, padding: "18px 20px", border: "1px solid #ece8e0", marginBottom: 14 }}>
+      <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: "#bbb", marginBottom: 12 }}>App Password</div>
+      {pwMode === "idle" && (
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 10 }}>
+          <div style={{ fontSize: 13, color: "#888" }}>
+            {hasAppPw ? "A backup password is set." : "No backup password — Google sign-in only."}
+          </div>
+          <div style={{ display: "flex", gap: 8 }}>
+            <button onClick={() => setPwMode("change")} style={{ padding: "7px 14px", borderRadius: 8, border: "1.5px solid #e8e8e8", background: "#fff", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
+              {hasAppPw ? "Change" : "Set Password"}
+            </button>
+            {hasAppPw && (
+              <button onClick={() => setPwMode("remove")} style={{ padding: "7px 14px", borderRadius: 8, border: "1.5px solid #fce8e8", background: "#fff8f8", fontSize: 12, fontWeight: 600, color: "#c0392b", cursor: "pointer" }}>
+                Remove
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+      {(pwMode === "change" || pwMode === "remove") && (
+        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+          {hasAppPw && <input type="password" placeholder="Current password" value={oldPw} onChange={e => setOldPw(e.target.value)} style={inp} autoFocus />}
+          {pwMode === "change" && <>
+            <input type="password" placeholder="New password" value={newPw} onChange={e => setNewPw(e.target.value)} style={inp} autoFocus={!hasAppPw} />
+            <input type="password" placeholder="Confirm new password" value={confirmPw} onChange={e => setConfirmPw(e.target.value)} style={inp} />
+          </>}
+          {pwError && <div style={{ fontSize: 12, color: "#c0392b" }}>{pwError}</div>}
+          {pwSuccess && <div style={{ fontSize: 12, color: "#3aaa6e" }}>{pwSuccess}</div>}
+          <div style={{ display: "flex", gap: 8 }}>
+            <button onClick={pwMode === "change" ? handleSave : handleRemove}
+              style={{ flex: 1, padding: "9px", borderRadius: 8, border: "none", background: pwMode === "remove" ? "#c0392b" : "#1a1a1a", color: "#fff", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
+              {pwMode === "change" ? (hasAppPw ? "Update Password" : "Set Password") : "Remove Password"}
+            </button>
+            <button onClick={resetForm} style={{ padding: "9px 16px", borderRadius: 8, border: "1.5px solid #e8e8e8", background: "#fff", fontSize: 13, cursor: "pointer" }}>Cancel</button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// Google "G" SVG logo
+function GoogleLogo() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 18 18" xmlns="http://www.w3.org/2000/svg">
+      <path d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844c-.209 1.125-.843 2.078-1.796 2.717v2.258h2.908c1.702-1.567 2.684-3.875 2.684-6.615z" fill="#4285F4"/>
+      <path d="M9 18c2.43 0 4.467-.806 5.956-2.184l-2.908-2.258c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332A8.997 8.997 0 009 18z" fill="#34A853"/>
+      <path d="M3.964 10.707A5.41 5.41 0 013.682 9c0-.593.102-1.17.282-1.707V4.961H.957A8.996 8.996 0 000 9c0 1.452.348 2.827.957 4.039l3.007-2.332z" fill="#FBBC05"/>
+      <path d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0A8.997 8.997 0 00.957 4.961L3.964 7.293C4.672 5.166 6.656 3.58 9 3.58z" fill="#EA4335"/>
+    </svg>
+  );
+}
+
 function LoginScreen({ onAuth }) {
   const hasPassword = !!localStorage.getItem(PW_HASH_KEY);
   const [mode, setMode] = useState(hasPassword ? "login" : "setup");
+  const [showPassword, setShowPassword] = useState(false);
   const [pw, setPw] = useState("");
   const [confirm, setConfirm] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+
+  const handleGoogle = async () => {
+    setLoading(true);
+    setError("");
+    const { error: err } = await supabase.auth.signInWithOAuth({
+      provider: "google",
+      options: { redirectTo: window.location.origin },
+    });
+    if (err) { setError(err.message); setLoading(false); }
+    // On success: page redirects to Google, then back — onAuthStateChange handles it
+  };
 
   const handleSetup = async (e) => {
     e.preventDefault();
@@ -7874,6 +7980,16 @@ function LoginScreen({ onAuth }) {
     }
   };
 
+  const inputStyle = {
+    width: "100%", padding: "11px 14px", borderRadius: 10, border: "1.5px solid #e8e8e8",
+    fontSize: 14, outline: "none", boxSizing: "border-box", fontFamily: "'DM Sans', sans-serif",
+  };
+  const btnBase = {
+    width: "100%", padding: "12px", borderRadius: 10, border: "none",
+    fontSize: 14, fontWeight: 500, cursor: "pointer", fontFamily: "'DM Sans', sans-serif",
+    display: "flex", alignItems: "center", justifyContent: "center", gap: 10,
+  };
+
   return (
     <div style={{
       minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center",
@@ -7882,7 +7998,7 @@ function LoginScreen({ onAuth }) {
     }}>
       <div style={{
         background: "#fff", borderRadius: 20, padding: "48px 40px", width: 360,
-        boxShadow: "0 8px 40px rgba(0,0,0,0.10)", display: "flex", flexDirection: "column", alignItems: "center", gap: 0,
+        boxShadow: "0 8px 40px rgba(0,0,0,0.10)", display: "flex", flexDirection: "column", alignItems: "center",
       }}>
         {/* Monogram */}
         <div style={{
@@ -7896,54 +8012,53 @@ function LoginScreen({ onAuth }) {
           {mode === "setup" ? "Create a password" : "Welcome back"}
         </div>
         <div style={{ fontSize: 13, color: "#888", marginBottom: 28, textAlign: "center" }}>
-          {mode === "setup" ? "Set a password to protect your wardrobe." : "Enter your password to continue."}
+          {mode === "setup" ? "Set a backup password for your wardrobe." : "Sign in to continue."}
         </div>
 
-        <form onSubmit={mode === "setup" ? handleSetup : handleLogin} style={{ width: "100%", display: "flex", flexDirection: "column", gap: 12 }}>
-          <input
-            type="password"
-            placeholder="Password"
-            value={pw}
-            onChange={e => { setPw(e.target.value); setError(""); }}
-            autoFocus
-            style={{
-              width: "100%", padding: "11px 14px", borderRadius: 10, border: "1.5px solid #e8e8e8",
-              fontSize: 14, outline: "none", boxSizing: "border-box",
-              fontFamily: "'DM Sans', sans-serif",
-            }}
-          />
-          {mode === "setup" && (
-            <input
-              type="password"
-              placeholder="Confirm password"
-              value={confirm}
-              onChange={e => { setConfirm(e.target.value); setError(""); }}
-              style={{
-                width: "100%", padding: "11px 14px", borderRadius: 10, border: "1.5px solid #e8e8e8",
-                fontSize: 14, outline: "none", boxSizing: "border-box",
-                fontFamily: "'DM Sans', sans-serif",
-              }}
-            />
-          )}
-          {error && <div style={{ fontSize: 12, color: "#c0392b", textAlign: "center" }}>{error}</div>}
+        {/* Google button */}
+        <button
+          onClick={handleGoogle}
+          disabled={loading}
+          style={{ ...btnBase, background: "#fff", border: "1.5px solid #e8e8e8", color: "#1a1a1a", marginBottom: 16, opacity: loading ? 0.6 : 1 }}
+        >
+          <GoogleLogo /> Continue with Google
+        </button>
+
+        {/* Divider */}
+        <div style={{ width: "100%", display: "flex", alignItems: "center", gap: 10, marginBottom: 16 }}>
+          <div style={{ flex: 1, height: 1, background: "#efefef" }} />
+          <span style={{ fontSize: 11, color: "#bbb", whiteSpace: "nowrap" }}>or use password</span>
+          <div style={{ flex: 1, height: 1, background: "#efefef" }} />
+        </div>
+
+        {/* Password form */}
+        {!showPassword && mode === "login" ? (
           <button
-            type="submit"
-            disabled={loading}
-            style={{
-              marginTop: 4, padding: "12px", borderRadius: 10, border: "none",
-              background: "#1a1a1a", color: "#fff", fontSize: 14, fontWeight: 500,
-              cursor: loading ? "not-allowed" : "pointer", opacity: loading ? 0.6 : 1,
-              fontFamily: "'DM Sans', sans-serif",
-            }}
+            onClick={() => setShowPassword(true)}
+            style={{ ...btnBase, background: "transparent", border: "1.5px solid #e8e8e8", color: "#888" }}
           >
-            {mode === "setup" ? "Set Password" : "Unlock"}
+            Sign in with password
           </button>
-        </form>
+        ) : (
+          <form onSubmit={mode === "setup" ? handleSetup : handleLogin} style={{ width: "100%", display: "flex", flexDirection: "column", gap: 12 }}>
+            <input type="password" placeholder="Password" value={pw} autoFocus
+              onChange={e => { setPw(e.target.value); setError(""); }} style={inputStyle} />
+            {mode === "setup" && (
+              <input type="password" placeholder="Confirm password" value={confirm}
+                onChange={e => { setConfirm(e.target.value); setError(""); }} style={inputStyle} />
+            )}
+            {error && <div style={{ fontSize: 12, color: "#c0392b", textAlign: "center" }}>{error}</div>}
+            <button type="submit" disabled={loading}
+              style={{ ...btnBase, background: "#1a1a1a", color: "#fff", opacity: loading ? 0.6 : 1, cursor: loading ? "not-allowed" : "pointer" }}>
+              {mode === "setup" ? "Set Password" : "Unlock"}
+            </button>
+          </form>
+        )}
 
         {mode === "login" && (
           <button
-            onClick={() => { setMode("setup"); setPw(""); setConfirm(""); setError(""); localStorage.removeItem(PW_HASH_KEY); }}
-            style={{ marginTop: 16, background: "none", border: "none", fontSize: 12, color: "#aaa", cursor: "pointer" }}
+            onClick={() => { setMode("setup"); setPw(""); setConfirm(""); setError(""); setShowPassword(false); localStorage.removeItem(PW_HASH_KEY); }}
+            style={{ marginTop: 14, background: "none", border: "none", fontSize: 12, color: "#bbb", cursor: "pointer" }}
           >
             Forgot password? Reset
           </button>
@@ -7955,6 +8070,7 @@ function LoginScreen({ onAuth }) {
 
 export default function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(() => sessionStorage.getItem(SESSION_KEY) === "1");
+  const [authLoading, setAuthLoading] = useState(() => sessionStorage.getItem(SESSION_KEY) !== "1");
   const [activeTheme, setActiveTheme] = useState(() => getTheme());
   const itemsDb = useSupabaseTable("items");
   const wishlistDb = useSupabaseTable("wishlist");
@@ -8054,6 +8170,28 @@ export default function App() {
   const [annualBudget, setAnnualBudgetState] = useState(() => { try { return parseFloat(localStorage.getItem("wardrobe_annual_budget_v1")) || 0; } catch { return 0; } });
   const setMonthlyBudget = (v) => { setMonthlyBudgetState(v); try { localStorage.setItem("wardrobe_monthly_budget_v1", String(v)); } catch {} };
   const setAnnualBudget = (v) => { setAnnualBudgetState(v); try { localStorage.setItem("wardrobe_annual_budget_v1", String(v)); } catch {} };
+  // ── Google / Supabase Auth session check ──────────────────────────────────
+  useEffect(() => {
+    // Check for an existing Supabase session (handles Google OAuth redirect callback)
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session) {
+        sessionStorage.setItem(SESSION_KEY, "1");
+        setIsAuthenticated(true);
+      }
+      setAuthLoading(false);
+    });
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (session) {
+        sessionStorage.setItem(SESSION_KEY, "1");
+        setIsAuthenticated(true);
+      } else if (event === "SIGNED_OUT") {
+        sessionStorage.removeItem(SESSION_KEY);
+        setIsAuthenticated(false);
+      }
+    });
+    return () => subscription.unsubscribe();
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
   useEffect(() => {
     if (itemsDb.rows.length > 0) {
       const ts = new Date().toISOString();
@@ -8336,6 +8474,15 @@ export default function App() {
     wishlist: ["Wishlist", "Want it"],
     settings: ["Settings", "Customize your wardrobe"],
   };
+
+  if (authLoading) {
+    return (
+      <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", background: "linear-gradient(135deg, #faf9f7 0%, #f3ede8 100%)" }}>
+        <div style={{ width: 36, height: 36, borderRadius: "50%", border: "3px solid #e8e8e8", borderTopColor: "#1a1a1a", animation: "spin 0.8s linear infinite" }} />
+        <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+      </div>
+    );
+  }
 
   if (!isAuthenticated) {
     return <LoginScreen onAuth={() => setIsAuthenticated(true)} />;

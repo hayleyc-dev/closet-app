@@ -1684,25 +1684,33 @@ function AddItemModal({ onSave, onSaveWish, onCancel, initial, editMode, initial
 }
 
 // Clean minimal card: photo dominant (3:4), name + brand + chips below
-function ItemCard({ item, onClick, onCreateLook }) {
+function ItemCard({ item, onClick, onCreateLook, onEdit }) {
+  const [hovered, setHovered] = useState(false);
+  const btnBase = {
+    width: 28, height: 28, borderRadius: "50%",
+    background: "rgba(255,255,255,0.92)", border: "none",
+    cursor: "pointer", color: "#555",
+    display: "flex", alignItems: "center", justifyContent: "center",
+    backdropFilter: "blur(4px)", boxShadow: "0 1px 4px rgba(0,0,0,0.1)",
+    transition: "opacity 0.15s", opacity: hovered ? 1 : 0, pointerEvents: hovered ? "auto" : "none",
+  };
   return (
-    <div className="item-card" onClick={onClick} style={{ position: "relative", cursor: "pointer", overflow: "hidden", borderRadius: 16 }}>
+    <div className="item-card" onClick={onClick}
+      onMouseEnter={() => setHovered(true)} onMouseLeave={() => setHovered(false)}
+      style={{ position: "relative", cursor: "pointer", overflow: "hidden", borderRadius: 16 }}>
       <div style={{ width: "100%", aspectRatio: "1/1", background: "#fff", overflow: "hidden", display: "flex", alignItems: "center", justifyContent: "center", position: "relative" }}>
         {item.image
           ? <img src={item.image} alt={item.name} style={{ width: "100%", height: "100%", objectFit: "contain", display: "block", padding: 6 }} />
           : <HangerIcon size={36} color="#ddd" />
         }
-        <button
-          onClick={e => { e.stopPropagation(); onCreateLook && onCreateLook(); }}
-          style={{
-            position: "absolute", bottom: 7, right: 7,
-            width: 28, height: 28, borderRadius: "50%",
-            background: "rgba(255,255,255,0.92)", border: "none",
-            cursor: "pointer", fontSize: 13, color: "#555",
-            display: "flex", alignItems: "center", justifyContent: "center",
-            backdropFilter: "blur(4px)", boxShadow: "0 1px 4px rgba(0,0,0,0.1)"
-          }}
-        ><SvgHanger size={14} color="currentColor" /></button>
+        <button onClick={e => { e.stopPropagation(); onEdit && onEdit(); }}
+          style={{ position: "absolute", bottom: 7, left: 7, ...btnBase }}>
+          <SvgEdit size={13} color="currentColor" />
+        </button>
+        <button onClick={e => { e.stopPropagation(); onCreateLook && onCreateLook(); }}
+          style={{ position: "absolute", bottom: 7, right: 7, ...btnBase }}>
+          <SvgHanger size={14} color="currentColor" />
+        </button>
       </div>
     </div>
   );
@@ -8170,6 +8178,11 @@ export default function App() {
   const [itemDetail, setItemDetail] = useState(null); // closet item detail popup
   const [closetSort, setClosetSort] = useState(() => { try { return localStorage.getItem("wardrobe_default_sort_v1") || "default"; } catch { return "default"; } });
   const [closetSeasonFilter, setClosetSeasonFilter] = useState(() => { try { return localStorage.getItem("wardrobe_default_season_v1") || "All"; } catch { return "All"; } });
+  const [closetColorFilter, setClosetColorFilter] = useState([]);
+  const [closetItemOrder, setClosetItemOrder] = useState(() => { try { return JSON.parse(localStorage.getItem("wardrobe_item_order_v1") || "[]"); } catch { return []; } });
+  const saveItemOrder = (order) => { setClosetItemOrder(order); try { localStorage.setItem("wardrobe_item_order_v1", JSON.stringify(order)); } catch {} };
+  const dragItemRef = useRef(null);
+  const [dragOverId, setDragOverId] = useState(null);
   const [showNavLabels, setShowNavLabels] = useState(() => { try { return localStorage.getItem("wardrobe_nav_labels_v1") !== "0"; } catch { return true; } });
   const [density, setDensity] = useState(() => { try { return localStorage.getItem("wardrobe_density_v1") || "comfortable"; } catch { return "comfortable"; } });
   const CUSTOM_CATS_KEY = "wardrobe_custom_cats_v1";
@@ -8402,12 +8415,22 @@ export default function App() {
       ].filter(Boolean).map(v => String(v).toLowerCase());
       const matchDisney = !showDisneyOnly || disneyTags.includes("disney");
       const matchCapsule = !capsuleItemIds || capsuleItemIds.has(i.id);
-      return matchCat && matchSearch && matchSeason && matchNew && matchNeedsStyling && matchDisney && matchCapsule;
+      const matchColor = closetColorFilter.length === 0 || closetColorFilter.some(c => (i.color||"").toLowerCase() === c.toLowerCase());
+      return matchCat && matchSearch && matchSeason && matchNew && matchNeedsStyling && matchDisney && matchCapsule && matchColor;
     });
     if (closetSort === "az") rows = [...rows].sort((a, b) => a.name.localeCompare(b.name));
     else if (closetSort === "price") rows = [...rows].sort((a, b) => (parseFloat((b.price||"").replace(/[^0-9.]/g,""))||0) - (parseFloat((a.price||"").replace(/[^0-9.]/g,""))||0));
     else if (closetSort === "worn") rows = [...rows].sort((a, b) => (b.wornCount||0) - (a.wornCount||0));
     else if (closetSort === "newest") rows = [...rows].sort((a, b) => (b.purchaseDate||"").localeCompare(a.purchaseDate||""));
+    else if (closetSort === "color") rows = [...rows].sort((a, b) => (a.color||"zzz").localeCompare(b.color||"zzz"));
+    else if (closetSort === "default" && closetItemOrder.length > 0) {
+      const orderMap = new Map(closetItemOrder.map((id, idx) => [id, idx]));
+      rows = [...rows].sort((a, b) => {
+        const ai = orderMap.has(a.id) ? orderMap.get(a.id) : Number.MAX_SAFE_INTEGER;
+        const bi = orderMap.has(b.id) ? orderMap.get(b.id) : Number.MAX_SAFE_INTEGER;
+        return ai - bi;
+      });
+    }
     return rows;
   })();
   const saveCapsules = (updated) => {
@@ -8478,7 +8501,7 @@ export default function App() {
   );
 
   const PAGE_TITLES = {
-    closet: ["My Closet", `${itemsDb.rows.filter(i=>!i.forSale).length} pieces`],
+    closet: ["My Closet", ""],
     outfits: ["My Outfits", `${outfitsDb.rows.length} looks`],
     lookbooks: ["Lookbooks", "Curated collections"],
     stats: ["Style Profile", "Your wardrobe in focus"],
@@ -8634,11 +8657,6 @@ export default function App() {
                     );
                   })}
                 </div>
-                <div className="sidebar-section" style={{ marginTop: "auto" }}>
-                  <button className="sidebar-btn" onClick={() => { setCatFilters([]); setShowNeedsStylingOnly(false); setShowNewOnly(false); setShowDisneyOnly(false); setActiveCapsule(null); setClosetSearch(""); setClosetSeasonFilter("All"); }}>
-                    All items
-                  </button>
-                </div>
 
               </>)}
               {tab === "outfits" && (<>
@@ -8712,6 +8730,7 @@ export default function App() {
                     <select value={closetSort} onChange={e => setClosetSort(e.target.value)} className="pill-select" style={{}}>
                       <option value="default">Sort: Default</option>
                       <option value="az">Sort: A – Z</option>
+                      <option value="color">Sort: Color</option>
                       <option value="price">Sort: Price ↓</option>
                       <option value="worn">Sort: Most Worn</option>
                       <option value="newest">Sort: Newest</option>
@@ -8773,15 +8792,41 @@ export default function App() {
                   ) : (
                     <div style={{ display: "grid", gridTemplateColumns: `repeat(auto-fill, minmax(${closetZoom}px, 1fr))`, gap: 12 }}>
                       {filteredItems.map((item, i) => (
-                        <div key={item.id} className="fade-up" style={{ animationDelay: `${i * 0.02}s`, opacity: 0, position: "relative" }}
+                        <div key={item.id} className="fade-up"
+                          draggable={closetSort === "default" && !bulkMode}
+                          onDragStart={() => { dragItemRef.current = item.id; }}
+                          onDragEnter={e => { e.preventDefault(); setDragOverId(item.id); }}
+                          onDragOver={e => e.preventDefault()}
+                          onDragLeave={() => setDragOverId(null)}
+                          onDrop={() => {
+                            const fromId = dragItemRef.current;
+                            const toId = item.id;
+                            setDragOverId(null);
+                            dragItemRef.current = null;
+                            if (!fromId || fromId === toId) return;
+                            const ids = filteredItems.map(x => x.id);
+                            const from = ids.indexOf(fromId), to = ids.indexOf(toId);
+                            if (from < 0 || to < 0) return;
+                            const reordered = [...ids];
+                            reordered.splice(from, 1);
+                            reordered.splice(to, 0, fromId);
+                            const invisible = itemsDb.rows.map(x => x.id).filter(id => !new Set(reordered).has(id));
+                            saveItemOrder([...reordered, ...invisible]);
+                          }}
+                          onDragEnd={() => { dragItemRef.current = null; setDragOverId(null); }}
                           onClick={bulkMode ? () => setBulkSelected(s => { const n = new Set(s); n.has(item.id) ? n.delete(item.id) : n.add(item.id); return n; }) : undefined}
+                          style={{ animationDelay: `${i * 0.02}s`, opacity: 0, position: "relative", borderRadius: 16, outline: dragOverId === item.id ? "2px dashed #1a1a1a" : "none", outlineOffset: 2 }}
                         >
                           {bulkMode && (
                             <div style={{ position: "absolute", top: 8, left: 8, zIndex: 10, width: 22, height: 22, borderRadius: "50%", background: bulkSelected.has(item.id) ? "#2d6a3f" : "rgba(255,255,255,0.9)", border: `2px solid ${bulkSelected.has(item.id) ? "#2d6a3f" : "#ddd"}`, display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 1px 4px rgba(0,0,0,0.1)", pointerEvents: "none" }}>
                               {bulkSelected.has(item.id) && <SvgCheck size={12} color="#fff" />}
                             </div>
                           )}
-                          <ItemCard item={item} onClick={bulkMode ? undefined : () => setItemDetail(item)} onCreateLook={bulkMode ? undefined : () => { setEditingOutfit(null); setOutfitSeedItem(item); setOutfitBuilder(true); }} />
+                          <ItemCard item={item}
+                            onClick={bulkMode ? undefined : () => setItemDetail(item)}
+                            onCreateLook={bulkMode ? undefined : () => { setEditingOutfit(null); setOutfitSeedItem(item); setOutfitBuilder(true); }}
+                            onEdit={bulkMode ? undefined : () => { setEditItem(item); setWishlistDest(false); setModal("item"); }}
+                          />
                         </div>
                       ))}
                     </div>
@@ -9207,7 +9252,28 @@ export default function App() {
           {/* Season filter moved to top toolbar for closet */}
 
           {/* Capsules right card — closet tab only */}
-          {tab === "closet" && (
+          {tab === "closet" && (() => {
+            const allClosetColors = [...new Set(itemsDb.rows.filter(i => !i.forSale && i.color).map(i => i.color))].sort((a,b) => a.localeCompare(b));
+            const getColorSwatch = (name) => {
+              const n = (name||"").toLowerCase();
+              if (n.includes("black")) return "#6b6869";
+              if (n.includes("white") || n.includes("ivory") || n.includes("cream")) return "#f0ede8";
+              if (n.includes("grey") || n.includes("gray")) return "#c2bfbc";
+              if (n.includes("navy")) return "#b3bedc";
+              if (n.includes("blue") || n.includes("denim")) return "#b3cfee";
+              if (n.includes("red") || n.includes("scarlet")) return "#f5b8b8";
+              if (n.includes("pink") || n.includes("blush") || n.includes("rose")) return "#f5c6d8";
+              if (n.includes("coral") || n.includes("salmon")) return "#f5c4b0";
+              if (n.includes("orange") || n.includes("rust") || n.includes("terra")) return "#f5d0b0";
+              if (n.includes("yellow") || n.includes("gold") || n.includes("mustard")) return "#f5e6a3";
+              if (n.includes("green") || n.includes("olive") || n.includes("sage") || n.includes("mint")) return "#c0ddb5";
+              if (n.includes("teal") || n.includes("aqua") || n.includes("turquoise")) return "#b0ddd8";
+              if (n.includes("purple") || n.includes("violet") || n.includes("plum") || n.includes("lavender")) return "#d4bfee";
+              if (n.includes("brown") || n.includes("camel") || n.includes("tan") || n.includes("beige") || n.includes("nude")) return "#ddc9a8";
+              if (n.includes("silver") || n.includes("chrome")) return "#d8d8d8";
+              return "#e0dbd5";
+            };
+            return (<>
             <div className="right-card">
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
                 <div className="right-card-title" style={{ marginBottom: 0 }}>Capsules</div>
@@ -9242,9 +9308,30 @@ export default function App() {
                 </div>
               )}
             </div>
-          )}
 
-
+            {allClosetColors.length > 0 && (
+              <div className="right-card">
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
+                  <div className="right-card-title" style={{ marginBottom: 0 }}>Colors</div>
+                  {closetColorFilter.length > 0 && <button onClick={() => setClosetColorFilter([])} style={{ fontSize: 10, color: "#aaa", background: "none", border: "none", cursor: "pointer", fontFamily: "'DM Sans', sans-serif", fontWeight: 600 }}>Clear</button>}
+                </div>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+                  {allClosetColors.map(color => {
+                    const active = closetColorFilter.includes(color);
+                    const swatch = getColorSwatch(color);
+                    return (
+                      <button key={color} title={color} onClick={() => setClosetColorFilter(prev => active ? prev.filter(c => c !== color) : [...prev, color])}
+                        style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 4, background: "none", border: "none", cursor: "pointer", padding: 2 }}>
+                        <div style={{ width: 28, height: 28, borderRadius: "50%", background: swatch, border: active ? "2.5px solid #1a1a1a" : "2px solid transparent", boxShadow: active ? "0 0 0 1px #1a1a1a" : "0 1px 3px rgba(0,0,0,0.12)", transition: "all 0.15s" }} />
+                        <span style={{ fontSize: 9, color: active ? "#1a1a1a" : "#aaa", fontFamily: "'DM Sans', sans-serif", fontWeight: active ? 700 : 400, maxWidth: 36, textAlign: "center", lineHeight: 1.2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{color}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+            </>);
+          })()}
 
 
 

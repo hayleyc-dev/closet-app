@@ -1,0 +1,445 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>HC Closet</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,wght@0,300;0,400;0,500;1,300&family=Cormorant+Garamond:ital,wght@1,300&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #faf9f7;
+      --surface: #ffffff;
+      --border: #e8e4de;
+      --border-dark: #d4cfc8;
+      --text: #2c2825;
+      --text-2: #4a4540;
+      --muted: #8a8279;
+      --accent: #b5a99a;
+      --rose: #c4856a;
+      --rose-light: #f5ede8;
+      --radius: 8px;
+    }
+
+    html, body { height: 100%; background: var(--bg); color: var(--text); font-family: 'DM Sans', sans-serif; font-size: 13px; line-height: 1.45; }
+
+    .panel { display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
+
+    /* Header */
+    .header { display: flex; align-items: center; justify-content: space-between; padding: 13px 14px 11px; border-bottom: 1px solid var(--border); background: var(--surface); flex-shrink: 0; }
+    .logo { font-family: 'Cormorant Garamond', serif; font-style: italic; font-weight: 300; font-size: 17px; letter-spacing: 0.03em; color: var(--text); }
+    .header-icons { display: flex; gap: 4px; }
+    .icon-btn { width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; border: none; background: none; cursor: pointer; color: var(--muted); border-radius: 6px; transition: background 0.12s, color 0.12s; }
+    .icon-btn:hover { background: var(--border); color: var(--text); }
+
+    /* Scrollable body */
+    .body { flex: 1; overflow-y: auto; overflow-x: hidden; }
+    .body::-webkit-scrollbar { width: 4px; }
+    .body::-webkit-scrollbar-track { background: transparent; }
+    .body::-webkit-scrollbar-thumb { background: var(--border-dark); border-radius: 2px; }
+
+    /* Sections */
+    .section { padding: 13px 14px; border-bottom: 1px solid var(--border); }
+    .section:last-child { border-bottom: none; }
+    .section-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+    .section-title { font-size: 11px; font-weight: 500; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); }
+
+    /* Get Product button */
+    .get-product-btn { padding: 5px 12px; background: var(--text); color: #fff; border: none; border-radius: 5px; font-family: 'DM Sans', sans-serif; font-size: 12px; font-weight: 500; cursor: pointer; transition: opacity 0.15s; display: flex; align-items: center; gap: 5px; }
+    .get-product-btn:hover { opacity: 0.82; }
+    .get-product-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+    .get-product-btn .spinner { width: 10px; height: 10px; border: 1.5px solid rgba(255,255,255,0.4); border-top-color: #fff; border-radius: 50%; animation: spin 0.6s linear infinite; display: none; }
+    .get-product-btn.loading .spinner { display: block; }
+    .get-product-btn.loading .btn-label { display: none; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* Form fields */
+    .field { margin-bottom: 9px; }
+    .field:last-child { margin-bottom: 0; }
+    .field label { display: block; font-size: 10.5px; font-weight: 500; text-transform: uppercase; letter-spacing: 0.07em; color: var(--muted); margin-bottom: 4px; }
+    .field input, .field select, .field textarea { width: 100%; padding: 7px 9px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface); font-family: 'DM Sans', sans-serif; font-size: 12.5px; color: var(--text); outline: none; transition: border-color 0.15s; }
+    .field input:focus, .field select:focus, .field textarea:focus { border-color: var(--accent); }
+    .field input::placeholder, .field textarea::placeholder { color: var(--accent); }
+    .field textarea { resize: vertical; min-height: 56px; line-height: 1.5; }
+    .field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+    .field-row-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
+
+    /* Season pills */
+    .season-pills { display: flex; flex-wrap: wrap; gap: 5px; }
+    .season-pill { padding: 4px 9px; border: 1px solid var(--border); border-radius: 14px; font-family: 'DM Sans', sans-serif; font-size: 11.5px; color: var(--muted); background: var(--surface); cursor: pointer; transition: all 0.14s; user-select: none; }
+    .season-pill:hover { border-color: var(--accent); color: var(--text-2); }
+    .season-pill.active { border-color: var(--rose); background: var(--rose-light); color: var(--rose); font-weight: 500; }
+
+    /* Image tools */
+    .image-tools { display: flex; gap: 8px; align-items: flex-start; }
+    .image-btns { display: flex; flex-direction: column; gap: 6px; flex: 1; }
+    .img-tool-btn { display: flex; align-items: center; gap: 7px; padding: 7px 10px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface); font-family: 'DM Sans', sans-serif; font-size: 12px; color: var(--text-2); cursor: pointer; transition: border-color 0.15s, background 0.15s; white-space: nowrap; }
+    .img-tool-btn:hover { border-color: var(--accent); background: var(--bg); }
+    .img-tool-btn:disabled { opacity: 0.45; cursor: not-allowed; }
+    .img-tool-btn svg { flex-shrink: 0; color: var(--muted); }
+    .img-tool-btn.active { border-color: var(--rose); background: var(--rose-light); color: var(--rose); }
+    .img-tool-btn.active svg { color: var(--rose); }
+
+    /* BG remove button */
+    .bg-remove-btn { display: flex; align-items: center; gap: 6px; padding: 6px 10px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface); font-family: 'DM Sans', sans-serif; font-size: 11.5px; color: var(--text-2); cursor: pointer; transition: border-color 0.15s, background 0.15s; margin-top: 2px; width: 100%; }
+    .bg-remove-btn:hover { border-color: var(--accent); background: var(--bg); }
+    .bg-remove-btn:disabled { opacity: 0.45; cursor: not-allowed; }
+    .bg-remove-btn.processing { color: var(--muted); }
+    .bg-remove-btn .bg-spinner { width: 9px; height: 9px; border: 1.5px solid var(--border); border-top-color: var(--rose); border-radius: 50%; animation: spin 0.6s linear infinite; display: none; }
+    .bg-remove-btn.processing .bg-spinner { display: block; }
+    .bg-auto-badge { font-size: 10px; padding: 1px 5px; background: var(--rose-light); color: var(--rose); border-radius: 8px; font-weight: 500; }
+
+    .image-preview-wrap { width: 72px; flex-shrink: 0; position: relative; }
+    .image-preview { width: 72px; height: 88px; border-radius: 7px; object-fit: cover; border: 1.5px solid var(--border); display: none; background: #f5f5f5; }
+    .image-preview-empty { width: 72px; height: 88px; border-radius: 7px; border: 1.5px dashed var(--border-dark); display: flex; align-items: center; justify-content: center; color: var(--accent); font-size: 10px; text-align: center; line-height: 1.4; padding: 6px; }
+    .img-processing-overlay { position: absolute; top: 0; left: 0; width: 72px; height: 88px; border-radius: 7px; background: rgba(250,249,247,0.78); display: none; align-items: center; justify-content: center; }
+    .img-processing-overlay.visible { display: flex; }
+    .img-proc-spinner { width: 18px; height: 18px; border: 2px solid var(--border); border-top-color: var(--rose); border-radius: 50%; animation: spin 0.6s linear infinite; }
+    .clear-img-btn { display: none; width: 72px; margin-top: 4px; padding: 3px 0; font-size: 10px; color: var(--muted); background: none; border: none; cursor: pointer; font-family: 'DM Sans', sans-serif; text-align: center; text-decoration: underline; text-underline-offset: 2px; }
+    .clear-img-btn:hover { color: var(--rose); }
+
+    /* Destination toggle */
+    .dest-toggle { display: flex; background: var(--border); border-radius: 20px; padding: 3px; gap: 2px; }
+    .dest-btn { flex: 1; padding: 5px 0; border: none; background: transparent; border-radius: 16px; font-family: 'DM Sans', sans-serif; font-size: 12px; font-weight: 500; cursor: pointer; color: var(--muted); transition: all 0.18s; }
+    .dest-btn.active { background: var(--surface); color: var(--text); box-shadow: 0 1px 3px rgba(0,0,0,0.07); }
+
+    /* Wishlist-only fields */
+    .wishlist-only { display: none; }
+    .wishlist-only.visible { display: block; }
+    .wishlist-list-row { display: flex; gap: 6px; align-items: flex-end; }
+    .wishlist-list-row .field { flex: 1; margin-bottom: 0; }
+    .new-list-input-wrap { margin-top: 6px; display: none; }
+    .new-list-input-wrap.visible { display: block; }
+
+    /* Status bar */
+    .status-bar { padding: 7px 14px; font-size: 12px; display: none; align-items: center; gap: 6px; flex-shrink: 0; }
+    .status-bar.visible { display: flex; }
+    .status-bar.error { color: #b83232; background: #fdf2f2; border-bottom: 1px solid #f5d0d0; }
+    .status-bar.info { color: var(--muted); border-bottom: 1px solid var(--border); }
+    .status-bar.success { color: #2e7d32; background: #edf7ed; border-bottom: 1px solid #c8e6c9; }
+
+    /* Footer */
+    .footer { padding: 12px 14px; border-top: 1px solid var(--border); background: var(--surface); flex-shrink: 0; }
+    .submit-btn { width: 100%; padding: 10px; background: var(--text); color: #fff; border: none; border-radius: var(--radius); font-family: 'DM Sans', sans-serif; font-size: 13px; font-weight: 500; cursor: pointer; transition: opacity 0.15s; display: flex; align-items: center; justify-content: center; gap: 6px; }
+    .submit-btn:hover { opacity: 0.84; }
+    .submit-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+    .submit-btn .sub-spinner { width: 12px; height: 12px; border: 1.5px solid rgba(255,255,255,0.35); border-top-color: #fff; border-radius: 50%; animation: spin 0.6s linear infinite; display: none; }
+    .submit-btn.loading .sub-spinner { display: block; }
+    .submit-btn.loading .sub-label { opacity: 0.6; }
+
+    /* Success */
+    .success-panel { padding: 28px 16px; text-align: center; display: none; }
+    .success-panel.visible { display: block; }
+    .success-check { width: 44px; height: 44px; border-radius: 50%; background: #edf7ed; color: #2e7d32; font-size: 22px; display: flex; align-items: center; justify-content: center; margin: 0 auto 12px; }
+    .success-title { font-weight: 500; font-size: 14px; margin-bottom: 4px; }
+    .success-sub { color: var(--muted); font-size: 12px; margin-bottom: 18px; }
+    .add-another-btn { padding: 8px 20px; border: 1px solid var(--border-dark); border-radius: var(--radius); background: var(--surface); font-family: 'DM Sans', sans-serif; font-size: 12px; cursor: pointer; color: var(--text); }
+    .add-another-btn:hover { background: var(--bg); }
+
+    /* Setup */
+    #setup-screen { padding: 24px 16px; display: none; }
+    #setup-screen.visible { display: block; }
+    .setup-title { font-weight: 500; font-size: 14px; margin-bottom: 6px; }
+    .setup-sub { color: var(--muted); font-size: 12px; margin-bottom: 16px; line-height: 1.55; }
+    .setup-btn { width: 100%; padding: 9px; background: var(--text); color: #fff; border: none; border-radius: var(--radius); font-family: 'DM Sans', sans-serif; font-size: 13px; font-weight: 500; cursor: pointer; margin-top: 4px; }
+    .setup-error { color: #b83232; font-size: 12px; margin-top: 8px; }
+
+    /* Settings */
+    .settings-toggle { display: flex; align-items: center; gap: 6px; font-size: 11px; color: var(--muted); background: none; border: none; cursor: pointer; font-family: 'DM Sans', sans-serif; padding: 0; }
+    .settings-toggle:hover { color: var(--text); }
+    .settings-toggle svg { transition: transform 0.2s; }
+    .settings-toggle.open svg { transform: rotate(180deg); }
+    #settings-body { display: none; margin-top: 10px; }
+    #settings-body.visible { display: block; }
+    .settings-row { display: flex; gap: 6px; }
+    .settings-row input { flex: 1; padding: 7px 9px; border: 1px solid var(--border); border-radius: var(--radius); font-family: 'DM Sans', sans-serif; font-size: 12px; color: var(--text); background: var(--bg); outline: none; }
+    .settings-row input:focus { border-color: var(--accent); }
+    .settings-save-btn { padding: 7px 11px; background: var(--text); color: #fff; border: none; border-radius: var(--radius); font-family: 'DM Sans', sans-serif; font-size: 12px; cursor: pointer; }
+    .key-saved { font-size: 11px; color: #2e7d32; margin-top: 6px; display: none; }
+    .key-saved.visible { display: block; }
+    .settings-hint { font-size: 10.5px; color: var(--muted); margin-top: 5px; line-height: 1.5; }
+
+    /* Drafts panel */
+    .drafts-header { cursor: pointer; }
+    .drafts-header:hover .section-title { color: var(--text-2); }
+    #drafts-chevron { transition: transform 0.18s; color: var(--muted); }
+    #drafts-chevron.open { transform: rotate(180deg); }
+    .draft-row { display: flex; align-items: center; gap: 8px; padding: 6px 0; border-bottom: 1px solid var(--border); }
+    .draft-row:last-child { border-bottom: none; padding-bottom: 0; }
+    .draft-thumb { width: 32px; height: 40px; border-radius: 5px; object-fit: cover; border: 1px solid var(--border); background: var(--bg); flex-shrink: 0; }
+    .draft-thumb-empty { width: 32px; height: 40px; border-radius: 5px; border: 1px dashed var(--border-dark); display: flex; align-items: center; justify-content: center; color: var(--accent); font-size: 14px; flex-shrink: 0; }
+    .draft-info { flex: 1; min-width: 0; }
+    .draft-name { font-size: 12px; font-weight: 500; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .draft-meta { font-size: 10.5px; color: var(--muted); margin-top: 1px; }
+    .draft-actions { display: flex; gap: 4px; flex-shrink: 0; }
+    .draft-load-btn { padding: 3px 8px; font-size: 11px; background: var(--text); color: #fff; border: none; border-radius: 4px; cursor: pointer; font-family: 'DM Sans', sans-serif; }
+    .draft-load-btn:hover { opacity: 0.8; }
+    .draft-del-btn { width: 22px; height: 22px; display: flex; align-items: center; justify-content: center; border: 1px solid var(--border); border-radius: 4px; background: none; cursor: pointer; color: var(--muted); font-size: 14px; }
+    .draft-del-btn:hover { border-color: #b83232; color: #b83232; background: #fdf2f2; }
+
+    /* Save Draft link */
+    .save-draft-btn { background: none; border: none; font-family: 'DM Sans', sans-serif; font-size: 11px; color: var(--muted); cursor: pointer; padding: 0; text-decoration: underline; text-underline-offset: 2px; }
+    .save-draft-btn:hover { color: var(--rose); }
+    .section-header-actions { display: flex; align-items: center; gap: 8px; }
+  </style>
+</head>
+<body>
+<div class="panel">
+
+  <!-- Header -->
+  <div class="header">
+    <span class="logo">HC Closet</span>
+    <div class="header-icons">
+      <button class="icon-btn" id="btn-refresh" title="Re-scan page">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="23 4 23 10 17 10"/>
+          <polyline points="1 20 1 14 7 14"/>
+          <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
+        </svg>
+      </button>
+    </div>
+  </div>
+
+  <!-- Status bar -->
+  <div class="status-bar" id="status-bar">
+    <span id="status-text"></span>
+  </div>
+
+  <!-- Setup screen -->
+  <div id="setup-screen">
+    <div class="setup-title">Enter your Anthropic API key</div>
+    <div class="setup-sub">Your key is stored only in Chrome and only sent to Anthropic's API to parse product details.</div>
+    <div class="field">
+      <label>API Key</label>
+      <input type="password" id="setup-key-input" placeholder="sk-ant-…" />
+    </div>
+    <button class="setup-btn" id="btn-save-setup-key">Save & Continue</button>
+    <div class="setup-error" id="setup-error"></div>
+  </div>
+
+  <!-- Main form -->
+  <div class="body" id="main-screen" style="display:none">
+
+    <!-- Success -->
+    <div class="success-panel" id="success-panel">
+      <div class="success-check">✓</div>
+      <div class="success-title" id="success-title">Added to Closet</div>
+      <div class="success-sub" id="success-sub"></div>
+      <button class="add-another-btn" id="btn-add-another">Add another item</button>
+    </div>
+
+    <div id="form-content">
+
+      <!-- Drafts panel -->
+      <div class="section" id="drafts-section" style="display:none">
+        <div class="section-header drafts-header" id="drafts-header">
+          <span class="section-title">Drafts <span id="drafts-count" style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--muted)"></span></span>
+          <svg id="drafts-chevron" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+        </div>
+        <div id="drafts-list" style="display:none;padding-top:4px"></div>
+      </div>
+
+      <!-- Product Detail -->
+      <div class="section">
+        <div class="section-header">
+          <span class="section-title">Product Detail</span>
+          <div class="section-header-actions">
+            <button class="save-draft-btn" id="btn-save-draft">Save Draft</button>
+            <button class="get-product-btn" id="btn-get-product">
+              <div class="spinner"></div>
+              <span class="btn-label">Get Product</span>
+            </button>
+          </div>
+        </div>
+        <div class="field">
+          <label>Name</label>
+          <input type="text" id="f-name" placeholder="Product name" />
+        </div>
+        <div class="field" style="margin-bottom:0">
+          <label>URL</label>
+          <input type="text" id="f-url" placeholder="https://…" />
+        </div>
+      </div>
+
+      <!-- Image -->
+      <div class="section">
+        <div class="section-title" style="margin-bottom:10px">Image</div>
+        <div class="image-tools">
+          <div class="image-btns">
+            <button class="img-tool-btn" id="btn-select-image">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+              Select Image
+            </button>
+            <button class="img-tool-btn" id="btn-screenshot">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+              Take Screenshot
+            </button>
+            <button class="bg-remove-btn" id="btn-remove-bg" disabled>
+              <div class="bg-spinner"></div>
+              <svg id="bg-icon" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;color:var(--muted)"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+              <span id="bg-btn-label">Remove Background</span>
+              <span class="bg-auto-badge" id="bg-auto-badge" style="display:none">auto</span>
+            </button>
+            <button class="bg-remove-btn" id="btn-auto-crop" disabled>
+              <div class="bg-spinner" id="crop-spinner"></div>
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;color:var(--muted)"><polyline points="6 2 6 8 2 8"/><polyline points="18 22 18 16 22 16"/><path d="M2 8h14a2 2 0 0 1 2 2v10"/><path d="M22 16H8a2 2 0 0 1-2-2V4"/></svg>
+              <span id="crop-btn-label">Auto Crop</span>
+              <span class="bg-auto-badge" id="crop-auto-badge" style="display:none">auto</span>
+            </button>
+          </div>
+          <div class="image-preview-wrap">
+            <img class="image-preview" id="image-preview" src="" alt="" />
+            <div class="image-preview-empty" id="image-preview-empty">No image</div>
+            <div class="img-processing-overlay" id="img-processing-overlay">
+              <div class="img-proc-spinner"></div>
+            </div>
+            <button class="clear-img-btn" id="btn-clear-image">remove</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Add to -->
+      <div class="section">
+        <div class="section-title" style="margin-bottom:10px">Add to</div>
+        <div class="dest-toggle" style="margin-bottom:12px">
+          <button class="dest-btn active" id="btn-closet">Closet</button>
+          <button class="dest-btn" id="btn-wishlist">Wishlist</button>
+        </div>
+
+        <!-- Wishlist-only: Store + List -->
+        <div class="wishlist-only" id="wishlist-fields">
+          <div class="field">
+            <label>Store</label>
+            <input type="text" id="f-store" placeholder="e.g. Abercrombie, Zara" />
+          </div>
+          <div class="field" style="margin-bottom:0">
+            <label>Wishlist</label>
+            <div class="wishlist-list-row">
+              <div class="field">
+                <select id="f-wishlist-select">
+                  <option value="">— No list —</option>
+                </select>
+              </div>
+            </div>
+            <div class="new-list-input-wrap" id="new-list-wrap">
+              <input type="text" id="f-new-list-name" placeholder="New list name…" />
+            </div>
+          </div>
+        </div>
+
+        <div style="height:10px" id="dest-spacer-wishlist" class="wishlist-only"></div>
+
+        <!-- Shared fields -->
+        <div class="field">
+          <label>Brand</label>
+          <input type="text" id="f-brand" placeholder="Brand" />
+        </div>
+        <div class="field-row">
+          <div class="field">
+            <label>Sale Price</label>
+            <input type="text" id="f-spent" placeholder="0.00" />
+          </div>
+          <div class="field">
+            <label>Original Price</label>
+            <input type="text" id="f-price" placeholder="0.00" />
+          </div>
+        </div>
+        <div class="field-row">
+          <div class="field">
+            <label>Category</label>
+            <select id="f-category">
+              <option value="">—</option>
+              <option>Accessories</option><option>Activewear</option><option>Bags</option>
+              <option>Denim</option><option>Dresses</option><option>Intimates</option>
+              <option>Jewelry</option><option>Knits</option><option>Loungewear</option>
+              <option>Outerwear</option><option>Shoes</option><option>Shorts + Skirts</option>
+              <option>Sleepwear</option><option>Socks + Tights</option><option>Sweaters</option>
+              <option>Swim</option><option>Tops</option><option>Trousers</option>
+            </select>
+          </div>
+          <div class="field">
+            <label>Color</label>
+            <select id="f-color">
+              <option value="">—</option>
+              <option>Black</option><option>Blue</option><option>Brown</option>
+              <option>Clear</option><option>Cream</option><option>Gold</option>
+              <option>Green</option><option>Grey</option><option>Orange</option>
+              <option>Pink</option><option>Purple</option><option>Red</option>
+              <option>Silver</option><option>Tan</option><option>White</option>
+              <option>Yellow</option>
+            </select>
+          </div>
+        </div>
+        <div class="field-row">
+          <div class="field">
+            <label>Size</label>
+            <select id="f-size">
+              <option value="">—</option>
+              <option>XS</option><option>S</option><option>M</option><option>L</option><option>XL</option>
+              <option>00/24</option><option>0/25</option><option>2/26</option><option>4/27</option>
+              <option>6/28</option><option>OS</option><option>34B</option><option>S Tall</option>
+              <option>XS Long</option><option>S/M</option><option>7</option><option>9</option>
+            </select>
+          </div>
+          <div class="field" style="margin-bottom:0"><!-- spacer --></div>
+        </div>
+        <div class="field" style="margin-bottom:10px">
+          <label>Seasons</label>
+          <div class="season-pills" id="season-pills">
+            <button class="season-pill" data-season="Spring">Spring</button>
+            <button class="season-pill" data-season="Summer">Summer</button>
+            <button class="season-pill" data-season="Fall">Fall</button>
+            <button class="season-pill" data-season="Winter">Winter</button>
+            <button class="season-pill" data-season="All Season">All Season</button>
+            <button class="season-pill" data-season="Holiday">Holiday</button>
+          </div>
+        </div>
+        <div class="field" style="margin-bottom:0">
+          <label>Notes</label>
+          <textarea id="f-notes" placeholder="Any notes about this item…"></textarea>
+        </div>
+      </div>
+
+      <!-- Settings -->
+      <div class="section">
+        <button class="settings-toggle" id="btn-settings-toggle">
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+          Settings
+        </button>
+        <div id="settings-body">
+          <div class="field" style="margin-top:10px">
+            <label>Anthropic API Key</label>
+            <div class="settings-row">
+              <input type="password" id="settings-key-input" placeholder="sk-ant-…" />
+              <button class="settings-save-btn" id="btn-save-key">Save</button>
+            </div>
+          </div>
+          <div class="field">
+            <label>remove.bg API Key <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--muted)">(optional — for auto background removal)</span></label>
+            <div class="settings-row">
+              <input type="password" id="settings-removebg-input" placeholder="Your remove.bg key…" />
+              <button class="settings-save-btn" id="btn-save-removebg">Save</button>
+            </div>
+            <div class="settings-hint">Free tier: 50 removals/month at remove.bg</div>
+          </div>
+          <div class="key-saved" id="key-saved">Saved ✓</div>
+        </div>
+      </div>
+
+    </div><!-- /form-content -->
+  </div><!-- /body -->
+
+  <!-- Footer -->
+  <div class="footer" id="footer" style="display:none">
+    <button class="submit-btn" id="btn-submit">
+      <div class="sub-spinner"></div>
+      <span class="sub-label" id="submit-label">Add to Closet</span>
+    </button>
+  </div>
+
+</div>
+<script src="sidepanel.js"></script>
+</body>
+</html>

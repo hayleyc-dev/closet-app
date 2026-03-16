@@ -1,0 +1,394 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>HC Closet</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500&family=Cormorant+Garamond:ital,wght@1,300&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #faf9f7;
+      --surface: #ffffff;
+      --border: #e8e4de;
+      --text: #2c2825;
+      --muted: #8a8279;
+      --accent: #b5a99a;
+      --rose: #c4856a;
+      --radius: 8px;
+    }
+
+    body {
+      width: 360px;
+      min-height: 200px;
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'DM Sans', sans-serif;
+      font-size: 13px;
+    }
+
+    /* ── Header ── */
+    .header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 14px 16px 12px;
+      border-bottom: 1px solid var(--border);
+      background: var(--surface);
+    }
+    .logo {
+      font-family: 'Cormorant Garamond', serif;
+      font-size: 18px;
+      font-style: italic;
+      font-weight: 300;
+      letter-spacing: 0.04em;
+      color: var(--text);
+    }
+    .header-actions { display: flex; gap: 8px; }
+    .icon-btn {
+      background: none;
+      border: none;
+      cursor: pointer;
+      color: var(--muted);
+      padding: 2px;
+      display: flex;
+      align-items: center;
+      transition: color 0.15s;
+    }
+    .icon-btn:hover { color: var(--text); }
+
+    /* ── Loading / Error / Success states ── */
+    .state-box {
+      padding: 32px 20px;
+      text-align: center;
+      display: none;
+    }
+    .state-box.visible { display: block; }
+    .spinner {
+      width: 28px; height: 28px;
+      border: 2px solid var(--border);
+      border-top-color: var(--rose);
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+      margin: 0 auto 12px;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .state-label { color: var(--muted); font-size: 13px; }
+    .success-icon { font-size: 28px; margin-bottom: 10px; }
+    .success-msg { font-weight: 500; margin-bottom: 4px; }
+    .success-sub { color: var(--muted); font-size: 12px; }
+    .error-text { color: #c0392b; font-size: 12px; margin-top: 6px; }
+
+    /* ── Setup screen (API key entry) ── */
+    #setup-screen { padding: 20px 16px; display: none; }
+    #setup-screen.visible { display: block; }
+    .setup-title { font-weight: 500; margin-bottom: 6px; }
+    .setup-sub { color: var(--muted); font-size: 12px; margin-bottom: 14px; line-height: 1.5; }
+
+    /* ── Main form ── */
+    #main-screen { display: none; }
+    #main-screen.visible { display: block; }
+
+    /* Destination toggle */
+    .dest-toggle {
+      display: flex;
+      margin: 14px 16px 0;
+      background: var(--border);
+      border-radius: 20px;
+      padding: 3px;
+    }
+    .dest-btn {
+      flex: 1;
+      padding: 6px 0;
+      border: none;
+      background: transparent;
+      border-radius: 17px;
+      font-family: 'DM Sans', sans-serif;
+      font-size: 12px;
+      font-weight: 500;
+      cursor: pointer;
+      color: var(--muted);
+      transition: all 0.2s;
+    }
+    .dest-btn.active {
+      background: var(--surface);
+      color: var(--text);
+      box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+    }
+
+    /* Image strip */
+    .image-strip-wrap {
+      margin: 14px 16px 0;
+      position: relative;
+    }
+    .image-strip {
+      display: flex;
+      gap: 6px;
+      overflow-x: auto;
+      scrollbar-width: none;
+      padding-bottom: 2px;
+    }
+    .image-strip::-webkit-scrollbar { display: none; }
+    .img-thumb {
+      width: 72px;
+      height: 88px;
+      object-fit: cover;
+      border-radius: 6px;
+      border: 2px solid transparent;
+      cursor: pointer;
+      flex-shrink: 0;
+      background: var(--border);
+      transition: border-color 0.15s;
+    }
+    .img-thumb.selected { border-color: var(--rose); }
+    .img-thumb.error { display: none; }
+    .no-image {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 72px;
+      height: 88px;
+      border-radius: 6px;
+      background: var(--border);
+      color: var(--muted);
+      font-size: 11px;
+      text-align: center;
+      flex-shrink: 0;
+    }
+
+    /* Form fields */
+    .form-body { padding: 14px 16px 0; }
+    .field { margin-bottom: 10px; }
+    .field label {
+      display: block;
+      font-size: 11px;
+      font-weight: 500;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      margin-bottom: 4px;
+    }
+    .field input, .field select {
+      width: 100%;
+      padding: 8px 10px;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      background: var(--surface);
+      font-family: 'DM Sans', sans-serif;
+      font-size: 13px;
+      color: var(--text);
+      outline: none;
+      transition: border-color 0.15s;
+    }
+    .field input:focus, .field select:focus { border-color: var(--accent); }
+    .field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+
+    /* Submit */
+    .form-footer {
+      padding: 12px 16px 16px;
+    }
+    .submit-btn {
+      width: 100%;
+      padding: 10px;
+      background: var(--text);
+      color: #fff;
+      border: none;
+      border-radius: var(--radius);
+      font-family: 'DM Sans', sans-serif;
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: opacity 0.15s;
+    }
+    .submit-btn:hover { opacity: 0.85; }
+    .submit-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+    .submit-error { color: #c0392b; font-size: 12px; margin-top: 8px; text-align: center; }
+
+    /* Settings footer */
+    .settings-footer {
+      padding: 10px 16px;
+      border-top: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .settings-link {
+      font-size: 11px;
+      color: var(--muted);
+      cursor: pointer;
+      text-decoration: underline;
+      text-underline-offset: 2px;
+      background: none;
+      border: none;
+      font-family: 'DM Sans', sans-serif;
+    }
+    .settings-link:hover { color: var(--text); }
+
+    /* Inline API key settings panel */
+    #settings-panel {
+      padding: 14px 16px;
+      border-top: 1px solid var(--border);
+      background: var(--surface);
+      display: none;
+    }
+    #settings-panel.visible { display: block; }
+    .settings-label { font-size: 11px; font-weight: 500; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 6px; }
+    .settings-row { display: flex; gap: 6px; }
+    .settings-row input {
+      flex: 1;
+      padding: 7px 10px;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      font-family: 'DM Sans', sans-serif;
+      font-size: 12px;
+      color: var(--text);
+      background: var(--bg);
+      outline: none;
+    }
+    .settings-row input:focus { border-color: var(--accent); }
+    .save-key-btn {
+      padding: 7px 12px;
+      background: var(--text);
+      color: #fff;
+      border: none;
+      border-radius: var(--radius);
+      font-family: 'DM Sans', sans-serif;
+      font-size: 12px;
+      cursor: pointer;
+    }
+    .key-saved { font-size: 11px; color: #2e7d32; margin-top: 6px; display: none; }
+    .key-saved.visible { display: block; }
+  </style>
+</head>
+<body>
+
+  <!-- Header -->
+  <div class="header">
+    <span class="logo">HC Closet</span>
+    <div class="header-actions">
+      <button class="icon-btn" id="btn-refresh" title="Re-scan page">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/>
+          <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
+        </svg>
+      </button>
+    </div>
+  </div>
+
+  <!-- Loading state -->
+  <div class="state-box" id="state-loading">
+    <div class="spinner"></div>
+    <div class="state-label" id="loading-label">Scanning page…</div>
+  </div>
+
+  <!-- Success state -->
+  <div class="state-box" id="state-success">
+    <div class="success-icon">✓</div>
+    <div class="success-msg" id="success-msg">Added to Closet</div>
+    <div class="success-sub" id="success-sub">Item saved successfully</div>
+    <div style="margin-top:14px">
+      <button class="submit-btn" id="btn-add-another" style="background:transparent;color:var(--text);border:1px solid var(--border);">Add another</button>
+    </div>
+  </div>
+
+  <!-- Setup screen (first-run API key entry) -->
+  <div id="setup-screen">
+    <div class="setup-title">Enter your Anthropic API key</div>
+    <div class="setup-sub">Your key is stored locally in Chrome and never sent anywhere except Anthropic's API.</div>
+    <div class="field">
+      <input type="password" id="setup-key-input" placeholder="sk-ant-…" />
+    </div>
+    <button class="submit-btn" id="btn-save-setup-key">Save & Continue</button>
+    <div class="error-text" id="setup-error"></div>
+  </div>
+
+  <!-- Main screen -->
+  <div id="main-screen">
+
+    <!-- Destination toggle -->
+    <div class="dest-toggle">
+      <button class="dest-btn active" id="btn-closet" data-dest="closet">Closet</button>
+      <button class="dest-btn" id="btn-wishlist" data-dest="wishlist">Wishlist</button>
+    </div>
+
+    <!-- Image strip -->
+    <div class="image-strip-wrap">
+      <div class="image-strip" id="image-strip"></div>
+    </div>
+
+    <!-- Form fields -->
+    <div class="form-body">
+      <div class="field">
+        <label>Name</label>
+        <input type="text" id="f-name" placeholder="Item name" />
+      </div>
+      <div class="field-row">
+        <div class="field">
+          <label>Brand</label>
+          <input type="text" id="f-brand" placeholder="Brand" />
+        </div>
+        <div class="field">
+          <label>Price</label>
+          <input type="text" id="f-price" placeholder="0.00" />
+        </div>
+      </div>
+      <div class="field-row">
+        <div class="field">
+          <label>Category</label>
+          <select id="f-category">
+            <option value="">—</option>
+            <option>Accessories</option>
+            <option>Activewear</option>
+            <option>Bags</option>
+            <option>Denim</option>
+            <option>Dresses</option>
+            <option>Intimates</option>
+            <option>Jewelry</option>
+            <option>Knits</option>
+            <option>Loungewear</option>
+            <option>Outerwear</option>
+            <option>Shoes</option>
+            <option>Shorts + Skirts</option>
+            <option>Sleepwear</option>
+            <option>Socks + Tights</option>
+            <option>Sweaters</option>
+            <option>Swim</option>
+            <option>Tops</option>
+            <option>Trousers</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Color</label>
+          <input type="text" id="f-color" placeholder="e.g. Cream" />
+        </div>
+      </div>
+    </div>
+
+    <!-- Submit button -->
+    <div class="form-footer">
+      <button class="submit-btn" id="btn-submit">Add to Closet</button>
+      <div class="submit-error" id="submit-error"></div>
+    </div>
+
+    <!-- Settings footer -->
+    <div class="settings-footer">
+      <button class="settings-link" id="btn-toggle-settings">API key settings</button>
+    </div>
+
+    <!-- Inline settings panel -->
+    <div id="settings-panel">
+      <div class="settings-label">Anthropic API Key</div>
+      <div class="settings-row">
+        <input type="password" id="settings-key-input" placeholder="sk-ant-…" />
+        <button class="save-key-btn" id="btn-save-key">Save</button>
+      </div>
+      <div class="key-saved" id="key-saved">Key saved ✓</div>
+    </div>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>

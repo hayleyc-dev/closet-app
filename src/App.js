@@ -525,8 +525,27 @@ function removeBgCanvas(dataUrl) {
   });
 }
 
-// Fetch an external image via CORS proxy and return base64 data URL
+// Fetch an external image and return base64 data URL.
+// Tries direct fetch first (works for CORS-enabled hosts like Supabase Storage),
+// then falls back to CORS proxies for retailer sites that block direct requests.
 async function fetchImageAsDataUrl(url) {
+  const blobToDataUrl = (blob) => new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = e => resolve(e.target.result);
+    reader.onerror = reject;
+    reader.readAsDataURL(blob);
+  });
+
+  // 1. Try direct fetch (Supabase Storage, CDNs with CORS headers)
+  try {
+    const res = await fetch(url, { mode: "cors" });
+    if (res.ok) {
+      const blob = await res.blob();
+      if (blob.type.startsWith("image/")) return await blobToDataUrl(blob);
+    }
+  } catch {}
+
+  // 2. Fall back to CORS proxies
   const proxies = [
     `https://corsproxy.io/?${encodeURIComponent(url)}`,
     `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,
@@ -537,12 +556,7 @@ async function fetchImageAsDataUrl(url) {
       if (!res.ok) continue;
       const blob = await res.blob();
       if (!blob.type.startsWith("image/")) continue;
-      return await new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = e => resolve(e.target.result);
-        reader.onerror = reject;
-        reader.readAsDataURL(blob);
-      });
+      return await blobToDataUrl(blob);
     } catch { continue; }
   }
   throw new Error("Could not fetch image — try downloading it and uploading directly.");

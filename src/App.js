@@ -1392,37 +1392,50 @@ function AddItemModal({ onSave, onSaveWish, onCancel, initial, editMode, initial
         "",
         "Use all available signals. The URL slug is especially useful — e.g. 'bra-free-rib-90s-cami' means the product is a cami top. Return ONLY valid JSON, no markdown."
       ].join("\n");
+      // Slug-based fallback name: capitalize words from URL path
+      const slugName = urlSlug.split(" ").filter(Boolean).map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(" ").slice(0, 80);
+
       let extracted = {};
+      let apiErrorMsg = "";
       try {
         const apiKey = process.env.REACT_APP_ANTHROPIC_KEY || "";
         if (!apiKey) throw new Error("NO_KEY");
-        const apiRes = await fetch("https://api.anthropic.com/v1/messages", {
-          method: "POST",
-          headers: { "Content-Type": "application/json", "x-api-key": apiKey, "anthropic-version": "2023-06-01", "anthropic-dangerous-direct-browser-access": "true" },
-          body: JSON.stringify({ model: "claude-sonnet-4-20250514", max_tokens: 600, messages: [{ role: "user", content: promptText }] })
-        });
-        const apiData = await apiRes.json();
-        if (!apiRes.ok) throw new Error("API_" + apiRes.status + ": " + (apiData.error && apiData.error.message || "unknown"));
+        const models = ["claude-opus-4-5", "claude-sonnet-4-5", "claude-3-5-sonnet-20241022"];
+        let apiData = null; let lastErr = "";
+        for (const model of models) {
+          try {
+            const apiRes = await fetch("https://api.anthropic.com/v1/messages", {
+              method: "POST",
+              headers: { "Content-Type": "application/json", "x-api-key": apiKey, "anthropic-version": "2023-06-01", "anthropic-dangerous-direct-browser-access": "true" },
+              body: JSON.stringify({ model, max_tokens: 600, messages: [{ role: "user", content: promptText }] })
+            });
+            const d = await apiRes.json();
+            if (!apiRes.ok) { lastErr = "HTTP " + apiRes.status + ": " + (d.error && d.error.message || "unknown"); continue; }
+            apiData = d; break;
+          } catch(e) { lastErr = e.message || "fetch error"; }
+        }
+        if (!apiData) throw new Error("All models failed: " + lastErr);
         const text = (apiData.content || []).map(b => b.text || "").join("");
         const clean = text.replace(/```json|```/g, "").trim();
         const jsonMatch = clean.match(/\{[\s\S]*\}/);
         extracted = jsonMatch ? JSON.parse(jsonMatch[0]) : {};
       } catch(apiErr) {
         const msg = apiErr && apiErr.message || "";
+        console.error("[URL Import] API error:", msg);
         if (msg === "NO_KEY") {
-          setForm(f => ({ ...f, link: url }));
-          setUrlError("API key not configured — add REACT_APP_ANTHROPIC_KEY to Vercel env vars. Link saved.");
+          setForm(f => ({ ...f, link: url, ...(slugName ? { name: slugName } : {}), ...(imageUrl && !f.image ? { image: imageUrl } : {}) }));
+          setUrlError("API key not configured — add REACT_APP_ANTHROPIC_KEY to Vercel env vars. Name pre-filled from URL.");
           setUrlLoading(false);
           return;
         }
-        // Other API failure — still try to set link
+        apiErrorMsg = msg;
         extracted = {};
       }
       // Check if we got anything useful back
       const gotFields = extracted.name || extracted.brand || extracted.category;
       setForm(f => ({
         ...f,
-        ...(extracted.name ? { name: extracted.name } : {}),
+        name: extracted.name || slugName || f.name || "",
         ...(extracted.brand ? { brand: extracted.brand } : {}),
         ...(extracted.category ? { category: extracted.category } : {}),
         ...(extracted.price ? { price: String(extracted.price) } : {}),
@@ -1436,10 +1449,10 @@ function AddItemModal({ onSave, onSaveWish, onCancel, initial, editMode, initial
         setUrlSuccess(true);
         setUrlInput("");
       } else {
-        // Link was saved but nothing else filled — tell the user
-        setUrlError("Link saved — couldn't auto-fill details. Try filling in manually.");
+        setUrlError(apiErrorMsg ? `API error: ${apiErrorMsg.slice(0, 80)} — name pre-filled from URL, fill rest manually.` : "Link saved — name pre-filled from URL. Fill in remaining details manually.");
       }
     } catch (e) {
+      console.error("[URL Import] Outer error:", e);
       setForm(f => ({ ...f, link: url }));
       setUrlError("Link saved — couldn't auto-fill details. Try filling in manually.");
     } finally {

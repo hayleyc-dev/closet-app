@@ -9348,7 +9348,7 @@ export default function App() {
                   <div className="right-card-title" style={{ marginBottom: 0 }}>Colors</div>
                   {closetColorFilter.length > 0 && <button onClick={() => setClosetColorFilter([])} style={{ fontSize: 10, color: "#aaa", background: "none", border: "none", cursor: "pointer", fontFamily: "'DM Sans', sans-serif", fontWeight: 600 }}>Clear</button>}
                 </div>
-                <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(6, 1fr)", gap: 8 }}>
                   {allClosetColors.map(color => {
                     const active = closetColorFilter.includes(color);
                     const swatch = getColorSwatch(color);

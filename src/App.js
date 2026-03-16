@@ -1121,7 +1121,9 @@ function ImageUploadField({ value, onChange }) {
     if (!value) return;
     setRemoving(true);
     try {
-      const result = await removeBgCanvas(value);
+      // If it's an external URL, fetch as data URL first to avoid canvas taint
+      const src = value.startsWith("data:") ? value : await fetchImageAsDataUrl(value);
+      const result = await removeBgCanvas(src);
       // Don't reset originalSrc — keep the pre-removal version for restore brush
       onChange(result);
     } catch {
@@ -1135,7 +1137,9 @@ function ImageUploadField({ value, onChange }) {
     if (!value) return;
     setAutoCropping(true);
     try {
-      const result = await autoCropCanvas(value);
+      // If it's an external URL, fetch as data URL first to avoid canvas taint
+      const src = value.startsWith("data:") ? value : await fetchImageAsDataUrl(value);
+      const result = await autoCropCanvas(src);
       onChange(result);
     } catch {
       alert("Auto-crop failed.");

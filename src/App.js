@@ -9268,6 +9268,43 @@ export default function App() {
             };
             return (<>
             <div className="right-card">
+              <div className="right-card-title" style={{ marginBottom: 10 }}>Filters</div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                {[
+                  { label: "What's New", active: showNewOnly, toggle: () => setShowNewOnly(n => !n), icon: <SvgStar size={16} color={showNewOnly ? "#2d6a3f" : "#aaa"} />, activeStyle: { border: "1.5px solid #b6e8c8", background: "#f0faf4", color: "#2d6a3f" }, inactiveStyle: { border: "1px solid #e8e4dc", background: "#faf9f7", color: "#666" } },
+                  { label: "Needs Styling", active: showNeedsStylingOnly, toggle: () => setShowNeedsStylingOnly(n => !n), icon: <SvgHanger size={16} color={showNeedsStylingOnly ? "#b64b78" : "#aaa"} />, activeStyle: { border: "1.5px solid #f3b4ce", background: "#fff0f6", color: "#b64b78" }, inactiveStyle: { border: "1px solid #e8e4dc", background: "#faf9f7", color: "#666" } },
+                  { label: "Disney", active: showDisneyOnly, toggle: () => setShowDisneyOnly(n => !n), icon: <SvgCastle size={16} color={showDisneyOnly ? "#d040b0" : "#aaa"} />, activeStyle: { border: "1.5px solid #f1c0e8", background: "#fff0fb", color: "#d040b0" }, inactiveStyle: { border: "1px solid #e8e4dc", background: "#faf9f7", color: "#666" } },
+                ].map(({ label, active, toggle, icon, activeStyle, inactiveStyle }) => (
+                  <button key={label} onClick={toggle} style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 12px", borderRadius: 10, cursor: "pointer", fontFamily: "'DM Sans', sans-serif", fontSize: 12, fontWeight: 600, textAlign: "left", transition: "all 0.15s", ...(active ? activeStyle : inactiveStyle) }}>
+                    {icon}{label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {allClosetColors.length > 0 && (
+              <div className="right-card">
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
+                  <div className="right-card-title" style={{ marginBottom: 0 }}>Colors</div>
+                  {closetColorFilter.length > 0 && <button onClick={() => setClosetColorFilter([])} style={{ fontSize: 10, color: "#aaa", background: "none", border: "none", cursor: "pointer", fontFamily: "'DM Sans', sans-serif", fontWeight: 600 }}>Clear</button>}
+                </div>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+                  {allClosetColors.map(color => {
+                    const active = closetColorFilter.includes(color);
+                    const swatch = getColorSwatch(color);
+                    return (
+                      <button key={color} title={color} onClick={() => setClosetColorFilter(prev => active ? prev.filter(c => c !== color) : [...prev, color])}
+                        style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 4, background: "none", border: "none", cursor: "pointer", padding: 2 }}>
+                        <div style={{ width: 28, height: 28, borderRadius: "50%", background: swatch, border: active ? "2.5px solid #1a1a1a" : "2px solid transparent", boxShadow: active ? "0 0 0 1px #1a1a1a" : "0 1px 3px rgba(0,0,0,0.12)", transition: "all 0.15s" }} />
+                        <span style={{ fontSize: 9, color: active ? "#1a1a1a" : "#aaa", fontFamily: "'DM Sans', sans-serif", fontWeight: active ? 700 : 400, maxWidth: 36, textAlign: "center", lineHeight: 1.2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{color}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            <div className="right-card">
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
                 <div className="right-card-title" style={{ marginBottom: 0 }}>Capsules</div>
                 <button onClick={() => { setCapsuleName(""); setShowCapsuleModal(true); }} style={{
@@ -9300,43 +9337,6 @@ export default function App() {
                   })}
                 </div>
               )}
-            </div>
-
-            {allClosetColors.length > 0 && (
-              <div className="right-card">
-                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
-                  <div className="right-card-title" style={{ marginBottom: 0 }}>Colors</div>
-                  {closetColorFilter.length > 0 && <button onClick={() => setClosetColorFilter([])} style={{ fontSize: 10, color: "#aaa", background: "none", border: "none", cursor: "pointer", fontFamily: "'DM Sans', sans-serif", fontWeight: 600 }}>Clear</button>}
-                </div>
-                <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-                  {allClosetColors.map(color => {
-                    const active = closetColorFilter.includes(color);
-                    const swatch = getColorSwatch(color);
-                    return (
-                      <button key={color} title={color} onClick={() => setClosetColorFilter(prev => active ? prev.filter(c => c !== color) : [...prev, color])}
-                        style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 4, background: "none", border: "none", cursor: "pointer", padding: 2 }}>
-                        <div style={{ width: 28, height: 28, borderRadius: "50%", background: swatch, border: active ? "2.5px solid #1a1a1a" : "2px solid transparent", boxShadow: active ? "0 0 0 1px #1a1a1a" : "0 1px 3px rgba(0,0,0,0.12)", transition: "all 0.15s" }} />
-                        <span style={{ fontSize: 9, color: active ? "#1a1a1a" : "#aaa", fontFamily: "'DM Sans', sans-serif", fontWeight: active ? 700 : 400, maxWidth: 36, textAlign: "center", lineHeight: 1.2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{color}</span>
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
-
-            <div className="right-card">
-              <div className="right-card-title" style={{ marginBottom: 10 }}>Filters</div>
-              <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                {[
-                  { label: "What's New", active: showNewOnly, toggle: () => setShowNewOnly(n => !n), icon: <SvgStar size={16} color={showNewOnly ? "#2d6a3f" : "#aaa"} />, activeStyle: { border: "1.5px solid #b6e8c8", background: "#f0faf4", color: "#2d6a3f" }, inactiveStyle: { border: "1px solid #e8e4dc", background: "#faf9f7", color: "#666" } },
-                  { label: "Needs Styling", active: showNeedsStylingOnly, toggle: () => setShowNeedsStylingOnly(n => !n), icon: <SvgHanger size={16} color={showNeedsStylingOnly ? "#b64b78" : "#aaa"} />, activeStyle: { border: "1.5px solid #f3b4ce", background: "#fff0f6", color: "#b64b78" }, inactiveStyle: { border: "1px solid #e8e4dc", background: "#faf9f7", color: "#666" } },
-                  { label: "Disney", active: showDisneyOnly, toggle: () => setShowDisneyOnly(n => !n), icon: <SvgCastle size={16} color={showDisneyOnly ? "#d040b0" : "#aaa"} />, activeStyle: { border: "1.5px solid #f1c0e8", background: "#fff0fb", color: "#d040b0" }, inactiveStyle: { border: "1px solid #e8e4dc", background: "#faf9f7", color: "#666" } },
-                ].map(({ label, active, toggle, icon, activeStyle, inactiveStyle }) => (
-                  <button key={label} onClick={toggle} style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 12px", borderRadius: 10, cursor: "pointer", fontFamily: "'DM Sans', sans-serif", fontSize: 12, fontWeight: 600, textAlign: "left", transition: "all 0.15s", ...(active ? activeStyle : inactiveStyle) }}>
-                    {icon}{label}
-                  </button>
-                ))}
-              </div>
             </div>
             </>);
           })()}

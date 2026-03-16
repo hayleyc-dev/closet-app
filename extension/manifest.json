@@ -1,0 +1,28 @@
+{
+  "manifest_version": 3,
+  "name": "HC Closet",
+  "version": "1.1",
+  "description": "Add items to your HC Closet or Wishlist from any shopping site",
+  "permissions": ["activeTab", "storage", "sidePanel", "tabs"],
+  "host_permissions": [
+    "https://api.anthropic.com/*",
+    "https://*.supabase.co/*",
+    "<all_urls>"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "side_panel": {
+    "default_path": "sidepanel.html"
+  },
+  "action": {
+    "default_title": "HC Closet"
+  },
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    }
+  ]
+}

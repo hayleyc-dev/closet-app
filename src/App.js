@@ -1703,6 +1703,11 @@ function ItemDetailPopup({ item, onClose, onEdit, onDelete, onWorn, onDuplicate,
   const cpw = worn > 0 && (spentNum || priceNum) > 0 ? ((spentNum || priceNum) / worn).toFixed(2) : null;
   const [featuredView, setFeaturedView] = useState("outfits"); // "outfits" | "lookbooks" | "wornWith"
   const [showPurchasedModal, setShowPurchasedModal] = useState(false);
+  const [lightbox, setLightbox] = useState(false);
+  const [lbZoom, setLbZoom] = useState(1);
+  const [lbPan, setLbPan] = useState({ x: 0, y: 0 });
+  const [lbDrag, setLbDrag] = useState(null); // {startX, startY, panX, panY}
+  const closeLightbox = () => { setLightbox(false); setLbZoom(1); setLbPan({ x: 0, y: 0 }); };
   const [purchasedDate, setPurchasedDate] = useState(new Date().toISOString().slice(0, 10));
   const featuredOutfits = (outfits || []).filter(o => (o.layers || o.itemIds || []).includes(item.id));
   const featuredOutfitIds = new Set(featuredOutfits.map(o => o.id));
@@ -1730,6 +1735,30 @@ function ItemDetailPopup({ item, onClose, onEdit, onDelete, onWorn, onDuplicate,
 
   return (
     <>
+    {/* Lightbox */}
+    {lightbox && item.image && (
+      <div style={{ position: "fixed", inset: 0, zIndex: 99999, background: "rgba(0,0,0,0.88)", display: "flex", alignItems: "center", justifyContent: "center", cursor: lbZoom > 1 ? (lbDrag ? "grabbing" : "grab") : "zoom-out" }}
+        onClick={closeLightbox}
+        onWheel={e => { e.preventDefault(); setLbZoom(z => Math.max(1, Math.min(4, z - e.deltaY * 0.003))); if (lbZoom <= 1) setLbPan({ x: 0, y: 0 }); }}
+        onMouseDown={e => { if (lbZoom > 1) { e.stopPropagation(); setLbDrag({ startX: e.clientX - lbPan.x, startY: e.clientY - lbPan.y }); } }}
+        onMouseMove={e => { if (lbDrag) setLbPan({ x: e.clientX - lbDrag.startX, y: e.clientY - lbDrag.startY }); }}
+        onMouseUp={() => setLbDrag(null)}
+        onKeyDown={e => e.key === "Escape" && closeLightbox()}
+        tabIndex={0}
+      >
+        <img src={item.image} alt={item.name} draggable={false}
+          style={{ maxWidth: "90vw", maxHeight: "90vh", objectFit: "contain", transform: `scale(${lbZoom}) translate(${lbPan.x / lbZoom}px, ${lbPan.y / lbZoom}px)`, transformOrigin: "center", transition: lbDrag ? "none" : "transform 0.15s", userSelect: "none", pointerEvents: "none" }}
+          onClick={e => e.stopPropagation()}
+        />
+        <button onClick={closeLightbox} style={{ position: "absolute", top: 16, right: 16, background: "rgba(255,255,255,0.15)", border: "none", borderRadius: "50%", width: 36, height: 36, cursor: "pointer", color: "#fff", fontSize: 20, display: "flex", alignItems: "center", justifyContent: "center" }}>×</button>
+        <div style={{ position: "absolute", bottom: 16, left: "50%", transform: "translateX(-50%)", display: "flex", gap: 8, alignItems: "center" }}>
+          <button onClick={e => { e.stopPropagation(); setLbZoom(z => Math.max(1, z - 0.5)); }} style={{ background: "rgba(255,255,255,0.15)", border: "none", borderRadius: 6, color: "#fff", padding: "5px 12px", cursor: "pointer", fontSize: 16 }}>−</button>
+          <span style={{ color: "rgba(255,255,255,0.7)", fontSize: 12, minWidth: 44, textAlign: "center" }}>{Math.round(lbZoom * 100)}%</span>
+          <button onClick={e => { e.stopPropagation(); setLbZoom(z => Math.min(4, z + 0.5)); }} style={{ background: "rgba(255,255,255,0.15)", border: "none", borderRadius: 6, color: "#fff", padding: "5px 12px", cursor: "pointer", fontSize: 16 }}>+</button>
+          {lbZoom > 1 && <button onClick={e => { e.stopPropagation(); setLbZoom(1); setLbPan({ x: 0, y: 0 }); }} style={{ background: "rgba(255,255,255,0.15)", border: "none", borderRadius: 6, color: "#fff", padding: "5px 10px", cursor: "pointer", fontSize: 11 }}>Reset</button>}
+        </div>
+      </div>
+    )}
     <div className="item-detail-overlay fade-in" onClick={onClose}>
       <div className="fade-up" onClick={e => e.stopPropagation()} style={{
         background: "#fff", borderRadius: 24, width: "min(1200px, 96vw)",  maxWidth: 1200,
@@ -1740,12 +1769,15 @@ function ItemDetailPopup({ item, onClose, onEdit, onDelete, onWorn, onDuplicate,
         {/* ── LEFT: image + info ── */}
         <div style={{ width: 280, flexShrink: 0, display: "flex", flexDirection: "column", overflowY: "auto" }}>
           {/* Image */}
-          <div style={{ width: "100%", aspectRatio: "3/4", background: "#f5f2ed", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", position: "relative" }}>
+          <div style={{ width: "100%", aspectRatio: "3/4", background: "#f5f2ed", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", position: "relative", cursor: item.image ? "zoom-in" : "default" }}
+            onClick={() => item.image && setLightbox(true)}>
             {item.image
               ? <img src={item.image} alt={item.name} style={{ width: "100%", height: "100%", objectFit: "contain", display: "block", padding: 8 }} />
               : <HangerIcon size={56} color="#ddd" />
             }
-
+            {item.image && <div style={{ position: "absolute", bottom: 7, right: 7, background: "rgba(0,0,0,0.25)", borderRadius: 5, padding: "3px 5px", pointerEvents: "none" }}>
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="11" y1="8" x2="11" y2="14"/><line x1="8" y1="11" x2="14" y2="11"/></svg>
+            </div>}
           </div>
 
           {/* Info */}
@@ -8083,6 +8115,7 @@ export default function App() {
   const [catFilter, setCatFilter] = useState("All");
   const [catFilters, setCatFilters] = useState([]); // multi-select categories
   const [closetZoom, setClosetZoom] = useState(148); // card min-width in px
+  const [shopMode, setShopMode] = useState(false); // editorial "shop your closet" view
   const [outfitZoom, setOutfitZoom] = useState(200); // outfit card min-width in px
   const [showNewOnly, setShowNewOnly] = useState(false); // "What's New" filter
   const [showNeedsStylingOnly, setShowNeedsStylingOnly] = useState(false);
@@ -8707,12 +8740,20 @@ export default function App() {
                       <option value="All">All Seasons</option>
                       {SEASONS.filter(s => s !== "All Season").map(s => <option key={s} value={s}>{s}</option>)}
                     </select>
-                    {/* Zoom slider */}
+                    {/* View toggle + Zoom slider */}
                     <div style={{ display: "flex", alignItems: "center", gap: 8, marginLeft: "auto" }}>
-                      <SvgBox size={12} color="#bbb" />
-                      <input type="range" min={110} max={220} step={10} value={closetZoom} onChange={e => setClosetZoom(Number(e.target.value))}
-                        style={{ width: 80, accentColor: "#1a1a1a", cursor: "pointer" }} />
-                      <SvgBox size={16} color="#bbb" />
+                      {/* Shop mode toggle */}
+                      <button title={shopMode ? "Grid view" : "Shop view"} onClick={() => setShopMode(m => !m)} style={{ width: 28, height: 28, border: "1.5px solid", borderColor: shopMode ? "#1a1a1a" : "#ddd", borderRadius: 7, background: shopMode ? "#1a1a1a" : "transparent", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", transition: "all 0.15s", flexShrink: 0 }}>
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke={shopMode ? "#fff" : "#aaa"} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 01-8 0"/>
+                        </svg>
+                      </button>
+                      {!shopMode && <>
+                        <SvgBox size={12} color="#bbb" />
+                        <input type="range" min={110} max={220} step={10} value={closetZoom} onChange={e => setClosetZoom(Number(e.target.value))}
+                          style={{ width: 80, accentColor: "#1a1a1a", cursor: "pointer" }} />
+                        <SvgBox size={16} color="#bbb" />
+                      </>}
                     </div>
                   </div>
                   {/* Bulk action bar */}
@@ -8756,6 +8797,25 @@ export default function App() {
                           <div style={{ marginTop: 16, fontSize: 12, color: "#ccc" }}>Upload a photo or paste a product link</div>
                         </>
                       )}
+                    </div>
+                  ) : shopMode ? (
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+                      {filteredItems.map((item, i) => (
+                        <div key={item.id} className="fade-up" style={{ animationDelay: `${i * 0.02}s`, opacity: 0, position: "relative", borderRadius: 14, overflow: "hidden", background: "#f5f2ed", cursor: "pointer", transition: "transform 0.18s", aspectRatio: "2/3" }}
+                          onClick={() => setItemDetail(item)}
+                          onMouseEnter={e => e.currentTarget.style.transform = "scale(1.015)"}
+                          onMouseLeave={e => e.currentTarget.style.transform = "scale(1)"}
+                        >
+                          {item.image
+                            ? <img src={item.image} alt={item.name} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
+                            : <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center" }}><HangerIcon size={40} color="#ccc" /></div>
+                          }
+                          <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, padding: "28px 10px 10px", background: "linear-gradient(to top, rgba(0,0,0,0.52) 0%, transparent 100%)" }}>
+                            <div style={{ fontSize: 12, fontWeight: 500, color: "#fff", lineHeight: 1.3, marginBottom: 2, textShadow: "0 1px 3px rgba(0,0,0,0.4)" }}>{item.name}</div>
+                            {item.price && <div style={{ fontSize: 11, color: "rgba(255,255,255,0.8)" }}>${item.price}</div>}
+                          </div>
+                        </div>
+                      ))}
                     </div>
                   ) : (
                     <div style={{ display: "grid", gridTemplateColumns: `repeat(auto-fill, minmax(${closetZoom}px, 1fr))`, gap: 12 }}>

@@ -8702,31 +8702,6 @@ export default function App() {
                 <div className="fade-up">
                   {/* Closet toolbar: sort + season dropdowns */}
                   <div style={{ display: "flex", gap: 10, marginBottom: 20, flexWrap: "wrap", alignItems: "center" }}>
-                    {/* What's New filter — first */}
-                    <button onClick={() => setShowNewOnly(n => !n)} style={{
-                      padding: "7px 14px", borderRadius: 100, border: showNewOnly ? "1.5px solid #b6e8c8" : "1px solid #e0dbd2",
-                      background: showNewOnly ? "#f0faf4" : "#fff", color: showNewOnly ? "#2d6a3f" : "#666",
-                      fontFamily: "'DM Sans', sans-serif", fontSize: 12, fontWeight: 600, cursor: "pointer",
-                      display: "flex", alignItems: "center", gap: 6,
-                    }}>
-                      <SvgStar size={12} color={showNewOnly ? "#2d6a3f" : "#aaa"} />What's New
-                    </button>
-                    <button onClick={() => setShowNeedsStylingOnly(n => !n)} style={{
-                      padding: "7px 14px", borderRadius: 100, border: showNeedsStylingOnly ? "1.5px solid #f3b4ce" : "1px solid #e0dbd2",
-                      background: showNeedsStylingOnly ? "#fff0f6" : "#fff", color: showNeedsStylingOnly ? "#b64b78" : "#666",
-                      fontFamily: "'DM Sans', sans-serif", fontSize: 12, fontWeight: 600, cursor: "pointer",
-                      display: "flex", alignItems: "center", gap: 6,
-                    }}>
-                      <SvgHanger size={12} color={showNeedsStylingOnly ? "#b64b78" : "#aaa"} />Needs Styling
-                    </button>
-                    <button onClick={() => setShowDisneyOnly(n => !n)} style={{
-                      padding: "7px 14px", borderRadius: 100, border: showDisneyOnly ? "1.5px solid #f1c0e8" : "1px solid #e0dbd2",
-                      background: showDisneyOnly ? "#fff0fb" : "#fff", color: showDisneyOnly ? "#d040b0" : "#666",
-                      fontFamily: "'DM Sans', sans-serif", fontSize: 12, fontWeight: 600, cursor: "pointer",
-                      display: "flex", alignItems: "center", gap: 6,
-                    }}>
-                      <SvgCastle size={12} color={showDisneyOnly ? "#d040b0" : "#aaa"} />Disney
-                    </button>
                     <select value={closetSort} onChange={e => setClosetSort(e.target.value)} className="pill-select" style={{}}>
                       <option value="default">Sort: Default</option>
                       <option value="az">Sort: A – Z</option>
@@ -9330,6 +9305,21 @@ export default function App() {
                 </div>
               </div>
             )}
+
+            <div className="right-card">
+              <div className="right-card-title" style={{ marginBottom: 10 }}>Filters</div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                {[
+                  { label: "What's New", active: showNewOnly, toggle: () => setShowNewOnly(n => !n), icon: <SvgStar size={12} color={showNewOnly ? "#2d6a3f" : "#aaa"} />, activeStyle: { border: "1.5px solid #b6e8c8", background: "#f0faf4", color: "#2d6a3f" }, inactiveStyle: { border: "1px solid #e8e4dc", background: "#faf9f7", color: "#666" } },
+                  { label: "Needs Styling", active: showNeedsStylingOnly, toggle: () => setShowNeedsStylingOnly(n => !n), icon: <SvgHanger size={12} color={showNeedsStylingOnly ? "#b64b78" : "#aaa"} />, activeStyle: { border: "1.5px solid #f3b4ce", background: "#fff0f6", color: "#b64b78" }, inactiveStyle: { border: "1px solid #e8e4dc", background: "#faf9f7", color: "#666" } },
+                  { label: "Disney", active: showDisneyOnly, toggle: () => setShowDisneyOnly(n => !n), icon: <SvgCastle size={12} color={showDisneyOnly ? "#d040b0" : "#aaa"} />, activeStyle: { border: "1.5px solid #f1c0e8", background: "#fff0fb", color: "#d040b0" }, inactiveStyle: { border: "1px solid #e8e4dc", background: "#faf9f7", color: "#666" } },
+                ].map(({ label, active, toggle, icon, activeStyle, inactiveStyle }) => (
+                  <button key={label} onClick={toggle} style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 12px", borderRadius: 10, cursor: "pointer", fontFamily: "'DM Sans', sans-serif", fontSize: 12, fontWeight: 600, textAlign: "left", transition: "all 0.15s", ...(active ? activeStyle : inactiveStyle) }}>
+                    {icon}{label}
+                  </button>
+                ))}
+              </div>
+            </div>
             </>);
           })()}
 

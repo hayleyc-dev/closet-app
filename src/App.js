@@ -8464,7 +8464,8 @@ export default function App() {
         i.occasion,
         i.season,
       ].filter(Boolean).map(v => String(v).toLowerCase());
-      const matchDisney = !showDisneyOnly || disneyTags.includes("disney");
+      const isDisney = disneyTags.includes("disney");
+      const matchDisney = showDisneyOnly ? isDisney : !isDisney;
       const matchCapsule = !capsuleItemIds || capsuleItemIds.has(i.id);
       const matchColor = closetColorFilter.length === 0 || closetColorFilter.some(c => (i.color||"").toLowerCase() === c.toLowerCase());
       return matchCat && matchSearch && matchSeason && matchNew && matchNeedsStyling && matchDisney && matchCapsule && matchColor;

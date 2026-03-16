@@ -25,7 +25,25 @@ const SvgArrowL   = ({size=16,color="currentColor"}) => <Ico size={size} color={
 const SvgArrowR   = ({size=16,color="currentColor"}) => <Ico size={size} color={color}><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></Ico>;
 const SvgCheck    = ({size=14,color="currentColor"}) => <Ico size={size} color={color}><polyline points="20 6 9 17 4 12"/></Ico>;
 const SvgStar     = ({size=16,color="currentColor"}) => <Ico size={size} color={color}><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></Ico>;
-const SvgCastle   = ({size=14,color="currentColor"}) => <Ico size={size} color={color}><path d="M3 21h18"/><path d="M4 21V11h16v10"/><path d="M7 11V8h2V5h2v6"/><path d="M15 11V8h2V5h2v6"/><path d="M10 11V6h1.5V3h1V6H14v5"/><path d="M6 14h12"/><path d="M10 21v-4h4v4"/></Ico>;
+const SvgCastle = ({size=14,color="currentColor"}) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" style={{display:"inline-block",flexShrink:0,verticalAlign:"middle"}}>
+    <line x1="1" y1="22" x2="23" y2="22"/>
+    {/* Outer left turret */}
+    <path d="M2 22V17H5V22"/><path d="M2 17L3.5 14L5 17"/>
+    {/* Outer right turret */}
+    <path d="M19 22V17H22V22"/><path d="M19 17L20.5 14L22 17"/>
+    {/* Inner left tower */}
+    <path d="M5 22V12H9V22"/><path d="M5 12L7 8L9 12"/>
+    {/* Inner right tower */}
+    <path d="M15 22V12H19V22"/><path d="M15 12L17 8L19 12"/>
+    {/* Center tall spire */}
+    <path d="M9 22V7H15V22"/><path d="M9 7L12 2L15 7"/>
+    {/* Arch gate */}
+    <path d="M10.5 22V18.5a1.5 1.5 0 013 0V22"/>
+    {/* Battlements */}
+    <line x1="5" y1="12" x2="9" y2="12"/><line x1="15" y1="12" x2="19" y2="12"/>
+  </svg>
+);
 const SvgGrid     = ({size=16,color="currentColor"}) => <Ico size={size} color={color}><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></Ico>;
 const SvgBox      = ({size=16,color="currentColor"}) => <Ico size={size} color={color}><path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></Ico>;
 const SvgShop     = ({size=14,color="currentColor"}) => <Ico size={size} color={color}><path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 01-8 0"/></Ico>;
@@ -8642,9 +8660,9 @@ export default function App() {
                     <input className="closet-search" value={closetSearch} onChange={e => setClosetSearch(e.target.value)} placeholder="Search…" />
                   </div>
                 </div>
-                <div className="sidebar-section">
-                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
-                    <div className="sidebar-label" style={{ marginBottom: 0 }}>Category</div>
+                <div className="right-card" style={{ marginBottom: 12 }}>
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
+                    <div className="right-card-title" style={{ marginBottom: 0 }}>Category</div>
                     {catFilters.length > 0 && <button onClick={() => setCatFilters([])} style={{ fontSize: 10, color: "#aaa", background: "none", border: "none", cursor: "pointer", fontFamily: "'DM Sans', sans-serif", fontWeight: 600 }}>Clear</button>}
                   </div>
                   {CATEGORIES.slice(1).map(cat => {
@@ -9312,7 +9330,7 @@ export default function App() {
                 {[
                   { label: "What's New", active: showNewOnly, toggle: () => setShowNewOnly(n => !n), icon: <SvgStar size={12} color={showNewOnly ? "#2d6a3f" : "#aaa"} />, activeStyle: { border: "1.5px solid #b6e8c8", background: "#f0faf4", color: "#2d6a3f" }, inactiveStyle: { border: "1px solid #e8e4dc", background: "#faf9f7", color: "#666" } },
                   { label: "Needs Styling", active: showNeedsStylingOnly, toggle: () => setShowNeedsStylingOnly(n => !n), icon: <SvgHanger size={12} color={showNeedsStylingOnly ? "#b64b78" : "#aaa"} />, activeStyle: { border: "1.5px solid #f3b4ce", background: "#fff0f6", color: "#b64b78" }, inactiveStyle: { border: "1px solid #e8e4dc", background: "#faf9f7", color: "#666" } },
-                  { label: "Disney", active: showDisneyOnly, toggle: () => setShowDisneyOnly(n => !n), icon: <SvgCastle size={12} color={showDisneyOnly ? "#d040b0" : "#aaa"} />, activeStyle: { border: "1.5px solid #f1c0e8", background: "#fff0fb", color: "#d040b0" }, inactiveStyle: { border: "1px solid #e8e4dc", background: "#faf9f7", color: "#666" } },
+                  { label: "Disney", active: showDisneyOnly, toggle: () => setShowDisneyOnly(n => !n), icon: <SvgCastle size={16} color={showDisneyOnly ? "#d040b0" : "#aaa"} />, activeStyle: { border: "1.5px solid #f1c0e8", background: "#fff0fb", color: "#d040b0" }, inactiveStyle: { border: "1px solid #e8e4dc", background: "#faf9f7", color: "#666" } },
                 ].map(({ label, active, toggle, icon, activeStyle, inactiveStyle }) => (
                   <button key={label} onClick={toggle} style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 12px", borderRadius: 10, cursor: "pointer", fontFamily: "'DM Sans', sans-serif", fontSize: 12, fontWeight: 600, textAlign: "left", transition: "all 0.15s", ...(active ? activeStyle : inactiveStyle) }}>
                     {icon}{label}

@@ -9356,7 +9356,6 @@ export default function App() {
                       <button key={color} title={color} onClick={() => setClosetColorFilter(prev => active ? prev.filter(c => c !== color) : [...prev, color])}
                         style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 4, background: "none", border: "none", cursor: "pointer", padding: 2 }}>
                         <div style={{ width: 28, height: 28, borderRadius: "50%", background: swatch, border: active ? "2.5px solid #1a1a1a" : "2px solid transparent", boxShadow: active ? "0 0 0 1px #1a1a1a" : "0 1px 3px rgba(0,0,0,0.12)", transition: "all 0.15s" }} />
-                        <span style={{ fontSize: 9, color: active ? "#1a1a1a" : "#aaa", fontFamily: "'DM Sans', sans-serif", fontWeight: active ? 700 : 400, maxWidth: 36, textAlign: "center", lineHeight: 1.2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{color}</span>
                       </button>
                     );
                   })}

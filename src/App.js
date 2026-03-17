@@ -8789,7 +8789,7 @@ export default function App() {
     stats: ["Style Profile", "Your wardrobe in focus"],
     moodboard: ["Moodboard", "Inspire yourself"],
     seller: ["Seller Dashboard", "What's for sale"],
-    wishlist: ["Wishlist", "Want it"],
+    wishlist: ["Wishlist", ""],
     settings: ["Settings", "Customize your wardrobe"],
   };
 

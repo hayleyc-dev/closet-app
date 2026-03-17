@@ -78,10 +78,34 @@ const SvgSparkle  = ({size=16,color="currentColor"}) => <Ico size={size} color={
 const SvgCart     = ({size=14,color="currentColor"}) => <Ico size={size} color={color}><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 002 1.61h9.72a2 2 0 001.95-1.57l1.65-8.42H6"/></Ico>;
 
 
-const SUPABASE_URL = "https://gucqffnjwvbvycfqvtcw.supabase.co";
-const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imd1Y3FmZm5qd3ZidnljZnF2dGN3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI1MDAyMTQsImV4cCI6MjA4ODA3NjIxNH0.rXbJ1E2BKmn5T_3pm2zK1TFqeE5yogDjDjQyqNcepd4";
+const DEFAULT_SUPABASE_URL = "https://gucqffnjwvbvycfqvtcw.supabase.co";
+const DEFAULT_SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imd1Y3FmZm5qd3ZidnljZnF2dGN3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI1MDAyMTQsImV4cCI6MjA4ODA3NjIxNH0.rXbJ1E2BKmn5T_3pm2zK1TFqeE5yogDjDjQyqNcepd4";
+const SUPABASE_URL_OVERRIDE_KEY = "wardrobe_supabase_url_v1";
+const SUPABASE_ANON_OVERRIDE_KEY = "wardrobe_supabase_anon_key_v1";
+const ITEMS_TABLE_OVERRIDE_KEY = "wardrobe_items_table_v1";
 
-const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+const readSupabaseConfig = () => {
+  const envUrl = process.env.REACT_APP_SUPABASE_URL || DEFAULT_SUPABASE_URL;
+  const envAnonKey = process.env.REACT_APP_SUPABASE_ANON_KEY || DEFAULT_SUPABASE_ANON_KEY;
+  if (typeof window === "undefined") {
+    return { url: envUrl, anonKey: envAnonKey, source: "env" };
+  }
+  try {
+    const overrideUrl = localStorage.getItem(SUPABASE_URL_OVERRIDE_KEY);
+    const overrideAnon = localStorage.getItem(SUPABASE_ANON_OVERRIDE_KEY);
+    if (overrideUrl && overrideAnon) return { url: overrideUrl, anonKey: overrideAnon, source: "device-override" };
+  } catch {}
+  return { url: envUrl, anonKey: envAnonKey, source: "env" };
+};
+
+const SUPABASE_CONFIG = readSupabaseConfig();
+const supabase = createClient(SUPABASE_CONFIG.url, SUPABASE_CONFIG.anonKey);
+const TABLE_LOCAL_KEYS = {
+  items: "wardrobe_items_v1",
+  wishlist: "wardrobe_wishlist_v1",
+  outfits: "wardrobe_outfits_v1",
+  lookbooks: "wardrobe_lookbooks_v1",
+};
 
 const CATEGORIES = ["All", "Accessories", "Activewear", "Bags", "Denim", "Dresses", "Intimates", "Jewelry", "Knits", "Loungewear", "Outerwear", "Shoes", "Shorts + Skirts", "Sleepwear", "Socks + Tights", "Sweaters", "Swim", "Tops", "Trousers"];
 const COLORS = ["Black", "Blue", "Brown", "Clear", "Cream", "Gold", "Green", "Grey", "Orange", "Pink", "Purple", "Red", "Silver", "Tan", "White", "Yellow"];
@@ -281,47 +305,153 @@ const globalStyles = `
 
 // ── Supabase hook ────────────────────────────────────────────────────────────
 function useSupabaseTable(table) {
-  const [rows, setRows] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const parseRows = (data) => data.map(r => {
-    if (r.data && typeof r.data === "object") return { ...r.data, id: r.id };
-    const { id, created_at, ...rest } = r;
-    return { ...rest, id };
-  }).filter(r => r.id);
-  const fetchRows = async (setter) => {
-    let { data, error } = await supabase.from(table).select("*").order("created_at");
-    if (error) ({ data, error } = await supabase.from(table).select("*"));
-    if (!error && data) setter(parseRows(data));
-    else if (error) console.error("[" + table + "] fetch:", error.message);
+  const localKey = TABLE_LOCAL_KEYS[table];
+  const remoteTable = (() => {
+    if (table !== "items") return table;
+    if (typeof window === "undefined") return table;
+    try { return localStorage.getItem(ITEMS_TABLE_OVERRIDE_KEY) || table; } catch { return table; }
+  })();
+  const readLocalRows = () => {
+    if (!localKey) return [];
+    try { return JSON.parse(localStorage.getItem(localKey) || "[]"); } catch { return []; }
   };
+
+  const [rows, setRows] = useState(readLocalRows);
+  const [loading, setLoading] = useState(true);
+  const [lastError, setLastError] = useState(null);
+
+  const parseRows = (data) => data.map((r, idx) => {
+    const payload = (() => {
+      if (r.data && typeof r.data === "object") return r.data;
+      if (typeof r.data === "string") {
+        try {
+          const parsed = JSON.parse(r.data);
+          if (parsed && typeof parsed === "object") return parsed;
+        } catch {}
+      }
+      return null;
+    })();
+
+    if (payload) {
+      const rowId = r.id || payload.id || payload.item_id || payload.uuid || `row-${idx}`;
+      return { ...payload, id: rowId };
+    }
+
+    const { id, created_at, ...rest } = r;
+    const rowId = id || rest.id || rest.item_id || rest.uuid || `row-${idx}`;
+    return { ...rest, id: rowId };
+  });
+
+  useEffect(() => {
+    if (!localKey) return;
+    try { localStorage.setItem(localKey, JSON.stringify(rows)); } catch {}
+  }, [localKey, rows]);
+
+  const fetchRows = async (setter) => {
+    let { data, error } = await supabase.from(remoteTable).select("*").order("created_at");
+    if (error) ({ data, error } = await supabase.from(remoteTable).select("*"));
+
+    if (!error && data) {
+      const parsed = parseRows(data);
+      if (parsed.length > 0) {
+        setLastError(null);
+        setter(parsed);
+        return parsed;
+      }
+
+      if (localKey) {
+        const localRows = readLocalRows();
+        if (localRows.length > 0) {
+          setLastError(null);
+          setter(localRows);
+          for (const item of localRows) {
+            if (!item?.id) continue;
+            const { error: upsertError } = await supabase.from(remoteTable).upsert({ id: item.id, data: item });
+            if (upsertError) {
+              console.error("[" + remoteTable + "] local sync:", upsertError.message);
+              break;
+            }
+          }
+          return localRows;
+        }
+      }
+
+      setLastError(null);
+      setter(prev => (prev.length > 0 ? prev : parsed));
+      return parsed;
+    }
+
+    if (localKey) {
+      const localRows = readLocalRows();
+      setter(localRows);
+      if (error) {
+        setLastError(error.message);
+        console.error("[" + remoteTable + "] fetch:", error.message);
+      }
+      return localRows;
+    }
+    if (error) {
+      setLastError(error.message);
+      console.error("[" + remoteTable + "] fetch:", error.message);
+    }
+    return [];
+  };
+
   useEffect(() => {
     fetchRows(setRows).then(() => setLoading(false));
-  }, [table]);
+  }, [table, remoteTable]);
+
   const add = async (item) => {
-    const { error } = await supabase.from(table).insert({ id: item.id, data: item });
-    if (!error) setRows(r => [...r, item]);
-    else console.error("[" + table + "] add:", error.message);
+    const { error } = await supabase.from(remoteTable).insert({ id: item.id, data: item });
+    if (!error) {
+      setLastError(null);
+      setRows(r => [...r, item]);
+    }
+    else {
+      setLastError(error.message);
+      console.error("[" + remoteTable + "] add:", error.message);
+      setRows(r => [...r, item]);
+    }
   };
+
   const update = async (item) => {
-    let { error } = await supabase.from(table).update({ data: item }).eq("id", item.id);
+    let { error } = await supabase.from(remoteTable).update({ data: item }).eq("id", item.id);
     if (error) {
       const { id, ...rest } = item;
-      ({ error } = await supabase.from(table).update(rest).eq("id", id));
+      ({ error } = await supabase.from(remoteTable).update(rest).eq("id", id));
     }
-    if (!error) setRows(r => r.map(i => i.id === item.id ? item : i));
-    else console.error("[" + table + "] update:", error.message);
+    if (!error) {
+      setLastError(null);
+      setRows(r => r.map(i => i.id === item.id ? item : i));
+    }
+    else {
+      setLastError(error.message);
+      console.error("[" + remoteTable + "] update:", error.message);
+      setRows(r => r.map(i => i.id === item.id ? item : i));
+    }
   };
+
   const remove = async (id) => {
-    const { error } = await supabase.from(table).delete().eq("id", id);
-    if (!error) setRows(r => r.filter(i => i.id !== id));
-    else console.error("[" + table + "] remove:", error.message);
+    const { error } = await supabase.from(remoteTable).delete().eq("id", id);
+    if (!error) {
+      setLastError(null);
+      setRows(r => r.filter(i => i.id !== id));
+    }
+    else {
+      setLastError(error.message);
+      console.error("[" + remoteTable + "] remove:", error.message);
+      setRows(r => r.filter(i => i.id !== id));
+    }
   };
+
   const refresh = async () => {
     setLoading(true);
-    await fetchRows(setRows);
+    const latest = await fetchRows(setRows);
     setLoading(false);
+    return latest;
   };
-  return { rows, loading, add, update, remove, refresh };
+
+  return { rows, loading, add, update, remove, refresh, remoteTable, lastError };
 }
 
 // ── Moodboards — Supabase + localStorage mirror ───────────────────────────────
@@ -6829,6 +6959,7 @@ function SettingsTab({
   annualBudget, setAnnualBudget,
   restoreLookbook,
   restoreOutfit,
+  onManualSync,
 }) {
   const [settingsTab, setSettingsTab] = useState("appearance");
   const [themeId, setThemeId] = useState(() => { try { return localStorage.getItem(THEME_KEY) || "parchment"; } catch { return "parchment"; } });
@@ -6849,6 +6980,18 @@ function SettingsTab({
   // Data & sync
   const [importMsg, setImportMsg] = useState(null);
   const importRef = useRef(null);
+  const [manualSyncing, setManualSyncing] = useState(false);
+  const [manualSyncMsg, setManualSyncMsg] = useState(null);
+  const [supabaseUrlInput, setSupabaseUrlInput] = useState(() => {
+    try { return localStorage.getItem(SUPABASE_URL_OVERRIDE_KEY) || SUPABASE_CONFIG.url || ""; } catch { return SUPABASE_CONFIG.url || ""; }
+  });
+  const [supabaseAnonInput, setSupabaseAnonInput] = useState(() => {
+    try { return localStorage.getItem(SUPABASE_ANON_OVERRIDE_KEY) || SUPABASE_CONFIG.anonKey || ""; } catch { return SUPABASE_CONFIG.anonKey || ""; }
+  });
+  const [supabaseConfigMsg, setSupabaseConfigMsg] = useState(null);
+  const [itemsTableInput, setItemsTableInput] = useState(() => {
+    try { return localStorage.getItem(ITEMS_TABLE_OVERRIDE_KEY) || "items"; } catch { return "items"; }
+  });
 
   // Archived moodboards
   const MB_ARCHIVE_KEY = "wardrobe_moodboards_archived_v1";
@@ -6988,6 +7131,49 @@ function SettingsTab({
   );
 
   const TABS = [["appearance","Appearance"],["preferences","Preferences"],["data","Data"]];
+
+  const handleManualSync = async () => {
+    if (!onManualSync || manualSyncing) return;
+    setManualSyncing(true);
+    setManualSyncMsg(null);
+    try {
+      const ok = await onManualSync();
+      setManualSyncMsg(ok === false ? "Sync failed" : "Synced successfully");
+    } catch {
+      setManualSyncMsg("Sync failed");
+    } finally {
+      setManualSyncing(false);
+      setTimeout(() => setManualSyncMsg(null), 2500);
+    }
+  };
+
+  const saveSupabaseConfig = () => {
+    if (!supabaseUrlInput || !supabaseAnonInput) {
+      setSupabaseConfigMsg("Enter both Supabase URL and anon key.");
+      return;
+    }
+    try {
+      localStorage.setItem(SUPABASE_URL_OVERRIDE_KEY, supabaseUrlInput.trim());
+      localStorage.setItem(SUPABASE_ANON_OVERRIDE_KEY, supabaseAnonInput.trim());
+      localStorage.setItem(ITEMS_TABLE_OVERRIDE_KEY, (itemsTableInput || "items").trim() || "items");
+      setSupabaseConfigMsg("Saved. Reloading...");
+      setTimeout(() => window.location.reload(), 400);
+    } catch {
+      setSupabaseConfigMsg("Could not save on this device.");
+    }
+  };
+
+  const resetSupabaseConfig = () => {
+    try {
+      localStorage.removeItem(SUPABASE_URL_OVERRIDE_KEY);
+      localStorage.removeItem(SUPABASE_ANON_OVERRIDE_KEY);
+      localStorage.removeItem(ITEMS_TABLE_OVERRIDE_KEY);
+      setSupabaseConfigMsg("Reset to env defaults. Reloading...");
+      setTimeout(() => window.location.reload(), 400);
+    } catch {
+      setSupabaseConfigMsg("Could not reset on this device.");
+    }
+  };
 
   return (
     <div style={{ maxWidth:720, margin:"0 auto", padding:"4px 0 40px" }}>
@@ -7242,6 +7428,46 @@ function SettingsTab({
               </div>
             </div>
             <div style={{ textAlign:"right", fontSize:11, color:"#5aaa7e", fontWeight:600 }}>{itemsDb.rows.length} items</div>
+          </div>
+          <div style={{ marginTop: 10, display: "flex", alignItems: "center", gap: 10 }}>
+            <button
+              onClick={handleManualSync}
+              disabled={manualSyncing}
+              style={{
+                padding: "8px 12px",
+                borderRadius: 10,
+                border: "1px solid #b6e8c8",
+                background: manualSyncing ? "#eaf7ef" : "#f0faf4",
+                color: "#2d6a3f",
+                fontFamily: "'DM Sans',sans-serif",
+                fontSize: 12,
+                fontWeight: 700,
+                cursor: manualSyncing ? "default" : "pointer",
+              }}
+            >
+              {manualSyncing ? "Syncing…" : "Sync now"}
+            </button>
+            {manualSyncMsg && (
+              <div style={{ fontSize: 11, color: manualSyncMsg.includes("failed") ? "#e05555" : "#5aaa7e", fontWeight: 600 }}>
+                {manualSyncMsg}
+              </div>
+            )}
+          </div>
+          <div style={{ marginTop: 12, paddingTop: 12, borderTop: "1px solid #e6efe8" }}>
+            <div style={{ fontSize: 11, color: "#7b8d80", marginBottom: 4 }}>Project: {SUPABASE_CONFIG.url}</div>
+            <div style={{ fontSize: 11, color: "#7b8d80", marginBottom: 8 }}>Items table: {itemsDb.remoteTable || "items"}</div>
+            {itemsDb.lastError && <div style={{ fontSize: 11, color: "#c15656", marginBottom: 8 }}>Last sync error: {itemsDb.lastError}</div>}
+            <input value={supabaseUrlInput} onChange={e => setSupabaseUrlInput(e.target.value)} placeholder="Supabase URL"
+              style={{ width:"100%", marginBottom:8, padding:"8px 10px", border:"1px solid #dcd6ce", borderRadius:8, fontFamily:"'DM Sans', sans-serif", fontSize:12 }} />
+            <input value={supabaseAnonInput} onChange={e => setSupabaseAnonInput(e.target.value)} placeholder="Supabase anon key"
+              style={{ width:"100%", marginBottom:8, padding:"8px 10px", border:"1px solid #dcd6ce", borderRadius:8, fontFamily:"'DM Sans', sans-serif", fontSize:12 }} />
+            <input value={itemsTableInput} onChange={e => setItemsTableInput(e.target.value)} placeholder="Items table name (default: items)"
+              style={{ width:"100%", marginBottom:8, padding:"8px 10px", border:"1px solid #dcd6ce", borderRadius:8, fontFamily:"'DM Sans', sans-serif", fontSize:12 }} />
+            <div style={{ display:"flex", gap:8 }}>
+              <button onClick={saveSupabaseConfig} style={{ padding:"7px 10px", borderRadius:8, border:"1px solid #c8e8d0", background:"#f0faf4", color:"#2d6a3f", fontWeight:700, fontSize:11, cursor:"pointer" }}>Save & reconnect</button>
+              <button onClick={resetSupabaseConfig} style={{ padding:"7px 10px", borderRadius:8, border:"1px solid #e0dbd2", background:"#fff", color:"#666", fontWeight:700, fontSize:11, cursor:"pointer" }}>Reset</button>
+            </div>
+            {supabaseConfigMsg && <div style={{ marginTop: 6, fontSize: 11, color: "#888" }}>{supabaseConfigMsg}</div>}
           </div>
         </Card>
 
@@ -8505,6 +8731,26 @@ export default function App() {
       try { localStorage.setItem("wardrobe_last_synced_v1", ts); } catch {}
     }
   }, [itemsDb.rows]);
+
+  const manualSyncAll = async () => {
+    try {
+      const [items] = await Promise.all([
+        itemsDb.refresh(),
+        wishlistDb.refresh(),
+        outfitsDb.refresh(),
+        lookbooksDb.refresh(),
+      ]);
+      const ts = new Date().toISOString();
+      setLastSynced(ts);
+      try { localStorage.setItem("wardrobe_last_synced_v1", ts); } catch {}
+      const itemCount = Array.isArray(items) ? items.length : itemsDb.rows.length;
+      if (itemCount === 0) return false;
+      return true;
+    } catch (e) {
+      console.error("manual sync failed", e);
+      return false;
+    }
+  };
   const [closetSearch, setClosetSearch] = useState("");
   const [activeLookbook, setActiveLookbook] = useState(null);
   const [activeLookbookView, setActiveLookbookView] = useState("editorial");
@@ -9414,6 +9660,7 @@ export default function App() {
                 allItemsForExport={itemsDb.rows}
                 monthlyBudget={monthlyBudget} setMonthlyBudget={setMonthlyBudget}
                 annualBudget={annualBudget} setAnnualBudget={setAnnualBudget}
+                onManualSync={manualSyncAll}
                 restoreLookbook={async (lb) => {
                   try {
                     let { error } = await supabase.from("lookbooks").insert({ id: lb.id, data: lb });

@@ -1945,6 +1945,7 @@ function ItemDetailPopup({ item, onClose, onEdit, onDelete, onWorn, onDuplicate,
               {isWishlist ? (<>
                 {item.link && <a href={item.link} target="_blank" rel="noreferrer" style={{ padding: "6px 11px", background: "transparent", border: "1px solid #e8e4dc", borderRadius: 10, display: "flex", alignItems: "center", gap: 5, textDecoration: "none", flexShrink: 0, color: "#555", fontFamily: "'DM Sans', sans-serif", fontSize: 12, fontWeight: 700, whiteSpace: "nowrap" }}><SvgCart size={13} color="#555" />Buy</a>}
                 <button onClick={() => { setPurchasedFinalPrice(item.price ? item.price.replace(/[^0-9.]/g,"") : ""); setPurchasedKeepLink(true); setShowPurchasedModal(true); }} style={{ padding: "6px 11px", background: "transparent", border: "1px solid #e8e4dc", borderRadius: 10, cursor: "pointer", display: "flex", alignItems: "center", gap: 5, flexShrink: 0, fontFamily: "'DM Sans', sans-serif", fontSize: 12, fontWeight: 700, color: "#555", whiteSpace: "nowrap" }}><SvgShop size={13} color="#555" />Purchased</button>
+                {onCreateOutfit && <button onClick={onCreateOutfit} style={{ padding: "6px 11px", background: "#f5f2ed", border: "1px solid #e0dbd2", borderRadius: 10, cursor: "pointer", display: "flex", alignItems: "center", gap: 5, flexShrink: 0, fontFamily: "'DM Sans', sans-serif", fontSize: 12, fontWeight: 700, color: "#555", whiteSpace: "nowrap" }}><SvgHanger size={13} color="#555" />Create Look</button>}
                 <button onClick={onDelete} style={{ padding: "6px 11px", background: "#fef2f2", border: "none", borderRadius: 10, cursor: "pointer", display: "flex", alignItems: "center", gap: 5, flexShrink: 0, fontFamily: "'DM Sans', sans-serif", fontSize: 12, fontWeight: 700, color: "#e05555", whiteSpace: "nowrap" }}><SvgTrash size={13} color="#e05555" />Delete</button>
               </>) : (<>
                 <button onClick={onDelete} title="Delete" style={{ width: 32, height: 32, borderRadius: "50%", background: "#fef2f2", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", color: "#e05555", flexShrink: 0 }}><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4h6v2"/></svg></button>
@@ -5020,7 +5021,7 @@ function StatsTab({ itemsDb, outfitsDb, lookbooksDb, wishlistDb, outfitCalendar,
 }
 
 // ── Wishlist Tab ──────────────────────────────────────────────────────────────
-function WishlistTab({ wishlistDb, wishlistsDb, saveWishlistsMeta, activeWishlistId, setActiveWishlistId, wlSort, setWlSort, wlSortCat, setWlSortCat, wlZoom, setWlZoom, moveToCloset, onEdit, onItemClick, moodboardsDb, lookbooksDb, wlSelectMode, setWlSelectMode }) {
+function WishlistTab({ wishlistDb, wishlistsDb, saveWishlistsMeta, activeWishlistId, setActiveWishlistId, wlSort, setWlSort, wlSortCat, setWlSortCat, wlZoom, setWlZoom, moveToCloset, onEdit, onItemClick, moodboardsDb, lookbooksDb, wlSelectMode, setWlSelectMode, onCreateLook }) {
   const [showNewWl, setShowNewWl] = useState(false);
   const [newWlName, setNewWlName] = useState("");
   const [newWlNotes, setNewWlNotes] = useState("");
@@ -5415,6 +5416,13 @@ function WishlistTab({ wishlistDb, wishlistsDb, saveWishlistsMeta, activeWishlis
                         style={{ width: 30, height: 30, borderRadius: 8, background: "#f0faf4", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", opacity: 0, transition: "opacity 0.15s", flexShrink: 0 }}>
                         <SvgShop size={13} color="#3aaa6e" />
                       </button>
+                      {onCreateLook && (
+                        <button onClick={e => { e.stopPropagation(); onCreateLook(item); }} title="Create look"
+                          className="wl-hover-btn"
+                          style={{ width: 30, height: 30, borderRadius: 8, background: "#f5f2ed", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", opacity: 0, transition: "opacity 0.15s", flexShrink: 0 }}>
+                          <SvgHanger size={13} color="#555" />
+                        </button>
+                      )}
                       <div style={{ flex: 1 }} />
                       <button onClick={e => { e.stopPropagation(); wishlistDb.remove(item.id); }} title="Delete"
                         className="wl-hover-btn"
@@ -9390,6 +9398,7 @@ export default function App() {
               lookbooksDb={lookbooksDb.rows}
               wlSelectMode={wlSelectMode}
               setWlSelectMode={setWlSelectMode}
+              onCreateLook={(item) => { setEditingOutfit(null); setOutfitSeedItem(item); setOutfitBuilder(true); }}
             />}
 
             </>
@@ -9878,7 +9887,7 @@ export default function App() {
               setItemDetail(updated);
             }}
             onMoveToCloset={isWishlistItem ? (date, finalPrice, keepLink) => { const itemToMove = keepLink ? itemDetail : { ...itemDetail, link: undefined }; moveToCloset(itemToMove, date, finalPrice); setItemDetail(null); } : null}
-            onCreateOutfit={isWishlistItem ? null : () => { setEditingOutfit(null); setOutfitSeedItem(itemDetail); setOutfitBuilder(true); setItemDetail(null); }}
+            onCreateOutfit={() => { setEditingOutfit(null); setOutfitSeedItem(itemDetail); setOutfitBuilder(true); setItemDetail(null); }}
             onListForSale={isWishlistItem ? null : () => { itemsDb.update({ ...itemDetail, forSale: true, saleStatus: "listed", listedDate: new Date().toISOString().slice(0,10) }); setItemDetail(null); setTab("seller"); }}
             onAddToCapsule={isWishlistItem ? null : () => { setCapsulePreselect([itemDetail.id]); setCapsuleName(""); setShowCapsuleModal(true); }}
             onOpenItem={(nextItem) => setItemDetail(nextItem)}

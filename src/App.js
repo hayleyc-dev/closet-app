@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { createClient } from "@supabase/supabase-js";
 
 // ── Global SVG icon helper ───────────────────────────────────────────────────
@@ -2537,7 +2537,7 @@ function LookbookViewer({ lookbook, outfits, allItems, closetItems, onClose, onU
   const [checkedPack, setCheckedPack] = useState(() => {
     try { const all = JSON.parse(localStorage.getItem("wardrobe_pack_checked_v1") || "{}"); return all[lookbook.id] || {}; } catch { return {}; }
   });
-  React.useEffect(() => {
+  useEffect(() => {
     try { const all = JSON.parse(localStorage.getItem("wardrobe_pack_checked_v1") || "{}"); localStorage.setItem("wardrobe_pack_checked_v1", JSON.stringify({ ...all, [lookbook.id]: checkedPack })); } catch {}
   }, [checkedPack, lookbook.id]);
   const [packingListView, setPackingListView] = useState(() => {
@@ -7760,12 +7760,12 @@ function HomeTab({ outfitCalendar, outfitsDb, itemsDb, lookbooksDb, wishlistDb, 
   const cardStyle = { background: "#fff", borderRadius: 16, border: "1.5px solid #e8e4dc", overflow: "hidden", boxShadow: "0 2px 12px rgba(0,0,0,0.04)" };
 
   // ── Weather ──────────────────────────────────────────────────────────────
-  const [homeCity, setHomeCity] = React.useState(() => localStorage.getItem("wardrobe_home_city") || "");
-  const [homeCityInput, setHomeCityInput] = React.useState(() => localStorage.getItem("wardrobe_home_city") || "");
-  const [homeWeather, setHomeWeather] = React.useState(null);
-  const [wxLoading, setWxLoading] = React.useState(false);
+  const [homeCity, setHomeCity] = useState(() => localStorage.getItem("wardrobe_home_city") || "");
+  const [homeCityInput, setHomeCityInput] = useState(() => localStorage.getItem("wardrobe_home_city") || "");
+  const [homeWeather, setHomeWeather] = useState(null);
+  const [wxLoading, setWxLoading] = useState(false);
 
-  const fetchHomeWeather = React.useCallback(async (city) => {
+  const fetchHomeWeather = useCallback(async (city) => {
     if (!city) return;
     setWxLoading(true);
     const q = city.split(",")[0].trim();
@@ -7785,7 +7785,7 @@ function HomeTab({ outfitCalendar, outfitsDb, itemsDb, lookbooksDb, wishlistDb, 
     setWxLoading(false);
   }, []);
 
-  React.useEffect(() => { if (homeCity) fetchHomeWeather(homeCity); }, []); // eslint-disable-line
+  useEffect(() => { if (homeCity) fetchHomeWeather(homeCity); }, []); // eslint-disable-line
 
   const wxIcon = (code) => {
     if (code === 0) return "☀️";
@@ -7830,7 +7830,7 @@ function HomeTab({ outfitCalendar, outfitsDb, itemsDb, lookbooksDb, wishlistDb, 
     .slice(0, 3);
 
   // ── Packing progress ──────────────────────────────────────────────────────
-  const packCheckedAll = React.useMemo(() => {
+  const packCheckedAll = useMemo(() => {
     try { return JSON.parse(localStorage.getItem("wardrobe_pack_checked_v1") || "{}"); } catch { return {}; }
   }, []);
 

@@ -75,6 +75,7 @@ const SvgDress = ({size=16,color="currentColor",style}) => (
   </svg>
 );
 const SvgSparkle  = ({size=16,color="currentColor"}) => <Ico size={size} color={color}><path d="M12 2l2.4 7.4H22l-6.2 4.5 2.4 7.4L12 17l-6.2 4.3 2.4-7.4L2 9.4h7.6z"/></Ico>;
+const SvgCart     = ({size=14,color="currentColor"}) => <Ico size={size} color={color}><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 002 1.61h9.72a2 2 0 001.95-1.57l1.65-8.42H6"/></Ico>;
 
 
 const SUPABASE_URL = "https://gucqffnjwvbvycfqvtcw.supabase.co";
@@ -256,6 +257,8 @@ const globalStyles = `
 
   /* Item card edit btn reveal on hover */
   .item-card:hover .item-card-edit-btn { opacity: 1 !important; }
+  /* Wishlist card hover-only action buttons */
+  .wl-card:hover .wl-hover-btn { opacity: 1 !important; }
   .palette-del-btn { opacity: 0 !important; transition: opacity 0.15s; }
   div:hover > .palette-del-btn { opacity: 1 !important; }
 
@@ -1766,6 +1769,8 @@ function ItemDetailPopup({ item, onClose, onEdit, onDelete, onWorn, onDuplicate,
   const [lbDrag, setLbDrag] = useState(null); // {startX, startY, panX, panY}
   const closeLightbox = () => { setLightbox(false); setLbZoom(1); setLbPan({ x: 0, y: 0 }); };
   const [purchasedDate, setPurchasedDate] = useState(new Date().toISOString().slice(0, 10));
+  const [purchasedFinalPrice, setPurchasedFinalPrice] = useState("");
+  const [purchasedKeepLink, setPurchasedKeepLink] = useState(true);
   const featuredOutfits = (outfits || []).filter(o => (o.layers || o.itemIds || []).includes(item.id));
   const featuredOutfitIds = new Set(featuredOutfits.map(o => o.id));
   const featuredLookbooks = (lookbooks || []).filter(lb => (lb.outfitIds || []).some(oid => featuredOutfitIds.has(oid)));
@@ -1936,9 +1941,9 @@ function ItemDetailPopup({ item, onClose, onEdit, onDelete, onWorn, onDuplicate,
               {!isWishlist && onDuplicate && <button onClick={onDuplicate} style={{ padding: "6px 11px", background: "#f5f2ed", border: "1px solid #e0dbd2", borderRadius: 10, cursor: "pointer", fontSize: 12, fontWeight: 700, color: "#555", fontFamily: "'DM Sans', sans-serif", display: "flex", alignItems: "center", gap: 5, flexShrink: 0, whiteSpace: "nowrap" }}><SvgCopy size={14} color="currentColor" /></button>}
               {!isWishlist && onToggleNeedsStyling && <button onClick={onToggleNeedsStyling} style={{ padding: "6px 11px", background: item.needsStyling ? "#fff0f6" : "#f5f2ed", border: item.needsStyling ? "1.5px solid #f3b4ce" : "1px solid #e0dbd2", borderRadius: 10, cursor: "pointer", fontSize: 12, fontWeight: 700, color: item.needsStyling ? "#b64b78" : "#666", fontFamily: "'DM Sans', sans-serif", display: "flex", alignItems: "center", gap: 5, flexShrink: 0, whiteSpace: "nowrap" }}><SvgHanger size={14} color="currentColor" /></button>}
               {isWishlist ? (<>
-                {item.link && <a href={item.link} target="_blank" rel="noreferrer" style={{ padding: "6px 11px", background: "#1a1a1a", borderRadius: 10, fontSize: 12, fontWeight: 700, color: "#fff", fontFamily: "'DM Sans', sans-serif", display: "flex", alignItems: "center", gap: 5, textDecoration: "none", flexShrink: 0, whiteSpace: "nowrap" }}><SvgShop size={12} color="#fff" />Buy</a>}
-                <button onClick={() => setShowPurchasedModal(true)} style={{ padding: "6px 11px", background: "#f0faf4", border: "1.5px solid #b6e8c8", borderRadius: 10, cursor: "pointer", fontSize: 12, fontWeight: 700, color: "#2d6a3f", fontFamily: "'DM Sans', sans-serif", display: "flex", alignItems: "center", gap: 5, flexShrink: 0, whiteSpace: "nowrap" }}><SvgCheck size={12} color="currentColor" />Purchased</button>
-                <button onClick={onDelete} title="Delete" style={{ width: 32, height: 32, borderRadius: "50%", background: "#fef2f2", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", color: "#e05555", flexShrink: 0 }}><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4h6v2"/></svg></button>
+                {item.link && <a href={item.link} target="_blank" rel="noreferrer" title="Buy" style={{ width: 32, height: 32, borderRadius: "50%", background: "transparent", border: "1px solid #e8e4dc", display: "flex", alignItems: "center", justifyContent: "center", textDecoration: "none", flexShrink: 0 }}><SvgCart size={14} color="#555" /></a>}
+                <button onClick={() => { setPurchasedFinalPrice(item.price ? item.price.replace(/[^0-9.]/g,"") : ""); setPurchasedKeepLink(true); setShowPurchasedModal(true); }} title="Mark as purchased" style={{ width: 32, height: 32, borderRadius: "50%", background: "transparent", border: "1px solid #e8e4dc", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}><SvgShop size={14} color="#555" /></button>
+                <button onClick={onDelete} title="Delete" style={{ width: 32, height: 32, borderRadius: "50%", background: "#fef2f2", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", color: "#e05555", flexShrink: 0 }}><SvgTrash size={14} color="#e05555" /></button>
               </>) : (<>
                 <button onClick={onDelete} title="Delete" style={{ width: 32, height: 32, borderRadius: "50%", background: "#fef2f2", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", color: "#e05555", flexShrink: 0 }}><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4h6v2"/></svg></button>
               </>)}
@@ -2027,22 +2032,43 @@ function ItemDetailPopup({ item, onClose, onEdit, onDelete, onWorn, onDuplicate,
       </div>
     </div>
 
-      {/* Purchase date modal */}
+      {/* Purchase modal */}
       {showPurchasedModal && (
-        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", zIndex: 99999, display: "flex", alignItems: "center", justifyContent: "center" }}
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.45)", zIndex: 99999, display: "flex", alignItems: "center", justifyContent: "center", backdropFilter: "blur(6px)" }}
           onClick={() => setShowPurchasedModal(false)}>
-          <div onClick={e => e.stopPropagation()} style={{ background: "#fff", borderRadius: 20, padding: "28px 28px 24px", width: 320, boxShadow: "0 20px 60px rgba(0,0,0,0.2)", fontFamily: "'DM Sans', sans-serif" }}>
-            <div style={{ fontSize: 16, fontWeight: 800, color: "#1a1a1a", marginBottom: 6 }}>🎉 Mark as Purchased</div>
-            <div style={{ fontSize: 13, color: "#888", marginBottom: 18 }}>When did you buy <strong>{item.name}</strong>?</div>
-            <input type="date" value={purchasedDate} onChange={e => setPurchasedDate(e.target.value)}
-              style={{ width: "100%", padding: "9px 12px", border: "1.5px solid #e8e4dc", borderRadius: 10, fontFamily: "'DM Sans', sans-serif", fontSize: 13, outline: "none", boxSizing: "border-box", marginBottom: 16 }} />
-            <div style={{ display: "flex", gap: 8 }}>
-              <button onClick={() => { onMoveToCloset(purchasedDate); setShowPurchasedModal(false); }}
-                style={{ flex: 1, padding: "10px", background: "#2d6a3f", color: "#fff", border: "none", borderRadius: 12, cursor: "pointer", fontSize: 13, fontWeight: 700, fontFamily: "'DM Sans', sans-serif" }}>
+          <div onClick={e => e.stopPropagation()} style={{ background: "#fff", borderRadius: 22, padding: "28px 28px 24px", width: 340, boxShadow: "0 24px 64px rgba(0,0,0,0.18)", fontFamily: "'DM Sans', sans-serif" }}>
+            <div style={{ fontSize: 17, fontWeight: 800, color: "#1a1a1a", marginBottom: 4 }}>Mark as Purchased</div>
+            <div style={{ fontSize: 13, color: "#888", marginBottom: 20 }}><strong style={{ color: "#1a1a1a" }}>{item.name}</strong> will move to your closet.</div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+              <div>
+                <label style={{ fontSize: 11, fontWeight: 700, color: "#aaa", textTransform: "uppercase", letterSpacing: "0.06em", display: "block", marginBottom: 5 }}>Purchase Date</label>
+                <input type="date" value={purchasedDate} onChange={e => setPurchasedDate(e.target.value)}
+                  style={{ width: "100%", padding: "9px 12px", border: "1.5px solid #e8e4dc", borderRadius: 10, fontFamily: "'DM Sans', sans-serif", fontSize: 13, outline: "none", boxSizing: "border-box" }} />
+              </div>
+              <div>
+                <label style={{ fontSize: 11, fontWeight: 700, color: "#aaa", textTransform: "uppercase", letterSpacing: "0.06em", display: "block", marginBottom: 5 }}>Final Price Paid</label>
+                <div style={{ position: "relative" }}>
+                  <span style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", fontSize: 13, color: "#888", fontWeight: 600 }}>$</span>
+                  <input type="number" min="0" step="0.01" value={purchasedFinalPrice} onChange={e => setPurchasedFinalPrice(e.target.value)}
+                    placeholder={item.price ? item.price.replace(/[^0-9.]/g,"") : "0.00"}
+                    style={{ width: "100%", padding: "9px 12px 9px 24px", border: "1.5px solid #e8e4dc", borderRadius: 10, fontFamily: "'DM Sans', sans-serif", fontSize: 13, outline: "none", boxSizing: "border-box" }} />
+                </div>
+              </div>
+              {item.link && (
+                <label style={{ display: "flex", alignItems: "center", gap: 10, cursor: "pointer", padding: "10px 12px", background: "#faf9f6", borderRadius: 10 }}>
+                  <input type="checkbox" checked={purchasedKeepLink} onChange={e => setPurchasedKeepLink(e.target.checked)}
+                    style={{ width: 16, height: 16, cursor: "pointer", accentColor: "#1a1a1a" }} />
+                  <span style={{ fontSize: 13, color: "#555", fontWeight: 500 }}>Keep product link in closet</span>
+                </label>
+              )}
+            </div>
+            <div style={{ display: "flex", gap: 8, marginTop: 20 }}>
+              <button onClick={() => { onMoveToCloset(purchasedDate, purchasedFinalPrice, purchasedKeepLink); setShowPurchasedModal(false); }}
+                style={{ flex: 1, padding: "11px", background: "#1a1a1a", color: "#fff", border: "none", borderRadius: 12, cursor: "pointer", fontSize: 13, fontWeight: 700, fontFamily: "'DM Sans', sans-serif" }}>
                 Move to Closet
               </button>
               <button onClick={() => setShowPurchasedModal(false)}
-                style={{ padding: "10px 16px", background: "#f5f3ef", color: "#888", border: "none", borderRadius: 12, cursor: "pointer", fontSize: 13, fontWeight: 700, fontFamily: "'DM Sans', sans-serif" }}>
+                style={{ padding: "11px 16px", background: "#f5f3ef", color: "#888", border: "none", borderRadius: 12, cursor: "pointer", fontSize: 13, fontWeight: 600, fontFamily: "'DM Sans', sans-serif" }}>
                 Cancel
               </button>
             </div>
@@ -4992,25 +5018,31 @@ function StatsTab({ itemsDb, outfitsDb, lookbooksDb, wishlistDb, outfitCalendar,
 }
 
 // ── Wishlist Tab ──────────────────────────────────────────────────────────────
-function WishlistTab({ wishlistDb, wishlistsDb, saveWishlistsMeta, activeWishlistId, setActiveWishlistId, wlSort, setWlSort, wlSortCat, setWlSortCat, wlZoom, setWlZoom, moveToCloset, onEdit, onItemClick }) {
+function WishlistTab({ wishlistDb, wishlistsDb, saveWishlistsMeta, activeWishlistId, setActiveWishlistId, wlSort, setWlSort, wlSortCat, setWlSortCat, wlZoom, setWlZoom, moveToCloset, onEdit, onItemClick, moodboardsDb, lookbooksDb }) {
   const [showNewWl, setShowNewWl] = useState(false);
   const [newWlName, setNewWlName] = useState("");
   const [newWlNotes, setNewWlNotes] = useState("");
   const [editingWlId, setEditingWlId] = useState(null);
   const [dragItemId, setDragItemId] = useState(null);
   const [dragOverItemId, setDragOverItemId] = useState(null);
-  const [customOrder, setCustomOrder] = useState({}); // listId -> [itemIds]
+  const [customOrder, setCustomOrder] = useState({});
   const [wlStoreFilter, setWlStoreFilter] = useState("All");
+  const [wlSearch, setWlSearch] = useState("");
+  const [wlSelectMode, setWlSelectMode] = useState(false);
+  const [wlSelected, setWlSelected] = useState(new Set());
+  const [listDragId, setListDragId] = useState(null);
+  const [listDragOverId, setListDragOverId] = useState(null);
+  const [purchaseItem, setPurchaseItem] = useState(null);
+  const [purchaseDate, setPurchaseDate] = useState(new Date().toISOString().slice(0,10));
+  const [purchaseFinalPrice, setPurchaseFinalPrice] = useState("");
+  const [purchaseKeepLink, setPurchaseKeepLink] = useState(true);
+  const [showBulkMoveDropdown, setShowBulkMoveDropdown] = useState(false);
 
   const priorityMeta = { high: { label: "High", bg: "#fff0f0", color: "#e05555", border: "#ffc5c5" }, medium: { label: "Medium", bg: "#fff8ee", color: "#a07000", border: "#f5c842" }, low: { label: "Low", bg: "#f5f3ef", color: "#aaa", border: "#e0dbd0" } };
 
   const visibleItems = wishlistDb.rows.filter(i =>
     !activeWishlistId || i.wishlistId === activeWishlistId
   );
-
-  // Separate saved-for-later
-  const activeItems = visibleItems.filter(i => !i.savedForLater);
-  const savedLaterItems = visibleItems.filter(i => i.savedForLater);
 
   const applySort = (items) => {
     const po = { high: 0, medium: 1, low: 2 };
@@ -5019,11 +5051,10 @@ function WishlistTab({ wishlistDb, wishlistsDb, saveWishlistsMeta, activeWishlis
       if (wlSort === "store") return (a.store || "").localeCompare(b.store || "");
       if (wlSort === "category") return (a.category || "").localeCompare(b.category || "");
       if (wlSort === "price") return (parseFloat((b.price||"").replace(/[^0-9.]/g,""))||0) - (parseFloat((a.price||"").replace(/[^0-9.]/g,""))||0);
+      if (wlSort === "added") return new Date(b.addedAt || 0) - new Date(a.addedAt || 0);
       return 0;
     }).filter(i => wlSortCat === "All" || i.category === wlSortCat)
       .filter(i => wlStoreFilter === "All" || (i.store || "") === wlStoreFilter);
-
-    // Apply custom order if set
     const orderKey = activeWishlistId || "all";
     const order = customOrder[orderKey];
     if (order && order.length) {
@@ -5038,64 +5069,123 @@ function WishlistTab({ wishlistDb, wishlistsDb, saveWishlistsMeta, activeWishlis
     return sorted;
   };
 
-  const sortedItems = applySort(activeItems);
+  const sortedItems = applySort(visibleItems);
 
+  // Item drag-to-reorder
   const handleDragStart = (id) => setDragItemId(id);
   const handleDragEnter = (id) => setDragOverItemId(id);
   const handleDrop = () => {
     if (!dragItemId || !dragOverItemId || dragItemId === dragOverItemId) { setDragItemId(null); setDragOverItemId(null); return; }
     const orderKey = activeWishlistId || "all";
     const ids = sortedItems.map(i => i.id);
-    const fromIdx = ids.indexOf(dragItemId);
-    const toIdx = ids.indexOf(dragOverItemId);
+    const fromIdx = ids.indexOf(dragItemId), toIdx = ids.indexOf(dragOverItemId);
     if (fromIdx === -1 || toIdx === -1) { setDragItemId(null); setDragOverItemId(null); return; }
-    const next = [...ids];
-    next.splice(fromIdx, 1);
-    next.splice(toIdx, 0, dragItemId);
+    const next = [...ids]; next.splice(fromIdx, 1); next.splice(toIdx, 0, dragItemId);
     setCustomOrder(o => ({ ...o, [orderKey]: next }));
     setDragItemId(null); setDragOverItemId(null);
+  };
+
+  // List sidebar drag-to-reorder
+  const handleListDrop = () => {
+    if (!listDragId || !listDragOverId || listDragId === listDragOverId) { setListDragId(null); setListDragOverId(null); return; }
+    const fromIdx = wishlistsDb.findIndex(w => w.id === listDragId);
+    const toIdx = wishlistsDb.findIndex(w => w.id === listDragOverId);
+    if (fromIdx === -1 || toIdx === -1) { setListDragId(null); setListDragOverId(null); return; }
+    const next = [...wishlistsDb]; const [moved] = next.splice(fromIdx, 1); next.splice(toIdx, 0, moved);
+    saveWishlistsMeta(next);
+    setListDragId(null); setListDragOverId(null);
   };
 
   const wlCategories = [...new Set(wishlistDb.rows.map(i => i.category).filter(Boolean))];
   const wlStores = [...new Set(wishlistDb.rows.map(i => i.store).filter(Boolean))];
   const activeWl = wishlistsDb.find(w => w.id === activeWishlistId) || null;
+  const filteredWishlistsDb = wlSearch ? wishlistsDb.filter(w => w.name.toLowerCase().includes(wlSearch.toLowerCase())) : wishlistsDb;
+
+  const openPurchaseModal = (item) => {
+    setPurchaseItem(item);
+    setPurchaseDate(new Date().toISOString().slice(0,10));
+    setPurchaseFinalPrice(item.price ? item.price.replace(/[^0-9.]/g, "") : "");
+    setPurchaseKeepLink(true);
+  };
+
+  const confirmPurchase = () => {
+    if (!purchaseItem) return;
+    const itemToMove = purchaseKeepLink ? purchaseItem : { ...purchaseItem, link: undefined };
+    moveToCloset(itemToMove, purchaseDate, purchaseFinalPrice);
+    setPurchaseItem(null);
+  };
+
+  const toggleSelect = (id) => setWlSelected(prev => { const next = new Set(prev); next.has(id) ? next.delete(id) : next.add(id); return next; });
+
+  const bulkDelete = async () => {
+    if (!window.confirm(`Delete ${wlSelected.size} item${wlSelected.size !== 1 ? "s" : ""}?`)) return;
+    for (const id of wlSelected) await wishlistDb.remove(id);
+    setWlSelected(new Set()); setWlSelectMode(false);
+  };
+
+  const bulkMoveToList = async (listId) => {
+    for (const id of wlSelected) {
+      const item = wishlistDb.rows.find(i => i.id === id);
+      if (item) await wishlistDb.update({ ...item, wishlistId: listId || undefined });
+    }
+    setWlSelected(new Set()); setWlSelectMode(false);
+    if (listId) setActiveWishlistId(listId);
+  };
+
+  const bulkMarkPurchased = async () => {
+    const today = new Date().toISOString().slice(0,10);
+    for (const id of wlSelected) { const item = wishlistDb.rows.find(i => i.id === id); if (item) await moveToCloset(item, today); }
+    setWlSelected(new Set()); setWlSelectMode(false);
+  };
 
   return (
     <div className="fade-up" style={{ display: "flex", gap: 16, alignItems: "flex-start" }}>
 
-      {/* ── Left sidebar: list navigation ── */}
-      <div style={{ width: 180, flexShrink: 0, display: "flex", flexDirection: "column", gap: 4 }}>
+      {/* ── Left sidebar ── */}
+      <div style={{ width: 190, flexShrink: 0, display: "flex", flexDirection: "column", gap: 4 }}>
+        {/* Search */}
+        <div style={{ position: "relative", marginBottom: 6 }}>
+          <span style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)", pointerEvents: "none" }}>
+            <SvgSearch size={12} color="#bbb" />
+          </span>
+          <input value={wlSearch} onChange={e => setWlSearch(e.target.value)} placeholder="Search lists…"
+            style={{ width: "100%", padding: "7px 10px 7px 30px", border: "1px solid #e8e4dc", borderRadius: 10, fontFamily: "'DM Sans', sans-serif", fontSize: 12, outline: "none", boxSizing: "border-box", background: "#faf9f6", color: "#1a1a1a" }} />
+        </div>
+
         {/* All Items */}
         <button onClick={() => setActiveWishlistId(null)} style={{
-          width: "100%", textAlign: "left", padding: "9px 14px", borderRadius: 12,
-          border: "none", cursor: "pointer", fontFamily: "'DM Sans', sans-serif",
-          fontSize: 13, fontWeight: activeWishlistId === null ? 700 : 500,
+          width: "100%", textAlign: "left", padding: "9px 14px", borderRadius: 12, border: "none", cursor: "pointer",
+          fontFamily: "'DM Sans', sans-serif", fontSize: 13, fontWeight: activeWishlistId === null ? 700 : 500,
           background: activeWishlistId === null ? "#1a1a1a" : "transparent",
           color: activeWishlistId === null ? "#fff" : "#555",
-          display: "flex", alignItems: "center", justifyContent: "space-between",
-          transition: "all 0.15s",
+          display: "flex", alignItems: "center", justifyContent: "space-between", transition: "all 0.15s",
         }}>
           <span>All Items</span>
           <span style={{ fontSize: 11, opacity: 0.5, fontWeight: 600 }}>{wishlistDb.rows.length}</span>
         </button>
 
-        {/* Named lists */}
-        {wishlistsDb.map(wl => (
-          <button key={wl.id} onClick={() => setActiveWishlistId(wl.id)} style={{
-            width: "100%", textAlign: "left", padding: "9px 14px", borderRadius: 12,
-            border: "none", cursor: "pointer", fontFamily: "'DM Sans', sans-serif",
-            fontSize: 13, fontWeight: activeWishlistId === wl.id ? 700 : 500,
-            background: activeWishlistId === wl.id ? "#1a1a1a" : "transparent",
-            color: activeWishlistId === wl.id ? "#fff" : "#555",
-            display: "flex", alignItems: "center", justifyContent: "space-between",
-            transition: "all 0.15s",
-          }}>
+        {/* Named lists (draggable) */}
+        {filteredWishlistsDb.map(wl => (
+          <button key={wl.id} onClick={() => setActiveWishlistId(wl.id)}
+            draggable
+            onDragStart={() => setListDragId(wl.id)}
+            onDragEnter={() => setListDragOverId(wl.id)}
+            onDragEnd={handleListDrop}
+            onDragOver={e => e.preventDefault()}
+            style={{
+              width: "100%", textAlign: "left", padding: "9px 14px", borderRadius: 12, cursor: "grab",
+              border: listDragOverId === wl.id ? "2px dashed #888" : "none",
+              fontFamily: "'DM Sans', sans-serif", fontSize: 13, fontWeight: activeWishlistId === wl.id ? 700 : 500,
+              background: activeWishlistId === wl.id ? "#1a1a1a" : "transparent",
+              color: activeWishlistId === wl.id ? "#fff" : "#555",
+              display: "flex", alignItems: "center", justifyContent: "space-between", transition: "all 0.15s",
+            }}>
             <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1 }}>{wl.name}</span>
             <span style={{ fontSize: 11, opacity: 0.5, fontWeight: 600, flexShrink: 0, marginLeft: 6 }}>{wishlistDb.rows.filter(i => i.wishlistId === wl.id).length}</span>
           </button>
         ))}
 
-        {/* New list button */}
+        {/* New list */}
         {!showNewWl && (
           <button onClick={() => setShowNewWl(true)} style={{
             width: "100%", textAlign: "left", padding: "9px 14px", borderRadius: 12,
@@ -5107,44 +5197,66 @@ function WishlistTab({ wishlistDb, wishlistsDb, saveWishlistsMeta, activeWishlis
             New List
           </button>
         )}
-
-        {/* Inline new list form */}
         {showNewWl && (
-          <div style={{ background: "#fff", borderRadius: 14, border: "1px solid #ece8e0", padding: "12px 12px", marginTop: 4 }}>
+          <div style={{ background: "#fff", borderRadius: 14, border: "1px solid #ece8e0", padding: "12px", marginTop: 4 }}>
             <input value={newWlName} onChange={e => setNewWlName(e.target.value)} placeholder="List name…" autoFocus
               onKeyDown={e => { if (e.key === "Enter" && newWlName.trim()) { const wl = { id: Date.now().toString(36), name: newWlName.trim(), notes: newWlNotes }; saveWishlistsMeta([...wishlistsDb, wl]); setNewWlName(""); setNewWlNotes(""); setShowNewWl(false); setActiveWishlistId(wl.id); }}}
               style={{ width: "100%", padding: "7px 10px", border: "1px solid #e0dbd2", borderRadius: 8, fontFamily: "'DM Sans', sans-serif", fontSize: 12, fontWeight: 600, outline: "none", marginBottom: 6, boxSizing: "border-box" }} />
             <textarea value={newWlNotes} onChange={e => setNewWlNotes(e.target.value)} placeholder="Notes (optional)" rows={2}
               style={{ width: "100%", padding: "7px 10px", border: "1px solid #e0dbd2", borderRadius: 8, fontFamily: "'DM Sans', sans-serif", fontSize: 11, resize: "none", outline: "none", marginBottom: 8, boxSizing: "border-box" }} />
             <div style={{ display: "flex", gap: 6 }}>
-              <button onClick={() => {
-                if (!newWlName.trim()) return;
-                const wl = { id: Date.now().toString(36), name: newWlName.trim(), notes: newWlNotes };
-                saveWishlistsMeta([...wishlistsDb, wl]);
-                setNewWlName(""); setNewWlNotes(""); setShowNewWl(false);
-                setActiveWishlistId(wl.id);
-              }} style={{ flex: 1, padding: "7px 0", background: "#1a1a1a", color: "#fff", border: "none", borderRadius: 8, cursor: "pointer", fontSize: 12, fontWeight: 700, fontFamily: "'DM Sans', sans-serif" }}>Create</button>
-              <button onClick={() => { setShowNewWl(false); setNewWlName(""); setNewWlNotes(""); }} style={{ padding: "7px 10px", background: "#f5f2ed", border: "none", borderRadius: 8, cursor: "pointer", fontSize: 11, color: "#888", fontFamily: "'DM Sans', sans-serif" }}>✕</button>
+              <button onClick={() => { if (!newWlName.trim()) return; const wl = { id: Date.now().toString(36), name: newWlName.trim(), notes: newWlNotes }; saveWishlistsMeta([...wishlistsDb, wl]); setNewWlName(""); setNewWlNotes(""); setShowNewWl(false); setActiveWishlistId(wl.id); }}
+                style={{ flex: 1, padding: "7px 0", background: "#1a1a1a", color: "#fff", border: "none", borderRadius: 8, cursor: "pointer", fontSize: 12, fontWeight: 700, fontFamily: "'DM Sans', sans-serif" }}>Create</button>
+              <button onClick={() => { setShowNewWl(false); setNewWlName(""); setNewWlNotes(""); }}
+                style={{ padding: "7px 10px", background: "#f5f2ed", border: "none", borderRadius: 8, cursor: "pointer", fontSize: 11, color: "#888", fontFamily: "'DM Sans', sans-serif" }}>✕</button>
             </div>
           </div>
         )}
 
-        {/* Edit/delete active named list */}
+        {/* Edit active list + moodboard/lookbook links */}
         {activeWl && (
           <div style={{ marginTop: 8, paddingTop: 8, borderTop: "1px solid #ece8e0" }}>
             {editingWlId === activeWl.id ? (
-              <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+              <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
                 <input value={activeWl.name} onChange={e => saveWishlistsMeta(wishlistsDb.map(w => w.id === activeWl.id ? { ...w, name: e.target.value } : w))}
                   style={{ width: "100%", padding: "6px 10px", border: "1px solid #e0dbd2", borderRadius: 8, fontFamily: "'DM Sans', sans-serif", fontSize: 12, fontWeight: 700, outline: "none", boxSizing: "border-box" }} />
                 <textarea value={activeWl.notes || ""} onChange={e => saveWishlistsMeta(wishlistsDb.map(w => w.id === activeWl.id ? { ...w, notes: e.target.value } : w))} rows={2}
                   style={{ width: "100%", padding: "6px 10px", border: "1px solid #e0dbd2", borderRadius: 8, fontFamily: "'DM Sans', sans-serif", fontSize: 11, resize: "none", outline: "none", boxSizing: "border-box" }} />
+                {moodboardsDb && moodboardsDb.length > 0 && (
+                  <div>
+                    <div style={{ fontSize: 10, fontWeight: 700, color: "#aaa", textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: 4 }}>Moodboard</div>
+                    <select value={activeWl.linkedMoodboardId || ""} onChange={e => saveWishlistsMeta(wishlistsDb.map(w => w.id === activeWl.id ? { ...w, linkedMoodboardId: e.target.value || undefined } : w))}
+                      style={{ width: "100%", padding: "6px 8px", border: "1px solid #e0dbd2", borderRadius: 8, fontFamily: "'DM Sans', sans-serif", fontSize: 11, outline: "none", boxSizing: "border-box" }}>
+                      <option value="">None</option>
+                      {moodboardsDb.map((mb, idx) => <option key={mb.id} value={mb.id}>{mb.name || `Board ${idx + 1}`}</option>)}
+                    </select>
+                  </div>
+                )}
+                {lookbooksDb && lookbooksDb.length > 0 && (
+                  <div>
+                    <div style={{ fontSize: 10, fontWeight: 700, color: "#aaa", textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: 4 }}>Lookbook</div>
+                    <select value={activeWl.linkedLookbookId || ""} onChange={e => saveWishlistsMeta(wishlistsDb.map(w => w.id === activeWl.id ? { ...w, linkedLookbookId: e.target.value || undefined } : w))}
+                      style={{ width: "100%", padding: "6px 8px", border: "1px solid #e0dbd2", borderRadius: 8, fontFamily: "'DM Sans', sans-serif", fontSize: 11, outline: "none", boxSizing: "border-box" }}>
+                      <option value="">None</option>
+                      {lookbooksDb.map(lb => <option key={lb.id} value={lb.id}>{lb.name}</option>)}
+                    </select>
+                  </div>
+                )}
                 <button onClick={() => setEditingWlId(null)} style={{ padding: "6px 0", background: "#1a1a1a", color: "#fff", border: "none", borderRadius: 8, cursor: "pointer", fontSize: 12, fontWeight: 700, fontFamily: "'DM Sans', sans-serif" }}>Done</button>
               </div>
             ) : (
-              <div style={{ display: "flex", gap: 6 }}>
-                <button onClick={() => setEditingWlId(activeWl.id)} style={{ flex: 1, padding: "6px 0", background: "#f5f2ed", border: "none", borderRadius: 8, cursor: "pointer", fontSize: 11, color: "#666", fontFamily: "'DM Sans', sans-serif", fontWeight: 600 }}>Edit</button>
-                <button onClick={() => { if (window.confirm("Delete this list? Items stay in All Items.")) { saveWishlistsMeta(wishlistsDb.filter(w => w.id !== activeWishlistId)); setActiveWishlistId(null); }}} style={{ flex: 1, padding: "6px 0", background: "#fef2f2", border: "none", borderRadius: 8, cursor: "pointer", fontSize: 11, color: "#e05555", fontFamily: "'DM Sans', sans-serif", fontWeight: 600 }}>Delete</button>
-              </div>
+              <>
+                {(activeWl.linkedMoodboardId || activeWl.linkedLookbookId) && (
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 4, marginBottom: 8 }}>
+                    {activeWl.linkedMoodboardId && moodboardsDb && (() => { const mb = moodboardsDb.find(m => m.id === activeWl.linkedMoodboardId); return mb ? <span style={{ fontSize: 9, fontWeight: 700, color: "#7c6fe0", background: "#f0f4ff", border: "1px solid #c4b0f0", borderRadius: 100, padding: "2px 8px" }}>{mb.name || "Board"}</span> : null; })()}
+                    {activeWl.linkedLookbookId && lookbooksDb && (() => { const lb = lookbooksDb.find(l => l.id === activeWl.linkedLookbookId); return lb ? <span style={{ fontSize: 9, fontWeight: 700, color: "#2bafd4", background: "#f0fbff", border: "1px solid #a8d8e8", borderRadius: 100, padding: "2px 8px" }}>{lb.name}</span> : null; })()}
+                  </div>
+                )}
+                <div style={{ display: "flex", gap: 6 }}>
+                  <button onClick={() => setEditingWlId(activeWl.id)} style={{ flex: 1, padding: "6px 0", background: "#f5f2ed", border: "none", borderRadius: 8, cursor: "pointer", fontSize: 11, color: "#666", fontFamily: "'DM Sans', sans-serif", fontWeight: 600 }}>Edit</button>
+                  <button onClick={() => { if (window.confirm("Delete this list? Items stay in All Items.")) { saveWishlistsMeta(wishlistsDb.filter(w => w.id !== activeWishlistId)); setActiveWishlistId(null); }}} style={{ flex: 1, padding: "6px 0", background: "#fef2f2", border: "none", borderRadius: 8, cursor: "pointer", fontSize: 11, color: "#e05555", fontFamily: "'DM Sans', sans-serif", fontWeight: 600 }}>Delete</button>
+                </div>
+              </>
             )}
           </div>
         )}
@@ -5152,16 +5264,17 @@ function WishlistTab({ wishlistDb, wishlistsDb, saveWishlistsMeta, activeWishlis
 
       {/* ── Right: items area ── */}
       <div style={{ flex: 1, minWidth: 0 }}>
-        {/* Sort + filter bar */}
+        {/* Toolbar */}
         <div style={{ display: "flex", gap: 8, marginBottom: 16, flexWrap: "wrap", alignItems: "center" }}>
-          <select value={wlSort} onChange={e => setWlSort(e.target.value)} className="pill-select" style={{}}>
+          <select value={wlSort} onChange={e => setWlSort(e.target.value)} className="pill-select">
             <option value="priority">Priority</option>
+            <option value="added">Date Added</option>
             <option value="store">Store</option>
             <option value="category">Category</option>
             <option value="price">Price ↓</option>
           </select>
           {wlCategories.length > 1 && (
-            <select value={wlSortCat} onChange={e => setWlSortCat(e.target.value)} className="pill-select" style={{}}>
+            <select value={wlSortCat} onChange={e => setWlSortCat(e.target.value)} className="pill-select">
               <option value="All">All Categories</option>
               {wlCategories.map(c => <option key={c} value={c}>{c}</option>)}
             </select>
@@ -5172,13 +5285,49 @@ function WishlistTab({ wishlistDb, wishlistsDb, saveWishlistsMeta, activeWishlis
               {wlStores.map(s => <option key={s} value={s}>{s}</option>)}
             </select>
           )}
-          <div style={{ display: "flex", alignItems: "center", gap: 6, marginLeft: "auto" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginLeft: "auto" }}>
+            <button onClick={() => { setWlSelectMode(s => !s); setWlSelected(new Set()); }}
+              style={{ padding: "6px 14px", borderRadius: 100, border: "1px solid #e0dbd2", background: wlSelectMode ? "#1a1a1a" : "#fff", color: wlSelectMode ? "#fff" : "#666", fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "'DM Sans', sans-serif", whiteSpace: "nowrap" }}>
+              {wlSelectMode ? "Done" : "Select"}
+            </button>
             <SvgBox size={11} color="#bbb" />
             <input type="range" min={160} max={300} step={10} value={wlZoom || 210} onChange={e => setWlZoom && setWlZoom(Number(e.target.value))}
               style={{ width: 72, accentColor: "#1a1a1a", cursor: "pointer" }} />
             <SvgBox size={16} color="#bbb" />
           </div>
         </div>
+
+        {/* Bulk action bar */}
+        {wlSelectMode && wlSelected.size > 0 && (
+          <div style={{ display: "flex", gap: 8, marginBottom: 14, padding: "10px 14px", background: "#fff", borderRadius: 14, border: "1.5px solid #e8e4dc", flexWrap: "wrap", alignItems: "center" }}>
+            <span style={{ fontSize: 12, fontWeight: 700, color: "#555" }}>{wlSelected.size} selected</span>
+            <button onClick={bulkMarkPurchased} style={{ padding: "6px 14px", background: "#f0faf4", border: "1.5px solid #b6e8c8", borderRadius: 10, cursor: "pointer", fontSize: 12, fontWeight: 700, color: "#2d6a3f", fontFamily: "'DM Sans', sans-serif", display: "flex", alignItems: "center", gap: 5 }}>
+              <SvgShop size={12} color="#2d6a3f" />Purchased
+            </button>
+            <div style={{ position: "relative" }}>
+              <button onClick={() => setShowBulkMoveDropdown(v => !v)} style={{ padding: "6px 14px", background: "#f0f4ff", border: "1.5px solid #c4b0f0", borderRadius: 10, cursor: "pointer", fontSize: 12, fontWeight: 700, color: "#7c6fe0", fontFamily: "'DM Sans', sans-serif" }}>
+                Move to List ▾
+              </button>
+              {showBulkMoveDropdown && (
+                <div style={{ position: "absolute", top: "110%", left: 0, zIndex: 100, background: "#fff", borderRadius: 12, border: "1px solid #e8e4dc", boxShadow: "0 8px 32px rgba(0,0,0,0.12)", minWidth: 170, overflow: "hidden" }}
+                  onMouseLeave={() => setShowBulkMoveDropdown(false)}>
+                  <button onClick={() => { bulkMoveToList(null); setShowBulkMoveDropdown(false); }} style={{ display: "block", width: "100%", textAlign: "left", padding: "9px 14px", border: "none", background: "transparent", fontFamily: "'DM Sans', sans-serif", fontSize: 12, fontWeight: 600, color: "#555", cursor: "pointer" }}>All Items (unassigned)</button>
+                  {wishlistsDb.map(wl => (
+                    <button key={wl.id} onClick={() => { bulkMoveToList(wl.id); setShowBulkMoveDropdown(false); }} style={{ display: "block", width: "100%", textAlign: "left", padding: "9px 14px", border: "none", background: "transparent", fontFamily: "'DM Sans', sans-serif", fontSize: 12, fontWeight: 600, color: "#555", cursor: "pointer" }}>{wl.name}</button>
+                  ))}
+                  <hr style={{ margin: "4px 0", border: "none", borderTop: "1px solid #f0ece6" }} />
+                  <button onClick={() => { const name = window.prompt("New list name:"); if (!name?.trim()) { setShowBulkMoveDropdown(false); return; } const wl = { id: Date.now().toString(36), name: name.trim() }; saveWishlistsMeta([...wishlistsDb, wl]); bulkMoveToList(wl.id); setShowBulkMoveDropdown(false); }}
+                    style={{ display: "block", width: "100%", textAlign: "left", padding: "9px 14px", border: "none", background: "transparent", fontFamily: "'DM Sans', sans-serif", fontSize: 12, fontWeight: 700, color: "#1a1a1a", cursor: "pointer" }}>+ New List</button>
+                </div>
+              )}
+            </div>
+            <button onClick={bulkDelete} style={{ padding: "6px 14px", background: "#fef2f2", border: "none", borderRadius: 10, cursor: "pointer", fontSize: 12, fontWeight: 700, color: "#e05555", fontFamily: "'DM Sans', sans-serif", display: "flex", alignItems: "center", gap: 5 }}>
+              <SvgTrash size={12} color="#e05555" />Delete
+            </button>
+            <button onClick={() => setWlSelected(new Set(sortedItems.map(i => i.id)))} style={{ padding: "6px 14px", background: "#f5f2ed", border: "none", borderRadius: 10, cursor: "pointer", fontSize: 12, fontWeight: 700, color: "#666", fontFamily: "'DM Sans', sans-serif" }}>Select All</button>
+            <button onClick={() => setWlSelected(new Set())} style={{ padding: "6px 14px", background: "#f5f2ed", border: "none", borderRadius: 10, cursor: "pointer", fontSize: 12, fontWeight: 700, color: "#666", fontFamily: "'DM Sans', sans-serif" }}>Deselect All</button>
+          </div>
+        )}
 
         {sortedItems.length === 0 ? (
           <div style={{ textAlign: "center", padding: "80px 24px" }}>
@@ -5204,33 +5353,41 @@ function WishlistTab({ wishlistDb, wishlistsDb, saveWishlistsMeta, activeWishlis
             )}
           </div>
         ) : (
-          <>
           <div style={{ display: "grid", gridTemplateColumns: `repeat(auto-fill, minmax(${wlZoom || 210}px, 1fr))`, gap: 16 }}>
             {sortedItems.map((item, i) => {
               const pm = priorityMeta[item.priority] || null;
               const isDraggingOver = dragOverItemId === item.id;
+              const isSelected = wlSelected.has(item.id);
               return (
                 <div key={item.id}
-                  draggable
-                  onDragStart={() => handleDragStart(item.id)}
-                  onDragEnter={() => handleDragEnter(item.id)}
+                  draggable={!wlSelectMode}
+                  onDragStart={() => !wlSelectMode && handleDragStart(item.id)}
+                  onDragEnter={() => !wlSelectMode && handleDragEnter(item.id)}
                   onDragEnd={handleDrop}
                   onDragOver={e => e.preventDefault()}
-                  className="item-card fade-up" onClick={() => onItemClick && onItemClick(item)} style={{
-                  animationDelay: `${i * 0.04}s`, opacity: 0,
-                  border: isDraggingOver ? "2px dashed #888" : `1px solid ${pm ? pm.border : "#ece8e0"}`,
-                  position: "relative", cursor: "grab", transform: isDraggingOver ? "scale(1.02)" : "scale(1)", transition: "transform 0.1s",
-                }}>
-                  {/* Square image */}
-                  <div style={{ width: "100%", aspectRatio: "1/1", background: "#f7f5f2", overflow: "hidden", display: "flex", alignItems: "center", justifyContent: "center", position: "relative" }}>
+                  className="item-card wl-card fade-up"
+                  onClick={() => { if (wlSelectMode) { toggleSelect(item.id); return; } onItemClick && onItemClick(item); }}
+                  style={{
+                    animationDelay: `${i * 0.04}s`, opacity: 0, background: "#fff",
+                    border: isSelected ? "2px solid #2d6a3f" : isDraggingOver ? "2px dashed #888" : `1px solid ${pm ? pm.border : "#ece8e0"}`,
+                    position: "relative", cursor: wlSelectMode ? "pointer" : "grab",
+                    transform: isDraggingOver ? "scale(1.02)" : "scale(1)", transition: "transform 0.1s",
+                  }}>
+                  {/* Multi-select checkbox */}
+                  {wlSelectMode && (
+                    <div style={{ position: "absolute", top: 8, left: 8, zIndex: 10, width: 22, height: 22, borderRadius: "50%", background: isSelected ? "#2d6a3f" : "rgba(255,255,255,0.9)", border: `2px solid ${isSelected ? "#2d6a3f" : "#ddd"}`, display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 1px 4px rgba(0,0,0,0.1)" }}>
+                      {isSelected && <SvgCheck size={12} color="#fff" />}
+                    </div>
+                  )}
+                  {/* Image */}
+                  <div style={{ width: "100%", aspectRatio: "1/1", background: "#fff", overflow: "hidden", display: "flex", alignItems: "center", justifyContent: "center", position: "relative" }}>
                     {item.image
                       ? <img src={item.image} alt={item.name} style={{ width: "100%", height: "100%", objectFit: "contain", display: "block", padding: 6 }} />
                       : <SvgHeart size={26} color="#ccc" style={{ opacity: 0.3 }} />
                     }
                     {pm && <div style={{ position: "absolute", top: 7, left: 7, fontSize: 9, fontWeight: 700, color: pm.color, background: pm.bg, border: `1px solid ${pm.border}`, borderRadius: 100, padding: "2px 7px" }}>{item.priority}</div>}
-                    <button onClick={e => { e.stopPropagation(); onEdit(item); }}
-                      style={{ position: "absolute", bottom: 7, right: 7, width: 28, height: 28, borderRadius: "50%", background: "rgba(255,255,255,0.92)", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", backdropFilter: "blur(4px)", boxShadow: "0 1px 4px rgba(0,0,0,0.1)", opacity: 0 }}
-                      className="item-card-edit-btn">
+                    <button onClick={e => { e.stopPropagation(); onEdit(item); }} className="item-card-edit-btn"
+                      style={{ position: "absolute", bottom: 7, right: 7, width: 28, height: 28, borderRadius: "50%", background: "rgba(255,255,255,0.92)", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", backdropFilter: "blur(4px)", boxShadow: "0 1px 4px rgba(0,0,0,0.1)", opacity: 0 }}>
                       <SvgEdit size={12} color="#555" />
                     </button>
                   </div>
@@ -5241,33 +5398,27 @@ function WishlistTab({ wishlistDb, wishlistsDb, saveWishlistsMeta, activeWishlis
                         ? <span style={{ fontSize: 11, fontWeight: 700, color: "#1a1a1a" }}>{/^\$/.test(item.price) ? item.price : `$${item.price}`}</span>
                         : <span style={{ fontSize: 11, color: "#c0b8b0" }}>{item.brand || item.category || ""}</span>
                       }
-                      {item.store && <span style={{ fontSize: 10, color: "#7c6fe0", fontWeight: 600 }}>{item.store}</span>}
+                      {item.store && <span style={{ fontSize: 10, color: "#1a1a1a", fontWeight: 600 }}>{item.store}</span>}
                     </div>
-                    <div style={{ display: "flex", gap: 4, marginTop: 8, flexWrap: "wrap" }}>
+                    {/* Hover-only action row */}
+                    <div style={{ display: "flex", gap: 4, marginTop: 8, alignItems: "center" }}>
                       {item.link && (
-                        <a href={item.link} target="_blank" rel="noreferrer" onClick={e => e.stopPropagation()}
-                          style={{ flex: 1, padding: "5px 8px", background: "#1a1a1a", color: "#fff", borderRadius: 8, fontSize: 10, fontWeight: 700, textDecoration: "none", fontFamily: "'DM Sans', sans-serif", display: "flex", alignItems: "center", justifyContent: "center", gap: 3 }}>
-                          <SvgShop size={10} color="#fff" />Buy
+                        <a href={item.link} target="_blank" rel="noreferrer" onClick={e => e.stopPropagation()} title="Buy"
+                          className="wl-hover-btn"
+                          style={{ width: 30, height: 30, borderRadius: 8, background: "#f5f2ed", display: "flex", alignItems: "center", justifyContent: "center", textDecoration: "none", opacity: 0, transition: "opacity 0.15s", flexShrink: 0 }}>
+                          <SvgCart size={13} color="#555" />
                         </a>
                       )}
-                      <button onClick={e => {
-                        e.stopPropagation();
-                        const today = new Date().toISOString().slice(0,10);
-                        const d = window.prompt("Purchase date?", today);
-                        if (d === null) return;
-                        moveToCloset(item, d || today);
-                      }}
-                        style={{ flex: 1, padding: "5px 8px", background: "#f0faf4", border: "none", borderRadius: 8, cursor: "pointer", fontSize: 10, fontWeight: 700, color: "#3aaa6e", fontFamily: "'DM Sans', sans-serif", display: "flex", alignItems: "center", justifyContent: "center", gap: 3 }}>
-                        <SvgCheck size={10} color="#3aaa6e" />Purchased
+                      <button onClick={e => { e.stopPropagation(); openPurchaseModal(item); }} title="Mark as purchased"
+                        className="wl-hover-btn"
+                        style={{ width: 30, height: 30, borderRadius: 8, background: "#f0faf4", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", opacity: 0, transition: "opacity 0.15s", flexShrink: 0 }}>
+                        <SvgShop size={13} color="#3aaa6e" />
                       </button>
-                      <button onClick={e => { e.stopPropagation(); wishlistDb.update({ ...item, savedForLater: true }); }}
-                        title="Save for later"
-                        style={{ width: 28, padding: "5px", background: "#f0f4ff", border: "none", borderRadius: 8, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#7c6fe0" strokeWidth="2.5" strokeLinecap="round"><path d="M19 21l-7-5-7 5V5a2 2 0 012-2h10a2 2 0 012 2z"/></svg>
-                      </button>
-                      <button onClick={e => { e.stopPropagation(); wishlistDb.remove(item.id); }}
-                        style={{ width: 28, padding: "5px", background: "#fef2f2", border: "none", borderRadius: 8, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#e05555" strokeWidth="2.5" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                      <div style={{ flex: 1 }} />
+                      <button onClick={e => { e.stopPropagation(); wishlistDb.remove(item.id); }} title="Delete"
+                        className="wl-hover-btn"
+                        style={{ width: 30, height: 30, borderRadius: 8, background: "#fef2f2", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", opacity: 0, transition: "opacity 0.15s", flexShrink: 0 }}>
+                        <SvgTrash size={13} color="#e05555" />
                       </button>
                     </div>
                   </div>
@@ -5275,50 +5426,52 @@ function WishlistTab({ wishlistDb, wishlistsDb, saveWishlistsMeta, activeWishlis
               );
             })}
           </div>
-
-          {/* Saved for Later */}
-          {savedLaterItems.length > 0 && (
-            <div style={{ marginTop: 32 }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 14 }}>
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#7c6fe0" strokeWidth="2.5" strokeLinecap="round"><path d="M19 21l-7-5-7 5V5a2 2 0 012-2h10a2 2 0 012 2z"/></svg>
-                <span style={{ fontSize: 12, fontWeight: 800, color: "#7c6fe0", textTransform: "uppercase", letterSpacing: "0.07em" }}>Saved for Later</span>
-                <span style={{ fontSize: 11, color: "#bbb", fontWeight: 600 }}>({savedLaterItems.length})</span>
-              </div>
-              <div style={{ display: "grid", gridTemplateColumns: `repeat(auto-fill, minmax(${wlZoom || 210}px, 1fr))`, gap: 16, opacity: 0.75 }}>
-                {savedLaterItems.map((item, i) => {
-                  const pm = priorityMeta[item.priority] || null;
-                  return (
-                    <div key={item.id} className="item-card" onClick={() => onItemClick && onItemClick(item)}
-                      style={{ border: `1px solid #e8e4dc`, position: "relative", cursor: "pointer" }}>
-                      <div style={{ width: "100%", aspectRatio: "1/1", background: "#f7f5f2", overflow: "hidden", display: "flex", alignItems: "center", justifyContent: "center", position: "relative" }}>
-                        {item.image
-                          ? <img src={item.image} alt={item.name} style={{ width: "100%", height: "100%", objectFit: "contain", display: "block", padding: 6 }} />
-                          : <SvgHeart size={26} color="#ccc" style={{ opacity: 0.3 }} />
-                        }
-                        <div style={{ position: "absolute", top: 7, left: 7, fontSize: 9, fontWeight: 700, color: "#7c6fe0", background: "#f0f4ff", border: "1px solid #c4b0f0", borderRadius: 100, padding: "2px 7px" }}>Saved</div>
-                      </div>
-                      <div className="item-card-label">
-                        <div className="item-card-name">{item.name}</div>
-                        <div style={{ display: "flex", gap: 4, marginTop: 8 }}>
-                          <button onClick={e => { e.stopPropagation(); wishlistDb.update({ ...item, savedForLater: false }); }}
-                            style={{ flex: 1, padding: "5px 8px", background: "#f5f2ed", border: "none", borderRadius: 8, cursor: "pointer", fontSize: 10, fontWeight: 700, color: "#555", fontFamily: "'DM Sans', sans-serif" }}>
-                            Move Back
-                          </button>
-                          <button onClick={e => { e.stopPropagation(); wishlistDb.remove(item.id); }}
-                            style={{ width: 28, padding: "5px", background: "#fef2f2", border: "none", borderRadius: 8, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#e05555" strokeWidth="2.5" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          )}
-          </>
         )}
       </div>
+
+      {/* ── Purchase modal ── */}
+      {purchaseItem && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.45)", zIndex: 9999, display: "flex", alignItems: "center", justifyContent: "center", backdropFilter: "blur(6px)" }}
+          onClick={() => setPurchaseItem(null)}>
+          <div onClick={e => e.stopPropagation()} style={{ background: "#fff", borderRadius: 22, padding: "28px 28px 24px", width: 340, boxShadow: "0 24px 64px rgba(0,0,0,0.18)", fontFamily: "'DM Sans', sans-serif" }}>
+            <div style={{ fontSize: 17, fontWeight: 800, color: "#1a1a1a", marginBottom: 4 }}>Mark as Purchased</div>
+            <div style={{ fontSize: 13, color: "#888", marginBottom: 20 }}><strong style={{ color: "#1a1a1a" }}>{purchaseItem.name}</strong> will move to your closet.</div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+              <div>
+                <label style={{ fontSize: 11, fontWeight: 700, color: "#aaa", textTransform: "uppercase", letterSpacing: "0.06em", display: "block", marginBottom: 5 }}>Purchase Date</label>
+                <input type="date" value={purchaseDate} onChange={e => setPurchaseDate(e.target.value)}
+                  style={{ width: "100%", padding: "9px 12px", border: "1.5px solid #e8e4dc", borderRadius: 10, fontFamily: "'DM Sans', sans-serif", fontSize: 13, outline: "none", boxSizing: "border-box" }} />
+              </div>
+              <div>
+                <label style={{ fontSize: 11, fontWeight: 700, color: "#aaa", textTransform: "uppercase", letterSpacing: "0.06em", display: "block", marginBottom: 5 }}>Final Price Paid</label>
+                <div style={{ position: "relative" }}>
+                  <span style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", fontSize: 13, color: "#888", fontWeight: 600 }}>$</span>
+                  <input type="number" min="0" step="0.01" value={purchaseFinalPrice} onChange={e => setPurchaseFinalPrice(e.target.value)}
+                    placeholder={purchaseItem.price ? purchaseItem.price.replace(/[^0-9.]/g,"") : "0.00"}
+                    style={{ width: "100%", padding: "9px 12px 9px 24px", border: "1.5px solid #e8e4dc", borderRadius: 10, fontFamily: "'DM Sans', sans-serif", fontSize: 13, outline: "none", boxSizing: "border-box" }} />
+                </div>
+              </div>
+              {purchaseItem.link && (
+                <label style={{ display: "flex", alignItems: "center", gap: 10, cursor: "pointer", padding: "10px 12px", background: "#faf9f6", borderRadius: 10 }}>
+                  <input type="checkbox" checked={purchaseKeepLink} onChange={e => setPurchaseKeepLink(e.target.checked)}
+                    style={{ width: 16, height: 16, cursor: "pointer", accentColor: "#1a1a1a" }} />
+                  <span style={{ fontSize: 13, color: "#555", fontWeight: 500 }}>Keep product link in closet</span>
+                </label>
+              )}
+            </div>
+            <div style={{ display: "flex", gap: 8, marginTop: 20 }}>
+              <button onClick={confirmPurchase}
+                style={{ flex: 1, padding: "11px", background: "#1a1a1a", color: "#fff", border: "none", borderRadius: 12, cursor: "pointer", fontSize: 13, fontWeight: 700, fontFamily: "'DM Sans', sans-serif" }}>
+                Move to Closet
+              </button>
+              <button onClick={() => setPurchaseItem(null)}
+                style={{ padding: "11px 16px", background: "#f5f3ef", color: "#888", border: "none", borderRadius: 12, cursor: "pointer", fontSize: 13, fontWeight: 600, fontFamily: "'DM Sans', sans-serif" }}>
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -8348,9 +8501,9 @@ export default function App() {
     closeModal();
   };
 
-  const moveToCloset = async (wish, purchasedDate) => {
+  const moveToCloset = async (wish, purchasedDate, finalPrice) => {
     const today = purchasedDate || new Date().toISOString().slice(0, 10);
-    await itemsDb.add({ ...wish, purchaseDate: today, forSale: false, saleStatus: undefined });
+    await itemsDb.add({ ...wish, purchaseDate: today, forSale: false, saleStatus: undefined, ...(finalPrice ? { spent: String(finalPrice) } : {}) });
     await wishlistDb.remove(wish.id);
   };
 
@@ -9229,6 +9382,8 @@ export default function App() {
               moveToCloset={moveToCloset}
               onEdit={(item) => { setEditItem(item); setWishlistDest(true); setModal("item"); }}
               onItemClick={(item) => setItemDetail(item)}
+              moodboardsDb={moodboardsDb.boards}
+              lookbooksDb={lookbooksDb.rows}
             />}
 
             </>
@@ -9716,7 +9871,7 @@ export default function App() {
               await itemsDb.update(updated);
               setItemDetail(updated);
             }}
-            onMoveToCloset={isWishlistItem ? (date) => { moveToCloset(itemDetail, date); setItemDetail(null); } : null}
+            onMoveToCloset={isWishlistItem ? (date, finalPrice, keepLink) => { const itemToMove = keepLink ? itemDetail : { ...itemDetail, link: undefined }; moveToCloset(itemToMove, date, finalPrice); setItemDetail(null); } : null}
             onCreateOutfit={isWishlistItem ? null : () => { setEditingOutfit(null); setOutfitSeedItem(itemDetail); setOutfitBuilder(true); setItemDetail(null); }}
             onListForSale={isWishlistItem ? null : () => { itemsDb.update({ ...itemDetail, forSale: true, saleStatus: "listed", listedDate: new Date().toISOString().slice(0,10) }); setItemDetail(null); setTab("seller"); }}
             onAddToCapsule={isWishlistItem ? null : () => { setCapsulePreselect([itemDetail.id]); setCapsuleName(""); setShowCapsuleModal(true); }}

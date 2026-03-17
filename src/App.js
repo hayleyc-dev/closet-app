@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react";
+import { createPortal } from "react-dom";
 import { createClient } from "@supabase/supabase-js";
 
 // ── Global SVG icon helper ───────────────────────────────────────────────────
@@ -725,14 +726,34 @@ function MaskEditor({ current, original, onDone, onCancel }) {
   };
 
   useEffect(() => {
-    const load = (src) => new Promise((res, rej) => {
-      const img = new Image();
-      img.onload = () => res(img);
-      img.onerror = rej;
-      img.src = src;
+    // Always convert external URLs to data URLs first to avoid canvas cross-origin taint
+    const loadSafe = (src) => new Promise((res, rej) => {
+      if (!src) { rej(new Error("no src")); return; }
+      if (src.startsWith("data:")) {
+        const img = new Image();
+        img.onload = () => res(img);
+        img.onerror = rej;
+        img.src = src;
+      } else {
+        fetch(src)
+          .then(r => r.blob())
+          .then(blob => new Promise((bres, brej) => {
+            const fr = new FileReader();
+            fr.onload = () => {
+              const img = new Image();
+              img.onload = () => bres(img);
+              img.onerror = brej;
+              img.src = fr.result;
+            };
+            fr.onerror = brej;
+            fr.readAsDataURL(blob);
+          }))
+          .then(res)
+          .catch(rej);
+      }
     });
 
-    Promise.all([load(current), load(original)]).then(([cur, orig]) => {
+    Promise.all([loadSafe(current), loadSafe(original)]).then(([cur, orig]) => {
       const w = cur.width;
       const h = cur.height;
       const c1 = document.createElement("canvas");
@@ -978,8 +999,8 @@ function MaskEditor({ current, original, onDone, onCancel }) {
     onDone(out.toDataURL("image/png"));
   };
 
-  return (
-    <div style={{ position: "fixed", inset: 0, zIndex: 700, background: "rgba(0,0,0,0.85)", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: 16 }}>
+  return createPortal(
+    <div style={{ position: "fixed", inset: 0, zIndex: 9000, background: "rgba(0,0,0,0.85)", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: 16 }}>
       <div style={{ background: "#fff", borderRadius: 20, overflow: "hidden", width: "100%", maxWidth: 640, boxShadow: "0 30px 80px rgba(0,0,0,0.5)", display: "flex", flexDirection: "column" }}>
         <div style={{ padding: "14px 18px", borderBottom: "1px solid #e8e4dc", display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
           <span style={{ fontSize: 14, fontWeight: 700, color: "#1a1a1a", marginRight: "auto" }}>Edit Mask</span>
@@ -1054,7 +1075,8 @@ function MaskEditor({ current, original, onDone, onCancel }) {
           <button onClick={applyEdit} style={{ padding: "9px 22px", background: "#1a1a1a", border: "none", borderRadius: 12, cursor: "pointer", fontFamily: "'Nunito',sans-serif", fontSize: 13, fontWeight: 700, color: "#fff" }}>Apply</button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
 
@@ -1108,8 +1130,8 @@ function CropTool({ src, onDone, onCancel }) {
     img.src = src;
   };
 
-  return (
-    <div style={{ position: "fixed", inset: 0, zIndex: 600, background: "rgba(0,0,0,0.75)", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: 24 }}>
+  return createPortal(
+    <div style={{ position: "fixed", inset: 0, zIndex: 8999, background: "rgba(0,0,0,0.75)", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: 24 }}>
       <div style={{ background: "#fff", borderRadius: 20, overflow: "hidden", maxWidth: 560, width: "100%", boxShadow: "0 30px 80px rgba(0,0,0,0.4)" }}>
         <div style={{ padding: "14px 18px", borderBottom: "1px solid #e8e4dc", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
           <span style={{ fontSize: 14, fontWeight: 700, color: "#1a1a1a" }}>Crop Image</span>
@@ -1148,7 +1170,8 @@ function CropTool({ src, onDone, onCancel }) {
           }}>{applying ? "Applying…" : "Apply Crop"}</button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
 

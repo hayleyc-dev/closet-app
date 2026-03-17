@@ -2534,7 +2534,12 @@ function LookbookViewer({ lookbook, outfits, allItems, closetItems, onClose, onU
   const [exportingPdf, setExportingPdf] = useState(false);
   const [shareToast, setShareToast] = useState("");
   const [showPackList, setShowPackList] = useState(false);
-  const [checkedPack, setCheckedPack] = useState({});
+  const [checkedPack, setCheckedPack] = useState(() => {
+    try { const all = JSON.parse(localStorage.getItem("wardrobe_pack_checked_v1") || "{}"); return all[lookbook.id] || {}; } catch { return {}; }
+  });
+  React.useEffect(() => {
+    try { const all = JSON.parse(localStorage.getItem("wardrobe_pack_checked_v1") || "{}"); localStorage.setItem("wardrobe_pack_checked_v1", JSON.stringify({ ...all, [lookbook.id]: checkedPack })); } catch {}
+  }, [checkedPack, lookbook.id]);
   const [packingListView, setPackingListView] = useState(() => {
     // Check if opened from right panel packing list shortcut
     try {
@@ -7714,7 +7719,7 @@ function HomeTab({ outfitCalendar, outfitsDb, itemsDb, lookbooksDb, wishlistDb, 
   const hour = now.getHours();
   const greeting = hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening";
   const dayName = now.toLocaleDateString("en-US", { weekday: "long" });
-  const dateStr = now.toLocaleDateString("en-US", { month: "long", day: "numeric" });
+  const dateLabel = now.toLocaleDateString("en-US", { month: "long", day: "numeric" });
 
   const todayKey = now.toISOString().slice(0, 10);
   const rawIds = outfitCalendar[todayKey] || [];
@@ -7752,20 +7757,252 @@ function HomeTab({ outfitCalendar, outfitsDb, itemsDb, lookbooksDb, wishlistDb, 
   const highPriorityWish = wishlistDb.rows.filter(i => i.priority === "high").slice(0, 3);
 
   const fmtDate = (d) => d ? new Date(d + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" }) : null;
-
   const cardStyle = { background: "#fff", borderRadius: 16, border: "1.5px solid #e8e4dc", overflow: "hidden", boxShadow: "0 2px 12px rgba(0,0,0,0.04)" };
 
+  // ── Weather ──────────────────────────────────────────────────────────────
+  const [homeCity, setHomeCity] = React.useState(() => localStorage.getItem("wardrobe_home_city") || "");
+  const [homeCityInput, setHomeCityInput] = React.useState(() => localStorage.getItem("wardrobe_home_city") || "");
+  const [homeWeather, setHomeWeather] = React.useState(null);
+  const [wxLoading, setWxLoading] = React.useState(false);
+
+  const fetchHomeWeather = React.useCallback(async (city) => {
+    if (!city) return;
+    setWxLoading(true);
+    const q = city.split(",")[0].trim();
+    try {
+      const geoRes = await fetch("https://geocoding-api.open-meteo.com/v1/search?name=" + encodeURIComponent(q) + "&count=1&language=en&format=json");
+      const geo = await geoRes.json();
+      const loc = geo.results?.[0];
+      if (!loc) { setHomeWeather({ error: "City not found" }); setWxLoading(false); return; }
+      const wRes = await fetch("https://api.open-meteo.com/v1/forecast?latitude=" + loc.latitude + "&longitude=" + loc.longitude + "&daily=temperature_2m_max,temperature_2m_min,weathercode&temperature_unit=fahrenheit&timezone=auto&forecast_days=7");
+      const w = await wRes.json();
+      const days = (w.daily?.time || []).map((d, i) => ({
+        date: d, high: Math.round(w.daily.temperature_2m_max[i]),
+        low: Math.round(w.daily.temperature_2m_min[i]), code: w.daily.weathercode[i],
+      }));
+      setHomeWeather({ city: loc.name, days });
+    } catch(e) { setHomeWeather({ error: "Weather unavailable" }); }
+    setWxLoading(false);
+  }, []);
+
+  React.useEffect(() => { if (homeCity) fetchHomeWeather(homeCity); }, []); // eslint-disable-line
+
+  const wxIcon = (code) => {
+    if (code === 0) return "☀️";
+    if (code <= 2) return "⛅";
+    if (code <= 45) return "☁️";
+    if (code <= 67) return "🌧️";
+    if (code <= 77) return "❄️";
+    if (code <= 82) return "🌦️";
+    return "⛈️";
+  };
+
+  const todayWx = homeWeather?.days?.find(d => d.date === todayKey);
+
+  // ── Calendar peek — today + next 6 days ──────────────────────────────────
+  const weekDays = (() => {
+    const days = [];
+    for (let i = 0; i < 7; i++) {
+      const d = new Date(now);
+      d.setDate(d.getDate() + i);
+      const key = d.toISOString().slice(0, 10);
+      const ids = (() => { const v = outfitCalendar[key] || []; return Array.isArray(v) ? v : v ? [v] : []; })();
+      days.push({ key, date: d, ids, isToday: i === 0 });
+    }
+    return days;
+  })();
+  const weekLogged = weekDays.filter(d => d.ids.length > 0).length;
+
+  // ── Upcoming trips ────────────────────────────────────────────────────────
+  const todayMidnight = new Date(todayKey + "T00:00:00");
+  const upcomingTrips = lookbooksDb.rows
+    .filter(lb => lb.dateStart || lb.dateEnd)
+    .map(lb => {
+      const start = lb.dateStart ? new Date(lb.dateStart + "T00:00:00") : null;
+      const end   = lb.dateEnd   ? new Date(lb.dateEnd   + "T00:00:00") : null;
+      const daysUntil = start ? Math.round((start - todayMidnight) / 86400000) : null;
+      const isActive  = (start && start <= todayMidnight && end && end >= todayMidnight) ||
+                        (!start && end && end >= todayMidnight);
+      return { ...lb, daysUntil, isActive };
+    })
+    .filter(lb => lb.isActive || (lb.daysUntil !== null && lb.daysUntil >= 0))
+    .sort((a, b) => (a.isActive ? -1 : b.isActive ? 1 : (a.daysUntil || 0) - (b.daysUntil || 0)))
+    .slice(0, 3);
+
+  // ── Packing progress ──────────────────────────────────────────────────────
+  const packCheckedAll = React.useMemo(() => {
+    try { return JSON.parse(localStorage.getItem("wardrobe_pack_checked_v1") || "{}"); } catch { return {}; }
+  }, []);
+
+  const getPackProgress = (lb) => {
+    const lbOutfits = (lb.outfitIds || []).map(id => outfitsDb.rows.find(o => o.id === id)).filter(Boolean);
+    const seen = {};
+    lbOutfits.forEach(o => (o.layers || o.itemIds || []).forEach(id => {
+      const item = allItems.find(i => i.id === id);
+      if (item) seen[id] = item;
+    }));
+    const items = Object.values(seen);
+    const checked = packCheckedAll[lb.id] || {};
+    return { total: items.length, packed: Object.keys(checked).filter(k => checked[k]).length };
+  };
+
   return (
-    <div className="fade-up" style={{ maxWidth: 860, margin: "0 auto" }}>
-      {/* Greeting */}
-      <div style={{ marginBottom: 32 }}>
-        <div style={{ fontFamily: "'Cormorant Garamond', serif", fontStyle: "italic", fontWeight: 300, fontSize: 38, color: "#1a1a1a", lineHeight: 1.2, marginBottom: 4 }}>
-          {greeting}
+    <div className="fade-up" style={{ maxWidth: 900, margin: "0 auto" }}>
+
+      {/* ── Greeting + weather ── */}
+      <div style={{ marginBottom: 32, display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 20, flexWrap: "wrap" }}>
+        <div>
+          <div style={{ fontFamily: "'Cormorant Garamond', serif", fontStyle: "italic", fontWeight: 300, fontSize: 38, color: "#1a1a1a", lineHeight: 1.2, marginBottom: 4 }}>
+            {greeting}
+          </div>
+          <div style={{ fontSize: 13, color: "#aaa", fontWeight: 500 }}>{dayName}, {dateLabel}</div>
         </div>
-        <div style={{ fontSize: 13, color: "#aaa", fontWeight: 500 }}>{dayName}, {dateStr}</div>
+        {/* Weather pill */}
+        <div style={{ flexShrink: 0 }}>
+          {homeWeather?.days && todayWx ? (
+            <div style={{ background: "#fff", border: "1.5px solid #e8e4dc", borderRadius: 14, padding: "10px 16px", display: "flex", alignItems: "center", gap: 14, boxShadow: "0 2px 8px rgba(0,0,0,0.04)" }}>
+              <div style={{ fontSize: 28, lineHeight: 1 }}>{wxIcon(todayWx.code)}</div>
+              <div>
+                <div style={{ fontSize: 18, fontWeight: 800, color: "#1a1a1a", lineHeight: 1 }}>{todayWx.high}°</div>
+                <div style={{ fontSize: 11, color: "#aaa", fontWeight: 500 }}>{todayWx.low}° low · {homeWeather.city}</div>
+              </div>
+              <div style={{ display: "flex", gap: 8, marginLeft: 8 }}>
+                {homeWeather.days.slice(1, 4).map(d => (
+                  <div key={d.date} style={{ textAlign: "center" }}>
+                    <div style={{ fontSize: 13 }}>{wxIcon(d.code)}</div>
+                    <div style={{ fontSize: 10, fontWeight: 700, color: "#888" }}>{d.high}°</div>
+                    <div style={{ fontSize: 9, color: "#bbb" }}>{new Date(d.date + "T00:00:00").toLocaleDateString("en-US", { weekday: "short" })}</div>
+                  </div>
+                ))}
+              </div>
+              <button onClick={() => { setHomeCity(""); setHomeCityInput(""); setHomeWeather(null); localStorage.removeItem("wardrobe_home_city"); }}
+                style={{ fontSize: 11, color: "#ccc", background: "none", border: "none", cursor: "pointer", padding: 0, marginLeft: 4, fontFamily: "'DM Sans', sans-serif" }}>✕</button>
+            </div>
+          ) : homeWeather?.error ? (
+            <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+              <span style={{ fontSize: 12, color: "#e05555" }}>{homeWeather.error}</span>
+              <button onClick={() => setHomeWeather(null)} style={{ fontSize: 11, color: "#aaa", background: "none", border: "none", cursor: "pointer", fontFamily: "'DM Sans', sans-serif" }}>Retry</button>
+            </div>
+          ) : (
+            <form onSubmit={e => { e.preventDefault(); const c = homeCityInput.trim(); if (!c) return; setHomeCity(c); localStorage.setItem("wardrobe_home_city", c); fetchHomeWeather(c); }}
+              style={{ display: "flex", gap: 6, alignItems: "center" }}>
+              <input value={homeCityInput} onChange={e => setHomeCityInput(e.target.value)}
+                placeholder="Add your city for weather…"
+                style={{ padding: "8px 12px", borderRadius: 10, border: "1.5px solid #e8e4dc", fontSize: 12, fontFamily: "'DM Sans', sans-serif", outline: "none", width: 200, background: "#fff", color: "#1a1a1a" }} />
+              <button type="submit" disabled={wxLoading}
+                style={{ padding: "8px 14px", borderRadius: 10, background: "#1a1a1a", border: "none", color: "#fff", fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "'DM Sans', sans-serif", opacity: wxLoading ? 0.6 : 1 }}>
+                {wxLoading ? "…" : "Go"}
+              </button>
+            </form>
+          )}
+        </div>
       </div>
 
-      {/* Today's Outfit */}
+      {/* ── This Week calendar peek ── */}
+      <div style={{ marginBottom: 28 }}>
+        <div style={{ background: "#fff", borderRadius: 20, border: "1.5px solid #e8e4dc", padding: "20px 22px 0", boxShadow: "0 2px 12px rgba(0,0,0,0.04)" }}>
+          {/* Header */}
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 18 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <SvgCalendar size={15} color="#1a1a1a" />
+              <span style={{ fontSize: 14, fontWeight: 700, color: "#1a1a1a" }}>This Week</span>
+            </div>
+            <span style={{ fontSize: 13, fontWeight: 600, color: "#aaa" }}>{weekLogged}<span style={{ color: "#ddd" }}>/7</span> days</span>
+          </div>
+          {/* Day columns */}
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 8, marginBottom: 0 }}>
+            {weekDays.map(day => {
+              const outfit = day.ids.length > 0 ? outfitsDb.rows.find(o => o.id === day.ids[0]) : null;
+              const dayShort = day.date.toLocaleDateString("en-US", { weekday: "short" }).toUpperCase();
+              const dateNum = day.date.getDate();
+              return (
+                <div key={day.key} onClick={() => setTab("outfits")} style={{ cursor: "pointer", display: "flex", flexDirection: "column", alignItems: "center", gap: 6 }}>
+                  <div style={{ fontSize: 10, fontWeight: 700, color: day.isToday ? "#1a1a1a" : "#bbb", letterSpacing: "0.06em" }}>{dayShort}</div>
+                  <div style={{
+                    width: "100%", aspectRatio: "3/4", borderRadius: 12,
+                    border: day.isToday ? "2px dashed #1a1a1a" : "1.5px solid #e8e4dc",
+                    background: outfit?.previewImage ? `url(${outfit.previewImage}) center/cover no-repeat` : day.isToday ? "#fafaf8" : "#f5f3ef",
+                    display: "flex", alignItems: "center", justifyContent: "center",
+                    overflow: "hidden", position: "relative",
+                    transition: "transform 0.12s",
+                  }}
+                    onMouseEnter={e => e.currentTarget.style.transform = "scale(1.03)"}
+                    onMouseLeave={e => e.currentTarget.style.transform = "scale(1)"}>
+                    {!outfit?.previewImage && (
+                      outfit ? (
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#888" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                      ) : (
+                        <div style={{ width: 6, height: 6, borderRadius: "50%", background: "#ddd" }} />
+                      )
+                    )}
+                    {day.ids.length > 1 && (
+                      <div style={{ position: "absolute", bottom: 3, right: 3, background: "rgba(255,255,255,0.92)", borderRadius: 5, padding: "1px 4px", fontSize: 8, fontWeight: 800, color: "#1a1a1a" }}>+{day.ids.length}</div>
+                    )}
+                  </div>
+                  <div style={{ fontSize: 10, color: day.isToday ? "#1a1a1a" : "#bbb", fontWeight: day.isToday ? 800 : 500 }}>{day.isToday ? "Today" : dateNum}</div>
+                </div>
+              );
+            })}
+          </div>
+          {/* Footer hint */}
+          <div style={{ padding: "12px 0 16px", textAlign: "center" }}>
+            <span style={{ fontSize: 12, color: "#bbb" }}>
+              {weekLogged === 0
+                ? <>Log your first outfit this week from <strong style={{ color: "#888", cursor: "pointer" }} onClick={() => setTab("outfits")}>Outfits → Calendar</strong></>
+                : weekLogged === 7
+                  ? <span style={{ color: "#3aaa6e", fontWeight: 700 }}>🎉 Perfect week!</span>
+                  : <>{weekLogged} of 7 days logged this week</>
+              }
+            </span>
+          </div>
+        </div>
+      </div>
+
+      {/* ── Upcoming trips + packing ── */}
+      {upcomingTrips.length > 0 && (
+        <div style={{ marginBottom: 28 }}>
+          <SectionHeader title="Upcoming Trips" action={{ label: "All lookbooks →", onClick: () => setTab("lookbooks") }} />
+          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+            {upcomingTrips.map(lb => {
+              const dateStr = [fmtDate(lb.dateStart), fmtDate(lb.dateEnd)].filter(Boolean).join(" – ");
+              const pack = getPackProgress(lb);
+              const packPct = pack.total > 0 ? Math.round(pack.packed / pack.total * 100) : 0;
+              const countdown = lb.isActive ? "Active now" : lb.daysUntil === 0 ? "Today" : lb.daysUntil === 1 ? "Tomorrow" : `in ${lb.daysUntil} days`;
+              const countdownColor = lb.isActive ? "#3aaa6e" : lb.daysUntil <= 3 ? "#e05555" : lb.daysUntil <= 7 ? "#a07000" : "#888";
+              return (
+                <div key={lb.id} onClick={() => { setActiveLookbookView("editorial"); setActiveLookbook(lb); setTab("lookbooks"); }}
+                  style={{ ...cardStyle, padding: "14px 16px", cursor: "pointer", borderRadius: 14, display: "flex", alignItems: "center", gap: 14 }}
+                  onMouseEnter={e => e.currentTarget.style.borderColor = "#1a1a1a"}
+                  onMouseLeave={e => e.currentTarget.style.borderColor = "#e8e4dc"}>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
+                      <span style={{ fontSize: 14, fontWeight: 700, color: "#1a1a1a", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{lb.name}</span>
+                      <span style={{ fontSize: 11, fontWeight: 700, color: countdownColor, flexShrink: 0 }}>{countdown}</span>
+                    </div>
+                    {dateStr && <div style={{ fontSize: 11, color: "#aaa", fontWeight: 600, marginBottom: pack.total > 0 ? 8 : 0 }}>{dateStr}</div>}
+                    {pack.total > 0 && (
+                      <div>
+                        <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
+                          <span style={{ fontSize: 10, fontWeight: 700, color: "#aaa", textTransform: "uppercase", letterSpacing: "0.06em" }}>
+                            <SvgLuggage size={10} color="#aaa" style={{ marginRight: 4, verticalAlign: "middle" }} />Packing
+                          </span>
+                          <span style={{ fontSize: 10, fontWeight: 700, color: packPct === 100 ? "#3aaa6e" : "#888" }}>{pack.packed}/{pack.total}</span>
+                        </div>
+                        <div style={{ height: 4, borderRadius: 4, background: "#f0ece4", overflow: "hidden" }}>
+                          <div style={{ height: "100%", borderRadius: 4, background: packPct === 100 ? "#3aaa6e" : "#1a1a1a", width: packPct + "%", transition: "width 0.3s" }} />
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                  <span style={{ fontSize: 12, color: "#ccc", flexShrink: 0 }}>→</span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* ── Today's Outfit ── */}
       <div style={{ marginBottom: 28 }}>
         <SectionHeader title="Today's Outfit" />
         {todayOutfits.length === 0 ? (
@@ -7819,7 +8056,7 @@ function HomeTab({ outfitCalendar, outfitsDb, itemsDb, lookbooksDb, wishlistDb, 
         )}
       </div>
 
-      {/* Pinned Lookbooks */}
+      {/* ── Pinned Lookbooks ── */}
       <div style={{ marginBottom: 28 }}>
         <SectionHeader title="Pinned Lookbooks" action={{ label: "All lookbooks →", onClick: () => setTab("lookbooks") }} />
         {pinnedLookbooks.length === 0 ? (
@@ -7877,17 +8114,17 @@ function HomeTab({ outfitCalendar, outfitsDb, itemsDb, lookbooksDb, wishlistDb, 
         )}
       </div>
 
-      {/* Seller Rollup */}
+      {/* ── Seller Rollup ── */}
       {forSaleItems.length > 0 && (
         <div style={{ marginBottom: 28 }}>
           <SectionHeader title="Seller" action={{ label: "Go to Seller →", onClick: () => setTab("seller") }} />
           <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
             {[
-              { label: "Listed",    value: sellerListed,                   color: "#2090c0" },
-              { label: "Pending",   value: sellerPending,                  color: "#a07000" },
-              { label: "Sold",      value: sellerSold,                     color: "#3aaa6e" },
-              { label: "Earned",    value: `$${sellerEarned.toFixed(0)}`,  color: "#3aaa6e" },
-              { label: "Potential", value: `$${sellerPotential.toFixed(0)}`, color: "#888" },
+              { label: "Listed",    value: sellerListed,                     color: "#2090c0" },
+              { label: "Pending",   value: sellerPending,                    color: "#a07000" },
+              { label: "Sold",      value: sellerSold,                       color: "#3aaa6e" },
+              { label: "Earned",    value: `$${sellerEarned.toFixed(0)}`,    color: "#3aaa6e" },
+              { label: "Potential", value: `$${sellerPotential.toFixed(0)}`, color: "#888"    },
             ].map(stat => (
               <div key={stat.label} style={{ background: "#fff", borderRadius: 14, border: "1.5px solid #e8e4dc", padding: "14px 18px", flex: "1 1 80px", minWidth: 80, boxShadow: "0 2px 8px rgba(0,0,0,0.03)" }}>
                 <div style={{ fontSize: 20, fontWeight: 800, color: stat.color }}>{stat.value}</div>
@@ -7898,7 +8135,7 @@ function HomeTab({ outfitCalendar, outfitsDb, itemsDb, lookbooksDb, wishlistDb, 
         </div>
       )}
 
-      {/* Quick Stats */}
+      {/* ── Quick Stats ── */}
       <div style={{ marginBottom: 28 }}>
         <div onClick={() => setTab("stats")} style={{ background: "#fff", borderRadius: 16, border: "1.5px solid #e8e4dc", padding: "16px 20px", display: "flex", gap: 24, flexWrap: "wrap", alignItems: "center", cursor: "pointer", boxShadow: "0 2px 8px rgba(0,0,0,0.03)", transition: "border-color 0.15s" }}
           onMouseEnter={e => e.currentTarget.style.borderColor = "#1a1a1a"}
@@ -7915,8 +8152,8 @@ function HomeTab({ outfitCalendar, outfitsDb, itemsDb, lookbooksDb, wishlistDb, 
           <div style={{ width: 1, height: 32, background: "#e8e4dc", flexShrink: 0 }} />
           {[
             { label: "Total Value", value: `$${totalValue.toFixed(0)}` },
-            { label: "Items", value: closetItems.length },
-            { label: "Never Worn", value: unwornCount },
+            { label: "Items",       value: closetItems.length },
+            { label: "Never Worn",  value: unwornCount },
           ].map(s => (
             <div key={s.label} style={{ flexShrink: 0 }}>
               <div style={{ fontSize: 16, fontWeight: 800, color: "#1a1a1a" }}>{s.value}</div>
@@ -7928,7 +8165,7 @@ function HomeTab({ outfitCalendar, outfitsDb, itemsDb, lookbooksDb, wishlistDb, 
         </div>
       </div>
 
-      {/* Wishlist Highlights */}
+      {/* ── Wishlist Highlights ── */}
       {highPriorityWish.length > 0 && (
         <div style={{ marginBottom: 28 }}>
           <SectionHeader title="Wishlist Highlights" action={{ label: "See all →", onClick: () => setTab("wishlist") }} />

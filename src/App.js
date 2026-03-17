@@ -1328,7 +1328,7 @@ function ImageUploadField({ value, onChange, style: outerStyle }) {
               display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
               fontSize: 12, fontWeight: 700, color: "#fff", opacity: removing || autoCropping ? 0.5 : 1
             }}>
-              <span><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="6" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><line x1="20" y1="4" x2="8.12" y2="15.88"/><line x1="14.47" y1="14.48" x2="20" y2="20"/><line x1="8.12" y1="8.12" x2="12" y2="12"/></svg></span><span>{removing ? "Working…" : "Remove BG"}</span>
+              <span><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><circle cx="12" cy="12" r="9"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/></svg></span><span>{removing ? "Working…" : "Remove BG"}</span>
             </button>
             <button onClick={() => setShowMaskEditor(true)} disabled={removing || autoCropping} style={{
               padding: "9px 4px", background: "#f0ece4", border: "none", borderRadius: 10,
@@ -1336,7 +1336,7 @@ function ImageUploadField({ value, onChange, style: outerStyle }) {
               display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
               fontSize: 12, fontWeight: 700, color: "#444", opacity: removing || autoCropping ? 0.5 : 1
             }}>
-              <span><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20.84 4.61a5.5 5.5 0 00-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 00-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 000-7.78z"/></svg></span><span>Edit Mask</span>
+              <span><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="6" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><line x1="20" y1="4" x2="8.12" y2="15.88"/><line x1="14.47" y1="14.48" x2="20" y2="20"/><line x1="8.12" y1="8.12" x2="12" y2="12"/></svg></span><span>Edit Mask</span>
             </button>
             <button onClick={() => setShowCropTool(true)} disabled={removing || autoCropping} style={{
               padding: "9px 4px", background: "#f5f2ed", border: "none", borderRadius: 10,
@@ -1344,7 +1344,7 @@ function ImageUploadField({ value, onChange, style: outerStyle }) {
               display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
               fontSize: 12, fontWeight: 700, color: "#444", opacity: removing || autoCropping ? 0.5 : 1
             }}>
-              <span>⊡</span><span>Crop</span>
+              <span><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="1" strokeDasharray="4 3"/></svg></span><span>Crop</span>
             </button>
             <button onClick={handleAutoCrop} disabled={removing || autoCropping} style={{
               padding: "9px 4px", background: "#f5f2ed", border: "none", borderRadius: 10,
@@ -1352,7 +1352,7 @@ function ImageUploadField({ value, onChange, style: outerStyle }) {
               display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
               fontSize: 12, fontWeight: 700, color: "#444", opacity: removing || autoCropping ? 0.5 : 1
             }}>
-              <span>⊹</span><span>{autoCropping ? "Working…" : "Auto-Crop"}</span>
+              <span><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="1"/></svg></span><span>{autoCropping ? "Working…" : "Auto-Crop"}</span>
             </button>
           </div>
         </div>

@@ -259,6 +259,8 @@ const globalStyles = `
   .item-card:hover .item-card-edit-btn { opacity: 1 !important; }
   /* Wishlist card hover-only action buttons */
   .wl-card:hover .wl-hover-btn { opacity: 1 !important; }
+  .wl-card .wl-card-actions { max-height: 0; overflow: hidden; margin-top: 0; transition: max-height 0.2s ease, margin-top 0.2s ease; }
+  .wl-card:hover .wl-card-actions { max-height: 50px; margin-top: 8px; }
   .palette-del-btn { opacity: 0 !important; transition: opacity 0.15s; }
   div:hover > .palette-del-btn { opacity: 1 !important; }
 
@@ -5401,7 +5403,7 @@ function WishlistTab({ wishlistDb, wishlistsDb, saveWishlistsMeta, activeWishlis
                       {item.store && <span style={{ fontSize: 10, color: "#1a1a1a", fontWeight: 600 }}>{item.store}</span>}
                     </div>
                     {/* Hover-only action row */}
-                    <div style={{ display: "flex", gap: 4, marginTop: 8, alignItems: "center" }}>
+                    <div className="wl-card-actions" style={{ display: "flex", gap: 4, alignItems: "center" }}>
                       {item.link && (
                         <a href={item.link} target="_blank" rel="noreferrer" onClick={e => e.stopPropagation()} title="Buy"
                           className="wl-hover-btn"

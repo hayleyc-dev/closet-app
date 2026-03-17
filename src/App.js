@@ -8378,7 +8378,8 @@ export default function App() {
   const lookbooksDb = useSupabaseTable("lookbooks");
   const moodboardsDb = useMoodboardsDb();
 
-  const [tab, setTab] = useState("closet");
+  const [tab, setTabRaw] = useState(() => localStorage.getItem("wardrobe_active_tab") || "closet");
+  const setTab = (t) => { setTabRaw(t); localStorage.setItem("wardrobe_active_tab", t); };
   const [modal, setModal] = useState(null);
   const [catFilter, setCatFilter] = useState("All");
   const [catFilters, setCatFilters] = useState([]); // multi-select categories

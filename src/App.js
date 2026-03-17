@@ -7481,7 +7481,268 @@ function SettingsTab({
   );
 }
 
+function SectionHeader({ title, action }) {
+  return (
+    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
+      <div style={{ fontSize: 12, fontWeight: 800, color: "#1a1a1a", textTransform: "uppercase", letterSpacing: "0.08em" }}>
+        {title}
+      </div>
+      {action && (
+        <button onClick={action.onClick} style={{ fontSize: 12, fontWeight: 600, color: "#aaa", background: "none", border: "none", cursor: "pointer", fontFamily: "'DM Sans', sans-serif", padding: 0 }}>
+          {action.label}
+        </button>
+      )}
+    </div>
+  );
+}
+
+function HomeTab({ outfitCalendar, outfitsDb, itemsDb, lookbooksDb, wishlistDb, setTab, setActiveLookbook, setActiveLookbookView, setOutfitPopup }) {
+  const now = new Date();
+  const hour = now.getHours();
+  const greeting = hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening";
+  const dayName = now.toLocaleDateString("en-US", { weekday: "long" });
+  const dateStr = now.toLocaleDateString("en-US", { month: "long", day: "numeric" });
+
+  const todayKey = now.toISOString().slice(0, 10);
+  const rawIds = outfitCalendar[todayKey] || [];
+  const todayIds = Array.isArray(rawIds) ? rawIds : rawIds ? [rawIds] : [];
+  const todayOutfits = todayIds.map(id => outfitsDb.rows.find(o => o.id === id)).filter(Boolean);
+
+  const pinnedLookbooks = lookbooksDb.rows.filter(lb => lb.pinned);
+
+  const allItems = itemsDb.rows;
+  const forSaleItems = allItems.filter(i => i.forSale);
+  const sellerListed  = forSaleItems.filter(i => (i.saleStatus || "listed") === "listed").length;
+  const sellerPending = forSaleItems.filter(i => i.saleStatus === "pending").length;
+  const sellerSold    = forSaleItems.filter(i => i.saleStatus === "sold").length;
+  const parseAmt = (v) => parseFloat((v || "").replace(/[^0-9.]/g, "")) || 0;
+  const sellerEarned    = forSaleItems.filter(i => i.saleStatus === "sold").reduce((s, i) => s + parseAmt(i.netRevenue || i.salePrice), 0);
+  const sellerPotential = forSaleItems.filter(i => i.saleStatus !== "sold").reduce((s, i) => s + parseAmt(i.salePrice), 0);
+
+  const closetItems = allItems.filter(i => !i.forSale);
+  const parsePrice  = (p) => parseFloat((p || "").replace(/[^0-9.]/g, "")) || 0;
+  const totalValue  = closetItems.reduce((s, i) => s + parsePrice(i.price), 0);
+  const totalWears  = closetItems.reduce((s, i) => s + (i.wornCount || 0), 0);
+  const unwornCount = closetItems.filter(i => !(i.wornCount > 0)).length;
+  const cpwItems    = closetItems.filter(i => (i.wornCount || 0) > 0 && parsePrice(i.price) > 0);
+  const EXPECTED_CATS = ["Tops", "Bottoms", "Dresses", "Outerwear", "Shoes", "Bags", "Accessories"];
+  const catsPresent = new Set(closetItems.map(i => i.category || ""));
+  const missingCatCount = EXPECTED_CATS.filter(c => !catsPresent.has(c)).length;
+  const healthScore = closetItems.length === 0 ? 0 : Math.min(100, Math.round(
+    Math.min((totalWears / closetItems.length) * 20, 40) +
+    Math.max(0, 30 - missingCatCount * 5) +
+    (cpwItems.length > 0 ? Math.min((cpwItems.length / closetItems.length) * 60, 30) : 0)
+  ));
+  const healthColor = healthScore >= 80 ? "#3aaa6e" : healthScore >= 60 ? "#2090c0" : healthScore >= 40 ? "#a07000" : "#e05555";
+  const healthLabel = healthScore >= 80 ? "Thriving" : healthScore >= 60 ? "Healthy" : healthScore >= 40 ? "Growing" : "Needs Love";
+
+  const highPriorityWish = wishlistDb.rows.filter(i => i.priority === "high").slice(0, 3);
+
+  const fmtDate = (d) => d ? new Date(d + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" }) : null;
+
+  const cardStyle = { background: "#fff", borderRadius: 16, border: "1.5px solid #e8e4dc", overflow: "hidden", boxShadow: "0 2px 12px rgba(0,0,0,0.04)" };
+
+  return (
+    <div className="fade-up" style={{ maxWidth: 860, margin: "0 auto" }}>
+      {/* Greeting */}
+      <div style={{ marginBottom: 32 }}>
+        <div style={{ fontFamily: "'Cormorant Garamond', serif", fontStyle: "italic", fontWeight: 300, fontSize: 38, color: "#1a1a1a", lineHeight: 1.2, marginBottom: 4 }}>
+          {greeting}
+        </div>
+        <div style={{ fontSize: 13, color: "#aaa", fontWeight: 500 }}>{dayName}, {dateStr}</div>
+      </div>
+
+      {/* Today's Outfit */}
+      <div style={{ marginBottom: 28 }}>
+        <SectionHeader title="Today's Outfit" />
+        {todayOutfits.length === 0 ? (
+          <div style={{ ...cardStyle, padding: "22px 20px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+            <div>
+              <div style={{ fontSize: 14, fontWeight: 700, color: "#1a1a1a", marginBottom: 4 }}>No outfit planned today</div>
+              <div style={{ fontSize: 12, color: "#aaa" }}>What are you wearing?</div>
+            </div>
+            <button onClick={() => setTab("outfits")} style={{ fontSize: 13, fontWeight: 600, color: "#888", background: "#f5f3ef", border: "none", borderRadius: 10, padding: "8px 14px", cursor: "pointer", fontFamily: "'DM Sans', sans-serif" }}>
+              Plan one →
+            </button>
+          </div>
+        ) : (
+          <div style={{ display: "flex", gap: 12, overflowX: "auto", paddingBottom: 4, scrollbarWidth: "none" }}>
+            {todayOutfits.map(outfit => {
+              const layerIds = outfit.layers || outfit.itemIds || [];
+              const thumbItems = layerIds.slice(0, 4).map(id => allItems.find(x => x.id === id)).filter(Boolean);
+              return (
+                <div key={outfit.id} onClick={() => setOutfitPopup(outfit)}
+                  style={{ ...cardStyle, cursor: "pointer", minWidth: 160, maxWidth: 200, flex: "0 0 auto" }}>
+                  {outfit.previewImage ? (
+                    <div style={{ aspectRatio: "1/1", background: `url(${outfit.previewImage}) center/cover no-repeat` }} />
+                  ) : (
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", aspectRatio: "1/1" }}>
+                      {[0,1,2,3].map(qi => {
+                        const it = thumbItems[qi];
+                        return (
+                          <div key={qi} style={{ background: it?.image ? `url(${it.image}) center/contain no-repeat #f5f3ef` : "#f5f3ef", display: "flex", alignItems: "center", justifyContent: "center", borderRight: qi%2===0 ? "1px solid #fff" : "none", borderBottom: qi<2 ? "1px solid #fff" : "none" }}>
+                            {!it?.image && <HangerIcon size={14} color="#ddd" />}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                  <div style={{ padding: "10px 12px 12px" }}>
+                    <div style={{ fontSize: 13, fontWeight: 700, color: "#1a1a1a", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                      {outfit.name || "Untitled Outfit"}
+                    </div>
+                    {(outfit.tags || []).length > 0 && (
+                      <div style={{ display: "flex", gap: 4, flexWrap: "wrap", marginTop: 5 }}>
+                        {(outfit.tags || []).slice(0, 2).map(tag => (
+                          <span key={tag} style={{ fontSize: 10, fontWeight: 600, padding: "2px 7px", background: "#f0ece4", borderRadius: 100, color: "#888" }}>{tag}</span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      {/* Pinned Lookbooks */}
+      <div style={{ marginBottom: 28 }}>
+        <SectionHeader title="Pinned Lookbooks" action={{ label: "All lookbooks →", onClick: () => setTab("lookbooks") }} />
+        {pinnedLookbooks.length === 0 ? (
+          <div style={{ ...cardStyle, border: "1.5px dashed #e8e4dc", padding: 22, textAlign: "center", color: "#bbb", fontSize: 13 }}>
+            Pin lookbooks from the Lookbooks tab
+          </div>
+        ) : (
+          <div style={{ display: "flex", gap: 14, overflowX: "auto", paddingBottom: 4, scrollbarWidth: "none" }}>
+            {pinnedLookbooks.map(lb => {
+              const lbOutfits = (lb.outfitIds || []).map(id => outfitsDb.rows.find(o => o.id === id)).filter(Boolean);
+              const previewItems = lbOutfits.slice(0, 4).flatMap(o =>
+                (o.layers || o.itemIds || []).slice(0, 1).map(id => allItems.find(x => x.id === id)).filter(Boolean)
+              );
+              const lbDateStr = (lb.dateStart || lb.dateEnd) ? [fmtDate(lb.dateStart), fmtDate(lb.dateEnd)].filter(Boolean).join(" – ") : null;
+              return (
+                <div key={lb.id} style={{ ...cardStyle, cursor: "pointer", minWidth: 170, maxWidth: 200, flex: "0 0 auto" }}>
+                  {lb.coverImage ? (
+                    <div style={{ aspectRatio: "4/5", background: `url(${lb.coverImage}) center/cover no-repeat` }} />
+                  ) : (
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", aspectRatio: "4/5" }}>
+                      {[0,1,2,3].map(qi => {
+                        const it = previewItems[qi];
+                        return (
+                          <div key={qi} style={{ background: it?.image ? `url(${it.image}) center/contain no-repeat #f5f3ef` : "#f5f3ef", display: "flex", alignItems: "center", justifyContent: "center", borderRight: qi%2===0 ? "1.5px solid #fff" : "none", borderBottom: qi<2 ? "1.5px solid #fff" : "none" }}>
+                            {!it?.image && <HangerIcon size={14} color="#ddd" />}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                  <div style={{ padding: "10px 12px 12px" }}>
+                    <div style={{ fontSize: 13, fontWeight: 700, color: "#1a1a1a", lineHeight: 1.3, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{lb.name}</div>
+                    <div style={{ fontSize: 11, color: "#aaa", fontWeight: 600, marginTop: 3 }}>{lbOutfits.length} outfit{lbOutfits.length !== 1 ? "s" : ""}</div>
+                    {lbDateStr && (
+                      <div style={{ fontSize: 11, color: "#b0a898", marginTop: 3, fontWeight: 600, display: "flex", alignItems: "center", gap: 4 }}>
+                        <SvgCalendar size={10} color="#b0a898" />{lbDateStr}
+                      </div>
+                    )}
+                    {(lb.tags || []).length > 0 && (
+                      <div style={{ display: "flex", gap: 4, flexWrap: "wrap", marginTop: 5 }}>
+                        {(lb.tags || []).slice(0, 2).map(tag => (
+                          <span key={tag} style={{ fontSize: 10, fontWeight: 600, padding: "2px 7px", background: "#f0ece4", borderRadius: 100, color: "#888" }}>{tag}</span>
+                        ))}
+                      </div>
+                    )}
+                    <button onClick={() => { setActiveLookbookView("editorial"); setActiveLookbook(lb); setTab("lookbooks"); }}
+                      style={{ marginTop: 8, width: "100%", padding: "6px 0", background: "#f5f3ef", border: "none", borderRadius: 8, fontSize: 11, fontWeight: 700, color: "#888", cursor: "pointer", fontFamily: "'DM Sans', sans-serif" }}>
+                      View
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      {/* Seller Rollup */}
+      {forSaleItems.length > 0 && (
+        <div style={{ marginBottom: 28 }}>
+          <SectionHeader title="Seller" action={{ label: "Go to Seller →", onClick: () => setTab("seller") }} />
+          <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+            {[
+              { label: "Listed",    value: sellerListed,                   color: "#2090c0" },
+              { label: "Pending",   value: sellerPending,                  color: "#a07000" },
+              { label: "Sold",      value: sellerSold,                     color: "#3aaa6e" },
+              { label: "Earned",    value: `$${sellerEarned.toFixed(0)}`,  color: "#3aaa6e" },
+              { label: "Potential", value: `$${sellerPotential.toFixed(0)}`, color: "#888" },
+            ].map(stat => (
+              <div key={stat.label} style={{ background: "#fff", borderRadius: 14, border: "1.5px solid #e8e4dc", padding: "14px 18px", flex: "1 1 80px", minWidth: 80, boxShadow: "0 2px 8px rgba(0,0,0,0.03)" }}>
+                <div style={{ fontSize: 20, fontWeight: 800, color: stat.color }}>{stat.value}</div>
+                <div style={{ fontSize: 11, color: "#aaa", fontWeight: 600, marginTop: 2, textTransform: "uppercase", letterSpacing: "0.06em" }}>{stat.label}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Quick Stats */}
+      <div style={{ marginBottom: 28 }}>
+        <div onClick={() => setTab("stats")} style={{ background: "#fff", borderRadius: 16, border: "1.5px solid #e8e4dc", padding: "16px 20px", display: "flex", gap: 24, flexWrap: "wrap", alignItems: "center", cursor: "pointer", boxShadow: "0 2px 8px rgba(0,0,0,0.03)", transition: "border-color 0.15s" }}
+          onMouseEnter={e => e.currentTarget.style.borderColor = "#1a1a1a"}
+          onMouseLeave={e => e.currentTarget.style.borderColor = "#e8e4dc"}>
+          <div style={{ display: "flex", alignItems: "center", gap: 10, flexShrink: 0 }}>
+            <div style={{ width: 40, height: 40, borderRadius: "50%", border: `3px solid ${healthColor}`, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+              <span style={{ fontSize: 12, fontWeight: 800, color: healthColor }}>{healthScore}</span>
+            </div>
+            <div>
+              <div style={{ fontSize: 13, fontWeight: 700, color: "#1a1a1a" }}>{healthLabel}</div>
+              <div style={{ fontSize: 11, color: "#aaa" }}>Closet Health</div>
+            </div>
+          </div>
+          <div style={{ width: 1, height: 32, background: "#e8e4dc", flexShrink: 0 }} />
+          {[
+            { label: "Total Value", value: `$${totalValue.toFixed(0)}` },
+            { label: "Items", value: closetItems.length },
+            { label: "Never Worn", value: unwornCount },
+          ].map(s => (
+            <div key={s.label} style={{ flexShrink: 0 }}>
+              <div style={{ fontSize: 16, fontWeight: 800, color: "#1a1a1a" }}>{s.value}</div>
+              <div style={{ fontSize: 11, color: "#aaa", fontWeight: 500 }}>{s.label}</div>
+            </div>
+          ))}
+          <div style={{ flex: 1 }} />
+          <span style={{ fontSize: 12, color: "#bbb" }}>View full profile →</span>
+        </div>
+      </div>
+
+      {/* Wishlist Highlights */}
+      {highPriorityWish.length > 0 && (
+        <div style={{ marginBottom: 28 }}>
+          <SectionHeader title="Wishlist Highlights" action={{ label: "See all →", onClick: () => setTab("wishlist") }} />
+          <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
+            {highPriorityWish.map(item => (
+              <div key={item.id} style={{ background: "#fff", borderRadius: 14, border: "1.5px solid #ffc5c5", overflow: "hidden", flex: "1 1 160px", minWidth: 150, maxWidth: 220, boxShadow: "0 2px 8px rgba(0,0,0,0.03)" }}>
+                {item.image && (
+                  <div style={{ height: 120, background: `url(${item.image}) center/contain no-repeat #f5f3ef` }} />
+                )}
+                <div style={{ padding: "10px 12px 12px" }}>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: "#1a1a1a", marginBottom: 4, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{item.name}</div>
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 6 }}>
+                    {item.price && <span style={{ fontSize: 13, fontWeight: 800, color: "#1a1a1a" }}>{item.price}</span>}
+                    <span style={{ fontSize: 10, fontWeight: 700, padding: "2px 8px", background: "#fff0f0", color: "#e05555", border: "1px solid #ffc5c5", borderRadius: 100 }}>High</span>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 const NAV_ITEMS = [
+  { id: "home", label: "Home" },
   { id: "closet", label: "My Closet" },
   { id: "outfits", label: "Outfits" },
   { id: "lookbooks", label: "Lookbooks" },
@@ -8402,7 +8663,7 @@ export default function App() {
   const lookbooksDb = useSupabaseTable("lookbooks");
   const moodboardsDb = useMoodboardsDb();
 
-  const [tab, setTabRaw] = useState(() => localStorage.getItem("wardrobe_active_tab") || "closet");
+  const [tab, setTabRaw] = useState(() => localStorage.getItem("wardrobe_active_tab") || "home");
   const setTab = (t) => { setTabRaw(t); localStorage.setItem("wardrobe_active_tab", t); };
   const [modal, setModal] = useState(null);
   const [catFilter, setCatFilter] = useState("All");
@@ -8806,8 +9067,17 @@ export default function App() {
       ),
     ])
   );
+  NAV_ICON_MAP["home"] = (active) => (
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none"
+      stroke={active ? "#fff" : "rgba(0,0,0,0.55)"}
+      strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/>
+      <polyline points="9 22 9 12 15 12 15 22"/>
+    </svg>
+  );
 
   const PAGE_TITLES = {
+    home: ["", ""],
     closet: ["My Closet", ""],
     outfits: ["My Outfits", `${outfitsDb.rows.length} looks`],
     lookbooks: ["Lookbooks", "Curated collections"],
@@ -8874,11 +9144,13 @@ export default function App() {
 
           {/* Page hero + global search */}
           <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 28, gap: 16 }}>
-            <div className="page-hero" style={{ marginBottom: 0 }}>
-              <div className="page-hero-eyebrow">My Wardrobe</div>
-              <div className="page-hero-title">{PAGE_TITLES[tab]?.[0]}</div>
-              <div className="page-hero-sub">{PAGE_TITLES[tab]?.[1]}</div>
-            </div>
+            {tab !== "home" && (
+              <div className="page-hero" style={{ marginBottom: 0 }}>
+                <div className="page-hero-eyebrow">My Wardrobe</div>
+                <div className="page-hero-title">{PAGE_TITLES[tab]?.[0]}</div>
+                <div className="page-hero-sub">{PAGE_TITLES[tab]?.[1]}</div>
+              </div>
+            )}
             <div style={{ display: "flex", gap: 8, alignItems: "center", paddingTop: 6, flexShrink: 0 }}>
               {/* Global search */}
               <div style={{ position: "relative" }}>
@@ -8921,7 +9193,7 @@ export default function App() {
               {/* Bulk select for wishlist */}
               {tab === "wishlist" && <button onClick={() => setWlSelectMode(b => !b)} style={{ padding: "10px 16px", borderRadius: 14, background: wlSelectMode ? "#1a1a1a" : "#fff", border: "1.5px solid #e4dfd6", cursor: "pointer", fontSize: 13, fontWeight: 600, color: wlSelectMode ? "#fff" : "#888", fontFamily: "'DM Sans', sans-serif" }}>{wlSelectMode ? "Cancel" : "Select"}</button>}
               {/* Add button */}
-              {tab !== "stats" && tab !== "moodboard" && (
+              {tab !== "stats" && tab !== "moodboard" && tab !== "home" && tab !== "settings" && (
                 <button className="btn-primary" onClick={() => {
                   if (tab === "outfits") openNewOutfit();
                   else if (tab === "lookbooks") setLookbookModal(true);
@@ -8939,6 +9211,23 @@ export default function App() {
 
           {/* Content — 2-column layout (left sidebar + main) */}
           <div className="app-layout">
+
+        {/* ── HOME TAB ── */}
+        {tab === "home" && (
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <HomeTab
+              outfitCalendar={outfitCalendar}
+              outfitsDb={outfitsDb}
+              itemsDb={itemsDb}
+              lookbooksDb={lookbooksDb}
+              wishlistDb={wishlistDb}
+              setTab={setTab}
+              setActiveLookbook={setActiveLookbook}
+              setActiveLookbookView={setActiveLookbookView}
+              setOutfitPopup={setOutfitPopup}
+            />
+          </div>
+        )}
 
         {/* ── LEFT SIDEBAR (closet + outfits + lookbooks) ── */}
         {(tab === "closet" || tab === "outfits" || tab === "lookbooks") && (
@@ -9376,7 +9665,11 @@ export default function App() {
                             boxShadow: "0 2px 12px rgba(0,0,0,0.04)", cursor: "pointer",
                             animationDelay: `${i * 0.06}s`, opacity: 0, position: "relative"
                           }}>
-                            {/* Archive + Delete buttons */}
+                            {/* Pin + Archive + Delete buttons */}
+                            <button onClick={e => { e.stopPropagation(); lookbooksDb.update({ ...lb, pinned: !lb.pinned }); }} title={lb.pinned ? "Unpin from Home" : "Pin to Home"}
+                              style={{ position: "absolute", top: 8, right: 72, zIndex: 2, width: 26, height: 26, borderRadius: "50%", background: lb.pinned ? "#1a1a1a" : "rgba(255,255,255,0.92)", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 1px 4px rgba(0,0,0,0.1)" }}>
+                              <SvgPushPin size={12} color={lb.pinned ? "#fff" : "#888"} />
+                            </button>
                             <button onClick={e => { e.stopPropagation(); if (window.confirm(`Archive "${lb.name}"? Restore from Settings → Data.`)) { archiveLookbook(lb); } }} title="Archive lookbook"
                               style={{ position: "absolute", top: 8, right: 40, zIndex: 2, width: 26, height: 26, borderRadius: "50%", background: "rgba(255,255,255,0.92)", border: "none", cursor: "pointer", fontSize: 13, color: "#888", display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 1px 4px rgba(0,0,0,0.1)" }}>
                               <SvgArrowDn size={12} color="#888" />

@@ -280,6 +280,8 @@ const globalStyles = `
 `
 
 // ── Supabase hook ────────────────────────────────────────────────────────────
+const isGuestMode = () => { try { return localStorage.getItem("wardrobe_guest_mode_v1") === "1"; } catch { return false; } };
+
 function useSupabaseTable(table) {
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -289,6 +291,7 @@ function useSupabaseTable(table) {
     return { ...rest, id };
   }).filter(r => r.id);
   const fetchRows = async (setter) => {
+    if (isGuestMode()) return;
     let { data, error } = await supabase.from(table).select("*").order("created_at");
     if (error) ({ data, error } = await supabase.from(table).select("*"));
     if (!error && data) setter(parseRows(data));
@@ -298,23 +301,29 @@ function useSupabaseTable(table) {
     fetchRows(setRows).then(() => setLoading(false));
   }, [table]);
   const add = async (item) => {
-    const { error } = await supabase.from(table).insert({ id: item.id, data: item });
-    if (!error) setRows(r => [...r, item]);
-    else console.error("[" + table + "] add:", error.message);
+    if (!isGuestMode()) {
+      const { error } = await supabase.from(table).insert({ id: item.id, data: item });
+      if (error) console.error("[" + table + "] add:", error.message);
+    }
+    setRows(r => [...r, item]);
   };
   const update = async (item) => {
-    let { error } = await supabase.from(table).update({ data: item }).eq("id", item.id);
-    if (error) {
-      const { id, ...rest } = item;
-      ({ error } = await supabase.from(table).update(rest).eq("id", id));
+    if (!isGuestMode()) {
+      let { error } = await supabase.from(table).update({ data: item }).eq("id", item.id);
+      if (error) {
+        const { id, ...rest } = item;
+        ({ error } = await supabase.from(table).update(rest).eq("id", id));
+      }
+      if (error) { console.error("[" + table + "] update:", error.message); return; }
     }
-    if (!error) setRows(r => r.map(i => i.id === item.id ? item : i));
-    else console.error("[" + table + "] update:", error.message);
+    setRows(r => r.map(i => i.id === item.id ? item : i));
   };
   const remove = async (id) => {
-    const { error } = await supabase.from(table).delete().eq("id", id);
-    if (!error) setRows(r => r.filter(i => i.id !== id));
-    else console.error("[" + table + "] remove:", error.message);
+    if (!isGuestMode()) {
+      const { error } = await supabase.from(table).delete().eq("id", id);
+      if (error) { console.error("[" + table + "] remove:", error.message); return; }
+    }
+    setRows(r => r.filter(i => i.id !== id));
   };
   const refresh = async () => {
     setLoading(true);
@@ -6843,6 +6852,13 @@ function SettingsTab({
   itemsDb, activeTheme, setActiveTheme,
   showNavLabels, setShowNavLabels,
   density, setDensity,
+  fontSize, setFontSize,
+  accentOverride, setAccentOverride,
+  defaultTab, setDefaultTab,
+  outfitSort, setOutfitSort,
+  wlSort, setWlSort,
+  guestMode, setGuestMode,
+  allDb,
   closetSort, setClosetSort,
   closetSeasonFilter, setClosetSeasonFilter,
   customCategories, setCustomCategories,
@@ -7011,7 +7027,11 @@ function SettingsTab({
     </div>
   );
 
-  const TABS = [["appearance","Appearance"],["preferences","Preferences"],["data","Data"]];
+  const [resetConfirmText, setResetConfirmText] = useState("");
+  const [showResetConfirm, setShowResetConfirm] = useState(false);
+  const effectiveAccent = accentOverride || activeTheme.accent;
+
+  const TABS = [["appearance","Appearance"],["preferences","Preferences"],["data","Data"],["account","Account"]];
 
   return (
     <div style={{ maxWidth:720, margin:"0 auto", padding:"4px 0 40px" }}>
@@ -7093,6 +7113,43 @@ function SettingsTab({
           </div>
         </Card>
 
+        {/* Font Size */}
+        <Card>
+          <SectionLabel>Font Size</SectionLabel>
+          <div style={{ display:"flex", alignItems:"center", gap:12 }}>
+            <span style={{ fontSize:11, color:"#aaa", fontWeight:700, flexShrink:0 }}>A</span>
+            <input type="range" min={12} max={18} step={1} value={fontSize}
+              onChange={e => setFontSize(Number(e.target.value))}
+              style={{ flex:1, accentColor: effectiveAccent }} />
+            <span style={{ fontSize:17, color:"#aaa", fontWeight:700, flexShrink:0 }}>A</span>
+            <span style={{ fontSize:12, color:"#888", minWidth:34, textAlign:"right" }}>{fontSize}px</span>
+          </div>
+        </Card>
+
+        {/* Accent Color Override */}
+        <Card>
+          <SectionLabel>Accent Color</SectionLabel>
+          <div style={{ display:"flex", alignItems:"center", gap:14 }}>
+            <input type="color" value={accentOverride || activeTheme.accent}
+              onChange={e => setAccentOverride(e.target.value)}
+              style={{ width:40, height:40, border:"1.5px solid #e0dbd2", borderRadius:10, cursor:"pointer", padding:2, background:"#fff" }} />
+            <div style={{ flex:1 }}>
+              <div style={{ fontSize:13, fontWeight:600, color:"#1a1a1a" }}>
+                {accentOverride ? "Custom override active" : "Using theme default"}
+              </div>
+              <div style={{ fontSize:11, color:"#aaa", marginTop:2 }}>
+                {accentOverride || activeTheme.accent}
+              </div>
+            </div>
+            {accentOverride && (
+              <button onClick={() => setAccentOverride("")} style={{
+                padding:"6px 12px", borderRadius:8, border:"1.5px solid #e0dbd2",
+                background:"#fff", color:"#888", fontSize:11, fontWeight:600, cursor:"pointer"
+              }}>Reset</button>
+            )}
+          </div>
+        </Card>
+
         {/* Toggles */}
         <Card>
           <SectionLabel>Display Options</SectionLabel>
@@ -7102,6 +7159,22 @@ function SettingsTab({
 
       {/* ════════════ PREFERENCES ════════════ */}
       {settingsTab === "preferences" && (<>
+
+        {/* Default Landing Tab */}
+        <Card>
+          <SectionLabel>Default Landing Tab</SectionLabel>
+          <div style={{ display:"flex", gap:8, flexWrap:"wrap" }}>
+            {[["closet","Closet"],["outfits","Outfits"],["lookbooks","Lookbooks"],["wishlist","Wishlist"],["moodboard","Moodboard"],["stats","Stats"],["settings","Settings"]].map(([v,l]) => (
+              <button key={v} onClick={() => setDefaultTab(v)} style={{
+                padding:"7px 14px", borderRadius:20,
+                border: defaultTab===v ? `1.5px solid ${effectiveAccent}` : "1.5px solid #e0dbd2",
+                background: defaultTab===v ? effectiveAccent : "#fff",
+                color: defaultTab===v ? "#fff" : "#888",
+                cursor:"pointer", fontFamily:"'DM Sans',sans-serif", fontSize:12, fontWeight:700
+              }}>{l}</button>
+            ))}
+          </div>
+        </Card>
 
         {/* Budget Targets */}
         {(() => {
@@ -7236,6 +7309,38 @@ function SettingsTab({
           </div>
         </Card>
 
+        {/* Default Outfits Sort */}
+        <Card>
+          <SectionLabel>Default Outfits Sort</SectionLabel>
+          <div style={{ display:"flex", flexWrap:"wrap", gap:8 }}>
+            {[["default","Date Added"],["az","A → Z"],["worn","Most Worn"],["newest","Newest"]].map(([v,l]) => (
+              <button key={v} onClick={() => setOutfitSort(v)} style={{
+                padding:"7px 14px", borderRadius:20,
+                border: outfitSort===v ? "1.5px solid #1a1a1a" : "1.5px solid #e0dbd2",
+                background: outfitSort===v ? "#1a1a1a" : "#fff",
+                color: outfitSort===v ? "#fff" : "#888",
+                cursor:"pointer", fontFamily:"'DM Sans',sans-serif", fontSize:12, fontWeight:700
+              }}>{l}</button>
+            ))}
+          </div>
+        </Card>
+
+        {/* Default Wishlist Sort */}
+        <Card>
+          <SectionLabel>Default Wishlist Sort</SectionLabel>
+          <div style={{ display:"flex", flexWrap:"wrap", gap:8 }}>
+            {[["priority","Priority"],["store","Store"],["category","Category"],["price","Price"],["added","Recently Added"]].map(([v,l]) => (
+              <button key={v} onClick={() => setWlSort(v)} style={{
+                padding:"7px 14px", borderRadius:20,
+                border: wlSort===v ? "1.5px solid #1a1a1a" : "1.5px solid #e0dbd2",
+                background: wlSort===v ? "#1a1a1a" : "#fff",
+                color: wlSort===v ? "#fff" : "#888",
+                cursor:"pointer", fontFamily:"'DM Sans',sans-serif", fontSize:12, fontWeight:700
+              }}>{l}</button>
+            ))}
+          </div>
+        </Card>
+
         {/* Tag Lists — consolidated */}
         <TagListsCard
           customCategories={customCategories} setCustomCategories={setCustomCategories}
@@ -7250,6 +7355,40 @@ function SettingsTab({
 
       {/* ════════════ DATA & SYNC ════════════ */}
       {settingsTab === "data" && (<>
+
+        {/* Storage Usage */}
+        {(() => {
+          const tables = [
+            ["Closet items", allDb?.items?.length || 0],
+            ["Outfits", allDb?.outfits?.length || 0],
+            ["Lookbooks", allDb?.lookbooks?.length || 0],
+            ["Wishlist", allDb?.wishlist?.length || 0],
+            ["Moodboards", allDb?.moodboards?.length || 0],
+          ];
+          const total = tables.reduce((s, [,n]) => s + n, 0);
+          return (
+            <Card>
+              <SectionLabel>Storage</SectionLabel>
+              <div style={{ display:"flex", flexDirection:"column", gap:10 }}>
+                {tables.map(([label, count]) => (
+                  <div key={label} style={{ display:"flex", justifyContent:"space-between", alignItems:"center" }}>
+                    <span style={{ fontSize:13, color:"#666" }}>{label}</span>
+                    <div style={{ display:"flex", alignItems:"center", gap:10 }}>
+                      <div style={{ width:80, height:5, borderRadius:99, background:"#f0ede8", overflow:"hidden" }}>
+                        <div style={{ height:"100%", width: total > 0 ? `${(count/Math.max(total,1))*100}%` : "0%", background: effectiveAccent, borderRadius:99 }} />
+                      </div>
+                      <span style={{ fontSize:13, fontWeight:700, color:"#1a1a1a", minWidth:24, textAlign:"right" }}>{count}</span>
+                    </div>
+                  </div>
+                ))}
+                <div style={{ borderTop:"1px solid #f0ede8", paddingTop:10, display:"flex", justifyContent:"space-between", fontWeight:700, fontSize:13 }}>
+                  <span style={{ color:"#888" }}>Total</span>
+                  <span>{total}</span>
+                </div>
+              </div>
+            </Card>
+          );
+        })()}
 
         {/* App Password */}
         <AppPasswordCard />
@@ -7461,6 +7600,80 @@ function SettingsTab({
               </div>
             ))}
           </div>
+        </Card>
+      </>)}
+
+      {/* ════════════ ACCOUNT ════════════ */}
+      {settingsTab === "account" && (<>
+
+        {/* Supabase Info */}
+        <Card>
+          <SectionLabel>Database Connection</SectionLabel>
+          <div style={{ display:"flex", flexDirection:"column", gap:10 }}>
+            <div style={{ display:"flex", alignItems:"center", gap:10, padding:"10px 14px", background:"#f0faf4", borderRadius:12, border:"1px solid #c8e8d0" }}>
+              <div style={{ width:10, height:10, borderRadius:"50%", background:"#3aaa6e", flexShrink:0, boxShadow:"0 0 6px #3aaa6e" }} />
+              <div style={{ flex:1 }}>
+                <div style={{ fontSize:13, fontWeight:700, color:"#2d6a3f" }}>Connected to Supabase</div>
+                <div style={{ fontSize:11, color:"#5aaa7e", marginTop:1, fontFamily:"monospace" }}>
+                  {SUPABASE_URL.replace(/https?:\/\//, "").slice(0, 36)}
+                </div>
+              </div>
+            </div>
+          </div>
+        </Card>
+
+        {/* Guest Mode */}
+        <Card>
+          <SectionLabel>Sync Mode</SectionLabel>
+          <Toggle value={guestMode} onChange={setGuestMode} label="Local only mode" sub="Disable Supabase sync — data stays on this device only" />
+          {guestMode && (
+            <div style={{ marginTop:12, padding:"10px 14px", background:"#fff8e8", borderRadius:10, border:"1px solid #f0d888", fontSize:12, color:"#8a6a10", fontWeight:600 }}>
+              Changes won't sync across devices while local mode is on.
+            </div>
+          )}
+        </Card>
+
+        {/* Clear All Data */}
+        <Card>
+          <SectionLabel>Danger Zone</SectionLabel>
+          <div style={{ fontSize:13, color:"#888", marginBottom:14, lineHeight:1.5 }}>
+            Permanently clear all app data from this browser. This cannot be undone.
+          </div>
+          {!showResetConfirm ? (
+            <button onClick={() => setShowResetConfirm(true)} style={{
+              padding:"10px 20px", borderRadius:12, border:"1.5px solid #e05555",
+              background:"#fff", color:"#e05555", fontSize:13, fontWeight:700,
+              cursor:"pointer", fontFamily:"'DM Sans',sans-serif"
+            }}>Reset App…</button>
+          ) : (
+            <div style={{ display:"flex", flexDirection:"column", gap:10 }}>
+              <div style={{ fontSize:13, fontWeight:700, color:"#e05555" }}>
+                Type RESET to confirm:
+              </div>
+              <input
+                value={resetConfirmText}
+                onChange={e => setResetConfirmText(e.target.value)}
+                placeholder="RESET"
+                style={{ padding:"8px 12px", border:"1.5px solid #e05555", borderRadius:10, fontFamily:"'DM Sans',sans-serif", fontSize:13, outline:"none", width:180 }}
+              />
+              <div style={{ display:"flex", gap:10 }}>
+                <button onClick={() => { setShowResetConfirm(false); setResetConfirmText(""); }} style={{
+                  padding:"9px 18px", borderRadius:10, border:"1px solid #e0dbd2",
+                  background:"#fafaf8", cursor:"pointer", fontWeight:600, fontFamily:"'DM Sans',sans-serif", fontSize:13
+                }}>Cancel</button>
+                <button
+                  disabled={resetConfirmText !== "RESET"}
+                  onClick={() => { localStorage.clear(); window.location.reload(); }}
+                  style={{
+                    padding:"9px 18px", borderRadius:10, border:"none",
+                    background: resetConfirmText === "RESET" ? "#e05555" : "#f0dbd8",
+                    color: resetConfirmText === "RESET" ? "#fff" : "#c0a0a0",
+                    cursor: resetConfirmText === "RESET" ? "pointer" : "not-allowed",
+                    fontWeight:700, fontFamily:"'DM Sans',sans-serif", fontSize:13
+                  }}>Reset App</button>
+              </div>
+            </div>
+          )}
         </Card>
       </>)}
 
@@ -8665,6 +8878,8 @@ export default function App() {
 
   const [tab, setTabRaw] = useState(() => localStorage.getItem("wardrobe_active_tab") || "home");
   const setTab = (t) => { setTabRaw(t); localStorage.setItem("wardrobe_active_tab", t); };
+  const [tab, setTabRaw] = useState(() => { try { return localStorage.getItem("wardrobe_active_tab") || localStorage.getItem("wardrobe_default_tab_v1") || "closet"; } catch { return "closet"; } });
+  const setTab = (t) => { setTabRaw(t); try { localStorage.setItem("wardrobe_active_tab", t); } catch {} };
   const [modal, setModal] = useState(null);
   const [catFilter, setCatFilter] = useState("All");
   const [catFilters, setCatFilters] = useState([]); // multi-select categories
@@ -8688,7 +8903,8 @@ export default function App() {
   const [outfitTagFilter, setOutfitTagFilter] = useState("All");
   const [outfitSeasonFilter, setOutfitSeasonFilter] = useState("All");
   const [outfitSearch, setOutfitSearch] = useState("");
-  const [outfitSort, setOutfitSort] = useState("default");
+  const [outfitSort, setOutfitSortState] = useState(() => { try { return localStorage.getItem("wardrobe_outfit_sort_v1") || "default"; } catch { return "default"; } });
+  const setOutfitSort = v => { setOutfitSortState(v); try { localStorage.setItem("wardrobe_outfit_sort_v1", v); } catch {} };
   const [upcomingEvents, setUpcomingEvents] = useState(() => { try { return JSON.parse(localStorage.getItem("wardrobe_upcoming_events_v1") || "[]"); } catch { return []; } });
   const [eventDraftName, setEventDraftName] = useState("");
   const [eventDraftDate, setEventDraftDate] = useState("");
@@ -8751,6 +8967,14 @@ export default function App() {
   const [dragOverId, setDragOverId] = useState(null);
   const [showNavLabels, setShowNavLabels] = useState(() => { try { return localStorage.getItem("wardrobe_nav_labels_v1") !== "0"; } catch { return true; } });
   const [density, setDensity] = useState(() => { try { return localStorage.getItem("wardrobe_density_v1") || "comfortable"; } catch { return "comfortable"; } });
+  const [fontSize, setFontSizeState] = useState(() => { try { return parseInt(localStorage.getItem("wardrobe_font_size_v1")) || 14; } catch { return 14; } });
+  const setFontSize = v => { setFontSizeState(v); try { localStorage.setItem("wardrobe_font_size_v1", String(v)); } catch {} };
+  const [accentOverride, setAccentOverrideState] = useState(() => { try { return localStorage.getItem("wardrobe_accent_override_v1") || ""; } catch { return ""; } });
+  const setAccentOverride = v => { setAccentOverrideState(v); try { localStorage.setItem("wardrobe_accent_override_v1", v); } catch {} };
+  const [guestMode, setGuestModeState] = useState(() => { try { return localStorage.getItem("wardrobe_guest_mode_v1") === "1"; } catch { return false; } });
+  const setGuestMode = v => { setGuestModeState(v); try { localStorage.setItem("wardrobe_guest_mode_v1", v ? "1" : "0"); } catch {} };
+  const [defaultTab, setDefaultTabState] = useState(() => { try { return localStorage.getItem("wardrobe_default_tab_v1") || "closet"; } catch { return "closet"; } });
+  const setDefaultTab = v => { setDefaultTabState(v); try { localStorage.setItem("wardrobe_default_tab_v1", v); } catch {} };
   const CUSTOM_CATS_KEY = "wardrobe_custom_cats_v1";
   const CUSTOM_OCC_KEY = "wardrobe_custom_occ_v1";
   const CUSTOM_SEAS_KEY = "wardrobe_custom_seas_v1";
@@ -8808,7 +9032,8 @@ export default function App() {
   const [lbTypeFilter, setLbTypeFilter] = useState("All");
   const [bulkMode, setBulkMode] = useState(false);
   const [wishlistDest, setWishlistDest] = useState(false);
-  const [wlSort, setWlSort] = useState("priority");
+  const [wlSort, setWlSortState] = useState(() => { try { return localStorage.getItem("wardrobe_wl_sort_v1") || "priority"; } catch { return "priority"; } });
+  const setWlSort = v => { setWlSortState(v); try { localStorage.setItem("wardrobe_wl_sort_v1", v); } catch {} };
   const [wlSortCat, setWlSortCat] = useState("All");
   const [wlZoom, setWlZoom] = useState(180);
   const [activeWishlistId, setActiveWishlistId] = useState(null); // null = "All"
@@ -9094,9 +9319,12 @@ export default function App() {
     return <LoginScreen onAuth={() => setIsAuthenticated(true)} />;
   }
 
+  const effectiveAccent = accentOverride || activeTheme.accent;
+
   return (
-    <div className={`density-${density}`} style={{ background: activeTheme.bg, minHeight: "100vh", color: activeTheme.text }}>
+    <div className={`density-${density}`} style={{ background: activeTheme.bg, minHeight: "100vh", color: activeTheme.text, fontSize: fontSize + "px" }}>
       <style>{globalStyles}</style>
+      <style>{`:root { --accent: ${effectiveAccent}; }`}</style>
 
       {/* ── Vertical nav sidebar ── */}
       <nav className="app-nav-sidebar" style={{ background: activeTheme.nav, borderRightColor: activeTheme.border }}>
@@ -9716,6 +9944,13 @@ export default function App() {
                 activeTheme={activeTheme} setActiveTheme={setActiveTheme}
                 showNavLabels={showNavLabels} setShowNavLabels={v => { setShowNavLabels(v); try { localStorage.setItem("wardrobe_nav_labels_v1", v?"1":"0"); } catch {} }}
                 density={density} setDensity={v => { setDensity(v); try { localStorage.setItem("wardrobe_density_v1", v); } catch {} }}
+                fontSize={fontSize} setFontSize={setFontSize}
+                accentOverride={accentOverride} setAccentOverride={setAccentOverride}
+                defaultTab={defaultTab} setDefaultTab={setDefaultTab}
+                outfitSort={outfitSort} setOutfitSort={setOutfitSort}
+                wlSort={wlSort} setWlSort={setWlSort}
+                guestMode={guestMode} setGuestMode={setGuestMode}
+                allDb={{ items: itemsDb.rows, outfits: outfitsDb.rows, lookbooks: lookbooksDb.rows, wishlist: wishlistDb.rows, moodboards: moodboardsDb.boards }}
                 closetSort={closetSort} setClosetSort={v => { setClosetSort(v); try { localStorage.setItem("wardrobe_default_sort_v1", v); } catch {} }}
                 closetSeasonFilter={closetSeasonFilter} setClosetSeasonFilter={v => { setClosetSeasonFilter(v); try { localStorage.setItem("wardrobe_default_season_v1", v); } catch {} }}
                 customCategories={customCategories} setCustomCategories={v => { setCustomCategories(v); try { localStorage.setItem("wardrobe_custom_cats_v1", JSON.stringify(v)); } catch {} }}

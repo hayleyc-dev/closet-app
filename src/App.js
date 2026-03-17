@@ -260,6 +260,9 @@ const globalStyles = `
     padding: 10px 12px 12px;
     border-top: 1px solid #f5f2ee;
   }
+  /* Closet cards: collapse label until hover */
+  .item-card .item-card-label { max-height: 0; overflow: hidden; padding: 0; border-top: none; transition: max-height 0.2s ease, padding 0.2s ease; }
+  .item-card:hover .item-card-label { max-height: 70px; padding: 8px 10px 10px; border-top: 1px solid #f5f2ee; }
   .item-card-name { font-size: 12px; font-weight: 600; color: #1a1a1a; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-bottom: 2px; }
   .item-card-brand { font-size: 11px; color: #b0a898; font-weight: 400; }
   .item-card-img { width: 100%; aspect-ratio: 3/4; object-fit: contain; display: block; background: #f7f5f2; padding: 8px; }
@@ -1856,28 +1859,25 @@ function ItemCard({ item, onClick, onCreateLook, onEdit, onDelete, onAddToCapsul
           : <HangerIcon size={36} color="#ddd" />
         }
       </div>
-      {/* Hover actions */}
+      {/* Hover-reveal: brand + action buttons */}
       <div className="item-card-label">
-        <div className="wl-card-actions" style={{ display: "flex", gap: 4, alignItems: "center" }}>
+        {(item.brand) && <div className="item-card-brand" style={{ marginBottom: 6 }}>{item.brand}</div>}
+        <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
           <button onClick={e => { e.stopPropagation(); onEdit && onEdit(); }} title="Edit"
-            className="wl-hover-btn"
-            style={{ width: 30, height: 30, borderRadius: 8, background: "#f5f2ed", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", opacity: 0, transition: "opacity 0.15s", flexShrink: 0 }}>
+            style={{ width: 30, height: 30, borderRadius: 8, background: "#f5f2ed", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
             <SvgEdit size={12} color="#555" />
           </button>
           <button onClick={e => { e.stopPropagation(); onCreateLook && onCreateLook(); }} title="Create outfit"
-            className="wl-hover-btn"
-            style={{ width: 30, height: 30, borderRadius: 8, background: "#f5f2ed", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", opacity: 0, transition: "opacity 0.15s", flexShrink: 0 }}>
+            style={{ width: 30, height: 30, borderRadius: 8, background: "#f5f2ed", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
             <SvgHanger size={13} color="#555" />
           </button>
           <button onClick={e => { e.stopPropagation(); onAddToCapsule && onAddToCapsule(); }} title="Add to capsule"
-            className="wl-hover-btn"
-            style={{ width: 30, height: 30, borderRadius: 8, background: "#f5f2ed", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", opacity: 0, transition: "opacity 0.15s", flexShrink: 0 }}>
+            style={{ width: 30, height: 30, borderRadius: 8, background: "#f5f2ed", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
             <SvgBox size={12} color="#555" />
           </button>
           <div style={{ flex: 1 }} />
           <button onClick={e => { e.stopPropagation(); onDelete && onDelete(); }} title="Delete"
-            className="wl-hover-btn"
-            style={{ width: 30, height: 30, borderRadius: 8, background: "#fef2f2", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", opacity: 0, transition: "opacity 0.15s", flexShrink: 0 }}>
+            style={{ width: 30, height: 30, borderRadius: 8, background: "#fef2f2", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
             <SvgTrash size={12} color="#e05555" />
           </button>
         </div>

@@ -5028,6 +5028,7 @@ function WishlistTab({ wishlistDb, wishlistsDb, saveWishlistsMeta, activeWishlis
   const [editingWlId, setEditingWlId] = useState(null);
   const [dragItemId, setDragItemId] = useState(null);
   const [dragOverItemId, setDragOverItemId] = useState(null);
+  const [dropTargetListId, setDropTargetListId] = useState(null); // list being hovered during item drag
   const [customOrder, setCustomOrder] = useState({});
   const [wlStoreFilter, setWlStoreFilter] = useState("All");
   const [wlSearch, setWlSearch] = useState("");
@@ -5089,6 +5090,15 @@ function WishlistTab({ wishlistDb, wishlistsDb, saveWishlistsMeta, activeWishlis
     const next = [...ids]; next.splice(fromIdx, 1); next.splice(toIdx, 0, dragItemId);
     setCustomOrder(o => ({ ...o, [orderKey]: next }));
     setDragItemId(null); setDragOverItemId(null);
+  };
+
+  // Drop item onto a list in the sidebar
+  const handleDropOnList = (targetListId) => {
+    if (!dragItemId) return;
+    const item = wishlistDb.rows.find(i => i.id === dragItemId);
+    if (!item) return;
+    wishlistDb.update({ ...item, wishlistId: targetListId || undefined });
+    setDragItemId(null); setDragOverItemId(null); setDropTargetListId(null);
   };
 
   // List sidebar drag-to-reorder
@@ -5158,13 +5168,17 @@ function WishlistTab({ wishlistDb, wishlistsDb, saveWishlistsMeta, activeWishlis
         {/* Lists card */}
         <div style={{ background: "#fff", borderRadius: 18, border: "1px solid #ece8e0", padding: "6px", display: "flex", flexDirection: "column", gap: 2 }}>
           {/* All Items */}
-          <button onClick={() => setActiveWishlistId(null)} style={{
-            width: "100%", textAlign: "left", padding: "9px 14px", borderRadius: 12, border: "none", cursor: "pointer",
-            fontFamily: "'DM Sans', sans-serif", fontSize: 13, fontWeight: activeWishlistId === null ? 700 : 500,
-            background: activeWishlistId === null ? "#1a1a1a" : "transparent",
-            color: activeWishlistId === null ? "#fff" : "#555",
-            display: "flex", alignItems: "center", justifyContent: "space-between", transition: "all 0.15s",
-          }}>
+          <button onClick={() => setActiveWishlistId(null)}
+            onDragOver={e => { if (dragItemId) { e.preventDefault(); setDropTargetListId("all"); } }}
+            onDragLeave={() => setDropTargetListId(null)}
+            onDrop={() => handleDropOnList(null)}
+            style={{
+              width: "100%", textAlign: "left", padding: "9px 14px", borderRadius: 12, border: dropTargetListId === "all" ? "2px dashed #1a1a1a" : "none", cursor: "pointer",
+              fontFamily: "'DM Sans', sans-serif", fontSize: 13, fontWeight: activeWishlistId === null ? 700 : 500,
+              background: dropTargetListId === "all" ? "#f0f0f0" : activeWishlistId === null ? "#1a1a1a" : "transparent",
+              color: activeWishlistId === null && dropTargetListId !== "all" ? "#fff" : "#555",
+              display: "flex", alignItems: "center", justifyContent: "space-between", transition: "all 0.15s",
+            }}>
             <span>All Items</span>
             <span style={{ fontSize: 11, opacity: 0.5, fontWeight: 600 }}>{wishlistDb.rows.length}</span>
           </button>
@@ -5174,15 +5188,18 @@ function WishlistTab({ wishlistDb, wishlistsDb, saveWishlistsMeta, activeWishlis
             <button key={wl.id} onClick={() => setActiveWishlistId(wl.id)}
               draggable
               onDragStart={() => setListDragId(wl.id)}
-              onDragEnter={() => setListDragOverId(wl.id)}
+              onDragEnter={() => { setListDragOverId(wl.id); if (dragItemId) setDropTargetListId(wl.id); }}
+              onDragLeave={() => setDropTargetListId(null)}
               onDragEnd={handleListDrop}
               onDragOver={e => e.preventDefault()}
+              onDrop={() => { if (dragItemId) handleDropOnList(wl.id); }}
               style={{
-                width: "100%", textAlign: "left", padding: "9px 14px", borderRadius: 12, cursor: "grab",
-                border: listDragOverId === wl.id ? "2px dashed #888" : "none",
+                width: "100%", textAlign: "left", padding: "9px 14px", borderRadius: 12,
+                cursor: dragItemId ? "copy" : "grab",
+                border: dropTargetListId === wl.id ? "2px dashed #1a1a1a" : listDragOverId === wl.id ? "2px dashed #888" : "none",
                 fontFamily: "'DM Sans', sans-serif", fontSize: 13, fontWeight: activeWishlistId === wl.id ? 700 : 500,
-                background: activeWishlistId === wl.id ? "#1a1a1a" : "transparent",
-                color: activeWishlistId === wl.id ? "#fff" : "#555",
+                background: dropTargetListId === wl.id ? "#f0f0f0" : activeWishlistId === wl.id ? "#1a1a1a" : "transparent",
+                color: activeWishlistId === wl.id && dropTargetListId !== wl.id ? "#fff" : "#555",
                 display: "flex", alignItems: "center", justifyContent: "space-between", transition: "all 0.15s",
               }}>
               <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1 }}>{wl.name}</span>

@@ -5303,8 +5303,13 @@ function WishlistTab({ wishlistDb, wishlistsDb, saveWishlistsMeta, activeWishlis
             </select>
           )}
           {wlStoreFilter !== "All" && (() => {
-            const storeQuery = encodeURIComponent(wlStoreFilter);
-            const storeUrl = `https://www.google.com/search?q=${storeQuery}+official+site`;
+            const STORE_URLS = {
+              "abercrombie": "https://www.abercrombie.com/shop/us",
+              "banana republic factory": "https://bananarepublicfactory.gapfactory.com/",
+              "amazon": "https://www.amazon.com/",
+              "zara": "https://www.zara.com/us/",
+            };
+            const storeUrl = STORE_URLS[wlStoreFilter.toLowerCase()] || `https://www.google.com/search?q=${encodeURIComponent(wlStoreFilter)}+official+site`;
             return (
               <a href={storeUrl} target="_blank" rel="noreferrer"
                 style={{ padding: "7px 13px", background: "#1a1a1a", borderRadius: 100, display: "flex", alignItems: "center", gap: 6, textDecoration: "none", color: "#fff", fontFamily: "'DM Sans', sans-serif", fontSize: 12, fontWeight: 700, flexShrink: 0 }}>

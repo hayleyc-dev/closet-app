@@ -8894,8 +8894,6 @@ export default function App() {
   const lookbooksDb = useSupabaseTable("lookbooks");
   const moodboardsDb = useMoodboardsDb();
 
-  const [tab, setTabRaw] = useState(() => localStorage.getItem("wardrobe_active_tab") || "home");
-  const setTab = (t) => { setTabRaw(t); localStorage.setItem("wardrobe_active_tab", t); };
   const [tab, setTabRaw] = useState(() => { try { return localStorage.getItem("wardrobe_active_tab") || localStorage.getItem("wardrobe_default_tab_v1") || "closet"; } catch { return "closet"; } });
   const setTab = (t) => { setTabRaw(t); try { localStorage.setItem("wardrobe_active_tab", t); } catch {} };
   const [modal, setModal] = useState(null);

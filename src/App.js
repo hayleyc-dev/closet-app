@@ -1943,9 +1943,9 @@ function ItemDetailPopup({ item, onClose, onEdit, onDelete, onWorn, onDuplicate,
               {!isWishlist && onDuplicate && <button onClick={onDuplicate} style={{ padding: "6px 11px", background: "#f5f2ed", border: "1px solid #e0dbd2", borderRadius: 10, cursor: "pointer", fontSize: 12, fontWeight: 700, color: "#555", fontFamily: "'DM Sans', sans-serif", display: "flex", alignItems: "center", gap: 5, flexShrink: 0, whiteSpace: "nowrap" }}><SvgCopy size={14} color="currentColor" /></button>}
               {!isWishlist && onToggleNeedsStyling && <button onClick={onToggleNeedsStyling} style={{ padding: "6px 11px", background: item.needsStyling ? "#fff0f6" : "#f5f2ed", border: item.needsStyling ? "1.5px solid #f3b4ce" : "1px solid #e0dbd2", borderRadius: 10, cursor: "pointer", fontSize: 12, fontWeight: 700, color: item.needsStyling ? "#b64b78" : "#666", fontFamily: "'DM Sans', sans-serif", display: "flex", alignItems: "center", gap: 5, flexShrink: 0, whiteSpace: "nowrap" }}><SvgHanger size={14} color="currentColor" /></button>}
               {isWishlist ? (<>
-                {item.link && <a href={item.link} target="_blank" rel="noreferrer" title="Buy" style={{ width: 32, height: 32, borderRadius: "50%", background: "transparent", border: "1px solid #e8e4dc", display: "flex", alignItems: "center", justifyContent: "center", textDecoration: "none", flexShrink: 0 }}><SvgCart size={14} color="#555" /></a>}
-                <button onClick={() => { setPurchasedFinalPrice(item.price ? item.price.replace(/[^0-9.]/g,"") : ""); setPurchasedKeepLink(true); setShowPurchasedModal(true); }} title="Mark as purchased" style={{ width: 32, height: 32, borderRadius: "50%", background: "transparent", border: "1px solid #e8e4dc", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}><SvgShop size={14} color="#555" /></button>
-                <button onClick={onDelete} title="Delete" style={{ width: 32, height: 32, borderRadius: "50%", background: "#fef2f2", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", color: "#e05555", flexShrink: 0 }}><SvgTrash size={14} color="#e05555" /></button>
+                {item.link && <a href={item.link} target="_blank" rel="noreferrer" style={{ padding: "6px 11px", background: "transparent", border: "1px solid #e8e4dc", borderRadius: 10, display: "flex", alignItems: "center", gap: 5, textDecoration: "none", flexShrink: 0, color: "#555", fontFamily: "'DM Sans', sans-serif", fontSize: 12, fontWeight: 700, whiteSpace: "nowrap" }}><SvgCart size={13} color="#555" />Buy</a>}
+                <button onClick={() => { setPurchasedFinalPrice(item.price ? item.price.replace(/[^0-9.]/g,"") : ""); setPurchasedKeepLink(true); setShowPurchasedModal(true); }} style={{ padding: "6px 11px", background: "transparent", border: "1px solid #e8e4dc", borderRadius: 10, cursor: "pointer", display: "flex", alignItems: "center", gap: 5, flexShrink: 0, fontFamily: "'DM Sans', sans-serif", fontSize: 12, fontWeight: 700, color: "#555", whiteSpace: "nowrap" }}><SvgShop size={13} color="#555" />Purchased</button>
+                <button onClick={onDelete} style={{ padding: "6px 11px", background: "#fef2f2", border: "none", borderRadius: 10, cursor: "pointer", display: "flex", alignItems: "center", gap: 5, flexShrink: 0, fontFamily: "'DM Sans', sans-serif", fontSize: 12, fontWeight: 700, color: "#e05555", whiteSpace: "nowrap" }}><SvgTrash size={13} color="#e05555" />Delete</button>
               </>) : (<>
                 <button onClick={onDelete} title="Delete" style={{ width: 32, height: 32, borderRadius: "50%", background: "#fef2f2", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", color: "#e05555", flexShrink: 0 }}><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4h6v2"/></svg></button>
               </>)}
@@ -5020,7 +5020,7 @@ function StatsTab({ itemsDb, outfitsDb, lookbooksDb, wishlistDb, outfitCalendar,
 }
 
 // ── Wishlist Tab ──────────────────────────────────────────────────────────────
-function WishlistTab({ wishlistDb, wishlistsDb, saveWishlistsMeta, activeWishlistId, setActiveWishlistId, wlSort, setWlSort, wlSortCat, setWlSortCat, wlZoom, setWlZoom, moveToCloset, onEdit, onItemClick, moodboardsDb, lookbooksDb }) {
+function WishlistTab({ wishlistDb, wishlistsDb, saveWishlistsMeta, activeWishlistId, setActiveWishlistId, wlSort, setWlSort, wlSortCat, setWlSortCat, wlZoom, setWlZoom, moveToCloset, onEdit, onItemClick, moodboardsDb, lookbooksDb, wlSelectMode, setWlSelectMode }) {
   const [showNewWl, setShowNewWl] = useState(false);
   const [newWlName, setNewWlName] = useState("");
   const [newWlNotes, setNewWlNotes] = useState("");
@@ -5030,7 +5030,6 @@ function WishlistTab({ wishlistDb, wishlistsDb, saveWishlistsMeta, activeWishlis
   const [customOrder, setCustomOrder] = useState({});
   const [wlStoreFilter, setWlStoreFilter] = useState("All");
   const [wlSearch, setWlSearch] = useState("");
-  const [wlSelectMode, setWlSelectMode] = useState(false);
   const [wlSelected, setWlSelected] = useState(new Set());
   const [listDragId, setListDragId] = useState(null);
   const [listDragOverId, setListDragOverId] = useState(null);
@@ -5039,6 +5038,9 @@ function WishlistTab({ wishlistDb, wishlistsDb, saveWishlistsMeta, activeWishlis
   const [purchaseFinalPrice, setPurchaseFinalPrice] = useState("");
   const [purchaseKeepLink, setPurchaseKeepLink] = useState(true);
   const [showBulkMoveDropdown, setShowBulkMoveDropdown] = useState(false);
+
+  // Clear selection when select mode is turned off externally (e.g. Cancel button in toolbar)
+  useEffect(() => { if (!wlSelectMode) setWlSelected(new Set()); }, [wlSelectMode]);
 
   const priorityMeta = { high: { label: "High", bg: "#fff0f0", color: "#e05555", border: "#ffc5c5" }, medium: { label: "Medium", bg: "#fff8ee", color: "#a07000", border: "#f5c842" }, low: { label: "Low", bg: "#f5f3ef", color: "#aaa", border: "#e0dbd0" } };
 
@@ -5056,7 +5058,8 @@ function WishlistTab({ wishlistDb, wishlistsDb, saveWishlistsMeta, activeWishlis
       if (wlSort === "added") return new Date(b.addedAt || 0) - new Date(a.addedAt || 0);
       return 0;
     }).filter(i => wlSortCat === "All" || i.category === wlSortCat)
-      .filter(i => wlStoreFilter === "All" || (i.store || "") === wlStoreFilter);
+      .filter(i => wlStoreFilter === "All" || (i.store || "") === wlStoreFilter)
+      .filter(i => !wlSearch || (i.name||"").toLowerCase().includes(wlSearch.toLowerCase()) || (i.brand||"").toLowerCase().includes(wlSearch.toLowerCase()) || (i.store||"").toLowerCase().includes(wlSearch.toLowerCase()));
     const orderKey = activeWishlistId || "all";
     const order = customOrder[orderKey];
     if (order && order.length) {
@@ -5101,7 +5104,7 @@ function WishlistTab({ wishlistDb, wishlistsDb, saveWishlistsMeta, activeWishlis
   const wlCategories = [...new Set(wishlistDb.rows.map(i => i.category).filter(Boolean))];
   const wlStores = [...new Set(wishlistDb.rows.map(i => i.store).filter(Boolean))];
   const activeWl = wishlistsDb.find(w => w.id === activeWishlistId) || null;
-  const filteredWishlistsDb = wlSearch ? wishlistsDb.filter(w => w.name.toLowerCase().includes(wlSearch.toLowerCase())) : wishlistsDb;
+  const filteredWishlistsDb = wishlistsDb;
 
   const openPurchaseModal = (item) => {
     setPurchaseItem(item);
@@ -5150,7 +5153,7 @@ function WishlistTab({ wishlistDb, wishlistsDb, saveWishlistsMeta, activeWishlis
           <span style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)", pointerEvents: "none" }}>
             <SvgSearch size={12} color="#bbb" />
           </span>
-          <input value={wlSearch} onChange={e => setWlSearch(e.target.value)} placeholder="Search lists…"
+          <input value={wlSearch} onChange={e => setWlSearch(e.target.value)} placeholder="Search items…"
             style={{ width: "100%", padding: "7px 10px 7px 30px", border: "1px solid #e8e4dc", borderRadius: 10, fontFamily: "'DM Sans', sans-serif", fontSize: 12, outline: "none", boxSizing: "border-box", background: "#faf9f6", color: "#1a1a1a" }} />
         </div>
 
@@ -5288,10 +5291,6 @@ function WishlistTab({ wishlistDb, wishlistsDb, saveWishlistsMeta, activeWishlis
             </select>
           )}
           <div style={{ display: "flex", alignItems: "center", gap: 8, marginLeft: "auto" }}>
-            <button onClick={() => { setWlSelectMode(s => !s); setWlSelected(new Set()); }}
-              style={{ padding: "6px 14px", borderRadius: 100, border: "1px solid #e0dbd2", background: wlSelectMode ? "#1a1a1a" : "#fff", color: wlSelectMode ? "#fff" : "#666", fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "'DM Sans', sans-serif", whiteSpace: "nowrap" }}>
-              {wlSelectMode ? "Done" : "Select"}
-            </button>
             <SvgBox size={11} color="#bbb" />
             <input type="range" min={160} max={300} step={10} value={wlZoom || 210} onChange={e => setWlZoom && setWlZoom(Number(e.target.value))}
               style={{ width: 72, accentColor: "#1a1a1a", cursor: "pointer" }} />
@@ -8472,6 +8471,7 @@ export default function App() {
   const [activeWishlistId, setActiveWishlistId] = useState(null); // null = "All"
   const [wishlistsDb, setWishlistsLocal] = useState(() => { try { return JSON.parse(localStorage.getItem("wardrobe_wishlists_v1") || "[]"); } catch { return []; } });
   const [bulkSelected, setBulkSelected] = useState(new Set());
+  const [wlSelectMode, setWlSelectMode] = useState(false);
   const [globalSearch, setGlobalSearch] = useState("");
   const [showGlobalSearch, setShowGlobalSearch] = useState(false);
   const [lookbookModal, setLookbookModal] = useState(false);
@@ -8836,6 +8836,8 @@ export default function App() {
               </div>
               {/* Bulk select for closet */}
               {tab === "closet" && <button onClick={() => { setBulkMode(b => !b); setBulkSelected(new Set()); }} style={{ padding: "10px 16px", borderRadius: 14, background: bulkMode ? "#1a1a1a" : "#fff", border: "1.5px solid #e4dfd6", cursor: "pointer", fontSize: 13, fontWeight: 600, color: bulkMode ? "#fff" : "#888", fontFamily: "'DM Sans', sans-serif" }}>{bulkMode ? "Cancel" : "Select"}</button>}
+              {/* Bulk select for wishlist */}
+              {tab === "wishlist" && <button onClick={() => setWlSelectMode(b => !b)} style={{ padding: "10px 16px", borderRadius: 14, background: wlSelectMode ? "#1a1a1a" : "#fff", border: "1.5px solid #e4dfd6", cursor: "pointer", fontSize: 13, fontWeight: 600, color: wlSelectMode ? "#fff" : "#888", fontFamily: "'DM Sans', sans-serif" }}>{wlSelectMode ? "Cancel" : "Select"}</button>}
               {/* Add button */}
               {tab !== "stats" && tab !== "moodboard" && (
                 <button className="btn-primary" onClick={() => {
@@ -9386,6 +9388,8 @@ export default function App() {
               onItemClick={(item) => setItemDetail(item)}
               moodboardsDb={moodboardsDb.boards}
               lookbooksDb={lookbooksDb.rows}
+              wlSelectMode={wlSelectMode}
+              setWlSelectMode={setWlSelectMode}
             />}
 
             </>

@@ -5151,11 +5151,8 @@ function WishlistTab({ wishlistDb, wishlistsDb, saveWishlistsMeta, activeWishlis
       <div style={{ width: 190, flexShrink: 0, display: "flex", flexDirection: "column", gap: 4 }}>
         {/* Search */}
         <div style={{ position: "relative", marginBottom: 6 }}>
-          <span style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)", pointerEvents: "none" }}>
-            <SvgSearch size={12} color="#bbb" />
-          </span>
-          <input value={wlSearch} onChange={e => setWlSearch(e.target.value)} placeholder="Search items…"
-            style={{ width: "100%", padding: "7px 10px 7px 30px", border: "1px solid #e8e4dc", borderRadius: 10, fontFamily: "'DM Sans', sans-serif", fontSize: 12, outline: "none", boxSizing: "border-box", background: "#faf9f6", color: "#1a1a1a" }} />
+          <span style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)", pointerEvents: "none", display: "flex" }}><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#bbb" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ pointerEvents: "none" }}><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg></span>
+          <input className="closet-search" value={wlSearch} onChange={e => setWlSearch(e.target.value)} placeholder="Search items…" />
         </div>
 
         {/* All Items */}

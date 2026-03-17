@@ -5155,70 +5155,73 @@ function WishlistTab({ wishlistDb, wishlistsDb, saveWishlistsMeta, activeWishlis
           <input className="closet-search" value={wlSearch} onChange={e => setWlSearch(e.target.value)} placeholder="Search items…" />
         </div>
 
-        {/* All Items */}
-        <button onClick={() => setActiveWishlistId(null)} style={{
-          width: "100%", textAlign: "left", padding: "9px 14px", borderRadius: 12, border: "none", cursor: "pointer",
-          fontFamily: "'DM Sans', sans-serif", fontSize: 13, fontWeight: activeWishlistId === null ? 700 : 500,
-          background: activeWishlistId === null ? "#1a1a1a" : "transparent",
-          color: activeWishlistId === null ? "#fff" : "#555",
-          display: "flex", alignItems: "center", justifyContent: "space-between", transition: "all 0.15s",
-        }}>
-          <span>All Items</span>
-          <span style={{ fontSize: 11, opacity: 0.5, fontWeight: 600 }}>{wishlistDb.rows.length}</span>
-        </button>
-
-        {/* Named lists (draggable) */}
-        {filteredWishlistsDb.map(wl => (
-          <button key={wl.id} onClick={() => setActiveWishlistId(wl.id)}
-            draggable
-            onDragStart={() => setListDragId(wl.id)}
-            onDragEnter={() => setListDragOverId(wl.id)}
-            onDragEnd={handleListDrop}
-            onDragOver={e => e.preventDefault()}
-            style={{
-              width: "100%", textAlign: "left", padding: "9px 14px", borderRadius: 12, cursor: "grab",
-              border: listDragOverId === wl.id ? "2px dashed #888" : "none",
-              fontFamily: "'DM Sans', sans-serif", fontSize: 13, fontWeight: activeWishlistId === wl.id ? 700 : 500,
-              background: activeWishlistId === wl.id ? "#1a1a1a" : "transparent",
-              color: activeWishlistId === wl.id ? "#fff" : "#555",
-              display: "flex", alignItems: "center", justifyContent: "space-between", transition: "all 0.15s",
-            }}>
-            <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1 }}>{wl.name}</span>
-            <span style={{ fontSize: 11, opacity: 0.5, fontWeight: 600, flexShrink: 0, marginLeft: 6 }}>{wishlistDb.rows.filter(i => i.wishlistId === wl.id).length}</span>
-          </button>
-        ))}
-
-        {/* New list */}
-        {!showNewWl && (
-          <button onClick={() => setShowNewWl(true)} style={{
-            width: "100%", textAlign: "left", padding: "9px 14px", borderRadius: 12,
-            border: "1.5px dashed #d8d2c8", background: "transparent", cursor: "pointer",
-            fontFamily: "'DM Sans', sans-serif", fontSize: 12, fontWeight: 600, color: "#aaa",
-            marginTop: 4, display: "flex", alignItems: "center", gap: 6,
+        {/* Lists card */}
+        <div style={{ background: "#fff", borderRadius: 18, border: "1px solid #ece8e0", padding: "6px", display: "flex", flexDirection: "column", gap: 2 }}>
+          {/* All Items */}
+          <button onClick={() => setActiveWishlistId(null)} style={{
+            width: "100%", textAlign: "left", padding: "9px 14px", borderRadius: 12, border: "none", cursor: "pointer",
+            fontFamily: "'DM Sans', sans-serif", fontSize: 13, fontWeight: activeWishlistId === null ? 700 : 500,
+            background: activeWishlistId === null ? "#1a1a1a" : "transparent",
+            color: activeWishlistId === null ? "#fff" : "#555",
+            display: "flex", alignItems: "center", justifyContent: "space-between", transition: "all 0.15s",
           }}>
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-            New List
+            <span>All Items</span>
+            <span style={{ fontSize: 11, opacity: 0.5, fontWeight: 600 }}>{wishlistDb.rows.length}</span>
           </button>
-        )}
-        {showNewWl && (
-          <div style={{ background: "#fff", borderRadius: 14, border: "1px solid #ece8e0", padding: "12px", marginTop: 4 }}>
-            <input value={newWlName} onChange={e => setNewWlName(e.target.value)} placeholder="List name…" autoFocus
-              onKeyDown={e => { if (e.key === "Enter" && newWlName.trim()) { const wl = { id: Date.now().toString(36), name: newWlName.trim(), notes: newWlNotes }; saveWishlistsMeta([...wishlistsDb, wl]); setNewWlName(""); setNewWlNotes(""); setShowNewWl(false); setActiveWishlistId(wl.id); }}}
-              style={{ width: "100%", padding: "7px 10px", border: "1px solid #e0dbd2", borderRadius: 8, fontFamily: "'DM Sans', sans-serif", fontSize: 12, fontWeight: 600, outline: "none", marginBottom: 6, boxSizing: "border-box" }} />
-            <textarea value={newWlNotes} onChange={e => setNewWlNotes(e.target.value)} placeholder="Notes (optional)" rows={2}
-              style={{ width: "100%", padding: "7px 10px", border: "1px solid #e0dbd2", borderRadius: 8, fontFamily: "'DM Sans', sans-serif", fontSize: 11, resize: "none", outline: "none", marginBottom: 8, boxSizing: "border-box" }} />
-            <div style={{ display: "flex", gap: 6 }}>
-              <button onClick={() => { if (!newWlName.trim()) return; const wl = { id: Date.now().toString(36), name: newWlName.trim(), notes: newWlNotes }; saveWishlistsMeta([...wishlistsDb, wl]); setNewWlName(""); setNewWlNotes(""); setShowNewWl(false); setActiveWishlistId(wl.id); }}
-                style={{ flex: 1, padding: "7px 0", background: "#1a1a1a", color: "#fff", border: "none", borderRadius: 8, cursor: "pointer", fontSize: 12, fontWeight: 700, fontFamily: "'DM Sans', sans-serif" }}>Create</button>
-              <button onClick={() => { setShowNewWl(false); setNewWlName(""); setNewWlNotes(""); }}
-                style={{ padding: "7px 10px", background: "#f5f2ed", border: "none", borderRadius: 8, cursor: "pointer", fontSize: 11, color: "#888", fontFamily: "'DM Sans', sans-serif" }}>✕</button>
+
+          {/* Named lists (draggable) */}
+          {filteredWishlistsDb.map(wl => (
+            <button key={wl.id} onClick={() => setActiveWishlistId(wl.id)}
+              draggable
+              onDragStart={() => setListDragId(wl.id)}
+              onDragEnter={() => setListDragOverId(wl.id)}
+              onDragEnd={handleListDrop}
+              onDragOver={e => e.preventDefault()}
+              style={{
+                width: "100%", textAlign: "left", padding: "9px 14px", borderRadius: 12, cursor: "grab",
+                border: listDragOverId === wl.id ? "2px dashed #888" : "none",
+                fontFamily: "'DM Sans', sans-serif", fontSize: 13, fontWeight: activeWishlistId === wl.id ? 700 : 500,
+                background: activeWishlistId === wl.id ? "#1a1a1a" : "transparent",
+                color: activeWishlistId === wl.id ? "#fff" : "#555",
+                display: "flex", alignItems: "center", justifyContent: "space-between", transition: "all 0.15s",
+              }}>
+              <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1 }}>{wl.name}</span>
+              <span style={{ fontSize: 11, opacity: 0.5, fontWeight: 600, flexShrink: 0, marginLeft: 6 }}>{wishlistDb.rows.filter(i => i.wishlistId === wl.id).length}</span>
+            </button>
+          ))}
+
+          {/* New list */}
+          {!showNewWl && (
+            <button onClick={() => setShowNewWl(true)} style={{
+              width: "100%", textAlign: "left", padding: "9px 14px", borderRadius: 12,
+              border: "1.5px dashed #d8d2c8", background: "transparent", cursor: "pointer",
+              fontFamily: "'DM Sans', sans-serif", fontSize: 12, fontWeight: 600, color: "#aaa",
+              display: "flex", alignItems: "center", gap: 6,
+            }}>
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+              New List
+            </button>
+          )}
+          {showNewWl && (
+            <div style={{ padding: "8px 4px 4px" }}>
+              <input value={newWlName} onChange={e => setNewWlName(e.target.value)} placeholder="List name…" autoFocus
+                onKeyDown={e => { if (e.key === "Enter" && newWlName.trim()) { const wl = { id: Date.now().toString(36), name: newWlName.trim(), notes: newWlNotes }; saveWishlistsMeta([...wishlistsDb, wl]); setNewWlName(""); setNewWlNotes(""); setShowNewWl(false); setActiveWishlistId(wl.id); }}}
+                style={{ width: "100%", padding: "7px 10px", border: "1px solid #e0dbd2", borderRadius: 8, fontFamily: "'DM Sans', sans-serif", fontSize: 12, fontWeight: 600, outline: "none", marginBottom: 6, boxSizing: "border-box" }} />
+              <textarea value={newWlNotes} onChange={e => setNewWlNotes(e.target.value)} placeholder="Notes (optional)" rows={2}
+                style={{ width: "100%", padding: "7px 10px", border: "1px solid #e0dbd2", borderRadius: 8, fontFamily: "'DM Sans', sans-serif", fontSize: 11, resize: "none", outline: "none", marginBottom: 8, boxSizing: "border-box" }} />
+              <div style={{ display: "flex", gap: 6 }}>
+                <button onClick={() => { if (!newWlName.trim()) return; const wl = { id: Date.now().toString(36), name: newWlName.trim(), notes: newWlNotes }; saveWishlistsMeta([...wishlistsDb, wl]); setNewWlName(""); setNewWlNotes(""); setShowNewWl(false); setActiveWishlistId(wl.id); }}
+                  style={{ flex: 1, padding: "7px 0", background: "#1a1a1a", color: "#fff", border: "none", borderRadius: 8, cursor: "pointer", fontSize: 12, fontWeight: 700, fontFamily: "'DM Sans', sans-serif" }}>Create</button>
+                <button onClick={() => { setShowNewWl(false); setNewWlName(""); setNewWlNotes(""); }}
+                  style={{ padding: "7px 10px", background: "#f5f2ed", border: "none", borderRadius: 8, cursor: "pointer", fontSize: 11, color: "#888", fontFamily: "'DM Sans', sans-serif" }}>✕</button>
+              </div>
             </div>
-          </div>
-        )}
+          )}
+        </div>
 
         {/* Edit active list + moodboard/lookbook links */}
         {activeWl && (
-          <div style={{ marginTop: 8, paddingTop: 8, borderTop: "1px solid #ece8e0" }}>
+          <div style={{ marginTop: 8, background: "#fff", borderRadius: 18, border: "1px solid #ece8e0", padding: "12px" }}>
             {editingWlId === activeWl.id ? (
               <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
                 <input value={activeWl.name} onChange={e => saveWishlistsMeta(wishlistsDb.map(w => w.id === activeWl.id ? { ...w, name: e.target.value } : w))}

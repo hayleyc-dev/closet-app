@@ -5302,12 +5302,17 @@ function WishlistTab({ wishlistDb, wishlistsDb, saveWishlistsMeta, activeWishlis
               {wlCategories.map(c => <option key={c} value={c}>{c}</option>)}
             </select>
           )}
-          {wlStores.length > 0 && (
-            <select value={wlStoreFilter} onChange={e => setWlStoreFilter(e.target.value)} className="pill-select">
-              <option value="All">All Stores</option>
-              {wlStores.map(s => <option key={s} value={s}>{s}</option>)}
-            </select>
-          )}
+          {wlStoreFilter !== "All" && (() => {
+            const storeQuery = encodeURIComponent(wlStoreFilter);
+            const storeUrl = `https://www.google.com/search?q=${storeQuery}+official+site`;
+            return (
+              <a href={storeUrl} target="_blank" rel="noreferrer"
+                style={{ padding: "7px 13px", background: "#1a1a1a", borderRadius: 100, display: "flex", alignItems: "center", gap: 6, textDecoration: "none", color: "#fff", fontFamily: "'DM Sans', sans-serif", fontSize: 12, fontWeight: 700, flexShrink: 0 }}>
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+                {wlStoreFilter}
+              </a>
+            );
+          })()}
           <div style={{ display: "flex", alignItems: "center", gap: 8, marginLeft: "auto" }}>
             <SvgBox size={11} color="#bbb" />
             <input type="range" min={160} max={300} step={10} value={wlZoom || 210} onChange={e => setWlZoom && setWlZoom(Number(e.target.value))}
@@ -5454,6 +5459,28 @@ function WishlistTab({ wishlistDb, wishlistsDb, saveWishlistsMeta, activeWishlis
           </div>
         )}
       </div>
+
+      {/* ── Right panel: Stores filter ── */}
+      {wlStores.length > 0 && (
+        <div style={{ width: 180, flexShrink: 0, display: "flex", flexDirection: "column", gap: 8 }}>
+          <div style={{ background: "#fff", borderRadius: 18, border: "1px solid #ece8e0", padding: "6px" }}>
+            <div style={{ padding: "8px 14px 6px", fontSize: 10, fontWeight: 700, color: "#aaa", textTransform: "uppercase", letterSpacing: "0.07em" }}>Stores</div>
+            {wlStores.map(store => (
+              <button key={store} onClick={() => setWlStoreFilter(s => s === store ? "All" : store)}
+                style={{
+                  width: "100%", textAlign: "left", padding: "9px 14px", borderRadius: 12, border: "none", cursor: "pointer",
+                  fontFamily: "'DM Sans', sans-serif", fontSize: 13, fontWeight: wlStoreFilter === store ? 700 : 500,
+                  background: wlStoreFilter === store ? "#1a1a1a" : "transparent",
+                  color: wlStoreFilter === store ? "#fff" : "#555",
+                  display: "flex", alignItems: "center", justifyContent: "space-between", transition: "all 0.15s",
+                }}>
+                <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{store}</span>
+                <span style={{ fontSize: 11, opacity: 0.5, fontWeight: 600, flexShrink: 0, marginLeft: 6 }}>{wishlistDb.rows.filter(i => (i.store || "") === store).length}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* ── Purchase modal ── */}
       {purchaseItem && (

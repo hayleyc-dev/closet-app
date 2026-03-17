@@ -448,7 +448,7 @@ const SelectField = ({ label, options, ...props }) => (
   </div>
 );
 
-const Modal = ({ open, onClose, title, children }) => {
+const Modal = ({ open, onClose, title, children, maxWidth = 520 }) => {
   if (!open) return null;
   return (
     <div className="fade-in" onClick={onClose} style={{
@@ -457,12 +457,14 @@ const Modal = ({ open, onClose, title, children }) => {
     }}>
       <div className="fade-up" onClick={e => e.stopPropagation()} style={{
         background: "#fff", borderRadius: 24, padding: "28px 24px", width: "100%",
-        maxWidth: 520, maxHeight: "90vh", overflowY: "auto", boxShadow: "0 24px 80px rgba(0,0,0,0.15)"
+        maxWidth, maxHeight: "90vh", overflowY: "auto", boxShadow: "0 24px 80px rgba(0,0,0,0.15)"
       }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 22 }}>
-          <h2 style={{ fontSize: 18, fontWeight: 700, color: "#1a1a1a" }}>{title}</h2>
-          <button onClick={onClose} style={{ width: 32, height: 32, borderRadius: "50%", border: "none", background: "#f5f2ed", cursor: "pointer", fontSize: 16, color: "#888", display: "flex", alignItems: "center", justifyContent: "center" }}><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
-        </div>
+        {title ? (
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 22 }}>
+            <h2 style={{ fontSize: 18, fontWeight: 700, color: "#1a1a1a" }}>{title}</h2>
+            <button onClick={onClose} style={{ width: 32, height: 32, borderRadius: "50%", border: "none", background: "#f5f2ed", cursor: "pointer", fontSize: 16, color: "#888", display: "flex", alignItems: "center", justifyContent: "center" }}><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+          </div>
+        ) : null}
         {children}
       </div>
     </div>
@@ -1129,7 +1131,7 @@ function CropTool({ src, onDone, onCancel }) {
   );
 }
 
-function ImageUploadField({ value, onChange }) {
+function ImageUploadField({ value, onChange, style: outerStyle }) {
   const [tab, setTab] = useState("upload"); // "upload" | "url"
   const [urlInput, setUrlInput] = useState("");
   const [fetching, setFetching] = useState(false);
@@ -1195,7 +1197,7 @@ function ImageUploadField({ value, onChange }) {
   };
 
   return (
-    <div style={{ marginBottom: 14 }}>
+    <div style={{ marginBottom: 14, ...outerStyle }}>
       {showCropTool && (
         <CropTool src={value} onDone={dataUrl => { onChange(dataUrl); setShowCropTool(false); }} onCancel={() => setShowCropTool(false)} />
       )}
@@ -1583,13 +1585,12 @@ function AddItemModal({ onSave, onSaveWish, onCancel, initial, editMode, initial
   // ── Main form ──
   return (
     <div>
-      {/* Closet / Wishlist toggle + draft button — rendered INSIDE modal by AddItemModal */}
-      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 20 }}>
-        {/* Toggle */}
+      {/* ── Header row: toggle + draft + close ── */}
+      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 16 }}>
         <div style={{ display: "flex", background: "#f5f2ed", borderRadius: 12, padding: 3, flex: 1 }}>
           {[["closet","My Closet"],["wishlist","Wishlist"]].map(([id, lbl]) => (
             <button key={id} onClick={() => setDest(id)} style={{
-              flex: 1, padding: "8px 0", borderRadius: 10, border: "none", cursor: "pointer",
+              flex: 1, padding: "7px 0", borderRadius: 10, border: "none", cursor: "pointer",
               background: dest === id ? "#1a1a1a" : "transparent",
               color: dest === id ? "#fff" : "#aaa",
               fontFamily: "'DM Sans', sans-serif", fontSize: 13, fontWeight: 700,
@@ -1597,26 +1598,30 @@ function AddItemModal({ onSave, onSaveWish, onCancel, initial, editMode, initial
             }}>{lbl}</button>
           ))}
         </div>
-        {/* Draft folder button */}
-        <button onClick={() => { refreshDrafts(); setShowDrafts(true); }} style={{
-          width: 38, height: 38, borderRadius: 10, background: "#f5f2ed", border: "none",
-          cursor: "pointer", fontSize: 18, display: "flex", alignItems: "center", justifyContent: "center",
+        <button onClick={() => { refreshDrafts(); setShowDrafts(true); }} title="Drafts" style={{
+          width: 36, height: 36, borderRadius: 10, background: "#f5f2ed", border: "none",
+          cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
           flexShrink: 0, position: "relative"
         }}>
-          <SvgBox size={16} color="#888" />
-          {drafts.length > 0 && <span style={{ position: "absolute", top: 4, right: 4, width: 14, height: 14, borderRadius: "50%", background: "#e05588", color: "#fff", fontSize: 9, fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center" }}>{drafts.length}</span>}
+          <SvgBox size={15} color="#888" />
+          {drafts.length > 0 && <span style={{ position: "absolute", top: 4, right: 4, width: 13, height: 13, borderRadius: "50%", background: "#e05588", color: "#fff", fontSize: 8, fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center" }}>{drafts.length}</span>}
+        </button>
+        <button onClick={onCancel} title="Close" style={{
+          width: 36, height: 36, borderRadius: 10, background: "#f5f2ed", border: "none",
+          cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0
+        }}>
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#888" strokeWidth="2.5" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
         </button>
       </div>
 
-      {/* URL Import Bar */}
+      {/* ── URL import — spans full width ── */}
       <div style={{ marginBottom: 16 }}>
-        <label style={{ display: "block", fontSize: 11, fontWeight: 600, color: "#999", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 6 }}>Import from URL</label>
         <div style={{ display: "flex", gap: 8 }}>
           <input
             value={urlInput}
             onChange={e => { setUrlInput(e.target.value); setUrlError(""); setUrlSuccess(false); }}
             onKeyDown={e => e.key === "Enter" && extractFromUrl()}
-            placeholder="Paste a product link to auto-fill…"
+            placeholder="Paste a product link to auto-fill all fields…"
             style={{ flex: 1, padding: "9px 14px", border: "1.5px solid #e0dbd2", borderRadius: 12, fontFamily: "'DM Sans', sans-serif", fontSize: 12, outline: "none", background: "#fafaf8" }}
           />
           <button onClick={extractFromUrl} disabled={urlLoading || !urlInput.trim()} style={{
@@ -1633,119 +1638,136 @@ function AddItemModal({ onSave, onSaveWish, onCancel, initial, editMode, initial
             )}
           </button>
         </div>
-        {urlError && <div style={{ marginTop: 6, fontSize: 11, color: "#e05555", fontWeight: 600 }}>{urlError}</div>}
-        {urlSuccess && <div style={{ marginTop: 6, fontSize: 11, color: "#2d6a3f", fontWeight: 600, display: "flex", alignItems: "center", gap: 4 }}><SvgCheck size={11} color="#2d6a3f" />Fields auto-filled — review and adjust below</div>}
+        {urlError && <div style={{ marginTop: 5, fontSize: 11, color: "#e05555", fontWeight: 600 }}>{urlError}</div>}
+        {urlSuccess && <div style={{ marginTop: 5, fontSize: 11, color: "#2d6a3f", fontWeight: 600, display: "flex", alignItems: "center", gap: 4 }}><SvgCheck size={11} color="#2d6a3f" />Fields auto-filled — review below</div>}
       </div>
 
-      {/* Photo */}
-      <ImageUploadField value={form.image} onChange={v => setForm(f => ({ ...f, image: v }))} />
+      {/* ── Two-column body ── */}
+      <div style={{ display: "flex", gap: 24, alignItems: "flex-start" }}>
 
-      {/* Wishlist-only: product link */}
-      {dest === "wishlist" && (
-        <div style={{ marginBottom: 14 }}>
-          <label style={{ display: "block", fontSize: 11, fontWeight: 600, color: "#999", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 6 }}>Product Link</label>
-          <input style={{ ...inputStyle, width: "100%" }} value={form.link || ""} onChange={e => setForm(f => ({ ...f, link: e.target.value }))} placeholder="https://zara.com/..." />
+        {/* LEFT: image */}
+        <div style={{ width: 252, flexShrink: 0 }}>
+          <ImageUploadField value={form.image} onChange={v => setForm(f => ({ ...f, image: v }))} style={{ marginBottom: 0 }} />
         </div>
-      )}
 
-      {/* Core fields */}
-      <Input label="Name" value={form.name} onChange={set("name")} placeholder="e.g. White linen shirt" />
-      <Input label="Brand" value={form.brand} onChange={set("brand")} placeholder="e.g. Zara" />
-      {dest === "wishlist" && <Input label="Store" value={form.store || ""} onChange={e => setForm(f => ({ ...f, store: e.target.value }))} placeholder="e.g. Zara, ASOS, Amazon" />}
+        {/* RIGHT: all fields — independently scrollable */}
+        <div style={{ flex: 1, minWidth: 0, overflowY: "auto", maxHeight: "calc(90vh - 230px)", paddingRight: 2 }}>
 
-      {dest === "wishlist" && (
-        <div style={{ marginBottom: 14 }}>
-          <label style={{ display: "block", fontSize: 11, fontWeight: 600, color: "#999", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 6 }}>Reason</label>
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-            {["Replace", "Gap", "Trend", "Trip", "Dream Item"].map(r => {
-              const val = r.toLowerCase();
-              const active = form.reason === val;
-              return (
-                <button key={r} type="button" onClick={() => setForm(f => ({ ...f, reason: f.reason === val ? "" : val }))} style={{
-                  padding: "6px 14px", borderRadius: 100,
-                  border: active ? "none" : "1px solid #e0dbd2",
-                  background: active ? "#1a1a1a" : "#fff",
-                  color: active ? "#fff" : "#555",
-                  fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "'DM Sans', sans-serif",
-                }}>{r}</button>
-              );
-            })}
-          </div>
-        </div>
-      )}
-
-      {/* Wishlist list picker */}
-      {dest === "wishlist" && (
-        <div style={{ marginBottom: 14 }}>
-          <label style={{ display: "block", fontSize: 11, fontWeight: 600, color: "#999", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 6 }}>Add to List</label>
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-            <button type="button" onClick={() => setSelectedListId("none")} style={{
-              padding: "6px 14px", borderRadius: 100, border: selectedListId === "none" ? "none" : "1px solid #e0dbd2",
-              background: selectedListId === "none" ? "#1a1a1a" : "#fff", color: selectedListId === "none" ? "#fff" : "#555",
-              fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "'DM Sans', sans-serif",
-            }}>No List</button>
-            {wishlistsDb.map(wl => (
-              <button key={wl.id} type="button" onClick={() => setSelectedListId(wl.id)} style={{
-                padding: "6px 14px", borderRadius: 100, border: selectedListId === wl.id ? "none" : "1px solid #e0dbd2",
-                background: selectedListId === wl.id ? "#1a1a1a" : "#fff", color: selectedListId === wl.id ? "#fff" : "#555",
-                fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "'DM Sans', sans-serif",
-              }}>{wl.name}</button>
-            ))}
-            <button type="button" onClick={() => setSelectedListId("new")} style={{
-              padding: "6px 14px", borderRadius: 100, border: selectedListId === "new" ? "none" : "1.5px dashed #c0b8b0",
-              background: selectedListId === "new" ? "#1a1a1a" : "transparent", color: selectedListId === "new" ? "#fff" : "#aaa",
-              fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "'DM Sans', sans-serif",
-            }}>+ New List</button>
-          </div>
-          {selectedListId === "new" && (
-            <input value={newListName} onChange={e => setNewListName(e.target.value)} placeholder="New list name…" autoFocus
-              style={{ marginTop: 8, width: "100%", padding: "8px 12px", border: "1px solid #e0dbd2", borderRadius: 10, fontFamily: "'DM Sans', sans-serif", fontSize: 13, fontWeight: 600, outline: "none", boxSizing: "border-box" }} />
+          {/* Wishlist-only: product link */}
+          {dest === "wishlist" && (
+            <div style={{ marginBottom: 12 }}>
+              <label style={{ display: "block", fontSize: 11, fontWeight: 600, color: "#999", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 5 }}>Product Link</label>
+              <input style={{ ...inputStyle, width: "100%" }} value={form.link || ""} onChange={e => setForm(f => ({ ...f, link: e.target.value }))} placeholder="https://zara.com/..." />
+            </div>
           )}
-        </div>
-      )}
 
-      <div style={{ display: "flex", gap: 10 }}>
-        <div style={{ flex: 1 }}><SelectField label="Category" options={CATEGORIES.slice(1)} value={form.category} onChange={set("category")} /></div>
-        <div style={{ flex: 1 }}><SelectField label="Size" options={SIZES} value={form.size} onChange={set("size")} /></div>
-      </div>
+          {/* Name */}
+          <Input label="Name" value={form.name} onChange={set("name")} placeholder="e.g. White linen shirt" />
 
-      {/* Multi-select Color + Season */}
-      <MultiPills label="Color" options={COLORS} selected={form.colors || []} onChange={v => setForm(f => ({ ...f, colors: v }))} />
-      <MultiPills label="Season" options={SEASONS} selected={form.seasons || []} onChange={v => setForm(f => ({ ...f, seasons: v }))} />
+          {/* Brand + Store side-by-side (wishlist), Brand alone (closet) */}
+          {dest === "wishlist" ? (
+            <div style={{ display: "flex", gap: 10 }}>
+              <div style={{ flex: 1 }}><Input label="Brand" value={form.brand} onChange={set("brand")} placeholder="e.g. Zara" /></div>
+              <div style={{ flex: 1 }}><Input label="Store" value={form.store || ""} onChange={e => setForm(f => ({ ...f, store: e.target.value }))} placeholder="e.g. Zara, ASOS" /></div>
+            </div>
+          ) : (
+            <Input label="Brand" value={form.brand} onChange={set("brand")} placeholder="e.g. Zara" />
+          )}
 
-      {/* Price + Spent */}
-      <div style={{ display: "flex", gap: 10 }}>
-        <div style={{ flex: 1 }}><Input label="Original Price ($)" value={form.price} onChange={set("price")} placeholder="e.g. 89" /></div>
-        <div style={{ flex: 1 }}><Input label="Spent ($)" value={form.spent || ""} onChange={set("spent")} placeholder="e.g. 55" /></div>
-      </div>
+          {/* Category + Size */}
+          <div style={{ display: "flex", gap: 10 }}>
+            <div style={{ flex: 1 }}><SelectField label="Category" options={CATEGORIES.slice(1)} value={form.category} onChange={set("category")} /></div>
+            <div style={{ flex: 1 }}><SelectField label="Size" options={SIZES} value={form.size} onChange={set("size")} /></div>
+          </div>
 
-      {/* Purchase date — closet only */}
-      {dest === "closet" && (
-        <div style={{ marginBottom: 14 }}>
-          <label style={{ display: "block", fontSize: 11, fontWeight: 600, color: "#999", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 6 }}>Purchase Date</label>
-          <input type="date" value={form.purchaseDate || ""} onChange={set("purchaseDate")} style={{ ...inputStyle, width: "100%" }} />
-        </div>
-      )}
+          {/* Color + Season */}
+          <MultiPills label="Color" options={COLORS} selected={form.colors || []} onChange={v => setForm(f => ({ ...f, colors: v }))} />
+          <MultiPills label="Season" options={SEASONS} selected={form.seasons || []} onChange={v => setForm(f => ({ ...f, seasons: v }))} />
 
-      {/* Notes */}
-      <div style={{ marginBottom: 18 }}>
-        <label style={{ display: "block", fontSize: 11, fontWeight: 600, color: "#999", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 6 }}>Notes</label>
-        <textarea style={{ ...inputStyle, resize: "vertical", minHeight: 56 }} value={form.notes || ""} onChange={set("notes")} placeholder="Care instructions, fit notes…" />
-      </div>
+          {/* Price + Spent */}
+          <div style={{ display: "flex", gap: 10 }}>
+            <div style={{ flex: 1 }}><Input label="Original Price ($)" value={form.price} onChange={set("price")} placeholder="e.g. 89" /></div>
+            <div style={{ flex: 1 }}><Input label="Spent ($)" value={form.spent || ""} onChange={set("spent")} placeholder="e.g. 55" /></div>
+          </div>
 
-      {/* Actions */}
-      <div style={{ display: "flex", gap: 8 }}>
+          {/* Purchase date — closet only */}
+          {dest === "closet" && (
+            <div style={{ marginBottom: 14 }}>
+              <label style={{ display: "block", fontSize: 11, fontWeight: 600, color: "#999", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 6 }}>Purchase Date</label>
+              <input type="date" value={form.purchaseDate || ""} onChange={set("purchaseDate")} style={{ ...inputStyle, width: "100%" }} />
+            </div>
+          )}
+
+          {/* Wishlist-only: Reason + List picker */}
+          {dest === "wishlist" && (
+            <div style={{ marginBottom: 14 }}>
+              <label style={{ display: "block", fontSize: 11, fontWeight: 600, color: "#999", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 6 }}>Reason</label>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                {["Replace", "Gap", "Trend", "Trip", "Dream Item"].map(r => {
+                  const val = r.toLowerCase();
+                  const active = form.reason === val;
+                  return (
+                    <button key={r} type="button" onClick={() => setForm(f => ({ ...f, reason: f.reason === val ? "" : val }))} style={{
+                      padding: "5px 12px", borderRadius: 100,
+                      border: active ? "none" : "1px solid #e0dbd2",
+                      background: active ? "#1a1a1a" : "#fff",
+                      color: active ? "#fff" : "#555",
+                      fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "'DM Sans', sans-serif",
+                    }}>{r}</button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {dest === "wishlist" && (
+            <div style={{ marginBottom: 14 }}>
+              <label style={{ display: "block", fontSize: 11, fontWeight: 600, color: "#999", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 6 }}>Add to List</label>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                <button type="button" onClick={() => setSelectedListId("none")} style={{
+                  padding: "5px 12px", borderRadius: 100, border: selectedListId === "none" ? "none" : "1px solid #e0dbd2",
+                  background: selectedListId === "none" ? "#1a1a1a" : "#fff", color: selectedListId === "none" ? "#fff" : "#555",
+                  fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "'DM Sans', sans-serif",
+                }}>No List</button>
+                {wishlistsDb.map(wl => (
+                  <button key={wl.id} type="button" onClick={() => setSelectedListId(wl.id)} style={{
+                    padding: "5px 12px", borderRadius: 100, border: selectedListId === wl.id ? "none" : "1px solid #e0dbd2",
+                    background: selectedListId === wl.id ? "#1a1a1a" : "#fff", color: selectedListId === wl.id ? "#fff" : "#555",
+                    fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "'DM Sans', sans-serif",
+                  }}>{wl.name}</button>
+                ))}
+                <button type="button" onClick={() => setSelectedListId("new")} style={{
+                  padding: "5px 12px", borderRadius: 100, border: selectedListId === "new" ? "none" : "1.5px dashed #c0b8b0",
+                  background: selectedListId === "new" ? "#1a1a1a" : "transparent", color: selectedListId === "new" ? "#fff" : "#aaa",
+                  fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "'DM Sans', sans-serif",
+                }}>+ New List</button>
+              </div>
+              {selectedListId === "new" && (
+                <input value={newListName} onChange={e => setNewListName(e.target.value)} placeholder="New list name…" autoFocus
+                  style={{ marginTop: 8, width: "100%", padding: "8px 12px", border: "1px solid #e0dbd2", borderRadius: 10, fontFamily: "'DM Sans', sans-serif", fontSize: 13, fontWeight: 600, outline: "none", boxSizing: "border-box" }} />
+              )}
+            </div>
+          )}
+
+          {/* Notes */}
+          <div style={{ marginBottom: 4 }}>
+            <label style={{ display: "block", fontSize: 11, fontWeight: 600, color: "#999", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 6 }}>Notes</label>
+            <textarea style={{ ...inputStyle, resize: "vertical", minHeight: 52 }} value={form.notes || ""} onChange={set("notes")} placeholder="Care instructions, fit notes…" />
+          </div>
+
+        </div>{/* /right column */}
+      </div>{/* /two-column body */}
+
+      {/* ── Footer actions ── */}
+      <div style={{ display: "flex", gap: 8, marginTop: 20, paddingTop: 16, borderTop: "1.5px solid #f0ece5" }}>
         <button onClick={saveDraft} style={{
           padding: "10px 14px", background: "#f5f2ed", border: "none", borderRadius: 12,
           cursor: "pointer", fontSize: 13, fontWeight: 700, color: "#888",
           fontFamily: "'DM Sans', sans-serif"
         }}>Save Draft</button>
-        <button onClick={onCancel} style={{
-          padding: "10px 14px", background: "none", border: "none",
-          cursor: "pointer", color: "#bbb", fontFamily: "'DM Sans', sans-serif", fontSize: 13, fontWeight: 600
-        }}>Cancel</button>
+        <div style={{ flex: 1 }} />
         <button className="btn-primary" onClick={handleSave} style={{
-          flex: 1, padding: "10px 0", background: "#1a1a1a", color: "#fff",
+          padding: "10px 24px", background: "#1a1a1a", color: "#fff",
           border: "none", borderRadius: 12, cursor: "pointer",
           fontFamily: "'DM Sans', sans-serif", fontSize: 14, fontWeight: 700
         }}>{dest === "wishlist" ? "Save to Wishlist" : (editMode ? "Save Changes" : "Add to Closet")}</button>
@@ -4104,12 +4126,8 @@ function OutfitBuilder({ itemsDb, wishlistDb, onSave, onClose, initial, seedItem
         }}>
           <div onClick={e => e.stopPropagation()} style={{
             background: "#fff", borderRadius: 20, padding: "24px 22px",
-            width: "100%", maxWidth: 420, maxHeight: "85vh", overflowY: "auto", boxShadow: "0 20px 60px rgba(0,0,0,0.2)"
+            width: "100%", maxWidth: 860, maxHeight: "90vh", overflowY: "auto", boxShadow: "0 20px 60px rgba(0,0,0,0.2)"
           }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
-              <h3 style={{ fontSize: 16, fontWeight: 700, color: "#1a1a1a" }}>{itemPopup.mode === "add" ? `Add to ${panelTab}` : "Edit item"}</h3>
-              <button onClick={() => setItemPopup(null)} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 18, color: "#aaa" }}><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
-            </div>
             <AddItemModal
               initial={itemPopup.mode === "edit" ? itemPopup.item : BLANK}
               editMode={itemPopup.mode === "edit" ? "manual" : null}
@@ -10250,7 +10268,7 @@ export default function App() {
       </div>{/* end app-body */}
 
       {/* Modals */}
-      <Modal open={modal === "item"} onClose={closeModal} title="">
+      <Modal open={modal === "item"} onClose={closeModal} title="" maxWidth={860}>
         <AddItemModal
           initial={editItem || BLANK}
           editMode={editItem ? "manual" : null}

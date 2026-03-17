@@ -1653,6 +1653,27 @@ function AddItemModal({ onSave, onSaveWish, onCancel, initial, editMode, initial
       <Input label="Brand" value={form.brand} onChange={set("brand")} placeholder="e.g. Zara" />
       {dest === "wishlist" && <Input label="Store" value={form.store || ""} onChange={e => setForm(f => ({ ...f, store: e.target.value }))} placeholder="e.g. Zara, ASOS, Amazon" />}
 
+      {dest === "wishlist" && (
+        <div style={{ marginBottom: 14 }}>
+          <label style={{ display: "block", fontSize: 11, fontWeight: 600, color: "#999", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 6 }}>Reason</label>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+            {["Replace", "Gap", "Trend", "Trip", "Dream Item"].map(r => {
+              const val = r.toLowerCase();
+              const active = form.reason === val;
+              return (
+                <button key={r} type="button" onClick={() => setForm(f => ({ ...f, reason: f.reason === val ? "" : val }))} style={{
+                  padding: "6px 14px", borderRadius: 100,
+                  border: active ? "none" : "1px solid #e0dbd2",
+                  background: active ? "#1a1a1a" : "#fff",
+                  color: active ? "#fff" : "#555",
+                  fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "'DM Sans', sans-serif",
+                }}>{r}</button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
       {/* Wishlist list picker */}
       {dest === "wishlist" && (
         <div style={{ marginBottom: 14 }}>
@@ -1865,6 +1886,7 @@ function ItemDetailPopup({ item, onClose, onEdit, onDelete, onWorn, onDuplicate,
               {(item.colors?.length ? item.colors : item.color ? [item.color] : []).map(c => chip(c))}
               {(item.seasons?.length ? item.seasons : item.season ? [item.season] : []).map(s => chip(s, "#f0fbff", "#2bafd4"))}
               {item.needsStyling && chip("Needs styling", "#fff0f6", "#b64b78")}
+              {isWishlist && item.reason && (() => { const rMap = { replace: ["Replace", "#fff0f0", "#e05555"], gap: ["Gap", "#f0f4ff", "#3b5bdb"], trend: ["Trend", "#fdf0ff", "#9c27b0"], trip: ["Trip", "#f0fbff", "#2bafd4"], "dream item": ["Dream Item", "#fffbe6", "#a07000"] }; const rm = rMap[item.reason]; return rm ? chip(rm[0], rm[1], rm[2]) : null; })()}
             </div>
             {/* Color swatches */}
             {(item.colors?.length ? item.colors : item.color ? [item.color] : []).length > 0 && (() => {
@@ -5054,6 +5076,7 @@ function WishlistTab({ wishlistDb, wishlistsDb, saveWishlistsMeta, activeWishlis
   useEffect(() => { if (!wlSelectMode) setWlSelected(new Set()); }, [wlSelectMode]);
 
   const priorityMeta = { high: { label: "High", bg: "#fff0f0", color: "#e05555", border: "#ffc5c5" }, medium: { label: "Medium", bg: "#fff8ee", color: "#a07000", border: "#f5c842" }, low: { label: "Low", bg: "#f5f3ef", color: "#aaa", border: "#e0dbd0" } };
+  const reasonMeta = { replace: { label: "Replace", bg: "#fff0f0", color: "#e05555", border: "#ffc5c5" }, gap: { label: "Gap", bg: "#f0f4ff", color: "#3b5bdb", border: "#b0c4ff" }, trend: { label: "Trend", bg: "#fdf0ff", color: "#9c27b0", border: "#e2b0ff" }, trip: { label: "Trip", bg: "#f0fbff", color: "#2bafd4", border: "#9adff5" }, "dream item": { label: "Dream Item", bg: "#fffbe6", color: "#a07000", border: "#f5c842" } };
 
   const visibleItems = wishlistDb.rows.filter(i =>
     !activeWishlistId || i.wishlistId === activeWishlistId
@@ -5424,6 +5447,7 @@ function WishlistTab({ wishlistDb, wishlistsDb, saveWishlistsMeta, activeWishlis
                       : <SvgHeart size={26} color="#ccc" style={{ opacity: 0.3 }} />
                     }
                     {pm && <div style={{ position: "absolute", top: 7, left: 7, fontSize: 9, fontWeight: 700, color: pm.color, background: pm.bg, border: `1px solid ${pm.border}`, borderRadius: 100, padding: "2px 7px" }}>{item.priority}</div>}
+                    {item.reason && reasonMeta[item.reason] && <div style={{ position: "absolute", top: 7, right: 7, fontSize: 9, fontWeight: 700, color: reasonMeta[item.reason].color, background: reasonMeta[item.reason].bg, border: `1px solid ${reasonMeta[item.reason].border}`, borderRadius: 100, padding: "2px 7px" }}>{reasonMeta[item.reason].label}</div>}
                     <button onClick={e => { e.stopPropagation(); onEdit(item); }} className="item-card-edit-btn"
                       style={{ position: "absolute", bottom: 7, right: 7, width: 28, height: 28, borderRadius: "50%", background: "rgba(255,255,255,0.92)", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", backdropFilter: "blur(4px)", boxShadow: "0 1px 4px rgba(0,0,0,0.1)", opacity: 0 }}>
                       <SvgEdit size={12} color="#555" />
@@ -8592,6 +8616,8 @@ export default function App() {
   const moodboardsDb = useMoodboardsDb();
 
   const [tab, setTab] = useState(() => { try { return localStorage.getItem("wardrobe_default_tab_v1") || "closet"; } catch { return "closet"; } });
+  const [tab, setTabRaw] = useState(() => localStorage.getItem("wardrobe_active_tab") || "closet");
+  const setTab = (t) => { setTabRaw(t); localStorage.setItem("wardrobe_active_tab", t); };
   const [modal, setModal] = useState(null);
   const [catFilter, setCatFilter] = useState("All");
   const [catFilters, setCatFilters] = useState([]); // multi-select categories

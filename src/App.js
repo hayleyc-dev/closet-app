@@ -1856,10 +1856,8 @@ function ItemCard({ item, onClick, onCreateLook, onEdit, onDelete, onAddToCapsul
           : <HangerIcon size={36} color="#ddd" />
         }
       </div>
-      {/* Label + hover actions */}
+      {/* Hover actions */}
       <div className="item-card-label">
-        <div className="item-card-name">{item.name || item.category || "Untitled"}</div>
-        <div className="item-card-brand">{item.brand || (item.colors && item.colors[0]) || item.color || ""}</div>
         <div className="wl-card-actions" style={{ display: "flex", gap: 4, alignItems: "center" }}>
           <button onClick={e => { e.stopPropagation(); onEdit && onEdit(); }} title="Edit"
             className="wl-hover-btn"

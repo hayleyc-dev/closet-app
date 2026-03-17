@@ -9665,12 +9665,8 @@ export default function App() {
             </div>
           </div>
 
-          {/* Content — 2-column layout (left sidebar + main) */}
-          <div className="app-layout">
-
-        {/* ── HOME TAB ── */}
-        {tab === "home" && (
-          <div style={{ flex: 1, minWidth: 0 }}>
+          {/* ── HOME TAB ── */}
+          {tab === "home" && (
             <HomeTab
               outfitCalendar={outfitCalendar}
               outfitsDb={outfitsDb}
@@ -9682,8 +9678,10 @@ export default function App() {
               setActiveLookbookView={setActiveLookbookView}
               setOutfitPopup={setOutfitPopup}
             />
-          </div>
-        )}
+          )}
+
+          {/* Content — 2-column layout (left sidebar + main) */}
+          {tab !== "home" && <div className="app-layout">
 
         {/* ── LEFT SIDEBAR (closet + outfits + lookbooks) ── */}
         {(tab === "closet" || tab === "outfits" || tab === "lookbooks") && (
@@ -10479,7 +10477,7 @@ export default function App() {
           );
         })()}
 
-          </div>{/* end app-layout */}
+          </div>}{/* end app-layout */}
         </div>{/* end app-main-area */}
         {/* ── RIGHT RAIL (stats/sort/etc) ── */}
       </div>{/* end app-body */}

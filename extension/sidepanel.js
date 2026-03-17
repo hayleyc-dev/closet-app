@@ -6,10 +6,137 @@ const SUPABASE_ANON_KEY =
 const STORAGE_BUCKET = "item-images";
 const COLORS = ["Black","Blue","Brown","Clear","Cream","Gold","Green","Grey","Orange","Pink","Purple","Red","Silver","Tan","White","Yellow"];
 
+// ── Canvas image tools (no external API needed) ────────────────────────────
+function removeBgCanvas(dataUrl) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => {
+      const canvas = document.createElement("canvas");
+      canvas.width = img.width;
+      canvas.height = img.height;
+      const ctx = canvas.getContext("2d");
+      ctx.drawImage(img, 0, 0);
+      const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      const data = imageData.data;
+      const w = canvas.width, h = canvas.height;
+
+      const samplePts = [
+        [0,0],[w-1,0],[0,h-1],[w-1,h-1],
+        [Math.floor(w/2),0],[Math.floor(w/2),h-1],
+        [0,Math.floor(h/2)],[w-1,Math.floor(h/2)],
+      ];
+      let rSum=0, gSum=0, bSum=0;
+      samplePts.forEach(([x,y]) => {
+        const i = (y*w+x)*4;
+        rSum+=data[i]; gSum+=data[i+1]; bSum+=data[i+2];
+      });
+      const n = samplePts.length;
+      const bgR=rSum/n, bgG=gSum/n, bgB=bSum/n;
+
+      const colorDist = (i, r, g, b) => {
+        const dr=data[i]-r, dg=data[i+1]-g, db=data[i+2]-b;
+        return Math.sqrt(dr*dr+dg*dg+db*db);
+      };
+
+      const tolerance = 28;
+      const cx = Math.floor(w/2), cy = Math.floor(h/2);
+      const ci = (cy*w+cx)*4;
+      const itemR=data[ci], itemG=data[ci+1], itemB=data[ci+2];
+      const visited = new Uint8Array(w * h);
+
+      const shouldRemove = (i) => {
+        const distToBg = colorDist(i, bgR, bgG, bgB);
+        if (distToBg >= tolerance) return false;
+        const distToItem = colorDist(i, itemR, itemG, itemB);
+        return distToBg <= distToItem * 0.85;
+      };
+
+      const queue = [];
+      samplePts.forEach(([x,y]) => {
+        const idx = y*w+x;
+        if (!visited[idx] && shouldRemove(idx*4)) { visited[idx]=1; queue.push(idx); }
+      });
+
+      while (queue.length) {
+        const idx = queue.pop();
+        data[idx*4+3] = 0;
+        const x = idx % w, y = Math.floor(idx / w);
+        [[1,0],[-1,0],[0,1],[0,-1]].forEach(([dx,dy]) => {
+          const nx=x+dx, ny=y+dy;
+          if (nx<0||nx>=w||ny<0||ny>=h) return;
+          const ni = ny*w+nx;
+          if (!visited[ni] && shouldRemove(ni*4)) { visited[ni]=1; queue.push(ni); }
+        });
+      }
+
+      ctx.putImageData(imageData, 0, 0);
+      resolve(canvas.toDataURL("image/png"));
+    };
+    img.onerror = reject;
+    img.src = dataUrl;
+  });
+}
+
+function autoCropCanvas(dataUrl, padding = 12) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => {
+      const c = document.createElement("canvas");
+      c.width = img.width; c.height = img.height;
+      const ctx = c.getContext("2d");
+      ctx.drawImage(img, 0, 0);
+      const { data, width, height } = ctx.getImageData(0, 0, c.width, c.height);
+
+      const corners = [[0,0],[width-1,0],[0,height-1],[width-1,height-1]];
+      let rS=0, gS=0, bS=0;
+      corners.forEach(([x,y]) => { const i=(y*width+x)*4; rS+=data[i]; gS+=data[i+1]; bS+=data[i+2]; });
+      const bgR=rS/4, bgG=gS/4, bgB=bS/4, tol=40;
+
+      const isBg = (i) => {
+        if (data[i+3] < 20) return true;
+        const dr=data[i]-bgR, dg=data[i+1]-bgG, db=data[i+2]-bgB;
+        return Math.sqrt(dr*dr+dg*dg+db*db) < tol;
+      };
+
+      let minX=width, maxX=0, minY=height, maxY=0;
+      for (let y=0; y<height; y++) for (let x=0; x<width; x++) {
+        if (!isBg((y*width+x)*4)) {
+          if (x<minX) minX=x; if (x>maxX) maxX=x;
+          if (y<minY) minY=y; if (y>maxY) maxY=y;
+        }
+      }
+      if (maxX <= minX || maxY <= minY) { resolve(dataUrl); return; }
+
+      minX = Math.max(0, minX-padding); minY = Math.max(0, minY-padding);
+      maxX = Math.min(width-1, maxX+padding); maxY = Math.min(height-1, maxY+padding);
+
+      const cw = maxX-minX, ch = maxY-minY;
+      const out = document.createElement("canvas");
+      out.width = cw; out.height = ch;
+      out.getContext("2d").drawImage(c, minX, minY, cw, ch, 0, 0, cw, ch);
+      resolve(out.toDataURL("image/png"));
+    };
+    img.onerror = reject;
+    img.src = dataUrl;
+  });
+}
+
+// Fetch an external image URL as a data URL (works in extension context with all_urls permission)
+async function fetchAsDataUrl(url) {
+  const r = await fetch(url);
+  if (!r.ok) throw new Error("fetch_failed");
+  const blob = await r.blob();
+  return new Promise((resolve, reject) => {
+    const fr = new FileReader();
+    fr.onload = () => resolve(fr.result);
+    fr.onerror = reject;
+    fr.readAsDataURL(blob);
+  });
+}
+
 // ── State ──────────────────────────────────────────────────────────────────
 let dest = "closet";
 let apiKey = "";
-let removeBgKey = "";
 let selectedImageUrl = null;
 let selectedImageIsData = false;
 let selectedSeasons = [];
@@ -37,10 +164,9 @@ async function sendToContent(type, data = {}) {
 // ── Storage helpers ────────────────────────────────────────────────────────
 async function loadSettings() {
   return new Promise((resolve) => {
-    chrome.storage.sync.get(["anthropicKey", "removeBgKey", "wishlistLists"], (d) => {
+    chrome.storage.sync.get(["anthropicKey", "wishlistLists"], (d) => {
       resolve({
         anthropicKey: d.anthropicKey || "",
-        removeBgKey: d.removeBgKey || "",
         wishlistLists: d.wishlistLists || [],
       });
     });
@@ -141,9 +267,9 @@ document.getElementById("f-wishlist-select").addEventListener("change", (e) => {
   document.getElementById("new-list-wrap").classList.toggle("visible", e.target.value === "__new__");
 });
 
-// ── Background removal ─────────────────────────────────────────────────────
+// ── Background removal (canvas-based, no API key needed) ──────────────────
 async function removeBackground() {
-  if (!selectedImageUrl || !removeBgKey) return;
+  if (!selectedImageUrl) return;
 
   const btn = document.getElementById("btn-remove-bg");
   btn.classList.add("processing");
@@ -152,55 +278,22 @@ async function removeBackground() {
   setImageProcessing(true);
 
   try {
-    let blob;
-    if (selectedImageIsData) {
-      const r = await fetch(selectedImageUrl);
-      blob = await r.blob();
-    } else {
-      const r = await fetch(selectedImageUrl);
-      if (!r.ok) throw new Error("fetch_failed");
-      blob = await r.blob();
-    }
-
-    const formData = new FormData();
-    formData.append("image_file", blob, "image.jpg");
-    formData.append("size", "auto");
-
-    const res = await fetch("https://api.remove.bg/v1.0/removebg", {
-      method: "POST",
-      headers: { "X-Api-Key": removeBgKey },
-      body: formData,
-    });
-
-    if (!res.ok) {
-      const err = await res.json().catch(() => ({}));
-      throw new Error(err.errors?.[0]?.title || "remove.bg API error");
-    }
-
-    const resultBlob = await res.blob();
-    const reader = new FileReader();
-    reader.onload = () => {
-      selectedImageUrl = reader.result;
-      selectedImageIsData = true;
-      setImagePreview(selectedImageUrl);
-      setImageProcessing(false);
-      btn.classList.remove("processing");
-      btn.disabled = false;
-      document.getElementById("bg-btn-label").textContent = "Remove Background";
-    };
-    reader.readAsDataURL(resultBlob);
+    const dataUrl = selectedImageIsData ? selectedImageUrl : await fetchAsDataUrl(selectedImageUrl);
+    const result = await removeBgCanvas(dataUrl);
+    selectedImageUrl = result;
+    selectedImageIsData = true;
+    setImagePreview(result);
   } catch (err) {
+    setStatus("BG removal failed: " + (err.message || "Unknown error"), "error");
+  } finally {
     setImageProcessing(false);
     btn.classList.remove("processing");
     btn.disabled = false;
     document.getElementById("bg-btn-label").textContent = "Remove Background";
-    setStatus("BG removal failed: " + (err.message || "Unknown error"), "error");
   }
 }
 
 // ── Auto Crop ──────────────────────────────────────────────────────────────
-// Finds the bounding box of the subject (non-transparent or non-background pixels)
-// and crops the image to it. Works best after BG removal (PNG with alpha).
 async function autoCrop() {
   if (!selectedImageUrl) return;
 
@@ -211,103 +304,8 @@ async function autoCrop() {
   setImageProcessing(true);
 
   try {
-    // Ensure we have a data URL to work with
-    let dataUrl = selectedImageUrl;
-    if (!selectedImageIsData) {
-      const r = await fetch(selectedImageUrl);
-      if (!r.ok) throw new Error("fetch_failed");
-      const blob = await r.blob();
-      dataUrl = await new Promise((res) => {
-        const fr = new FileReader();
-        fr.onload = () => res(fr.result);
-        fr.readAsDataURL(blob);
-      });
-    }
-
-    const cropped = await new Promise((resolve) => {
-      const img = new Image();
-      img.onload = () => {
-        const w = img.width;
-        const h = img.height;
-        const canvas = document.createElement("canvas");
-        canvas.width = w;
-        canvas.height = h;
-        const ctx = canvas.getContext("2d");
-        ctx.drawImage(img, 0, 0);
-        const { data } = ctx.getImageData(0, 0, w, h);
-
-        // Detect whether the image has meaningful alpha (post-BG removal)
-        let hasAlpha = false;
-        for (let i = 3; i < data.length; i += 4) {
-          if (data[i] < 245) { hasAlpha = true; break; }
-        }
-
-        let minX = w, minY = h, maxX = 0, maxY = 0;
-
-        if (hasAlpha) {
-          // Use alpha channel — find bounding box of non-transparent pixels
-          for (let y = 0; y < h; y++) {
-            for (let x = 0; x < w; x++) {
-              if (data[(y * w + x) * 4 + 3] > 10) {
-                if (x < minX) minX = x;
-                if (x > maxX) maxX = x;
-                if (y < minY) minY = y;
-                if (y > maxY) maxY = y;
-              }
-            }
-          }
-        } else {
-          // Sample background color from the four corners + edge midpoints
-          const samples = [
-            [0, 0], [w - 1, 0], [0, h - 1], [w - 1, h - 1],
-            [Math.floor(w / 2), 0], [0, Math.floor(h / 2)],
-            [w - 1, Math.floor(h / 2)], [Math.floor(w / 2), h - 1],
-          ];
-          let rSum = 0, gSum = 0, bSum = 0;
-          samples.forEach(([sx, sy]) => {
-            const i = (sy * w + sx) * 4;
-            rSum += data[i]; gSum += data[i + 1]; bSum += data[i + 2];
-          });
-          const bgR = rSum / samples.length;
-          const bgG = gSum / samples.length;
-          const bgB = bSum / samples.length;
-          const threshold = 25;
-
-          for (let y = 0; y < h; y++) {
-            for (let x = 0; x < w; x++) {
-              const i = (y * w + x) * 4;
-              const diff = Math.abs(data[i] - bgR) + Math.abs(data[i + 1] - bgG) + Math.abs(data[i + 2] - bgB);
-              if (diff > threshold) {
-                if (x < minX) minX = x;
-                if (x > maxX) maxX = x;
-                if (y < minY) minY = y;
-                if (y > maxY) maxY = y;
-              }
-            }
-          }
-        }
-
-        if (minX >= maxX || minY >= maxY) { resolve(dataUrl); return; }
-
-        // Add a small padding (3% of shortest side, max 16px)
-        const pad = Math.min(16, Math.floor(Math.min(w, h) * 0.03));
-        minX = Math.max(0, minX - pad);
-        minY = Math.max(0, minY - pad);
-        maxX = Math.min(w - 1, maxX + pad);
-        maxY = Math.min(h - 1, maxY + pad);
-
-        const cw = maxX - minX + 1;
-        const ch = maxY - minY + 1;
-        const out = document.createElement("canvas");
-        out.width = cw;
-        out.height = ch;
-        out.getContext("2d").drawImage(canvas, minX, minY, cw, ch, 0, 0, cw, ch);
-        resolve(out.toDataURL("image/png"));
-      };
-      img.onerror = () => resolve(dataUrl);
-      img.src = dataUrl;
-    });
-
+    const dataUrl = selectedImageIsData ? selectedImageUrl : await fetchAsDataUrl(selectedImageUrl);
+    const cropped = await autoCropCanvas(dataUrl);
     selectedImageUrl = cropped;
     selectedImageIsData = true;
     setImagePreview(cropped);
@@ -321,17 +319,16 @@ async function autoCrop() {
   }
 }
 
-// Auto-remove BG + crop when image is selected (if API key exists)
+// Auto-remove BG + crop when image is selected
 async function onImageSelected(url, isData = false) {
   selectedImageUrl = url;
   selectedImageIsData = isData;
   setImagePreview(url);
 
-  if (removeBgKey && url) {
+  if (url) {
     document.getElementById("bg-auto-badge").style.display = "inline";
     await removeBackground();
     document.getElementById("bg-auto-badge").style.display = "none";
-    // Auto-crop after BG removal
     document.getElementById("crop-auto-badge").style.display = "inline";
     await autoCrop();
     document.getElementById("crop-auto-badge").style.display = "none";
@@ -837,7 +834,6 @@ function resetForm() {
 async function init() {
   const settings = await loadSettings();
   apiKey = settings.anthropicKey;
-  removeBgKey = settings.removeBgKey;
   wishlistLists = settings.wishlistLists;
 
   drafts = await loadDrafts();
@@ -860,11 +856,6 @@ async function init() {
       }
     }
   } catch {}
-
-  // Show "auto" badge hint on BG button if key is set
-  if (removeBgKey) {
-    document.getElementById("bg-auto-badge").style.display = "inline";
-  }
 
   renderWishlistSelect();
 
@@ -952,7 +943,6 @@ document.getElementById("btn-settings-toggle").addEventListener("click", () => {
   toggle.classList.toggle("open");
   if (body.classList.contains("visible")) {
     document.getElementById("settings-key-input").value = apiKey ? apiKey.slice(0, 14) + "…" : "";
-    document.getElementById("settings-removebg-input").value = removeBgKey ? removeBgKey.slice(0, 8) + "…" : "";
   }
 });
 document.getElementById("btn-save-key").addEventListener("click", async () => {
@@ -964,15 +954,5 @@ document.getElementById("btn-save-key").addEventListener("click", async () => {
   document.getElementById("key-saved").classList.add("visible");
   setTimeout(() => document.getElementById("key-saved").classList.remove("visible"), 2000);
 });
-document.getElementById("btn-save-removebg").addEventListener("click", async () => {
-  const key = document.getElementById("settings-removebg-input").value.trim();
-  if (!key || key.includes("…")) return;
-  await saveSettings({ removeBgKey: key });
-  removeBgKey = key;
-  document.getElementById("bg-auto-badge").style.display = removeBgKey ? "inline" : "none";
-  document.getElementById("key-saved").classList.add("visible");
-  setTimeout(() => document.getElementById("key-saved").classList.remove("visible"), 2000);
-});
-
 // Start
 init();

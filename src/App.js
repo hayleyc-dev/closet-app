@@ -7847,7 +7847,7 @@ function HomeTab({ outfitCalendar, outfitsDb, itemsDb, lookbooksDb, wishlistDb, 
   };
 
   return (
-    <div className="fade-up" style={{ maxWidth: 900, margin: "0 auto" }}>
+    <div className="fade-up" style={{ width: "100%" }}>
 
       {/* ── Greeting + weather ── */}
       <div style={{ marginBottom: 32, display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 20, flexWrap: "wrap" }}>

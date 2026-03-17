@@ -5467,7 +5467,7 @@ function WishlistTab({ wishlistDb, wishlistsDb, saveWishlistsMeta, activeWishlis
 
       {/* ── Right panel: Stores filter ── */}
       {wlStores.length > 0 && (
-        <div style={{ width: 180, flexShrink: 0, display: "flex", flexDirection: "column", gap: 8 }}>
+        <div style={{ width: 272, flexShrink: 0, display: "flex", flexDirection: "column", gap: 8 }}>
           <div style={{ background: "#fff", borderRadius: 18, border: "1px solid #ece8e0", padding: "6px" }}>
             <div style={{ padding: "8px 14px 6px", fontSize: 10, fontWeight: 700, color: "#aaa", textTransform: "uppercase", letterSpacing: "0.07em" }}>Stores</div>
             {wlStores.map(store => (

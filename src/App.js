@@ -85,6 +85,27 @@ const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 const CATEGORIES = ["All", "Accessories", "Activewear", "Bags", "Denim", "Dresses", "Intimates", "Jewelry", "Knits", "Loungewear", "Outerwear", "Shoes", "Shorts + Skirts", "Sleepwear", "Socks + Tights", "Sweaters", "Swim", "Tops", "Trousers"];
 const COLORS = ["Black", "Blue", "Brown", "Clear", "Cream", "Gold", "Green", "Grey", "Orange", "Pink", "Purple", "Red", "Silver", "Tan", "White", "Yellow"];
+
+function getColorSwatch(name) {
+  const n = (name || "").toLowerCase();
+  if (n.includes("black")) return "#6b6869";
+  if (n.includes("white") || n.includes("ivory") || n.includes("cream")) return "#f0ede8";
+  if (n.includes("grey") || n.includes("gray")) return "#c2bfbc";
+  if (n.includes("navy")) return "#b3bedc";
+  if (n.includes("blue") || n.includes("denim")) return "#b3cfee";
+  if (n.includes("red") || n.includes("scarlet")) return "#f5b8b8";
+  if (n.includes("pink") || n.includes("blush") || n.includes("rose")) return "#f5c6d8";
+  if (n.includes("coral") || n.includes("salmon")) return "#f5c4b0";
+  if (n.includes("orange") || n.includes("rust") || n.includes("terra")) return "#f5d0b0";
+  if (n.includes("yellow") || n.includes("gold") || n.includes("mustard")) return "#f5e6a3";
+  if (n.includes("green") || n.includes("olive") || n.includes("sage") || n.includes("mint")) return "#c0ddb5";
+  if (n.includes("teal") || n.includes("aqua") || n.includes("turquoise")) return "#b0ddd8";
+  if (n.includes("purple") || n.includes("violet") || n.includes("plum") || n.includes("lavender")) return "#d4bfee";
+  if (n.includes("brown") || n.includes("camel") || n.includes("tan") || n.includes("beige") || n.includes("nude")) return "#ddc9a8";
+  if (n.includes("silver") || n.includes("chrome")) return "#d8d8d8";
+  if (n.includes("clear")) return "linear-gradient(135deg, #f0ede8 50%, #e0dbd5 50%)";
+  return "#e0dbd5";
+}
 const SIZES = ["XS", "S", "M", "L", "XL", "00/24", "0/25", "2/26", "4/27", "6/28", "OS", "34B", "S Tall", "XS Long", "S/M", "7", "9"];
 const SEASONS = ["Spring", "Summer", "Fall", "Winter", "All Season", "Holiday", "Disney"];
 const OCCASIONS = ["WFH", "Disney", "Universal", "Date Night", "Travel", "Sport", "Weekend", "Occasion"];
@@ -1645,9 +1666,18 @@ function AddItemModal({ onSave, onSaveWish, onCancel, initial, editMode, initial
       {/* ── Two-column body ── */}
       <div style={{ display: "flex", gap: 24, alignItems: "flex-start" }}>
 
-        {/* LEFT: image */}
+        {/* LEFT: image + name + brand */}
         <div style={{ width: 252, flexShrink: 0 }}>
-          <ImageUploadField value={form.image} onChange={v => setForm(f => ({ ...f, image: v }))} style={{ marginBottom: 0 }} />
+          <ImageUploadField value={form.image} onChange={v => setForm(f => ({ ...f, image: v }))} style={{ marginBottom: 12 }} />
+          <Input label="Name" value={form.name} onChange={set("name")} placeholder="e.g. White linen shirt" />
+          {dest === "wishlist" ? (
+            <div style={{ display: "flex", gap: 10 }}>
+              <div style={{ flex: 1 }}><Input label="Brand" value={form.brand} onChange={set("brand")} placeholder="e.g. Zara" /></div>
+              <div style={{ flex: 1 }}><Input label="Store" value={form.store || ""} onChange={e => setForm(f => ({ ...f, store: e.target.value }))} placeholder="e.g. Zara, ASOS" /></div>
+            </div>
+          ) : (
+            <Input label="Brand" value={form.brand} onChange={set("brand")} placeholder="e.g. Zara" />
+          )}
         </div>
 
         {/* RIGHT: all fields — independently scrollable */}
@@ -1661,27 +1691,42 @@ function AddItemModal({ onSave, onSaveWish, onCancel, initial, editMode, initial
             </div>
           )}
 
-          {/* Name */}
-          <Input label="Name" value={form.name} onChange={set("name")} placeholder="e.g. White linen shirt" />
-
-          {/* Brand + Store side-by-side (wishlist), Brand alone (closet) */}
-          {dest === "wishlist" ? (
-            <div style={{ display: "flex", gap: 10 }}>
-              <div style={{ flex: 1 }}><Input label="Brand" value={form.brand} onChange={set("brand")} placeholder="e.g. Zara" /></div>
-              <div style={{ flex: 1 }}><Input label="Store" value={form.store || ""} onChange={e => setForm(f => ({ ...f, store: e.target.value }))} placeholder="e.g. Zara, ASOS" /></div>
-            </div>
-          ) : (
-            <Input label="Brand" value={form.brand} onChange={set("brand")} placeholder="e.g. Zara" />
-          )}
-
           {/* Category + Size */}
           <div style={{ display: "flex", gap: 10 }}>
             <div style={{ flex: 1 }}><SelectField label="Category" options={CATEGORIES.slice(1)} value={form.category} onChange={set("category")} /></div>
             <div style={{ flex: 1 }}><SelectField label="Size" options={SIZES} value={form.size} onChange={set("size")} /></div>
           </div>
 
-          {/* Color + Season */}
-          <MultiPills label="Color" options={COLORS} selected={form.colors || []} onChange={v => setForm(f => ({ ...f, colors: v }))} />
+          {/* Color swatches */}
+          <div style={{ marginBottom: 14 }}>
+            <label style={{ display: "block", fontSize: 11, fontWeight: 600, color: "#999", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 8 }}>Color</label>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(8, 1fr)", gap: 7 }}>
+              {COLORS.map(color => {
+                const active = (form.colors || []).includes(color);
+                const swatch = getColorSwatch(color);
+                return (
+                  <button key={color} type="button" title={color}
+                    onClick={() => setForm(f => {
+                      const cur = f.colors || [];
+                      return { ...f, colors: active ? cur.filter(c => c !== color) : [...cur, color] };
+                    })}
+                    style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 3, background: "none", border: "none", cursor: "pointer", padding: 2 }}>
+                    <div style={{ width: 26, height: 26, borderRadius: "50%", background: swatch, border: active ? "2.5px solid #1a1a1a" : "2px solid transparent", boxShadow: active ? "0 0 0 1px #1a1a1a" : "0 1px 3px rgba(0,0,0,0.12)", transition: "all 0.15s" }} />
+                  </button>
+                );
+              })}
+            </div>
+            {(form.colors || []).length > 0 && (
+              <div style={{ marginTop: 5, display: "flex", flexWrap: "wrap", gap: 4, alignItems: "center" }}>
+                {(form.colors || []).map(c => (
+                  <span key={c} style={{ fontSize: 11, color: "#888", background: "#f5f2ed", borderRadius: 6, padding: "2px 7px", fontWeight: 600 }}>{c}</span>
+                ))}
+                <button type="button" onClick={() => setForm(f => ({ ...f, colors: [] }))} style={{ fontSize: 10, color: "#bbb", background: "none", border: "none", cursor: "pointer", fontWeight: 700, padding: "2px 4px" }}>Clear</button>
+              </div>
+            )}
+          </div>
+
+          {/* Season */}
           <MultiPills label="Season" options={SEASONS} selected={form.seasons || []} onChange={v => setForm(f => ({ ...f, seasons: v }))} />
 
           {/* Price + Spent */}
@@ -10107,25 +10152,7 @@ export default function App() {
           {/* Capsules right card — closet tab only */}
           {tab === "closet" && (() => {
             const allClosetColors = [...new Set(itemsDb.rows.filter(i => !i.forSale && i.color).map(i => i.color))].sort((a,b) => a.localeCompare(b));
-            const getColorSwatch = (name) => {
-              const n = (name||"").toLowerCase();
-              if (n.includes("black")) return "#6b6869";
-              if (n.includes("white") || n.includes("ivory") || n.includes("cream")) return "#f0ede8";
-              if (n.includes("grey") || n.includes("gray")) return "#c2bfbc";
-              if (n.includes("navy")) return "#b3bedc";
-              if (n.includes("blue") || n.includes("denim")) return "#b3cfee";
-              if (n.includes("red") || n.includes("scarlet")) return "#f5b8b8";
-              if (n.includes("pink") || n.includes("blush") || n.includes("rose")) return "#f5c6d8";
-              if (n.includes("coral") || n.includes("salmon")) return "#f5c4b0";
-              if (n.includes("orange") || n.includes("rust") || n.includes("terra")) return "#f5d0b0";
-              if (n.includes("yellow") || n.includes("gold") || n.includes("mustard")) return "#f5e6a3";
-              if (n.includes("green") || n.includes("olive") || n.includes("sage") || n.includes("mint")) return "#c0ddb5";
-              if (n.includes("teal") || n.includes("aqua") || n.includes("turquoise")) return "#b0ddd8";
-              if (n.includes("purple") || n.includes("violet") || n.includes("plum") || n.includes("lavender")) return "#d4bfee";
-              if (n.includes("brown") || n.includes("camel") || n.includes("tan") || n.includes("beige") || n.includes("nude")) return "#ddc9a8";
-              if (n.includes("silver") || n.includes("chrome")) return "#d8d8d8";
-              return "#e0dbd5";
-            };
+            // getColorSwatch is defined at module level
             return (<>
             <div className="right-card">
               <div className="right-card-title" style={{ marginBottom: 10 }}>Filters</div>

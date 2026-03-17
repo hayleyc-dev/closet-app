@@ -7756,6 +7756,16 @@ function HomeTab({ outfitCalendar, outfitsDb, itemsDb, lookbooksDb, wishlistDb, 
 
   const highPriorityWish = wishlistDb.rows.filter(i => i.priority === "high").slice(0, 3);
 
+  // ── New In (added to closet in last 30 days) ─────────────────────────────
+  const thirtyDaysAgo = Date.now() - 30 * 24 * 60 * 60 * 1000;
+  const newInItems = closetItems
+    .filter(i => {
+      const d = new Date(i.created_at || i.purchaseDate || 0).getTime();
+      return d >= thirtyDaysAgo;
+    })
+    .sort((a, b) => new Date(b.created_at || b.purchaseDate || 0) - new Date(a.created_at || a.purchaseDate || 0))
+    .slice(0, 20);
+
   const fmtDate = (d) => d ? new Date(d + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" }) : null;
   const cardStyle = { background: "#fff", borderRadius: 16, border: "1.5px solid #e8e4dc", overflow: "hidden", boxShadow: "0 2px 12px rgba(0,0,0,0.04)" };
 
@@ -7957,6 +7967,39 @@ function HomeTab({ outfitCalendar, outfitsDb, itemsDb, lookbooksDb, wishlistDb, 
           </div>
         </div>
       </div>
+
+      {/* ── New In ── */}
+      {newInItems.length > 0 && (
+        <div style={{ marginBottom: 36 }}>
+          <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 16 }}>
+            <div>
+              <div style={{ fontFamily: "'Cormorant Garamond', serif", fontStyle: "italic", fontWeight: 300, fontSize: 28, color: "#1a1a1a", lineHeight: 1.1 }}>New In</div>
+              <div style={{ fontSize: 11, color: "#aaa", fontWeight: 600, letterSpacing: "0.08em", textTransform: "uppercase", marginTop: 2 }}>Added in the last 30 days</div>
+            </div>
+            <button onClick={() => setTab("closet")} style={{ fontSize: 12, fontWeight: 600, color: "#888", background: "none", border: "none", cursor: "pointer", fontFamily: "'DM Sans', sans-serif", padding: 0 }}>View all →</button>
+          </div>
+          <div style={{ display: "flex", gap: 14, overflowX: "auto", paddingBottom: 6, scrollbarWidth: "none", msOverflowStyle: "none" }}>
+            {newInItems.map(item => (
+              <div key={item.id} onClick={() => setTab("closet")} style={{ flex: "0 0 auto", width: 160, cursor: "pointer" }}>
+                <div style={{
+                  width: 160, aspectRatio: "3/4", borderRadius: 16, overflow: "hidden",
+                  background: item.image ? `url(${item.image}) center/cover no-repeat` : "#f0ece4",
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  marginBottom: 8, boxShadow: "0 4px 16px rgba(0,0,0,0.07)",
+                  transition: "transform 0.18s, box-shadow 0.18s",
+                }}
+                  onMouseEnter={e => { e.currentTarget.style.transform = "translateY(-3px)"; e.currentTarget.style.boxShadow = "0 8px 24px rgba(0,0,0,0.12)"; }}
+                  onMouseLeave={e => { e.currentTarget.style.transform = "translateY(0)"; e.currentTarget.style.boxShadow = "0 4px 16px rgba(0,0,0,0.07)"; }}>
+                  {!item.image && <HangerIcon size={28} color="#ccc" />}
+                </div>
+                <div style={{ fontSize: 12, fontWeight: 700, color: "#1a1a1a", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{item.name || "Untitled"}</div>
+                {item.brand && <div style={{ fontSize: 11, color: "#aaa", fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{item.brand}</div>}
+                {item.price && <div style={{ fontSize: 11, fontWeight: 700, color: "#888", marginTop: 1 }}>{item.price}</div>}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* ── Upcoming trips + packing ── */}
       {upcomingTrips.length > 0 && (
@@ -9116,6 +9159,7 @@ export default function App() {
   const [tab, setTabRaw] = useState(() => { try { return localStorage.getItem("wardrobe_active_tab") || "home"; } catch { return "home"; } });
   const setTab = (t) => { setTabRaw(t); try { localStorage.setItem("wardrobe_active_tab", t); } catch {} };
   const [modal, setModal] = useState(null);
+  const [homeAddOpen, setHomeAddOpen] = useState(false);
   const [catFilter, setCatFilter] = useState("All");
   const [catFilters, setCatFilters] = useState([]); // multi-select categories
   const [closetZoom, setClosetZoom] = useState(148); // card min-width in px
@@ -9649,6 +9693,39 @@ export default function App() {
               {/* Bulk select for wishlist */}
               {tab === "wishlist" && <button onClick={() => setWlSelectMode(b => !b)} style={{ padding: "10px 16px", borderRadius: 14, background: wlSelectMode ? "#1a1a1a" : "#fff", border: "1.5px solid #e4dfd6", cursor: "pointer", fontSize: 13, fontWeight: 600, color: wlSelectMode ? "#fff" : "#888", fontFamily: "'DM Sans', sans-serif" }}>{wlSelectMode ? "Cancel" : "Select"}</button>}
               {/* Add button */}
+              {tab === "home" && (
+                <div style={{ position: "relative" }}>
+                  <button className="btn-primary" onClick={() => setHomeAddOpen(o => !o)} style={{
+                    padding: "10px 20px", borderRadius: 14, background: "#1a1a1a",
+                    border: "none", cursor: "pointer", fontSize: 13, fontWeight: 600, color: "#fff",
+                    display: "flex", alignItems: "center", gap: 6, fontFamily: "'DM Sans', sans-serif",
+                    boxShadow: "0 4px 14px rgba(0,0,0,0.15)"
+                  }}>+ Add</button>
+                  {homeAddOpen && (
+                    <>
+                      <div onClick={() => setHomeAddOpen(false)} style={{ position: "fixed", inset: 0, zIndex: 999 }} />
+                      <div style={{ position: "absolute", top: "calc(100% + 8px)", right: 0, zIndex: 1000, background: "#fff", borderRadius: 14, border: "1.5px solid #e8e4dc", boxShadow: "0 8px 32px rgba(0,0,0,0.12)", overflow: "hidden", minWidth: 180 }}>
+                        {[
+                          { label: "Add to Closet",    action: () => { setEditItem(null); setWishlistDest(false); setModal("item"); setHomeAddOpen(false); } },
+                          { label: "Add Outfit",       action: () => { openNewOutfit(); setHomeAddOpen(false); } },
+                          { label: "Create Lookbook",  action: () => { setLookbookModal(true); setHomeAddOpen(false); } },
+                        ].map((opt, i, arr) => (
+                          <button key={opt.label} onClick={opt.action} style={{
+                            display: "block", width: "100%", textAlign: "left",
+                            padding: "12px 18px", background: "none", border: "none",
+                            borderBottom: i < arr.length - 1 ? "1px solid #f0ece4" : "none",
+                            fontSize: 13, fontWeight: 600, color: "#1a1a1a", cursor: "pointer",
+                            fontFamily: "'DM Sans', sans-serif",
+                          }}
+                            onMouseEnter={e => e.currentTarget.style.background = "#f8f6f2"}
+                            onMouseLeave={e => e.currentTarget.style.background = "none"}
+                          >{opt.label}</button>
+                        ))}
+                      </div>
+                    </>
+                  )}
+                </div>
+              )}
               {tab !== "stats" && tab !== "moodboard" && tab !== "home" && tab !== "settings" && (
                 <button className="btn-primary" onClick={() => {
                   if (tab === "outfits") openNewOutfit();

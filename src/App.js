@@ -289,13 +289,24 @@ function useSupabaseTable(table) {
     return { ...rest, id };
   }).filter(r => r.id);
   const fetchRows = async (setter) => {
-    let { data, error } = await supabase.from(table).select("*").order("created_at");
-    if (error) ({ data, error } = await supabase.from(table).select("*"));
-    if (!error && data) setter(parseRows(data));
-    else if (error) console.error("[" + table + "] fetch:", error.message);
+    try {
+      let { data, error } = await supabase.from(table).select("*").order("created_at");
+      if (error) ({ data, error } = await supabase.from(table).select("*"));
+      if (!error && data) setter(parseRows(data));
+      else if (error) console.error("[" + table + "] fetch:", error.message);
+    } catch (e) {
+      console.error("[" + table + "] fetch exception:", e?.message || e);
+    }
   };
   useEffect(() => {
-    fetchRows(setRows).then(() => setLoading(false));
+    let cancelled = false;
+    const safeSetRows = (next) => { if (!cancelled) setRows(next); };
+    (async () => {
+      setLoading(true);
+      await fetchRows(safeSetRows);
+      if (!cancelled) setLoading(false);
+    })();
+    return () => { cancelled = true; };
   }, [table]);
   const add = async (item) => {
     const { error } = await supabase.from(table).insert({ id: item.id, data: item });

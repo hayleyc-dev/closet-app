@@ -255,7 +255,7 @@ const globalStyles = `
     cursor: pointer;
     transition: transform 0.22s cubic-bezier(0.22,1,0.36,1), box-shadow 0.22s, border-color 0.15s;
   }
-  .item-card:hover { transform: translateY(-4px) scale(1.01); box-shadow: 0 16px 40px rgba(0,0,0,0.09); border-color: #d8d2c8; }
+  .item-card:hover { box-shadow: 0 12px 32px rgba(0,0,0,0.1); border-color: #d8d2c8; }
   .item-card-label {
     padding: 10px 12px 12px;
     border-top: 1px solid #f5f2ee;
@@ -1845,33 +1845,44 @@ function AddItemModal({ onSave, onSaveWish, onCancel, initial, editMode, initial
 }
 
 // Clean minimal card: photo dominant (3:4), name + brand + chips below
-function ItemCard({ item, onClick, onCreateLook, onEdit }) {
-  const [hovered, setHovered] = useState(false);
-  const btnBase = {
-    width: 28, height: 28, borderRadius: "50%",
-    background: "rgba(255,255,255,0.92)", border: "none",
-    cursor: "pointer", color: "#555",
-    display: "flex", alignItems: "center", justifyContent: "center",
-    backdropFilter: "blur(4px)", boxShadow: "0 1px 4px rgba(0,0,0,0.1)",
-    transition: "opacity 0.15s", opacity: hovered ? 1 : 0, pointerEvents: hovered ? "auto" : "none",
-  };
+function ItemCard({ item, onClick, onCreateLook, onEdit, onDelete, onAddToCapsule }) {
   return (
-    <div className="item-card" onClick={onClick}
-      onMouseEnter={() => setHovered(true)} onMouseLeave={() => setHovered(false)}
-      style={{ position: "relative", cursor: "pointer", overflow: "hidden", borderRadius: 16 }}>
-      <div style={{ width: "100%", aspectRatio: "1/1", background: "#fff", overflow: "hidden", display: "flex", alignItems: "center", justifyContent: "center", position: "relative" }}>
+    <div className="item-card wl-card" onClick={onClick}
+      style={{ cursor: "pointer", borderRadius: 16, overflow: "hidden", background: "#fff", position: "relative" }}>
+      {/* Image */}
+      <div style={{ width: "100%", aspectRatio: "1/1", background: "#fff", overflow: "hidden", display: "flex", alignItems: "center", justifyContent: "center" }}>
         {item.image
           ? <img src={item.image} alt={item.name} style={{ width: "100%", height: "100%", objectFit: "contain", display: "block", padding: 6 }} />
           : <HangerIcon size={36} color="#ddd" />
         }
-        <button onClick={e => { e.stopPropagation(); onEdit && onEdit(); }}
-          style={{ position: "absolute", bottom: 7, left: 7, ...btnBase }}>
-          <SvgEdit size={13} color="currentColor" />
-        </button>
-        <button onClick={e => { e.stopPropagation(); onCreateLook && onCreateLook(); }}
-          style={{ position: "absolute", bottom: 7, right: 7, ...btnBase }}>
-          <SvgHanger size={14} color="currentColor" />
-        </button>
+      </div>
+      {/* Label + hover actions */}
+      <div className="item-card-label">
+        <div className="item-card-name">{item.name || item.category || "Untitled"}</div>
+        <div className="item-card-brand">{item.brand || (item.colors && item.colors[0]) || item.color || ""}</div>
+        <div className="wl-card-actions" style={{ display: "flex", gap: 4, alignItems: "center" }}>
+          <button onClick={e => { e.stopPropagation(); onEdit && onEdit(); }} title="Edit"
+            className="wl-hover-btn"
+            style={{ width: 30, height: 30, borderRadius: 8, background: "#f5f2ed", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", opacity: 0, transition: "opacity 0.15s", flexShrink: 0 }}>
+            <SvgEdit size={12} color="#555" />
+          </button>
+          <button onClick={e => { e.stopPropagation(); onCreateLook && onCreateLook(); }} title="Create outfit"
+            className="wl-hover-btn"
+            style={{ width: 30, height: 30, borderRadius: 8, background: "#f5f2ed", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", opacity: 0, transition: "opacity 0.15s", flexShrink: 0 }}>
+            <SvgHanger size={13} color="#555" />
+          </button>
+          <button onClick={e => { e.stopPropagation(); onAddToCapsule && onAddToCapsule(); }} title="Add to capsule"
+            className="wl-hover-btn"
+            style={{ width: 30, height: 30, borderRadius: 8, background: "#f5f2ed", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", opacity: 0, transition: "opacity 0.15s", flexShrink: 0 }}>
+            <SvgBox size={12} color="#555" />
+          </button>
+          <div style={{ flex: 1 }} />
+          <button onClick={e => { e.stopPropagation(); onDelete && onDelete(); }} title="Delete"
+            className="wl-hover-btn"
+            style={{ width: 30, height: 30, borderRadius: 8, background: "#fef2f2", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", opacity: 0, transition: "opacity 0.15s", flexShrink: 0 }}>
+            <SvgTrash size={12} color="#e05555" />
+          </button>
+        </div>
       </div>
     </div>
   );
@@ -9729,8 +9740,10 @@ export default function App() {
                           )}
                           <ItemCard item={item}
                             onClick={bulkMode ? undefined : () => setItemDetail(item)}
-                            onCreateLook={bulkMode ? undefined : () => { setEditingOutfit(null); setOutfitSeedItem(item); setOutfitBuilder(true); }}
                             onEdit={bulkMode ? undefined : () => { setEditItem(item); setWishlistDest(false); setModal("item"); }}
+                            onCreateLook={bulkMode ? undefined : () => { setEditingOutfit(null); setOutfitSeedItem(item); setOutfitBuilder(true); }}
+                            onAddToCapsule={bulkMode ? undefined : () => { setCapsulePreselect([item.id]); setCapsuleName(""); setShowCapsuleModal(true); }}
+                            onDelete={bulkMode ? undefined : () => { if (window.confirm(`Delete "${item.name || "this item"}"?`)) { itemsDb.remove(item.id); } }}
                           />
                         </div>
                       ))}

@@ -505,7 +505,7 @@ const Modal = ({ open, onClose, title, children, maxWidth = 520 }) => {
   );
 };
 
-const BLANK = { name: "", brand: "", category: "", color: "", colors: [], size: "", season: "", seasons: [], price: "", spent: "", notes: "", image: "", purchaseDate: "", wornCount: 0, link: "", needsStyling: false };
+const BLANK = { name: "", brand: "", category: "", color: "", colors: [], size: "", season: "", seasons: [], price: "", spent: "", notes: "", image: "", purchaseDate: "", wornCount: 0, lastWorn: "", link: "", needsStyling: false };
 const BLANK_WISH = { name: "", brand: "", price: "", image: "", link: "" };
 
 // ── Shared image helpers ─────────────────────────────────────────────────────
@@ -1912,6 +1912,69 @@ function ItemCard({ item, onClick, onCreateLook, onEdit, onDelete, onAddToCapsul
             <SvgTrash size={12} color="#e05555" />
           </button>
         </div>
+      </div>
+    </div>
+  );
+}
+
+function ShopCard({ item, onClick }) {
+  const wornCount = item.wornCount || 0;
+  const price = parseFloat(item.price || item.spent || 0);
+  const cpw = price > 0 ? price / Math.max(1, wornCount) : null;
+  const daysSince = item.lastWorn
+    ? Math.floor((Date.now() - new Date(item.lastWorn)) / 86400000)
+    : null;
+
+  // Badge: never worn (amber) or stale 60+ days (muted gray)
+  let badge = null;
+  if (wornCount === 0) {
+    badge = { label: "Never worn", bg: "#fff4e0", color: "#b97a00" };
+  } else if (daysSince !== null && daysSince > 60) {
+    badge = { label: `${daysSince}d ago`, bg: "#f0ece5", color: "#999" };
+  }
+
+  // CPW color: green < $5, amber $5-$20, gray > $20
+  let cpwBg = "#f0ece5", cpwColor = "#999";
+  if (cpw !== null) {
+    if (cpw < 5) { cpwBg = "#e8f5ee"; cpwColor = "#2d8a55"; }
+    else if (cpw < 20) { cpwBg = "#fff4e0"; cpwColor = "#b97a00"; }
+  }
+
+  return (
+    <div onClick={onClick} className="fade-up" style={{ cursor: "pointer", background: "#fff", border: "1px solid #ece8e0", borderRadius: 16, overflow: "hidden", transition: "transform 0.18s, box-shadow 0.18s", position: "relative" }}
+      onMouseEnter={e => { e.currentTarget.style.transform = "scale(1.015)"; e.currentTarget.style.boxShadow = "0 8px 24px rgba(0,0,0,0.08)"; }}
+      onMouseLeave={e => { e.currentTarget.style.transform = "scale(1)"; e.currentTarget.style.boxShadow = "none"; }}
+    >
+      {/* Badge */}
+      {badge && (
+        <div style={{ position: "absolute", top: 8, right: 8, zIndex: 2, padding: "3px 8px", borderRadius: 100, fontSize: 10, fontWeight: 700, background: badge.bg, color: badge.color, letterSpacing: "0.02em" }}>
+          {badge.label}
+        </div>
+      )}
+      {/* Image */}
+      <div style={{ aspectRatio: "3/4", background: "#f9f7f5", overflow: "hidden", display: "flex", alignItems: "center", justifyContent: "center" }}>
+        {item.image
+          ? <img src={item.image} alt={item.name} style={{ width: "100%", height: "100%", objectFit: "contain", display: "block", padding: 8 }} />
+          : <HangerIcon size={40} color="#ddd" />
+        }
+      </div>
+      {/* Bottom strip */}
+      <div style={{ padding: "9px 11px 11px" }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 5 }}>
+          <div style={{ fontSize: 11, color: "#b0a898", fontWeight: 400, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: "70%" }}>
+            {item.brand || item.category || ""}
+          </div>
+          <div style={{ fontSize: 10, color: "#ccc", flexShrink: 0 }}>
+            {wornCount > 0 ? `×${wornCount}` : ""}
+          </div>
+        </div>
+        {cpw !== null ? (
+          <div style={{ display: "inline-block", padding: "3px 8px", borderRadius: 100, background: cpwBg, color: cpwColor, fontSize: 11, fontWeight: 700 }}>
+            ${cpw.toFixed(2)}/wear
+          </div>
+        ) : (
+          <div style={{ fontSize: 11, color: "#ddd" }}>No price set</div>
+        )}
       </div>
     </div>
   );
@@ -9734,6 +9797,7 @@ export default function App() {
   const [catFilters, setCatFilters] = useState([]); // multi-select categories
   const [closetZoom, setClosetZoom] = useState(148); // card min-width in px
   const [shopMode, setShopMode] = useState(false); // editorial "shop your closet" view
+  const [shopSort, setShopSort] = useState("rediscover"); // "rediscover" | "leastWorn" | "cpwHigh" | "cpwLow"
   const [outfitZoom, setOutfitZoom] = useState(200); // outfit card min-width in px
   const [showNewOnly, setShowNewOnly] = useState(false); // "What's New" filter
   const [showNeedsStylingOnly, setShowNeedsStylingOnly] = useState(false);
@@ -10021,18 +10085,19 @@ export default function App() {
 
   const markOutfitWorn = async (outfit, dateStr) => {
     const ids = outfit.layers || outfit.itemIds || [];
+    const today = dateStr || new Date().toISOString().slice(0, 10);
     for (const id of ids) {
       const item = itemsDb.rows.find(i => i.id === id);
-      if (item) await itemsDb.update({ ...item, wornCount: (item.wornCount || 0) + 1 });
+      if (item) await itemsDb.update({ ...item, wornCount: (item.wornCount || 0) + 1, lastWorn: today });
     }
     // Log to outfit's wornDates array
-    const today = dateStr || new Date().toISOString().slice(0, 10);
     const updated = { ...outfit, wornCount: (outfit.wornCount || 0) + 1, wornDates: [...(outfit.wornDates || []), today] };
     await outfitsDb.update(updated);
   };
 
   const markWorn = async (item) => {
-    const updated = { ...item, wornCount: (item.wornCount || 0) + 1 };
+    const today = new Date().toISOString().slice(0, 10);
+    const updated = { ...item, wornCount: (item.wornCount || 0) + 1, lastWorn: today };
     await itemsDb.update(updated);
     if (itemDetail?.id === item.id) setItemDetail(updated);
   };
@@ -10081,6 +10146,31 @@ export default function App() {
     }
     return rows;
   })();
+  // Shop view helpers
+  const shopDaysSince = (d) => d ? Math.floor((Date.now() - new Date(d)) / 86400000) : 9999;
+  const shopCpw = (item) => { const p = parseFloat(item.price || item.spent || 0); return p > 0 ? p / Math.max(1, item.wornCount || 0) : null; };
+  const shopNeedsLove = (item) => (item.wornCount || 0) === 0 || shopDaysSince(item.lastWorn) > 60;
+  const shopSortedItems = shopMode ? [...filteredItems].sort((a, b) => {
+    if (shopSort === "rediscover") {
+      const aZ = (a.wornCount || 0) === 0, bZ = (b.wornCount || 0) === 0;
+      if (aZ !== bZ) return aZ ? -1 : 1;
+      return shopDaysSince(b.lastWorn) - shopDaysSince(a.lastWorn);
+    }
+    if (shopSort === "leastWorn") return (a.wornCount || 0) - (b.wornCount || 0);
+    if (shopSort === "cpwHigh") return (shopCpw(b) ?? -1) - (shopCpw(a) ?? -1);
+    if (shopSort === "cpwLow") return (shopCpw(a) ?? 9999) - (shopCpw(b) ?? 9999);
+    return 0;
+  }) : [];
+  const shopNeedsLoveCount = shopMode ? filteredItems.filter(shopNeedsLove).length : 0;
+  const shopWithPrice = shopMode ? filteredItems.filter(i => shopCpw(i) !== null) : [];
+  const shopAvgCpw = shopWithPrice.length ? shopWithPrice.reduce((s, i) => s + shopCpw(i), 0) / shopWithPrice.length : null;
+  const SHOP_SORT_OPTS = [
+    { key: "rediscover", label: "Needs Love" },
+    { key: "leastWorn", label: "Least Worn" },
+    { key: "cpwHigh", label: "CPW ↑" },
+    { key: "cpwLow", label: "CPW ↓" },
+  ];
+
   const saveCapsules = (updated) => {
     setCapsules(updated);
     try { localStorage.setItem("wardrobe_capsules_v1", JSON.stringify(updated)); } catch {}
@@ -10479,23 +10569,30 @@ export default function App() {
                       )}
                     </div>
                   ) : shopMode ? (
-                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-                      {filteredItems.map((item, i) => (
-                        <div key={item.id} className="fade-up" style={{ animationDelay: `${i * 0.02}s`, opacity: 0, position: "relative", borderRadius: 14, overflow: "hidden", background: "#f5f2ed", cursor: "pointer", transition: "transform 0.18s", aspectRatio: "2/3" }}
-                          onClick={() => setItemDetail(item)}
-                          onMouseEnter={e => e.currentTarget.style.transform = "scale(1.015)"}
-                          onMouseLeave={e => e.currentTarget.style.transform = "scale(1)"}
-                        >
-                          {item.image
-                            ? <img src={item.image} alt={item.name} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
-                            : <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center" }}><HangerIcon size={40} color="#ccc" /></div>
-                          }
-                          <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, padding: "28px 10px 10px", background: "linear-gradient(to top, rgba(0,0,0,0.52) 0%, transparent 100%)" }}>
-                            <div style={{ fontSize: 12, fontWeight: 500, color: "#fff", lineHeight: 1.3, marginBottom: 2, textShadow: "0 1px 3px rgba(0,0,0,0.4)" }}>{item.name}</div>
-                            {item.price && <div style={{ fontSize: 11, color: "rgba(255,255,255,0.8)" }}>${item.price}</div>}
-                          </div>
+                    <div>
+                      {/* Shop header */}
+                      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 16, flexWrap: "wrap" }}>
+                        <div style={{ fontSize: 12, color: "#b0a898", flexShrink: 0 }}>
+                          {shopNeedsLoveCount > 0
+                            ? <><strong style={{ color: "#b97a00" }}>{shopNeedsLoveCount}</strong> items need love{shopAvgCpw !== null ? <> · avg CPW <strong>${shopAvgCpw.toFixed(2)}</strong></> : ""}</>
+                            : shopAvgCpw !== null ? <>avg CPW <strong>${shopAvgCpw.toFixed(2)}</strong></> : ""}
                         </div>
-                      ))}
+                        <div style={{ flex: 1 }} />
+                        <div style={{ display: "flex", gap: 5 }}>
+                          {SHOP_SORT_OPTS.map(o => (
+                            <button key={o.key} onClick={() => setShopSort(o.key)}
+                              style={{ padding: "4px 10px", borderRadius: 100, border: "1.5px solid", borderColor: shopSort === o.key ? "#1a1a1a" : "#e0dbd2", background: shopSort === o.key ? "#1a1a1a" : "transparent", color: shopSort === o.key ? "#fff" : "#888", fontSize: 11, fontWeight: 600, cursor: "pointer", fontFamily: "'DM Sans', sans-serif", transition: "all 0.12s" }}>
+                              {o.label}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                      {/* Grid */}
+                      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12 }}>
+                        {shopSortedItems.map((item) => (
+                          <ShopCard key={item.id} item={item} onClick={() => setItemDetail(item)} />
+                        ))}
+                      </div>
                     </div>
                   ) : (
                     <div style={{ display: "grid", gridTemplateColumns: `repeat(auto-fill, minmax(${closetZoom}px, 1fr))`, gap: 12 }}>

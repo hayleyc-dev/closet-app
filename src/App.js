@@ -8984,8 +8984,6 @@ function OutfitCalendar({ outfits, calendar, onSaveCalendar, month, onMonthChang
           <button onClick={goToToday} style={{ padding: "4px 10px", borderRadius: 8, border: "1px solid #e8e4dc", background: "#fff", cursor: "pointer", fontSize: 10, fontWeight: 700, color: "#1a1a1a", fontFamily: "'DM Sans', sans-serif" }}>Today</button>
           <div style={{ width: 1, height: 14, background: "#e8e4dc" }} />
           <button onClick={planWeek} style={{ padding: "4px 10px", borderRadius: 8, border: "1px solid #e8e4dc", background: "#fff", cursor: "pointer", fontSize: 10, fontWeight: 700, color: "#2d6a3f", fontFamily: "'DM Sans', sans-serif" }}>✦ Plan Week</button>
-          <button onClick={() => openNewEvent("")} style={{ padding: "4px 10px", borderRadius: 8, border: "1px solid #e8e4dc", background: "#fff", cursor: "pointer", fontSize: 10, fontWeight: 700, color: "#888", fontFamily: "'DM Sans', sans-serif" }}>+ Event</button>
-          <button onClick={() => openNewMarker("")} style={{ padding: "4px 10px", borderRadius: 8, border: "1px solid #e8e4dc", background: "#fff", cursor: "pointer", fontSize: 10, fontWeight: 700, color: "#888", fontFamily: "'DM Sans', sans-serif" }}>+ Marker</button>
           <button onClick={() => setShowWeatherConfig(true)} style={{ padding: "4px 10px", borderRadius: 8, border: "1px solid #e8e4dc", background: "#fff", cursor: "pointer", fontSize: 10, fontWeight: 700, color: "#888", fontFamily: "'DM Sans', sans-serif" }}>
             {weatherLoading ? "…" : `⛅${weather ? " " + weather.city : " Weather"}`}
           </button>
@@ -9529,41 +9527,60 @@ function OutfitCalendar({ outfits, calendar, onSaveCalendar, month, onMonthChang
 
 
 
-function UpcomingEventsCard({ events, draftName, setDraftName, draftDate, setDraftDate, onAdd, onRemove, onSelect }) {
+const EVENT_TYPE_OPTIONS = [["trip","✈ Trip","#4a7fc1"],["event","★ Event","#9b72cf"],["work","💼 Work","#3aaa6e"],["other","• Other","#e8823a"]];
+function UpcomingEventsCard({ events, onAdd, onRemove, onSelect, onEdit }) {
+  const [name, setName] = React.useState("");
+  const [type, setType] = React.useState("event");
+  const [startDate, setStartDate] = React.useState("");
+  const [endDate, setEndDate] = React.useState("");
+  const [multiDay, setMultiDay] = React.useState(false);
+  const typeColor = EVENT_TYPE_OPTIONS.find(([v]) => v === type)?.[2] || "#9b72cf";
+  const canAdd = name.trim() && startDate;
+  const handleAdd = () => {
+    if (!canAdd) return;
+    onAdd({ name: name.trim(), type, startDate, endDate: multiDay && endDate ? endDate : startDate });
+    setName(""); setStartDate(""); setEndDate(""); setMultiDay(false); setType("event");
+  };
+  const upcoming = events.filter(ev => ev.endDate >= new Date().toISOString().slice(0,10)).sort((a,b) => a.startDate.localeCompare(b.startDate));
+  const fmtDate = (s, e) => {
+    const fmt = d => new Date(d + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" });
+    return s === e ? fmt(s) : fmt(s) + " – " + fmt(e);
+  };
   return (
     <div className="right-card">
       <div className="right-card-title">Upcoming Events</div>
-      <div style={{ display: "flex", gap: 8, marginBottom: 12, width: "100%" }}>
-        <input
-          value={draftName}
-          onChange={e => setDraftName(e.target.value)}
-          onKeyDown={e => { if (e.key === "Enter") onAdd(); }}
-          placeholder="Event name..."
-          style={{ flex: 1, minWidth: 0, boxSizing: "border-box", padding: "8px 12px", border: "1.5px solid #e8e4dc", borderRadius: 12, fontFamily: "'DM Sans', sans-serif", fontSize: 12, outline: "none" }}
-        />
-        <input
-          value={draftDate}
-          onChange={e => setDraftDate(e.target.value)}
-          onKeyDown={e => { if (e.key === "Enter") onAdd(); }}
-          placeholder="mm/dd"
-          maxLength={5}
-          style={{ width: 76, flexShrink: 0, boxSizing: "border-box", padding: "8px 10px", border: "1.5px solid #e8e4dc", borderRadius: 12, fontFamily: "'DM Sans', sans-serif", fontSize: 12, outline: "none" }}
-        />
-        <button onClick={onAdd} style={{ flexShrink: 0, padding: "8px 10px", borderRadius: 12, border: "none", background: "#1a1a1a", color: "#fff", fontFamily: "'DM Sans', sans-serif", fontSize: 11, fontWeight: 700, cursor: "pointer" }}>Add</button>
+      {/* Type pills */}
+      <div style={{ display: "flex", gap: 5, marginBottom: 10, flexWrap: "wrap" }}>
+        {EVENT_TYPE_OPTIONS.map(([val, lbl, clr]) => (
+          <button key={val} onClick={() => setType(val)} style={{ padding: "4px 10px", borderRadius: 20, border: type === val ? `1.5px solid ${clr}` : "1.5px solid #e8e4dc", background: type === val ? clr : "#fff", color: type === val ? "#fff" : "#888", fontSize: 11, fontWeight: 700, cursor: "pointer", fontFamily: "'DM Sans', sans-serif" }}>{lbl}</button>
+        ))}
       </div>
-      {events.length === 0 ? (
-        <div style={{ fontSize: 12, color: "#ccc", textAlign: "center", padding: "8px 0 4px" }}>No events yet</div>
-      ) : (
-        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-          {events.slice(0, 4).map(ev => (
-            <div key={ev.id} onClick={() => onSelect(ev)} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, background: "#faf9f6", borderRadius: 10, padding: "7px 9px", border: "1px solid #f0ece4", cursor: "pointer" }}>
-              <div style={{ minWidth: 0 }}>
-                <div style={{ fontSize: 12, fontWeight: 700, color: "#1a1a1a", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{ev.name}</div>
-                <div style={{ fontSize: 11, color: "#aaa" }}>{ev.date}</div>
+      {/* Name */}
+      <input value={name} onChange={e => setName(e.target.value)} onKeyDown={e => { if (e.key === "Enter") handleAdd(); }} placeholder="Event name..." style={{ width: "100%", boxSizing: "border-box", padding: "8px 12px", border: "1.5px solid #e8e4dc", borderRadius: 10, fontFamily: "'DM Sans', sans-serif", fontSize: 12, outline: "none", marginBottom: 8 }} />
+      {/* Date row */}
+      <div style={{ display: "flex", gap: 6, alignItems: "center", marginBottom: 8 }}>
+        <input type="date" value={startDate} onChange={e => { setStartDate(e.target.value); if (!multiDay) setEndDate(e.target.value); }} style={{ flex: 1, padding: "7px 8px", border: "1.5px solid #e8e4dc", borderRadius: 10, fontFamily: "'DM Sans', sans-serif", fontSize: 11, outline: "none", boxSizing: "border-box" }} />
+        <button onClick={() => setMultiDay(m => !m)} style={{ flexShrink: 0, padding: "7px 8px", borderRadius: 10, border: multiDay ? "1.5px solid #1a1a1a" : "1.5px solid #e8e4dc", background: multiDay ? "#1a1a1a" : "#fff", color: multiDay ? "#fff" : "#aaa", fontSize: 10, fontWeight: 700, cursor: "pointer" }}>Multi-day</button>
+      </div>
+      {multiDay && (
+        <input type="date" value={endDate} min={startDate} onChange={e => setEndDate(e.target.value)} placeholder="End date" style={{ width: "100%", boxSizing: "border-box", padding: "7px 8px", border: "1.5px solid #e8e4dc", borderRadius: 10, fontFamily: "'DM Sans', sans-serif", fontSize: 11, outline: "none", marginBottom: 8 }} />
+      )}
+      <button onClick={handleAdd} disabled={!canAdd} style={{ width: "100%", padding: "8px", borderRadius: 10, border: "none", background: canAdd ? typeColor : "#e8e4dc", color: canAdd ? "#fff" : "#aaa", fontFamily: "'DM Sans', sans-serif", fontSize: 12, fontWeight: 700, cursor: canAdd ? "pointer" : "default", marginBottom: upcoming.length > 0 ? 12 : 0 }}>Add to Calendar</button>
+      {upcoming.length > 0 && (
+        <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
+          {upcoming.slice(0, 5).map(ev => {
+            const clr = EVENT_TYPE_OPTIONS.find(([v]) => v === ev.type)?.[2] || "#9b72cf";
+            return (
+              <div key={ev.id} onClick={() => onSelect && onSelect(ev)} style={{ display: "flex", alignItems: "center", gap: 8, background: "#faf9f6", borderRadius: 10, padding: "7px 9px", border: "1px solid #f0ece4", cursor: "pointer" }}>
+                <div style={{ width: 8, height: 8, borderRadius: "50%", background: clr, flexShrink: 0 }} />
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 12, fontWeight: 700, color: "#1a1a1a", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{ev.name}</div>
+                  <div style={{ fontSize: 10, color: "#aaa" }}>{fmtDate(ev.startDate, ev.endDate)}</div>
+                </div>
+                <button onClick={e => { e.stopPropagation(); onRemove(ev.id); }} style={{ background: "none", border: "none", color: "#ccc", cursor: "pointer", fontSize: 15, lineHeight: 1, flexShrink: 0 }}>×</button>
               </div>
-              <button onClick={(e) => { e.stopPropagation(); onRemove(ev.id); }} style={{ background: "none", border: "none", color: "#bbb", cursor: "pointer", fontSize: 16, lineHeight: 1 }}>×</button>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>
@@ -10037,22 +10054,12 @@ export default function App() {
     return target.getTime();
   };
   const sortEventsByDate = (events) => [...events].sort((a, b) => eventSortKey(a.date) - eventSortKey(b.date));
-  const addUpcomingEvent = () => {
-    const name = eventDraftName.trim();
-    const rawDate = eventDraftDate.trim();
-    if (!name || !rawDate) return;
-    const m = /^(\d{1,2})\/(\d{1,2})$/.exec(rawDate);
-    if (!m) return;
-    const month = Number(m[1]);
-    const day = Number(m[2]);
-    if (month < 1 || month > 12 || day < 1 || day > 31) return;
-    const date = `${String(month).padStart(2, "0")}/${String(day).padStart(2, "0")}`;
-    saveUpcomingEvents(sortEventsByDate([{ id: uid(), name, date }, ...upcomingEvents]));
-    setEventDraftName("");
-    setEventDraftDate("");
+  const addUpcomingEvent = ({ name, type, startDate, endDate }) => {
+    const newEv = { id: uid(), name, type, startDate, endDate };
+    saveCalendarEvents([...calendarEvents, newEv]);
   };
   const removeUpcomingEvent = (eventId) => {
-    saveUpcomingEvents(upcomingEvents.filter(ev => ev.id !== eventId));
+    saveCalendarEvents(calendarEvents.filter(ev => ev.id !== eventId));
   };
   const startOutfitFromEvent = (event) => {
     if (!event?.name) return;
@@ -11339,11 +11346,7 @@ export default function App() {
 
           {tab === "outfits" && (
             <UpcomingEventsCard
-              events={sortEventsByDate(upcomingEvents)}
-              draftName={eventDraftName}
-              setDraftName={setEventDraftName}
-              draftDate={eventDraftDate}
-              setDraftDate={setEventDraftDate}
+              events={calendarEvents}
               onAdd={addUpcomingEvent}
               onRemove={removeUpcomingEvent}
               onSelect={startOutfitFromEvent}

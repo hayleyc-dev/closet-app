@@ -11286,56 +11286,54 @@ export default function App() {
                 const fmtDate = (d) => { if (!d) return null; const dt = new Date(d + "T00:00:00"); return dt.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }); };
                 const dateStr = (previewLb.dateStart || previewLb.dateEnd) ? [fmtDate(previewLb.dateStart), fmtDate(previewLb.dateEnd)].filter(Boolean).join(" – ") : null;
                 return (
-                  <div onClick={() => setLbPreview(null)} style={{ position: "fixed", inset: 0, zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center", padding: 24 }}>
-                    <div onClick={e => e.stopPropagation()} style={{ background: "#fff", borderRadius: 24, width: "100%", maxWidth: 720, maxHeight: "88vh", display: "flex", flexDirection: "column", overflow: "hidden", boxShadow: "0 24px 80px rgba(0,0,0,0.18)" }}>
-                      {/* Header */}
-                      <div style={{ padding: "20px 24px 16px", borderBottom: "1px solid #f0ece6", display: "flex", alignItems: "flex-start", justifyContent: "space-between", flexShrink: 0 }}>
-                        <div>
-                          <div style={{ fontSize: 20, fontWeight: 700, color: "#1a1a1a", lineHeight: 1.2 }}>{previewLb.name}</div>
-                          <div style={{ display: "flex", gap: 10, marginTop: 6, alignItems: "center", flexWrap: "wrap" }}>
-                            <span style={{ fontSize: 12, color: "#aaa", fontWeight: 600 }}>{previewLooks.length} look{previewLooks.length !== 1 ? "s" : ""}</span>
-                            {previewLb.type && <span style={{ fontSize: 11, color: "#b0a898", background: "#f5f2ed", borderRadius: 20, padding: "2px 9px", fontWeight: 600, textTransform: "capitalize" }}>{previewLb.type}</span>}
-                            {dateStr && <span style={{ fontSize: 11, color: "#b0a898", fontWeight: 600, display: "flex", alignItems: "center", gap: 4 }}><SvgCalendar size={11} color="#b0a898" />{dateStr}</span>}
-                          </div>
-                        </div>
-                        <div style={{ display: "flex", gap: 8, alignItems: "center", flexShrink: 0, marginLeft: 16 }}>
-                          <button onClick={() => { setLbPreview(null); setActiveLookbook(previewLb); }} style={{ padding: "8px 16px", background: "#1a1a1a", color: "#fff", border: "none", borderRadius: 100, fontFamily: "'DM Sans', sans-serif", fontSize: 12, fontWeight: 700, cursor: "pointer" }}>Open</button>
-                          <button onClick={() => setLbPreview(null)} style={{ width: 32, height: 32, borderRadius: "50%", background: "#f5f2ed", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#666" strokeWidth="2.5" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-                          </button>
+                  <div style={{ position: "fixed", top: "50%", left: "50%", transform: "translate(-50%, -50%)", zIndex: 1000, background: "#fff", borderRadius: 24, width: "min(720px, calc(100vw - 48px))", maxHeight: "88vh", display: "flex", flexDirection: "column", overflow: "hidden", boxShadow: "0 8px 40px rgba(0,0,0,0.14)" }}>
+                    {/* Header */}
+                    <div style={{ padding: "20px 24px 16px", borderBottom: "1px solid #f0ece6", display: "flex", alignItems: "flex-start", justifyContent: "space-between", flexShrink: 0 }}>
+                      <div>
+                        <div style={{ fontSize: 20, fontWeight: 700, color: "#1a1a1a", lineHeight: 1.2 }}>{previewLb.name}</div>
+                        <div style={{ display: "flex", gap: 10, marginTop: 6, alignItems: "center", flexWrap: "wrap" }}>
+                          <span style={{ fontSize: 12, color: "#aaa", fontWeight: 600 }}>{previewLooks.length} look{previewLooks.length !== 1 ? "s" : ""}</span>
+                          {previewLb.type && <span style={{ fontSize: 11, color: "#b0a898", background: "#f5f2ed", borderRadius: 20, padding: "2px 9px", fontWeight: 600, textTransform: "capitalize" }}>{previewLb.type}</span>}
+                          {dateStr && <span style={{ fontSize: 11, color: "#b0a898", fontWeight: 600, display: "flex", alignItems: "center", gap: 4 }}><SvgCalendar size={11} color="#b0a898" />{dateStr}</span>}
                         </div>
                       </div>
-                      {/* Scrollable looks grid */}
-                      <div style={{ overflowY: "auto", padding: "20px 24px 24px", flex: 1 }}>
-                        {previewLooks.length === 0 ? (
-                          <div style={{ textAlign: "center", padding: "48px 0", color: "#bbb", fontSize: 13 }}>No looks added yet.</div>
-                        ) : (
-                          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))", gap: 12 }}>
-                            {previewLooks.map((outfit, oi) => {
-                              const outfitItems = (outfit.layers || outfit.itemIds || []).map(id => allItems.find(x => x.id === id)).filter(Boolean);
-                              return (
-                                <div key={outfit.id} style={{ borderRadius: 16, overflow: "hidden", border: "1.5px solid #e8e4dc", background: "#fff", boxShadow: "0 1px 6px rgba(0,0,0,0.04)" }}>
-                                  {outfit.previewImage ? (
-                                    <div style={{ aspectRatio: "4/5", background: `url(${outfit.previewImage}) center/contain no-repeat #f5f3ef` }} />
-                                  ) : (
-                                    <div style={{ display: "grid", gridTemplateColumns: outfitItems.length === 1 ? "1fr" : "1fr 1fr", aspectRatio: "4/5" }}>
-                                      {(outfitItems.length === 0 ? [null] : outfitItems).slice(0, 4).map((item, ii) => (
-                                        <div key={ii} style={{ background: item?.image ? `url(${item.image}) center/contain no-repeat #f5f3ef` : "#f5f3ef", display: "flex", alignItems: "center", justifyContent: "center", borderRight: ii % 2 === 0 && outfitItems.length > 1 ? "1.5px solid #fff" : "none", borderBottom: ii < 2 && outfitItems.length > 2 ? "1.5px solid #fff" : "none" }}>
-                                          {!item?.image && <HangerIcon size={16} color="#ddd" />}
-                                        </div>
-                                      ))}
-                                    </div>
-                                  )}
-                                  <div style={{ padding: "8px 10px 10px" }}>
-                                    <div style={{ fontSize: 12, fontWeight: 700, color: "#1a1a1a", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{outfit.name}</div>
-                                    {outfitItems.length > 0 && <div style={{ fontSize: 10, color: "#bbb", marginTop: 2 }}>{outfitItems.length} piece{outfitItems.length !== 1 ? "s" : ""}</div>}
+                      <div style={{ display: "flex", gap: 8, alignItems: "center", flexShrink: 0, marginLeft: 16 }}>
+                        <button onClick={() => { setLbPreview(null); setActiveLookbook(previewLb); }} style={{ padding: "8px 16px", background: "#1a1a1a", color: "#fff", border: "none", borderRadius: 100, fontFamily: "'DM Sans', sans-serif", fontSize: 12, fontWeight: 700, cursor: "pointer" }}>Open</button>
+                        <button onClick={() => setLbPreview(null)} style={{ width: 32, height: 32, borderRadius: "50%", background: "#f5f2ed", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#666" strokeWidth="2.5" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                        </button>
+                      </div>
+                    </div>
+                    {/* Scrollable looks grid */}
+                    <div style={{ overflowY: "auto", padding: "20px 24px 24px", flex: 1 }}>
+                      {previewLooks.length === 0 ? (
+                        <div style={{ textAlign: "center", padding: "48px 0", color: "#bbb", fontSize: 13 }}>No looks added yet.</div>
+                      ) : (
+                        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))", gap: 12 }}>
+                          {previewLooks.map((outfit) => {
+                            const outfitItems = (outfit.layers || outfit.itemIds || []).map(id => allItems.find(x => x.id === id)).filter(Boolean);
+                            return (
+                              <div key={outfit.id} style={{ borderRadius: 16, overflow: "hidden", border: "1.5px solid #e8e4dc", background: "#fff", boxShadow: "0 1px 6px rgba(0,0,0,0.04)" }}>
+                                {outfit.previewImage ? (
+                                  <div style={{ aspectRatio: "4/5", background: `url(${outfit.previewImage}) center/contain no-repeat #f5f3ef` }} />
+                                ) : (
+                                  <div style={{ display: "grid", gridTemplateColumns: outfitItems.length === 1 ? "1fr" : "1fr 1fr", aspectRatio: "4/5" }}>
+                                    {(outfitItems.length === 0 ? [null] : outfitItems).slice(0, 4).map((item, ii) => (
+                                      <div key={ii} style={{ background: item?.image ? `url(${item.image}) center/contain no-repeat #f5f3ef` : "#f5f3ef", display: "flex", alignItems: "center", justifyContent: "center", borderRight: ii % 2 === 0 && outfitItems.length > 1 ? "1.5px solid #fff" : "none", borderBottom: ii < 2 && outfitItems.length > 2 ? "1.5px solid #fff" : "none" }}>
+                                        {!item?.image && <HangerIcon size={16} color="#ddd" />}
+                                      </div>
+                                    ))}
                                   </div>
+                                )}
+                                <div style={{ padding: "8px 10px 10px" }}>
+                                  <div style={{ fontSize: 12, fontWeight: 700, color: "#1a1a1a", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{outfit.name}</div>
+                                  {outfitItems.length > 0 && <div style={{ fontSize: 10, color: "#bbb", marginTop: 2 }}>{outfitItems.length} piece{outfitItems.length !== 1 ? "s" : ""}</div>}
                                 </div>
-                              );
-                            })}
-                          </div>
-                        )}
-                      </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
                     </div>
                   </div>
                 );

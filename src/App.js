@@ -4182,23 +4182,6 @@ function OutfitBuilder({ itemsDb, wishlistDb, onSave, onClose, initial, seedItem
 
         {/* RIGHT PANEL */}
         <div className="builder-right">
-          {layers.length > 0 && (
-            <div style={{ borderBottom: "1.5px solid #e8e4dc", flexShrink: 0 }}>
-              <div style={{ padding: "8px 12px 4px", fontSize: 11, fontWeight: 700, color: "#888", textTransform: "uppercase", letterSpacing: "0.08em" }}>Selected</div>
-              <div className="selected-strip">
-                {layers.map(id => {
-                  const item = allItems.find(i => i.id === id);
-                  if (!item) return null;
-                  return (
-                    <div key={id} className="selected-thumb" onClick={() => toggleItem(id)} title="Click to remove">
-                      {item.image ? <img src={item.image} alt={item.name} /> : <HangerIcon size={18} color="#ccc" />}
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          )}
-
           <div style={{ padding: "10px 12px 8px", borderBottom: "1.5px solid #e8e4dc", flexShrink: 0 }}>
             {/* Tab toggle */}
             <div style={{ display: "flex", background: "#f5f2ed", borderRadius: 10, padding: 3, gap: 2, marginBottom: 8 }}>
@@ -4247,15 +4230,16 @@ function OutfitBuilder({ itemsDb, wishlistDb, onSave, onClose, initial, seedItem
                   </select>
                   <div>
                     <div style={{ fontSize: 10, fontWeight: 700, color: "#aaa", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 5 }}>Color</div>
-                    <div style={{ display: "flex", flexWrap: "wrap", gap: 5 }}>
-                      <button onClick={() => setFilterColor("")} title="All" style={{ width: 20, height: 20, borderRadius: "50%", border: !filterColor ? "2px solid #2d6a3f" : "1.5px solid #ddd", background: "linear-gradient(135deg,#f66,#66f,#6f6)", cursor: "pointer", padding: 0, outline: "none" }} />
-                      {COLORS.map(c => (
-                        <button key={c} onClick={() => setFilterColor(filterColor === c ? "" : c)} title={c} style={{
-                          width: 20, height: 20, borderRadius: "50%", border: filterColor === c ? "2px solid #2d6a3f" : "1.5px solid #ddd",
-                          background: COLOR_HEX[c] || "#ccc", cursor: "pointer", padding: 0, outline: "none",
-                          boxShadow: filterColor === c ? "0 0 0 2px #fff, 0 0 0 4px #2d6a3f" : "none"
-                        }} />
-                      ))}
+                    <div style={{ display: "grid", gridTemplateColumns: "repeat(6, 1fr)", gap: 6 }}>
+                      {COLORS.map(c => {
+                        const active = filterColor === c;
+                        const swatch = getColorSwatch(c);
+                        return (
+                          <button key={c} onClick={() => setFilterColor(active ? "" : c)} title={c} style={{ display: "flex", alignItems: "center", justifyContent: "center", background: "none", border: "none", cursor: "pointer", padding: 2 }}>
+                            <div style={{ width: 24, height: 24, borderRadius: "50%", background: swatch, border: active ? "2.5px solid #1a1a1a" : "2px solid transparent", boxShadow: active ? "0 0 0 1px #1a1a1a" : "0 1px 3px rgba(0,0,0,0.12)", transition: "all 0.15s" }} />
+                          </button>
+                        );
+                      })}
                     </div>
                   </div>
                   <select value={filterSeason} onChange={e => setFilterSeason(e.target.value)} style={{ ...fieldStyle }}>

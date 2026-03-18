@@ -9861,7 +9861,7 @@ export default function App() {
     await wishlistDb.remove(wish.id);
   };
 
-  const openNewOutfit = (prefillName = "") => { setEditingOutfit(null); setOutfitSeedItem(null); setOutfitPrefillName(prefillName); setOutfitBuilder(true); };
+  const openNewOutfit = (prefillName = "") => { try { localStorage.removeItem("wardrobe_builder_draft"); } catch {} setEditingOutfit(null); setOutfitSeedItem(null); setOutfitPrefillName(prefillName); setOutfitBuilder(true); };
   const duplicateOutfit = async (outfit) => {
     const copy = { ...outfit, id: uid(), name: outfit.name + " (copy)" };
     await outfitsDb.add(copy);

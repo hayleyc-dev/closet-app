@@ -9280,6 +9280,7 @@ export default function App() {
   const [editingOutfit, setEditingOutfit] = useState(null);
   const [outfitSeedItem, setOutfitSeedItem] = useState(null);
   const [outfitPrefillName, setOutfitPrefillName] = useState("");
+  const [lbPickerOutfit, setLbPickerOutfit] = useState(null);
   const [outfitTagFilter, setOutfitTagFilter] = useState("All");
   const [outfitSeasonFilter, setOutfitSeasonFilter] = useState("All");
   const [outfitSearch, setOutfitSearch] = useState("");
@@ -10194,7 +10195,8 @@ export default function App() {
                             <div style={{ fontSize: 12, fontWeight: 700, color: "#1a1a1a", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", marginBottom: tags[0] ? 4 : 0 }}>{outfit.name}</div>
                             {tags[0] && (() => { const oc = OCCASION_COLORS[tags[0]] || { bg: "#f5f3ef", color: "#888" }; return <div style={{ display: "inline-block", background: oc.bg, color: oc.color, borderRadius: 20, padding: "2px 8px", fontSize: 10, fontWeight: 700 }}>{tags[0]}</div>; })()}
                             <div className="outfit-card-btns" style={{ display: "flex", gap: 6, marginTop: 6 }}>
-                              <button onClick={e => { e.stopPropagation(); setOutfitPopup(outfit); }} style={{ flex: 1, padding: "5px 0", background: "#f5f3ef", border: "none", borderRadius: 8, cursor: "pointer", fontFamily: "'DM Sans', sans-serif", fontSize: 11, fontWeight: 700, color: "#555" }}>Edit</button>
+                              <button onClick={e => { e.stopPropagation(); openEditOutfit(outfit); }} style={{ flex: 1, padding: "5px 0", background: "#f5f3ef", border: "none", borderRadius: 8, cursor: "pointer", fontFamily: "'DM Sans', sans-serif", fontSize: 11, fontWeight: 700, color: "#555" }}>Edit</button>
+                              <button onClick={e => { e.stopPropagation(); setLbPickerOutfit(outfit); }} style={{ flex: 1, padding: "5px 0", background: "#f0f4ff", border: "none", borderRadius: 8, cursor: "pointer", fontFamily: "'DM Sans', sans-serif", fontSize: 11, fontWeight: 700, color: "#3a5fe0" }}>+ Lookbook</button>
                               <button onClick={e => { e.stopPropagation(); if (window.confirm(`Delete "${outfit.name}"?`)) archiveOutfit(outfit); }} style={{ flex: 1, padding: "5px 0", background: "#fff0f0", border: "none", borderRadius: 8, cursor: "pointer", fontFamily: "'DM Sans', sans-serif", fontSize: 11, fontWeight: 700, color: "#e05555" }}>Delete</button>
                             </div>
                           </div>
@@ -10891,6 +10893,40 @@ export default function App() {
             isWishlist={isWishlistItem}
             allItems={allItems}
           />
+        );
+      })()}
+
+      {/* Lookbook picker modal (from outfit card) */}
+      {lbPickerOutfit && (() => {
+        const alreadyIn = lookbooksDb.rows.filter(lb => (lb.outfitIds || []).includes(lbPickerOutfit.id));
+        const available = lookbooksDb.rows.filter(lb => !(lb.outfitIds || []).includes(lbPickerOutfit.id));
+        return (
+          <div onClick={() => setLbPickerOutfit(null)} style={{ position: "fixed", inset: 0, zIndex: 600, background: "rgba(0,0,0,0.35)", display: "flex", alignItems: "center", justifyContent: "center", backdropFilter: "blur(6px)" }}>
+            <div onClick={e => e.stopPropagation()} style={{ background: "#fff", borderRadius: 20, padding: "24px 22px", width: 320, boxShadow: "0 12px 48px rgba(0,0,0,0.18)" }}>
+              <div style={{ fontSize: 15, fontWeight: 800, color: "#1a1a1a", marginBottom: 4 }}>Add to Lookbook</div>
+              <div style={{ fontSize: 12, color: "#aaa", marginBottom: 16, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{lbPickerOutfit.name}</div>
+              {available.length === 0 && alreadyIn.length === 0 && (
+                <div style={{ fontSize: 13, color: "#bbb", textAlign: "center", padding: "20px 0" }}>No lookbooks yet — create one in the Lookbooks tab.</div>
+              )}
+              {alreadyIn.length > 0 && (
+                <div style={{ marginBottom: 12 }}>
+                  <div style={{ fontSize: 10, fontWeight: 700, color: "#c0b8b0", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 8 }}>Already in</div>
+                  {alreadyIn.map(lb => <div key={lb.id} style={{ fontSize: 13, color: "#aaa", padding: "6px 0", borderBottom: "1px solid #f5f2ee" }}>{lb.name}</div>)}
+                </div>
+              )}
+              {available.length > 0 && (
+                <div>
+                  <div style={{ fontSize: 10, fontWeight: 700, color: "#c0b8b0", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 8 }}>Add to</div>
+                  {available.map(lb => (
+                    <button key={lb.id} onClick={() => { addOutfitToLookbook(lbPickerOutfit.id, lb.id); setLbPickerOutfit(null); }} style={{ display: "block", width: "100%", textAlign: "left", padding: "9px 12px", marginBottom: 6, background: "#f7f5f2", border: "none", borderRadius: 10, cursor: "pointer", fontFamily: "'DM Sans', sans-serif", fontSize: 13, fontWeight: 600, color: "#1a1a1a" }}>
+                      {lb.name}
+                    </button>
+                  ))}
+                </div>
+              )}
+              <button onClick={() => setLbPickerOutfit(null)} style={{ marginTop: 12, width: "100%", padding: "9px 0", background: "#f5f3ef", border: "none", borderRadius: 10, cursor: "pointer", fontFamily: "'DM Sans', sans-serif", fontSize: 12, fontWeight: 700, color: "#888" }}>Cancel</button>
+            </div>
+          </div>
         );
       })()}
 

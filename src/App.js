@@ -8110,6 +8110,7 @@ function HomeTab({ outfitCalendar, outfitsDb, itemsDb, lookbooksDb, wishlistDb, 
   const [homeCityInput, setHomeCityInput] = useState(() => localStorage.getItem("wardrobe_home_city") || "");
   const [homeWeather, setHomeWeather] = useState(null);
   const [wxLoading, setWxLoading] = useState(false);
+  const [hoveredTodayId, setHoveredTodayId] = useState(null);
 
   const fetchHomeWeather = useCallback(async (city) => {
     if (!city) return;
@@ -8383,7 +8384,21 @@ function HomeTab({ outfitCalendar, outfitsDb, itemsDb, lookbooksDb, wishlistDb, 
 
       {/* ── Today's Outfit ── */}
       <div style={{ marginBottom: 28 }}>
-        <SectionHeader title="Today's Outfit" />
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
+          <div>
+            <div style={{ fontSize: 10, fontWeight: 700, color: "#bbb", textTransform: "uppercase", letterSpacing: "0.12em", marginBottom: 2 }}>Today</div>
+            <div style={{ fontSize: 22, fontWeight: 800, color: "#1a1a1a", lineHeight: 1.15 }}>{dayName}, {dateLabel}</div>
+          </div>
+          {todayWx && (
+            <div style={{ display: "flex", alignItems: "center", gap: 6, background: "#f8f6f2", borderRadius: 12, padding: "8px 12px" }}>
+              <span style={{ fontSize: 20 }}>{wxIcon(todayWx.code)}</span>
+              <div>
+                <div style={{ fontSize: 15, fontWeight: 800, color: "#1a1a1a", lineHeight: 1 }}>{todayWx.high}°</div>
+                <div style={{ fontSize: 10, color: "#aaa", fontWeight: 500 }}>{todayWx.low}° low</div>
+              </div>
+            </div>
+          )}
+        </div>
         {todayOutfits.length === 0 ? (
           <div style={{ ...cardStyle, padding: "22px 20px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
             <div>
@@ -8399,35 +8414,46 @@ function HomeTab({ outfitCalendar, outfitsDb, itemsDb, lookbooksDb, wishlistDb, 
             {todayOutfits.map(outfit => {
               const layerIds = outfit.layers || outfit.itemIds || [];
               const thumbItems = layerIds.slice(0, 4).map(id => allItems.find(x => x.id === id)).filter(Boolean);
+              const isHov = hoveredTodayId === outfit.id;
               return (
                 <div key={outfit.id} onClick={() => setOutfitPopup(outfit)}
-                  style={{ ...cardStyle, cursor: "pointer", minWidth: 160, maxWidth: 200, flex: "0 0 auto" }}>
+                  onMouseEnter={() => setHoveredTodayId(outfit.id)}
+                  onMouseLeave={() => setHoveredTodayId(null)}
+                  style={{ borderRadius: 16, overflow: "hidden", cursor: "pointer", minWidth: 180, maxWidth: 240, flex: "0 0 auto", position: "relative", border: "1.5px solid #e8e4dc", boxShadow: "0 2px 12px rgba(0,0,0,0.04)", aspectRatio: "3/4", background: "#f5f3ef" }}>
                   {outfit.previewImage ? (
-                    <div style={{ aspectRatio: "1/1", background: `url(${outfit.previewImage}) center/cover no-repeat` }} />
+                    <img src={outfit.previewImage} alt={outfit.name} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block", position: "absolute", inset: 0 }} />
                   ) : (
-                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", aspectRatio: "1/1" }}>
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", position: "absolute", inset: 0 }}>
                       {[0,1,2,3].map(qi => {
                         const it = thumbItems[qi];
                         return (
-                          <div key={qi} style={{ background: it?.image ? `url(${it.image}) center/contain no-repeat #f5f3ef` : "#f5f3ef", display: "flex", alignItems: "center", justifyContent: "center", borderRight: qi%2===0 ? "1px solid #fff" : "none", borderBottom: qi<2 ? "1px solid #fff" : "none" }}>
+                          <div key={qi} style={{ background: it?.image ? `url(${it.image}) center/cover no-repeat` : "#f5f3ef", display: "flex", alignItems: "center", justifyContent: "center", borderRight: qi%2===0 ? "1px solid #fff" : "none", borderBottom: qi<2 ? "1px solid #fff" : "none" }}>
                             {!it?.image && <HangerIcon size={14} color="#ddd" />}
                           </div>
                         );
                       })}
                     </div>
                   )}
-                  <div style={{ padding: "10px 12px 12px" }}>
-                    <div style={{ fontSize: 13, fontWeight: 700, color: "#1a1a1a", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                      {outfit.name || "Untitled Outfit"}
+                  {/* Weather badge top-right */}
+                  {todayWx && (
+                    <div style={{ position: "absolute", top: 8, right: 8, background: "rgba(255,255,255,0.92)", borderRadius: 10, padding: "4px 8px", display: "flex", alignItems: "center", gap: 4, backdropFilter: "blur(4px)", zIndex: 2 }}>
+                      <span style={{ fontSize: 13 }}>{wxIcon(todayWx.code)}</span>
+                      <span style={{ fontSize: 11, fontWeight: 800, color: "#1a1a1a" }}>{todayWx.high}°</span>
                     </div>
-                    {(outfit.tags || []).length > 0 && (
-                      <div style={{ display: "flex", gap: 4, flexWrap: "wrap", marginTop: 5 }}>
-                        {(outfit.tags || []).slice(0, 2).map(tag => (
-                          <span key={tag} style={{ fontSize: 10, fontWeight: 600, padding: "2px 7px", background: "#f0ece4", borderRadius: 100, color: "#888" }}>{tag}</span>
-                        ))}
-                      </div>
-                    )}
-                  </div>
+                  )}
+                  {/* Outfit name — hover only */}
+                  {isHov && (
+                    <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, zIndex: 3, background: "linear-gradient(to top, rgba(0,0,0,0.55) 0%, transparent 100%)", padding: "24px 12px 12px" }}>
+                      <div style={{ fontSize: 13, fontWeight: 700, color: "#fff", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontFamily: "'DM Sans', sans-serif" }}>{outfit.name || "Untitled Outfit"}</div>
+                      {(outfit.tags || []).length > 0 && (
+                        <div style={{ display: "flex", gap: 4, marginTop: 4, flexWrap: "wrap" }}>
+                          {(outfit.tags || []).slice(0, 2).map(tag => (
+                            <span key={tag} style={{ fontSize: 9, fontWeight: 700, padding: "2px 6px", background: "rgba(255,255,255,0.25)", borderRadius: 100, color: "#fff" }}>{tag}</span>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
               );
             })}
@@ -9043,11 +9069,20 @@ function OutfitCalendar({ outfits, calendar, onSaveCalendar, month, onMonthChang
           const isDragOver = dragOver === dateStr;
           const dayEvts = eventsOnDate(dateStr);
           const seasonMark = isSeasonStart(dateStr);
-          const dow = new Date(dateStr + "T00:00:00").getDay();
-          const heatAlpha = dowCounts[dow] * 0.08; // subtle warm tint based on historical wear
+          const cellOutfit = ids.length > 0 ? outfits.find(x => x.id === ids[0]) : null;
+
+          // Build cell background: outfit image as cover, or plain white
+          const cellBg = (() => {
+            if (isDragOver) return "#f0faf4";
+            if (cellOutfit?.previewImage) return `url(${JSON.stringify(cellOutfit.previewImage)}) center/cover no-repeat #f5f3ef`;
+            return "#fff";
+          })();
 
           return (
             <div key={dateStr}
+              draggable={!!cellOutfit}
+              onDragStart={cellOutfit ? e => { setDraggingInfo({ outfitId: ids[0], fromDate: dateStr }); } : undefined}
+              onDragEnd={cellOutfit ? () => setDraggingInfo(null) : undefined}
               onClick={() => { setDayPopup(dateStr); setDayPopupTab(0); setShowDayAdd(false); setDayAddSearch(""); }}
               onDragOver={e => { e.preventDefault(); setDragOver(dateStr); }}
               onDragLeave={() => setDragOver(null)}
@@ -9055,8 +9090,11 @@ function OutfitCalendar({ outfits, calendar, onSaveCalendar, month, onMonthChang
               style={{
                 borderRadius: 8,
                 border: isToday ? "2px solid #1a1a1a" : isDragOver ? "1.5px dashed #2d6a3f" : "1px solid #ede9e2",
-                background: isDragOver ? "#f0faf4" : "#fff",
-                cursor: "pointer", minHeight: 88, overflow: "hidden", position: "relative",
+                background: cellBg,
+                backgroundImage: (!cellOutfit && !isDragOver && ids.length === 0 && !isPast)
+                  ? "repeating-linear-gradient(45deg, transparent, transparent 3px, rgba(0,0,0,0.018) 3px, rgba(0,0,0,0.018) 6px)"
+                  : undefined,
+                cursor: "pointer", aspectRatio: "3/4", overflow: "hidden", position: "relative",
                 transition: "box-shadow 0.12s",
                 opacity: isPast ? 0.55 : 1,
                 filter: isPast ? "saturate(0.45)" : "none",
@@ -9077,25 +9115,8 @@ function OutfitCalendar({ outfits, calendar, onSaveCalendar, month, onMonthChang
                 </>);
               })}
 
-              {/* Outfit image — fills full cell */}
-              {ids.length > 0 && (() => {
-                const o = outfits.find(x => x.id === ids[0]);
-                return (
-                  <div draggable onDragStart={e => { e.stopPropagation(); setDraggingInfo({ outfitId: ids[0], fromDate: dateStr }); }} onDragEnd={() => setDraggingInfo(null)}
-                    style={{ position: "absolute", inset: 0, zIndex: 1 }} onClick={e => e.stopPropagation()}>
-                    {o?.previewImage
-                      ? <img src={o.previewImage} alt={o.name} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
-                      : <div style={{ width: "100%", height: "100%", background: "#f5f3ef", display: "flex", alignItems: "center", justifyContent: "center" }}><span style={{ fontSize: 8, color: "#ccc", fontWeight: 700, fontFamily: "'DM Sans', sans-serif", textAlign: "center", padding: 4 }}>{o?.name || ""}</span></div>
-                    }
-                    {ids.length > 1 && <div style={{ position: "absolute", top: 4, right: 4, background: "rgba(26,26,26,0.7)", color: "#fff", borderRadius: 8, padding: "1px 5px", fontSize: 7, fontWeight: 800, fontFamily: "'DM Sans', sans-serif" }}>+{ids.length - 1}</div>}
-                  </div>
-                );
-              })()}
-
-              {/* Unplanned future: linen texture */}
-              {ids.length === 0 && !isPast && (
-                <div style={{ position: "absolute", inset: 0, backgroundImage: "repeating-linear-gradient(45deg, transparent, transparent 3px, rgba(0,0,0,0.018) 3px, rgba(0,0,0,0.018) 6px)", background: "#fff", pointerEvents: "none", zIndex: 1 }} />
-              )}
+              {/* +N badge for multiple outfits */}
+              {ids.length > 1 && <div style={{ position: "absolute", top: 4, right: 4, background: "rgba(26,26,26,0.7)", color: "#fff", borderRadius: 8, padding: "1px 5px", fontSize: 7, fontWeight: 800, fontFamily: "'DM Sans', sans-serif", zIndex: 5 }}>+{ids.length - 1}</div>}
 
               {/* Event pills — visible even on empty days */}
               {dayEvts.length > 0 && (

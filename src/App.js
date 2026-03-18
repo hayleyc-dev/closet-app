@@ -2336,7 +2336,7 @@ function OccasionPill({ tag, selected, onClick, small }) {
 }
 
 // ── Outfit Detail Popup ──────────────────────────────────────────────────────
-function OutfitDetailPopup({ outfit, allItems, allOutfits, lookbooks, onClose, onEdit, onDelete, onMarkWorn, onDuplicate, onAddToLookbook, onGoToLookbook, onItemClick }) {
+function OutfitDetailPopup({ outfit, allItems, wishlistIds = new Set(), allOutfits, lookbooks, onClose, onEdit, onDelete, onMarkWorn, onDuplicate, onAddToLookbook, onGoToLookbook, onItemClick }) {
   const [addingToLb, setAddingToLb] = useState(false);
   const [selectedLb, setSelectedLb] = useState("");
   const [exported, setExported] = useState(false);
@@ -2451,9 +2451,9 @@ function OutfitDetailPopup({ outfit, allItems, allOutfits, lookbooks, onClose, o
             {/* Action buttons */}
             <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
               <button onClick={onEdit} style={{ width: 32, height: 32, borderRadius: "50%", background: "#f5f2ed", border: "none", cursor: "pointer", fontSize: 14, color: "#444", display: "flex", alignItems: "center", justifyContent: "center" }}><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>
-              <button onClick={handleMarkWorn} style={{ padding: "6px 12px", borderRadius: 10, background: wornFlash ? "#2d6a3f" : "#f0faf4", border: "1.5px solid #b6e8c8", cursor: "pointer", fontSize: 12, fontWeight: 700, color: wornFlash ? "#fff" : "#2d6a3f", fontFamily: "'DM Sans', sans-serif", transition: "all 0.2s", display: "flex", alignItems: "center" }}><SvgCheck size={12} color="currentColor" style={{marginRight:6}} />{wornFlash ? "Marked!" : `${wornCount}×`}</button>
+              <button onClick={handleMarkWorn} style={{ padding: "6px 12px", borderRadius: 10, background: wornFlash ? "#2d6a3f" : "#f0faf4", border: "1.5px solid #b6e8c8", cursor: "pointer", fontSize: 12, fontWeight: 700, color: wornFlash ? "#fff" : "#2d6a3f", fontFamily: "'DM Sans', sans-serif", transition: "all 0.2s", display: "flex", alignItems: "center", gap: 6 }}><SvgCheck size={12} color="currentColor" />{wornFlash ? "Marked!" : `${wornCount}×`}</button>
               {nonMemberLookbooks.length > 0 && (
-                <button onClick={() => { setRightTab("lookbooks"); setAddingToLb(true); }} style={{ width: 32, height: 32, borderRadius: "50%", background: "#f5f0ff", border: "1.5px solid #d8ccf5", cursor: "pointer", color: "#7c6fe0", display: "flex", alignItems: "center", justifyContent: "center" }} title="Add to lookbook"><SvgGrid size={13} color="currentColor" /></button>
+                <button onClick={() => { setRightTab("lookbooks"); setAddingToLb(true); }} style={{ width: 32, height: 32, borderRadius: "50%", background: "#f5f2ed", border: "none", cursor: "pointer", color: "#666", display: "flex", alignItems: "center", justifyContent: "center" }} title="Add to lookbook"><SvgGrid size={13} color="#666" /></button>
               )}
               <button onClick={onDuplicate} style={{ width: 32, height: 32, borderRadius: "50%", background: "#f5f2ed", border: "none", cursor: "pointer", color: "#666", display: "flex", alignItems: "center", justifyContent: "center" }} title="Duplicate"><SvgCopy size={12} color="currentColor" /></button>
               <button onClick={onDelete} style={{ width: 32, height: 32, borderRadius: "50%", background: "#fef2f2", border: "none", cursor: "pointer", color: "#e05555", display: "flex", alignItems: "center", justifyContent: "center" }}><SvgTrash size={14} color="#e05555" /></button>
@@ -2487,16 +2487,15 @@ function OutfitDetailPopup({ outfit, allItems, allOutfits, lookbooks, onClose, o
               ) : (
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(120px, 1fr))", gap: 10 }}>
                   {outfitItems.map(item => (
-                    <div key={item.id} onClick={() => onItemClick && onItemClick(item)} style={{ borderRadius: 14, overflow: "hidden", background: "#f5f2ed", cursor: "pointer", border: "1.5px solid transparent", transition: "border-color 0.15s" }}
-                      onMouseEnter={e => e.currentTarget.style.borderColor = "#d0c8bc"}
-                      onMouseLeave={e => e.currentTarget.style.borderColor = "transparent"}
+                    <div key={item.id} onClick={() => onItemClick && onItemClick(item)} style={{ borderRadius: 14, overflow: "hidden", background: "#fff", cursor: "pointer", border: "1.5px solid #ece8e0", transition: "border-color 0.15s", position: "relative" }}
+                      onMouseEnter={e => e.currentTarget.style.borderColor = "#c0b8b0"}
+                      onMouseLeave={e => e.currentTarget.style.borderColor = "#ece8e0"}
                     >
+                      {wishlistIds.has(item.id) && (
+                        <div style={{ position: "absolute", top: 6, right: 6, zIndex: 2, fontSize: 11, color: "#f5a623" }}>★</div>
+                      )}
                       <div style={{ aspectRatio: "1/1", display: "flex", alignItems: "center", justifyContent: "center" }}>
                         {item.image ? <img src={item.image} alt={item.name} style={{ width: "100%", height: "100%", objectFit: "contain", padding: 6 }} /> : <HangerIcon size={24} color="#ddd" />}
-                      </div>
-                      <div style={{ padding: "6px 8px 8px" }}>
-                        <div style={{ fontSize: 11, fontWeight: 700, color: "#1a1a1a", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{item.name}</div>
-                        {item.brand && <div style={{ fontSize: 10, color: "#aaa", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{item.brand}</div>}
                       </div>
                     </div>
                   ))}
@@ -6975,6 +6974,8 @@ function SettingsTab({
   annualBudget, setAnnualBudget,
   restoreLookbook,
   restoreOutfit,
+  deleteOutfit,
+  supabaseArchivedOutfits = [],
 }) {
   const [settingsTab, setSettingsTab] = useState("appearance");
   const [themeId, setThemeId] = useState(() => { try { return localStorage.getItem(THEME_KEY) || "parchment"; } catch { return "parchment"; } });
@@ -7581,26 +7582,29 @@ function SettingsTab({
         )}
 
         {/* Archived Outfits */}
-        {archivedOutfits.length > 0 && (
+        {(() => {
+          const lsIds = new Set(archivedOutfits.map(o => o.id));
+          const merged = [...archivedOutfits, ...supabaseArchivedOutfits.filter(o => !lsIds.has(o.id))];
+          return merged.length > 0 && (
           <Card>
             <SectionLabel>Archived Outfits</SectionLabel>
             <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
-              {archivedOutfits.map((outfit, i) => (
+              {merged.map((outfit, i) => (
                 <div key={outfit.id||i} style={{ display:"flex", alignItems:"center", gap:10, padding:"10px 12px", background:"#fafaf8", borderRadius:12, border:"1px solid #ece8e0" }}>
                   <div style={{ flex:1, minWidth:0 }}>
                     <div style={{ fontSize:13, fontWeight:700, color:"#1a1a1a", overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{outfit.name||"Unnamed Outfit"}</div>
                     <div style={{ fontSize:11, color:"#bbb", marginTop:1 }}>{(outfit.layers||outfit.itemIds||[]).length} pieces · archived {outfit.archivedAt ? new Date(outfit.archivedAt).toLocaleDateString("en-US",{month:"short",day:"numeric",year:"numeric"}) : ""}</div>
                   </div>
                   <button onClick={async () => {
-                    const restored = { ...outfit }; delete restored.archivedAt;
-                    if (restoreOutfit) await restoreOutfit(restored);
-                    const updated = archivedOutfits.filter((_,idx)=>idx!==i);
+                    if (restoreOutfit) await restoreOutfit(outfit);
+                    const updated = archivedOutfits.filter(o => o.id !== outfit.id);
                     localStorage.setItem(OUTFIT_ARCHIVE_KEY, JSON.stringify(updated));
                     setArchivedOutfits(updated);
                   }} style={{ padding:"6px 12px", background:"#f0faf4", border:"1px solid #b6e8c8", borderRadius:8, cursor:"pointer", fontFamily:"'DM Sans',sans-serif", fontSize:11, fontWeight:700, color:"#2d6a3f", flexShrink:0 }}>Restore</button>
-                  <button onClick={() => {
+                  <button onClick={async () => {
                     if (window.confirm(`Permanently delete "${outfit.name||"this outfit"}"?`)) {
-                      const updated = archivedOutfits.filter((_,idx)=>idx!==i);
+                      if (deleteOutfit) await deleteOutfit(outfit);
+                      const updated = archivedOutfits.filter(o => o.id !== outfit.id);
                       localStorage.setItem(OUTFIT_ARCHIVE_KEY, JSON.stringify(updated));
                       setArchivedOutfits(updated);
                     }
@@ -7609,7 +7613,7 @@ function SettingsTab({
               ))}
             </div>
           </Card>
-        )}
+        );})()}
 
         {/* Export */}
         <Card>
@@ -9536,12 +9540,15 @@ export default function App() {
 
   const OUTFIT_ARCHIVE_KEY = "wardrobe_outfits_archived_v1";
   const archiveOutfit = async (outfit) => {
+    const withMeta = { ...outfit, archived: true, archivedAt: new Date().toISOString() };
+    try { await outfitsDb.update(withMeta); } catch (e) {}
     try {
       const archived = JSON.parse(localStorage.getItem(OUTFIT_ARCHIVE_KEY) || "[]");
-      archived.push({ ...outfit, archivedAt: new Date().toISOString() });
-      localStorage.setItem(OUTFIT_ARCHIVE_KEY, JSON.stringify(archived));
+      if (!archived.find(o => o.id === outfit.id)) {
+        archived.push(withMeta);
+        localStorage.setItem(OUTFIT_ARCHIVE_KEY, JSON.stringify(archived));
+      }
     } catch {}
-    try { await outfitsDb.remove(outfit.id); } catch (e) {}
     setOutfitPopup(null);
   };
 
@@ -9615,6 +9622,7 @@ export default function App() {
   const filteredOutfits = (() => {
     const q = outfitSearch.trim().toLowerCase();
     let rows = outfitsDb.rows.filter(o => {
+      if (o.archived) return false;
       const matchTag = outfitTagFilter === "All" || (o.tags || []).includes(outfitTagFilter);
       const matchSeason = outfitSeasonFilter === "All" || (o.seasons || []).includes(outfitSeasonFilter);
       const matchSearch = !q || (o.name || "").toLowerCase().includes(q);
@@ -10196,8 +10204,9 @@ export default function App() {
                             {tags[0] && (() => { const oc = OCCASION_COLORS[tags[0]] || { bg: "#f5f3ef", color: "#888" }; return <div style={{ display: "inline-block", background: oc.bg, color: oc.color, borderRadius: 20, padding: "2px 8px", fontSize: 10, fontWeight: 700 }}>{tags[0]}</div>; })()}
                             <div className="outfit-card-btns" style={{ display: "flex", gap: 6, marginTop: 8 }}>
                               <button onClick={e => { e.stopPropagation(); openEditOutfit(outfit); }} title="Edit" style={{ width: 32, height: 32, borderRadius: "50%", background: "#f5f2ed", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#444" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>
-                              <button onClick={e => { e.stopPropagation(); setLbPickerOutfit(outfit); }} title="Add to lookbook" style={{ width: 32, height: 32, borderRadius: "50%", background: "#f5f0ff", border: "1.5px solid #d8ccf5", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}><SvgGrid size={13} color="#7c6fe0" /></button>
-                              <button onClick={e => { e.stopPropagation(); if (window.confirm(`Delete "${outfit.name}"?`)) archiveOutfit(outfit); }} title="Delete" style={{ width: 32, height: 32, borderRadius: "50%", background: "#fef2f2", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}><SvgTrash size={14} color="#e05555" /></button>
+                              <button onClick={e => { e.stopPropagation(); setLbPickerOutfit(outfit); }} title="Add to lookbook" style={{ width: 32, height: 32, borderRadius: "50%", background: "#f5f2ed", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}><SvgGrid size={13} color="#666" /></button>
+                              <button onClick={e => { e.stopPropagation(); archiveOutfit(outfit); }} title="Archive" style={{ width: 32, height: 32, borderRadius: "50%", background: "#f5f2ed", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}><SvgArrowDn size={13} color="#888" /></button>
+                              <button onClick={e => { e.stopPropagation(); if (window.confirm(`Delete "${outfit.name}"?`)) outfitsDb.remove(outfit.id); }} title="Delete" style={{ width: 32, height: 32, borderRadius: "50%", background: "#fef2f2", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}><SvgTrash size={14} color="#e05555" /></button>
                             </div>
                           </div>
                         </div>
@@ -10384,12 +10393,15 @@ export default function App() {
                     await lookbooksDb.refresh();
                   } catch(e) { console.error("restore lookbook error", e); }
                 }}
+                supabaseArchivedOutfits={outfitsDb.rows.filter(o => o.archived)}
                 restoreOutfit={async (outfit) => {
                   try {
-                    let { error } = await supabase.from("outfits").insert({ id: outfit.id, data: outfit });
-                    if (error) ({ error } = await supabase.from("outfits").insert(outfit));
-                    await outfitsDb.refresh();
+                    const restored = { ...outfit }; delete restored.archived; delete restored.archivedAt;
+                    await outfitsDb.update(restored);
                   } catch (e) { console.error("restore outfit error", e); }
+                }}
+                deleteOutfit={async (outfit) => {
+                  try { await outfitsDb.remove(outfit.id); } catch (e) { console.error("delete outfit error", e); }
                 }}
               />}
 
@@ -10935,6 +10947,7 @@ export default function App() {
         <OutfitDetailPopup
           outfit={outfitPopup}
           allItems={allItems}
+          wishlistIds={new Set(wishlistDb.rows.map(i => i.id))}
           allOutfits={outfitsDb.rows}
           lookbooks={lookbooksDb.rows}
           onClose={() => setOutfitPopup(null)}

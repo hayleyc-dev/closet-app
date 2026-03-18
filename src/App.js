@@ -8078,8 +8078,9 @@ function HomeTab({ outfitCalendar, outfitsDb, itemsDb, lookbooksDb, wishlistDb, 
   const totalValue  = closetItems.reduce((s, i) => s + parsePrice(i.price), 0);
   const totalWears  = closetItems.reduce((s, i) => s + (i.wornCount || 0), 0);
   const unwornCount = closetItems.filter(i => !(i.wornCount > 0)).length;
+  const missingImageCount = closetItems.filter(i => !i.image).length;
   const cpwItems    = closetItems.filter(i => (i.wornCount || 0) > 0 && parsePrice(i.price) > 0);
-  const EXPECTED_CATS = ["Tops", "Bottoms", "Dresses", "Outerwear", "Shoes", "Bags", "Accessories"];
+  const EXPECTED_CATS = ["Tops", "Trousers", "Dresses", "Outerwear", "Shoes", "Bags", "Accessories"];
   const catsPresent = new Set(closetItems.map(i => i.category || ""));
   const missingCatCount = EXPECTED_CATS.filter(c => !catsPresent.has(c)).length;
   const healthScore = closetItems.length === 0 ? 0 : Math.min(100, Math.round(
@@ -8091,6 +8092,7 @@ function HomeTab({ outfitCalendar, outfitsDb, itemsDb, lookbooksDb, wishlistDb, 
   const healthLabel = healthScore >= 80 ? "Thriving" : healthScore >= 60 ? "Healthy" : healthScore >= 40 ? "Growing" : "Needs Love";
 
   const highPriorityWish = wishlistDb.rows.filter(i => i.priority === "high").slice(0, 3);
+  const highPriorityWishCount = wishlistDb.rows.filter(i => i.priority === "high").length;
 
   // ── New In (added to closet in last 30 days) ─────────────────────────────
   const thirtyDaysAgo = Date.now() - 30 * 24 * 60 * 60 * 1000;
@@ -9070,18 +9072,12 @@ function OutfitCalendar({ outfits, calendar, onSaveCalendar, month, onMonthChang
           const dayEvts = eventsOnDate(dateStr);
           const seasonMark = isSeasonStart(dateStr);
           const cellOutfit = ids.length > 0 ? outfits.find(x => x.id === ids[0]) : null;
-
-          // Build cell background: outfit image as cover, or plain white
-          const cellBg = (() => {
-            if (isDragOver) return "#f0faf4";
-            if (cellOutfit?.previewImage) return `url(${JSON.stringify(cellOutfit.previewImage)}) center/cover no-repeat #f5f3ef`;
-            return "#fff";
-          })();
+          const isEmptyFuture = ids.length === 0 && !isPast;
 
           return (
             <div key={dateStr}
               draggable={!!cellOutfit}
-              onDragStart={cellOutfit ? e => { setDraggingInfo({ outfitId: ids[0], fromDate: dateStr }); } : undefined}
+              onDragStart={cellOutfit ? () => { setDraggingInfo({ outfitId: ids[0], fromDate: dateStr }); } : undefined}
               onDragEnd={cellOutfit ? () => setDraggingInfo(null) : undefined}
               onClick={() => { setDayPopup(dateStr); setDayPopupTab(0); setShowDayAdd(false); setDayAddSearch(""); }}
               onDragOver={e => { e.preventDefault(); setDragOver(dateStr); }}
@@ -9090,10 +9086,7 @@ function OutfitCalendar({ outfits, calendar, onSaveCalendar, month, onMonthChang
               style={{
                 borderRadius: 8,
                 border: isToday ? "2px solid #1a1a1a" : isDragOver ? "1.5px dashed #2d6a3f" : "1px solid #ede9e2",
-                background: cellBg,
-                backgroundImage: (!cellOutfit && !isDragOver && ids.length === 0 && !isPast)
-                  ? "repeating-linear-gradient(45deg, transparent, transparent 3px, rgba(0,0,0,0.018) 3px, rgba(0,0,0,0.018) 6px)"
-                  : undefined,
+                background: isDragOver ? "#f0faf4" : isEmptyFuture ? "#fff" : cellOutfit ? "#f5f3ef" : "#fff",
                 cursor: "pointer", aspectRatio: "3/4", overflow: "hidden", position: "relative",
                 transition: "box-shadow 0.12s",
                 opacity: isPast ? 0.55 : 1,
@@ -9102,6 +9095,16 @@ function OutfitCalendar({ outfits, calendar, onSaveCalendar, month, onMonthChang
               onMouseEnter={e => { setHoveredDay(dateStr); e.currentTarget.style.boxShadow = "0 2px 10px rgba(0,0,0,0.08)"; if(isPast) e.currentTarget.style.opacity="0.8"; }}
               onMouseLeave={e => { setHoveredDay(null); e.currentTarget.style.boxShadow = "none"; if(isPast) e.currentTarget.style.opacity="0.55"; }}
             >
+              {/* Outfit image — absolutely fills cell (works because cell has aspectRatio) */}
+              {cellOutfit?.previewImage && (
+                <img src={cellOutfit.previewImage} alt="" style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", display: "block", zIndex: 1 }} />
+              )}
+
+              {/* Linen texture for unplanned future days */}
+              {isEmptyFuture && !isDragOver && (
+                <div style={{ position: "absolute", inset: 0, backgroundImage: "repeating-linear-gradient(45deg, transparent, transparent 3px, rgba(0,0,0,0.018) 3px, rgba(0,0,0,0.018) 6px)", zIndex: 1 }} />
+              )}
+
               {/* Season start marker */}
               {seasonMark && <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 2, background: SEASON_COLORS[seasonMark], zIndex: 4 }} />}
               {seasonMark && <div style={{ position: "absolute", top: 2, left: "50%", transform: "translateX(-50%)", background: SEASON_COLORS[seasonMark], color: "#fff", fontSize: 6, fontWeight: 800, padding: "1px 4px", borderRadius: "0 0 4px 4px", zIndex: 4, whiteSpace: "nowrap", fontFamily: "'DM Sans', sans-serif", textTransform: "uppercase", letterSpacing: "0.05em" }}>{seasonMark}</div>}

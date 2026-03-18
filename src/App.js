@@ -8112,7 +8112,6 @@ function HomeTab({ outfitCalendar, outfitsDb, itemsDb, lookbooksDb, wishlistDb, 
   const [homeCityInput, setHomeCityInput] = useState(() => localStorage.getItem("wardrobe_home_city") || "");
   const [homeWeather, setHomeWeather] = useState(null);
   const [wxLoading, setWxLoading] = useState(false);
-  const [hoveredTodayId, setHoveredTodayId] = useState(null);
 
   const fetchHomeWeather = useCallback(async (city) => {
     if (!city) return;
@@ -8195,6 +8194,102 @@ function HomeTab({ outfitCalendar, outfitsDb, itemsDb, lookbooksDb, wishlistDb, 
     return { total: items.length, packed: Object.keys(checked).filter(k => checked[k]).length };
   };
 
+  const heroCardStyle = {
+    background: "linear-gradient(135deg, #1f1a17 0%, #3b3026 52%, #8d755a 100%)",
+    borderRadius: 24,
+    border: "1px solid rgba(255,255,255,0.08)",
+    padding: 24,
+    color: "#fff",
+    boxShadow: "0 16px 44px rgba(43,31,20,0.22)",
+    position: "relative",
+    overflow: "hidden",
+  };
+  const heroAccentStyle = {
+    position: "absolute",
+    inset: "auto -40px -60px auto",
+    width: 180,
+    height: 180,
+    borderRadius: "50%",
+    background: "radial-gradient(circle, rgba(255,255,255,0.18), rgba(255,255,255,0))",
+    pointerEvents: "none",
+  };
+
+  let primaryAction = {
+    title: "Plan today's outfit",
+    body: "Start with one look for today so Home has something to anchor the rest of the week around.",
+    cta: "Open Outfits",
+    onClick: () => setTab("outfits"),
+  };
+
+  if (todayOutfits.length > 0) {
+    primaryAction = {
+      title: todayOutfits.length > 1 ? "Today's looks are ready" : "Today's outfit is ready",
+      body: todayOutfits.length > 1
+        ? `${todayOutfits.length} outfits are planned for today. Open them to compare or make a final pick.`
+        : `You already planned ${todayOutfits[0].name || "a look"} for today. Open it to tweak details or log wear.`,
+      cta: "Open Today's Outfit",
+      onClick: () => setOutfitPopup(todayOutfits[0]),
+    };
+  } else if (upcomingTrips[0]) {
+    const trip = upcomingTrips[0];
+    primaryAction = {
+      title: trip.isActive ? `${trip.name} is happening now` : `${trip.name} is coming up`,
+      body: trip.isActive
+        ? "Your trip lookbook is active. Double-check outfits and packing progress before you head out."
+        : trip.daysUntil <= 3
+          ? `This trip starts ${trip.daysUntil === 0 ? "today" : trip.daysUntil === 1 ? "tomorrow" : `in ${trip.daysUntil} days`}.`
+          : "A trip is on the horizon, which is a good excuse to tighten your packing plan now.",
+      cta: "Open Trip Lookbook",
+      onClick: () => { setActiveLookbookView("editorial"); setActiveLookbook(trip); setTab("lookbooks"); },
+    };
+  } else if (weekLogged < 3) {
+    primaryAction = {
+      title: "Your week is still open",
+      body: `Only ${weekLogged} of 7 days have looks logged right now. Planning ahead here will make the rest of Home feel a lot smarter.`,
+      cta: "Fill This Week",
+      onClick: () => setTab("outfits"),
+    };
+  }
+
+  const focusStats = [
+    { label: "Week logged", value: `${weekLogged}/7` },
+    { label: "Closet items", value: closetItems.length },
+    { label: "Need attention", value: unwornCount + missingImageCount },
+  ];
+
+  const homeTasks = [
+    {
+      id: "unworn",
+      label: "Never worn",
+      value: unwornCount,
+      note: unwornCount === 0 ? "Everything has been worn at least once." : "Style or sell the pieces you still haven't reached for.",
+      tone: unwornCount === 0 ? "#3aaa6e" : "#a07000",
+      bg: unwornCount === 0 ? "#f2fbf6" : "#fbf6eb",
+      border: unwornCount === 0 ? "#cdebd8" : "#eadcb6",
+      onClick: () => setTab("stats"),
+    },
+    {
+      id: "photos",
+      label: "Missing photos",
+      value: missingImageCount,
+      note: missingImageCount === 0 ? "Every closet item has a photo." : "Photos make Home, search, and outfit building feel much richer.",
+      tone: missingImageCount === 0 ? "#3aaa6e" : "#2090c0",
+      bg: missingImageCount === 0 ? "#f2fbf6" : "#eef7fc",
+      border: missingImageCount === 0 ? "#cdebd8" : "#cde4ef",
+      onClick: () => setTab("closet"),
+    },
+    {
+      id: "wishlist",
+      label: "High-priority wishes",
+      value: highPriorityWishCount,
+      note: highPriorityWishCount === 0 ? "Nothing urgent on your wishlist." : "Keep only the pieces you still genuinely want to hunt down.",
+      tone: highPriorityWishCount === 0 ? "#3aaa6e" : "#e05555",
+      bg: highPriorityWishCount === 0 ? "#f2fbf6" : "#fff3f3",
+      border: highPriorityWishCount === 0 ? "#cdebd8" : "#f2caca",
+      onClick: () => setTab("wishlist"),
+    },
+  ];
+
   return (
     <div className="fade-up" style={{ width: "100%" }}>
 
@@ -8245,6 +8340,96 @@ function HomeTab({ outfitCalendar, outfitsDb, itemsDb, lookbooksDb, wishlistDb, 
             </form>
           )}
         </div>
+      </div>
+
+      {/* ── Daily focus ── */}
+      <div style={{ marginBottom: 28 }}>
+        <div style={heroCardStyle}>
+          <div style={heroAccentStyle} />
+          <div style={{ display: "flex", justifyContent: "space-between", gap: 20, flexWrap: "wrap", position: "relative" }}>
+            <div style={{ flex: "1 1 360px", minWidth: 260 }}>
+              <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", color: "rgba(255,255,255,0.62)", marginBottom: 10 }}>
+                Today at a glance
+              </div>
+              <div style={{ fontFamily: "'Cormorant Garamond', serif", fontStyle: "italic", fontWeight: 300, fontSize: 38, lineHeight: 1.02, marginBottom: 10 }}>
+                {primaryAction.title}
+              </div>
+              <div style={{ maxWidth: 560, fontSize: 14, lineHeight: 1.6, color: "rgba(255,255,255,0.78)", marginBottom: 18 }}>
+                {primaryAction.body}
+              </div>
+              <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+                <button onClick={primaryAction.onClick} style={{ padding: "11px 16px", borderRadius: 12, border: "none", background: "#fff", color: "#1a1a1a", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "'DM Sans', sans-serif" }}>
+                  {primaryAction.cta}
+                </button>
+                <button onClick={() => setTab("closet")} style={{ padding: "11px 16px", borderRadius: 12, border: "1px solid rgba(255,255,255,0.18)", background: "rgba(255,255,255,0.06)", color: "#fff", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "'DM Sans', sans-serif" }}>
+                  Browse Closet
+                </button>
+              </div>
+            </div>
+            <div style={{ flex: "0 1 320px", minWidth: 240, display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: 10, alignSelf: "stretch" }}>
+              {focusStats.map(stat => (
+                <div key={stat.label} style={{ background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 16, padding: "16px 14px" }}>
+                  <div style={{ fontSize: 24, fontWeight: 800, color: "#fff", marginBottom: 4 }}>{stat.value}</div>
+                  <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase", color: "rgba(255,255,255,0.6)" }}>{stat.label}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* ── Today's Outfit ── */}
+      <div style={{ marginBottom: 28 }}>
+        <SectionHeader title="Today's Outfit" />
+        {todayOutfits.length === 0 ? (
+          <div style={{ ...cardStyle, padding: "22px 20px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16, flexWrap: "wrap" }}>
+            <div>
+              <div style={{ fontSize: 14, fontWeight: 700, color: "#1a1a1a", marginBottom: 4 }}>No outfit planned today</div>
+              <div style={{ fontSize: 12, color: "#aaa" }}>What are you wearing?</div>
+            </div>
+            <button onClick={() => setTab("outfits")} style={{ fontSize: 13, fontWeight: 600, color: "#888", background: "#f5f3ef", border: "none", borderRadius: 10, padding: "8px 14px", cursor: "pointer", fontFamily: "'DM Sans', sans-serif" }}>
+              Plan one →
+            </button>
+          </div>
+        ) : (
+          <div style={{ display: "flex", gap: 12, overflowX: "auto", paddingBottom: 4, scrollbarWidth: "none" }}>
+            {todayOutfits.map(outfit => {
+              const layerIds = outfit.layers || outfit.itemIds || [];
+              const thumbItems = layerIds.slice(0, 4).map(id => allItems.find(x => x.id === id)).filter(Boolean);
+              return (
+                <div key={outfit.id} onClick={() => setOutfitPopup(outfit)}
+                  style={{ ...cardStyle, cursor: "pointer", minWidth: 160, maxWidth: 200, flex: "0 0 auto" }}>
+                  {outfit.previewImage ? (
+                    <div style={{ aspectRatio: "1/1", background: `url(${outfit.previewImage}) center/cover no-repeat` }} />
+                  ) : (
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", aspectRatio: "1/1" }}>
+                      {[0,1,2,3].map(qi => {
+                        const it = thumbItems[qi];
+                        return (
+                          <div key={qi} style={{ background: it?.image ? `url(${it.image}) center/contain no-repeat #f5f3ef` : "#f5f3ef", display: "flex", alignItems: "center", justifyContent: "center", borderRight: qi%2===0 ? "1px solid #fff" : "none", borderBottom: qi<2 ? "1px solid #fff" : "none" }}>
+                            {!it?.image && <HangerIcon size={14} color="#ddd" />}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                  <div style={{ padding: "10px 12px 12px" }}>
+                    <div style={{ fontSize: 13, fontWeight: 700, color: "#1a1a1a", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                      {outfit.name || "Untitled Outfit"}
+                    </div>
+                    {(outfit.tags || []).length > 0 && (
+                      <div style={{ display: "flex", gap: 4, flexWrap: "wrap", marginTop: 5 }}>
+                        {(outfit.tags || []).slice(0, 2).map(tag => (
+                          <span key={tag} style={{ fontSize: 10, fontWeight: 600, padding: "2px 7px", background: "#f0ece4", borderRadius: 100, color: "#888" }}>{tag}</span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
       </div>
 
       {/* ── This Week calendar peek ── */}
@@ -8304,6 +8489,26 @@ function HomeTab({ outfitCalendar, outfitsDb, itemsDb, lookbooksDb, wishlistDb, 
               }
             </span>
           </div>
+        </div>
+      </div>
+
+      {/* ── Needs attention ── */}
+      <div style={{ marginBottom: 28 }}>
+        <SectionHeader title="Needs Attention" />
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 12 }}>
+          {homeTasks.map(task => (
+            <button
+              key={task.id}
+              onClick={task.onClick}
+              style={{ textAlign: "left", background: task.bg, borderRadius: 16, border: `1.5px solid ${task.border}`, padding: "16px 16px 14px", cursor: "pointer", fontFamily: "'DM Sans', sans-serif" }}
+            >
+              <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 12, marginBottom: 8 }}>
+                <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: "0.08em", textTransform: "uppercase", color: "#8c847a" }}>{task.label}</div>
+                <div style={{ fontSize: 28, fontWeight: 800, color: task.tone, lineHeight: 1 }}>{task.value}</div>
+              </div>
+              <div style={{ fontSize: 12, color: "#6f675f", lineHeight: 1.5 }}>{task.note}</div>
+            </button>
+          ))}
         </div>
       </div>
 
@@ -8383,85 +8588,6 @@ function HomeTab({ outfitCalendar, outfitsDb, itemsDb, lookbooksDb, wishlistDb, 
           </div>
         </div>
       )}
-
-      {/* ── Today's Outfit ── */}
-      <div style={{ marginBottom: 28 }}>
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
-          <div>
-            <div style={{ fontSize: 10, fontWeight: 700, color: "#bbb", textTransform: "uppercase", letterSpacing: "0.12em", marginBottom: 2 }}>Today</div>
-            <div style={{ fontSize: 22, fontWeight: 800, color: "#1a1a1a", lineHeight: 1.15 }}>{dayName}, {dateLabel}</div>
-          </div>
-          {todayWx && (
-            <div style={{ display: "flex", alignItems: "center", gap: 6, background: "#f8f6f2", borderRadius: 12, padding: "8px 12px" }}>
-              <span style={{ fontSize: 20 }}>{wxIcon(todayWx.code)}</span>
-              <div>
-                <div style={{ fontSize: 15, fontWeight: 800, color: "#1a1a1a", lineHeight: 1 }}>{todayWx.high}°</div>
-                <div style={{ fontSize: 10, color: "#aaa", fontWeight: 500 }}>{todayWx.low}° low</div>
-              </div>
-            </div>
-          )}
-        </div>
-        {todayOutfits.length === 0 ? (
-          <div style={{ ...cardStyle, padding: "22px 20px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-            <div>
-              <div style={{ fontSize: 14, fontWeight: 700, color: "#1a1a1a", marginBottom: 4 }}>No outfit planned today</div>
-              <div style={{ fontSize: 12, color: "#aaa" }}>What are you wearing?</div>
-            </div>
-            <button onClick={() => setTab("outfits")} style={{ fontSize: 13, fontWeight: 600, color: "#888", background: "#f5f3ef", border: "none", borderRadius: 10, padding: "8px 14px", cursor: "pointer", fontFamily: "'DM Sans', sans-serif" }}>
-              Plan one →
-            </button>
-          </div>
-        ) : (
-          <div style={{ display: "flex", gap: 12, overflowX: "auto", paddingBottom: 4, scrollbarWidth: "none" }}>
-            {todayOutfits.map(outfit => {
-              const layerIds = outfit.layers || outfit.itemIds || [];
-              const thumbItems = layerIds.slice(0, 4).map(id => allItems.find(x => x.id === id)).filter(Boolean);
-              const isHov = hoveredTodayId === outfit.id;
-              return (
-                <div key={outfit.id} onClick={() => setOutfitPopup(outfit)}
-                  onMouseEnter={() => setHoveredTodayId(outfit.id)}
-                  onMouseLeave={() => setHoveredTodayId(null)}
-                  style={{ borderRadius: 16, overflow: "hidden", cursor: "pointer", minWidth: 180, maxWidth: 240, flex: "0 0 auto", position: "relative", border: "1.5px solid #e8e4dc", boxShadow: "0 2px 12px rgba(0,0,0,0.04)", aspectRatio: "3/4", background: "#f5f3ef" }}>
-                  {outfit.previewImage ? (
-                    <img src={outfit.previewImage} alt={outfit.name} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block", position: "absolute", inset: 0 }} />
-                  ) : (
-                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", position: "absolute", inset: 0 }}>
-                      {[0,1,2,3].map(qi => {
-                        const it = thumbItems[qi];
-                        return (
-                          <div key={qi} style={{ background: it?.image ? `url(${it.image}) center/cover no-repeat` : "#f5f3ef", display: "flex", alignItems: "center", justifyContent: "center", borderRight: qi%2===0 ? "1px solid #fff" : "none", borderBottom: qi<2 ? "1px solid #fff" : "none" }}>
-                            {!it?.image && <HangerIcon size={14} color="#ddd" />}
-                          </div>
-                        );
-                      })}
-                    </div>
-                  )}
-                  {/* Weather badge top-right */}
-                  {todayWx && (
-                    <div style={{ position: "absolute", top: 8, right: 8, background: "rgba(255,255,255,0.92)", borderRadius: 10, padding: "4px 8px", display: "flex", alignItems: "center", gap: 4, backdropFilter: "blur(4px)", zIndex: 2 }}>
-                      <span style={{ fontSize: 13 }}>{wxIcon(todayWx.code)}</span>
-                      <span style={{ fontSize: 11, fontWeight: 800, color: "#1a1a1a" }}>{todayWx.high}°</span>
-                    </div>
-                  )}
-                  {/* Outfit name — hover only */}
-                  {isHov && (
-                    <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, zIndex: 3, background: "linear-gradient(to top, rgba(0,0,0,0.55) 0%, transparent 100%)", padding: "24px 12px 12px" }}>
-                      <div style={{ fontSize: 13, fontWeight: 700, color: "#fff", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontFamily: "'DM Sans', sans-serif" }}>{outfit.name || "Untitled Outfit"}</div>
-                      {(outfit.tags || []).length > 0 && (
-                        <div style={{ display: "flex", gap: 4, marginTop: 4, flexWrap: "wrap" }}>
-                          {(outfit.tags || []).slice(0, 2).map(tag => (
-                            <span key={tag} style={{ fontSize: 9, fontWeight: 700, padding: "2px 6px", background: "rgba(255,255,255,0.25)", borderRadius: 100, color: "#fff" }}>{tag}</span>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        )}
-      </div>
 
       {/* ── Pinned Lookbooks ── */}
       <div style={{ marginBottom: 28 }}>
@@ -9050,14 +9176,6 @@ function OutfitCalendar({ outfits, calendar, onSaveCalendar, month, onMonthChang
         </div>
       )}
 
-      {/* Month at a glance */}
-      {calView === "month" && glanceImages.length > 0 && (
-        <div style={{ display: "flex", gap: 3, marginBottom: 8, overflowX: "auto", paddingBottom: 2, scrollbarWidth: "none" }}>
-          {glanceImages.map((img, i) => (
-            <img key={i} src={img} alt="" style={{ width: 22, height: 26, borderRadius: 5, objectFit: "cover", flexShrink: 0, border: "1px solid #ede9e2" }} />
-          ))}
-        </div>
-      )}
 
       {/* Month Calendar grid */}
       {calView === "month" && <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 4 }}>

@@ -124,6 +124,18 @@ const OCCASION_COLORS = {
   "Event":      { bg: "#f5f0ff", color: "#7c6fe0" },
 };
 
+const LOOKBOOK_TYPE_META = {
+  trip: { label: "Trip", bg: "#eef8ff", color: "#2b7db8" },
+  event: { label: "Event", bg: "#fff3f0", color: "#c26745" },
+  season: { label: "Season", bg: "#f3f5ea", color: "#72823d" },
+  capsule: { label: "Capsule", bg: "#f4f0ff", color: "#7057b6" },
+  inspiration: { label: "Inspiration", bg: "#fff1f7", color: "#b64b78" },
+};
+
+function getLookbookTypeMeta(type) {
+  return LOOKBOOK_TYPE_META[(type || "").toLowerCase()] || { label: "Lookbook", bg: "#f5f3ef", color: "#666" };
+}
+
 const uid = () => Math.random().toString(36).slice(2);
 
 // SVG hanger icon
@@ -2790,11 +2802,18 @@ function LookbookViewer({ lookbook, outfits, allItems, closetItems, onClose, onU
   });
   const [newActivity, setNewActivity] = useState("");
   const [plannedSlots, setPlannedSlots] = useState(() => lookbook.plannedSlots || []);
-  const [openAccordions, setOpenAccordions] = useState({ overview: true, trip: false, notes: false, looks: true });
+  const [openAccordions, setOpenAccordions] = useState({ overview: true, planning: false, notes: false, looks: true, insights: true, inspiration: true });
   const toggleAccordion = (key) => setOpenAccordions(a => ({ ...a, [key]: !a[key] }));
   const [editingSlotId, setEditingSlotId] = useState(null);
   const [slotDragIdx, setSlotDragIdx] = useState(null);
   const [slotDragOver, setSlotDragOver] = useState(null);
+  const lookbookType = (lookbook.type || "trip").toLowerCase();
+  const typeMeta = getLookbookTypeMeta(lookbookType);
+  const isTripType = lookbookType === "trip";
+  const isEventType = lookbookType === "event";
+  const isPlanningType = isTripType || isEventType;
+  const isInsightType = lookbookType === "season" || lookbookType === "capsule";
+  const isInspirationType = lookbookType === "inspiration";
 
   const looks = lookIds.map(id => outfits.find(o => o.id === id)).filter(Boolean);
   const availableToAdd = outfits.filter(o => !lookIds.includes(o.id));
@@ -3007,8 +3026,27 @@ function LookbookViewer({ lookbook, outfits, allItems, closetItems, onClose, onU
     });
   });
   const repeatCount = Object.values(itemUsageCount).filter(c => c > 1).length;
+  const repeatedItems = Object.entries(itemUsageCount)
+    .filter(([, count]) => count > 1)
+    .map(([id, count]) => ({ item: allItems.find(x => x.id === id), count }))
+    .filter(({ item }) => !!item)
+    .sort((a, b) => b.count - a.count);
+  const totalWearCount = packItems.reduce((sum, item) => sum + (item.wornCount || 0), 0);
+  const unwornPackCount = packItems.filter(item => !(item.wornCount || 0)).length;
+  const avgWearCount = packItems.length ? (totalWearCount / packItems.length) : 0;
+  const mostWornPackItems = [...packItems].filter(item => (item.wornCount || 0) > 0).sort((a, b) => (b.wornCount || 0) - (a.wornCount || 0)).slice(0, 3);
+  const canUseMoodboardView = isInspirationType || !!linkedMoodboardId;
+  const viewOptions = [
+    { id: "editorial", label: "Looks" },
+    { id: "grid", label: "Grid" },
+    ...(canUseMoodboardView ? [{ id: "moodboard", label: "Moodboard" }] : []),
+  ];
   const statTileStyle = { background: "#faf9f6", borderRadius: 10, padding: "10px 8px", textAlign: "center" };
   const acHdrStyle = { width: "100%", display: "flex", justifyContent: "space-between", alignItems: "center", background: "none", border: "none", borderBottom: "1.5px solid #f0ece4", cursor: "pointer", padding: "10px 16px", fontFamily: "'DM Sans', sans-serif" };
+
+  useEffect(() => {
+    if (view === "moodboard" && !canUseMoodboardView) setView("editorial");
+  }, [view, canUseMoodboardView]);
 
   return (
     <div className="lookbook-overlay">
@@ -3094,12 +3132,19 @@ function LookbookViewer({ lookbook, outfits, allItems, closetItems, onClose, onU
               {lbName} <SvgEdit size={12} color="#ccc" />
             </div>
           )}
-          {dateStr && <div style={{ fontSize: 11, color: "#aaa", fontWeight: 600, marginTop: 1 }}>{dateStr}{tripDays ? " \u00B7 " + tripDays + " day" + (tripDays !== 1 ? "s" : "") : ""}</div>}
+          <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap", marginTop: 1 }}>
+            <div style={{ fontSize: 11, color: "#aaa", fontWeight: 600 }}>
+              {dateStr ? `${dateStr}${isTripType && tripDays ? " \u00B7 " + tripDays + " day" + (tripDays !== 1 ? "s" : "") : ""}` : typeMeta.label}
+            </div>
+            <div style={{ padding: "2px 8px", borderRadius: 20, background: typeMeta.bg, color: typeMeta.color, fontSize: 10, fontWeight: 700 }}>
+              {typeMeta.label}
+            </div>
+          </div>
         </div>
         <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
           {/* View toggle */}
           <div style={{ display: "flex", background: "#f0ece4", borderRadius: 10, padding: 3, gap: 2 }}>
-            {[{ id: "editorial", label: "Looks" }, { id: "grid", label: "Grid" }, { id: "moodboard", label: "Moodboard" }].map(v => (
+            {viewOptions.map(v => (
               <button key={v.id} onClick={() => setView(v.id)} style={{
                 ...btnBase, padding: "6px 12px", fontSize: 12, borderRadius: 8,
                 background: view === v.id ? "#fff" : "transparent",
@@ -3117,12 +3162,14 @@ function LookbookViewer({ lookbook, outfits, allItems, closetItems, onClose, onU
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>
             {linkedMoodboardId && linkedMoodboardIdx >= 0 && moodboards[linkedMoodboardIdx]
               ? moodboards[linkedMoodboardIdx].name || "Linked Board"
-              : "Link Moodboard"}
+              : isInspirationType ? "Add Inspiration Board" : "Link Moodboard"}
           </button>
           <button onClick={handleShare} style={{ ...btnBase, padding: "7px 14px", background: "#f5f3ef", color: "#555", fontSize: 12 }}>Share</button>
-          <button onClick={() => setPackingListView(true)} style={{ ...btnBase, padding: "7px 14px", background: "#f0faf4", color: "#2d6a3f", fontSize: 12, border: "1.5px solid #b6e8c8" }}>
-            <SvgLuggage size={12} color="#2d6a3f" style={{ marginRight: 5 }} />Pack List
-          </button>
+          {isTripType && (
+            <button onClick={() => setPackingListView(true)} style={{ ...btnBase, padding: "7px 14px", background: "#f0faf4", color: "#2d6a3f", fontSize: 12, border: "1.5px solid #b6e8c8" }}>
+              <SvgLuggage size={12} color="#2d6a3f" style={{ marginRight: 5 }} />Pack List
+            </button>
+          )}
           <button onClick={handleExport} disabled={exportingPdf} style={{ ...btnBase, padding: "7px 14px", background: "#f5f3ef", color: "#555", fontSize: 12 }}>
             {exportingPdf ? "Exporting\u2026" : "Export PDF"}
           </button>
@@ -3144,9 +3191,9 @@ function LookbookViewer({ lookbook, outfits, allItems, closetItems, onClose, onU
       </div>
 
       {/* ── HERO HEADER ── */}
-      {(lbCity || dateStr || lbTags.length > 0 || lbWeather?.days) && (
+      {(dateStr || lbTags.length > 0 || (isPlanningType && (lbCity || lbWeather?.days))) && (
         <div style={{ background: "#fff", borderBottom: "1.5px solid #f0ece4", padding: "10px 20px", display: "flex", alignItems: "center", gap: 10, flexShrink: 0, flexWrap: "wrap" }}>
-          {lbCity && (
+          {isPlanningType && lbCity && (
             <div style={{ display: "flex", alignItems: "center", gap: 5, padding: "4px 12px", background: "#f5f3ef", borderRadius: 20 }}>
               <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#888" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/></svg>
               <span style={{ fontSize: 12, fontWeight: 700, color: "#555" }}>{lbCity}</span>
@@ -3164,7 +3211,7 @@ function LookbookViewer({ lookbook, outfits, allItems, closetItems, onClose, onU
           {lbTags.map(t => (
             <div key={t} style={{ padding: "4px 10px", background: "#1a1a1a", borderRadius: 20, fontSize: 11, fontWeight: 700, color: "#fff" }}>{t}</div>
           ))}
-          {lbWeather?.days && (() => {
+          {isPlanningType && lbWeather?.days && (() => {
             const wxDays = lbWeather.days.filter(d => {
               if (!lbDateStart && !lbDateEnd) return true;
               return d.date >= (lbDateStart || "0") && d.date <= (lbDateEnd || "9999");
@@ -3351,7 +3398,7 @@ function LookbookViewer({ lookbook, outfits, allItems, closetItems, onClose, onU
               })}
 
               {/* ── PLANNED SLOT CARDS (dotted placeholders) ── */}
-              {plannedSlots.map((slot, si) => {
+              {isPlanningType && plannedSlots.map((slot, si) => {
                 const slotWx = slot.date ? getWxForDate(slot.date) : null;
                 const slotDate = slot.date ? new Date(slot.date + "T00:00:00") : null;
                 const slotDateLabel = slotDate ? slotDate.toLocaleDateString("en-US", { month: "short", day: "numeric" }) : null;
@@ -3419,15 +3466,17 @@ function LookbookViewer({ lookbook, outfits, allItems, closetItems, onClose, onU
               })}
 
               {/* Add Slot tile */}
-              <div onClick={() => { const next = [...plannedSlots, { id: Date.now() + "_" + Math.random().toString(36).slice(2), name: "", date: "" }]; setPlannedSlots(next); save({ plannedSlots: next }); }}
-                style={{ borderRadius: 16, border: "2px dashed #e0dbd2", background: "#fafaf8", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 6, cursor: "pointer", minHeight: 200, transition: "border-color 0.15s, background 0.15s" }}
-                onMouseEnter={e => { e.currentTarget.style.borderColor = "#aaa"; e.currentTarget.style.background = "#f5f3ef"; }}
-                onMouseLeave={e => { e.currentTarget.style.borderColor = "#e0dbd2"; e.currentTarget.style.background = "#fafaf8"; }}>
-                <div style={{ width: 28, height: 28, borderRadius: "50%", background: "#e8e4dc", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                  <span style={{ fontSize: 17, color: "#999", lineHeight: 1 }}>+</span>
+              {isPlanningType && (
+                <div onClick={() => { const next = [...plannedSlots, { id: Date.now() + "_" + Math.random().toString(36).slice(2), name: "", date: "" }]; setPlannedSlots(next); save({ plannedSlots: next }); }}
+                  style={{ borderRadius: 16, border: "2px dashed #e0dbd2", background: "#fafaf8", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 6, cursor: "pointer", minHeight: 200, transition: "border-color 0.15s, background 0.15s" }}
+                  onMouseEnter={e => { e.currentTarget.style.borderColor = "#aaa"; e.currentTarget.style.background = "#f5f3ef"; }}
+                  onMouseLeave={e => { e.currentTarget.style.borderColor = "#e0dbd2"; e.currentTarget.style.background = "#fafaf8"; }}>
+                  <div style={{ width: 28, height: 28, borderRadius: "50%", background: "#e8e4dc", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                    <span style={{ fontSize: 17, color: "#999", lineHeight: 1 }}>+</span>
+                  </div>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: "#bbb" }}>Plan a Look</div>
                 </div>
-                <div style={{ fontSize: 11, fontWeight: 700, color: "#bbb" }}>Plan a Look</div>
-              </div>
+              )}
             </div>
           )}
         </div>
@@ -3442,25 +3491,30 @@ function LookbookViewer({ lookbook, outfits, allItems, closetItems, onClose, onU
           </button>
           {openAccordions.overview && (
             <div style={{ padding: "12px 16px 14px", display: "flex", flexDirection: "column", gap: 12 }}>
-              {/* Stats grid */}
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+                <div style={{ fontSize: 12, fontWeight: 800, color: "#1a1a1a" }}>{lbName}</div>
+                <div style={{ padding: "3px 9px", borderRadius: 20, background: typeMeta.bg, color: typeMeta.color, fontSize: 10, fontWeight: 700 }}>
+                  {typeMeta.label}
+                </div>
+              </div>
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 7 }}>
                 <div style={statTileStyle}>
-                  <div style={{ fontSize: 15, fontWeight: 800, color: "#1a1a1a", lineHeight: 1.2 }}>
-                    {looks.length}<span style={{ fontSize: 11, fontWeight: 600, color: "#bbb" }}> / {looks.length + plannedSlots.length}</span>
-                  </div>
-                  <div style={{ fontSize: 9, color: "#aaa", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", marginTop: 3 }}>Planned Looks</div>
+                  <div style={{ fontSize: 15, fontWeight: 800, color: "#1a1a1a", lineHeight: 1.2 }}>{looks.length}</div>
+                  <div style={{ fontSize: 9, color: "#aaa", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", marginTop: 3 }}>Looks</div>
                 </div>
                 <div style={statTileStyle}>
                   <div style={{ fontSize: 15, fontWeight: 800, color: "#1a1a1a", lineHeight: 1.2 }}>{packItems.length}</div>
-                  <div style={{ fontSize: 9, color: "#aaa", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", marginTop: 3 }}>Packed Pieces</div>
+                  <div style={{ fontSize: 9, color: "#aaa", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", marginTop: 3 }}>Pieces</div>
                 </div>
-                {repeatCount > 0 && (
+                {isPlanningType && (
                   <div style={statTileStyle}>
-                    <div style={{ fontSize: 15, fontWeight: 800, color: "#1a1a1a", lineHeight: 1.2 }}>{repeatCount}</div>
-                    <div style={{ fontSize: 9, color: "#aaa", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", marginTop: 3 }}>Repeats</div>
+                    <div style={{ fontSize: 15, fontWeight: 800, color: "#1a1a1a", lineHeight: 1.2 }}>
+                      {looks.length}<span style={{ fontSize: 11, fontWeight: 600, color: "#bbb" }}> / {looks.length + plannedSlots.length}</span>
+                    </div>
+                    <div style={{ fontSize: 9, color: "#aaa", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", marginTop: 3 }}>Planned</div>
                   </div>
                 )}
-                {tripDays && (
+                {isTripType && tripDays && (
                   <div style={statTileStyle}>
                     <div style={{ fontSize: 15, fontWeight: 800, color: "#1a1a1a", lineHeight: 1.2 }}>
                       {tripDays}<span style={{ fontSize: 10, color: "#bbb", fontWeight: 600 }}>d</span> {tripNights}<span style={{ fontSize: 10, color: "#bbb", fontWeight: 600 }}>n</span>
@@ -3468,102 +3522,207 @@ function LookbookViewer({ lookbook, outfits, allItems, closetItems, onClose, onU
                     <div style={{ fontSize: 9, color: "#aaa", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", marginTop: 3 }}>Duration</div>
                   </div>
                 )}
+                {isEventType && (
+                  <div style={statTileStyle}>
+                    <div style={{ fontSize: 15, fontWeight: 800, color: "#1a1a1a", lineHeight: 1.2 }}>{repeatCount}</div>
+                    <div style={{ fontSize: 9, color: "#aaa", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", marginTop: 3 }}>Repeat Pieces</div>
+                  </div>
+                )}
+                {isInsightType && (
+                  <>
+                    <div style={statTileStyle}>
+                      <div style={{ fontSize: 15, fontWeight: 800, color: "#1a1a1a", lineHeight: 1.2 }}>${totalVal.toFixed(0)}</div>
+                      <div style={{ fontSize: 9, color: "#aaa", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", marginTop: 3 }}>Value</div>
+                    </div>
+                    <div style={statTileStyle}>
+                      <div style={{ fontSize: 15, fontWeight: 800, color: "#1a1a1a", lineHeight: 1.2 }}>{totalWearCount}</div>
+                      <div style={{ fontSize: 9, color: "#aaa", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", marginTop: 3 }}>Total Wears</div>
+                    </div>
+                  </>
+                )}
+                {isInspirationType && (
+                  <>
+                    <div style={statTileStyle}>
+                      <div style={{ fontSize: 15, fontWeight: 800, color: linkedMoodboardId ? "#1a1a1a" : "#bbb", lineHeight: 1.2 }}>{linkedMoodboardId ? "Yes" : "No"}</div>
+                      <div style={{ fontSize: 9, color: "#aaa", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", marginTop: 3 }}>Moodboard</div>
+                    </div>
+                    <div style={statTileStyle}>
+                      <div style={{ fontSize: 15, fontWeight: 800, color: "#1a1a1a", lineHeight: 1.2 }}>{notes.trim() ? notes.trim().split(/\s+/).length : 0}</div>
+                      <div style={{ fontSize: 9, color: "#aaa", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", marginTop: 3 }}>Note Words</div>
+                    </div>
+                  </>
+                )}
               </div>
             </div>
           )}
 
-          {/* ── TRIP ── */}
-          <button onClick={() => toggleAccordion("trip")} style={{ ...acHdrStyle }}>
-            <span style={{ fontSize: 10, fontWeight: 700, color: "#aaa", textTransform: "uppercase", letterSpacing: "0.1em" }}>Trip</span>
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#ccc" strokeWidth="2.5" strokeLinecap="round" style={{ transform: openAccordions.trip ? "rotate(180deg)" : "none", transition: "transform 0.2s" }}><polyline points="6 9 12 15 18 9"/></svg>
-          </button>
-          {openAccordions.trip && (
-            <div style={{ padding: "12px 16px 14px", display: "flex", flexDirection: "column", gap: 10 }}>
-              {/* Name */}
-              <div>
-                <div style={{ fontSize: 9, fontWeight: 700, color: "#bbb", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 4 }}>Name</div>
-                <input value={lbName} onChange={e => setLbName(e.target.value)} onBlur={() => save()}
-                  style={{ width: "100%", padding: "6px 10px", border: "1.5px solid #e8e4dc", borderRadius: 8, fontFamily: "'DM Sans', sans-serif", fontSize: 12, outline: "none", boxSizing: "border-box" }} />
-              </div>
-              {/* Dates */}
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 7 }}>
-                <div>
-                  <div style={{ fontSize: 9, fontWeight: 700, color: "#bbb", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 4 }}>Start</div>
-                  <input type="date" value={lbDateStart} onChange={e => setLbDateStart(e.target.value)} onBlur={() => save()}
-                    style={{ width: "100%", padding: "6px 6px", border: "1.5px solid #e8e4dc", borderRadius: 8, fontFamily: "'DM Sans', sans-serif", fontSize: 10, outline: "none", boxSizing: "border-box" }} />
+          {isPlanningType && (
+            <>
+              <button onClick={() => toggleAccordion("planning")} style={{ ...acHdrStyle }}>
+                <span style={{ fontSize: 10, fontWeight: 700, color: "#aaa", textTransform: "uppercase", letterSpacing: "0.1em" }}>{isTripType ? "Trip Planning" : "Event Details"}</span>
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#ccc" strokeWidth="2.5" strokeLinecap="round" style={{ transform: openAccordions.planning ? "rotate(180deg)" : "none", transition: "transform 0.2s" }}><polyline points="6 9 12 15 18 9"/></svg>
+              </button>
+              {openAccordions.planning && (
+                <div style={{ padding: "12px 16px 14px", display: "flex", flexDirection: "column", gap: 10 }}>
+                  <div>
+                    <div style={{ fontSize: 9, fontWeight: 700, color: "#bbb", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 4 }}>Name</div>
+                    <input value={lbName} onChange={e => setLbName(e.target.value)} onBlur={() => save()}
+                      style={{ width: "100%", padding: "6px 10px", border: "1.5px solid #e8e4dc", borderRadius: 8, fontFamily: "'DM Sans', sans-serif", fontSize: 12, outline: "none", boxSizing: "border-box" }} />
+                  </div>
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 7 }}>
+                    <div>
+                      <div style={{ fontSize: 9, fontWeight: 700, color: "#bbb", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 4 }}>{isTripType ? "Start" : "Date"}</div>
+                      <input type="date" value={lbDateStart} onChange={e => setLbDateStart(e.target.value)} onBlur={() => save()}
+                        style={{ width: "100%", padding: "6px 6px", border: "1.5px solid #e8e4dc", borderRadius: 8, fontFamily: "'DM Sans', sans-serif", fontSize: 10, outline: "none", boxSizing: "border-box" }} />
+                    </div>
+                    <div>
+                      <div style={{ fontSize: 9, fontWeight: 700, color: "#bbb", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 4 }}>End</div>
+                      <input type="date" value={lbDateEnd} onChange={e => setLbDateEnd(e.target.value)} onBlur={() => save()}
+                        style={{ width: "100%", padding: "6px 6px", border: "1.5px solid #e8e4dc", borderRadius: 8, fontFamily: "'DM Sans', sans-serif", fontSize: 10, outline: "none", boxSizing: "border-box" }} />
+                    </div>
+                  </div>
+                  <div>
+                    <div style={{ fontSize: 9, fontWeight: 700, color: "#bbb", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 4 }}>{isTripType ? "Destination" : "Location"}</div>
+                    <div style={{ display: "flex", gap: 6 }}>
+                      <input value={lbCity} onChange={e => setLbCity(e.target.value)} placeholder={isTripType ? "City (e.g. Orlando, FL)" : "Venue or city"}
+                        onKeyDown={e => { if (e.key === "Enter") fetchWeather(); }}
+                        style={{ flex: 1, padding: "6px 10px", border: "1.5px solid #e8e4dc", borderRadius: 8, fontFamily: "'DM Sans', sans-serif", fontSize: 12, outline: "none" }} />
+                      <button onClick={fetchWeather} disabled={wxLoading || !lbCity.trim()} style={{ ...btnBase, padding: "6px 10px", background: "#f5f3ef", color: "#555", fontSize: 12, border: "none", flexShrink: 0 }}>
+                        {wxLoading ? "\u2026" : "\u26C5"}
+                      </button>
+                    </div>
+                    {lbWeather?.error && <div style={{ fontSize: 11, color: "#e05555", marginTop: 4 }}>{lbWeather.error}</div>}
+                    {lbWeather?.days && lbWeather.days.length > 0 && (
+                      <div style={{ marginTop: 6, maxHeight: 140, overflowY: "auto", display: "flex", flexDirection: "column", gap: 3 }}>
+                        {lbWeather.days.filter(d => {
+                          if (!lbDateStart && !lbDateEnd) return true;
+                          return d.date >= (lbDateStart || "0") && d.date <= (lbDateEnd || "9999");
+                        }).slice(0, 14).map(d => (
+                          <div key={d.date} style={{ display: "flex", alignItems: "center", gap: 8, padding: "3px 6px", borderRadius: 7, background: "#faf9f6" }}>
+                            <span style={{ fontSize: 13 }}>{wxIcon(d.code)}</span>
+                            <span style={{ fontSize: 11, fontWeight: 700, color: "#555", flex: 1 }}>{new Date(d.date + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" })}</span>
+                            <span style={{ fontSize: 11, color: "#1a1a1a", fontWeight: 700 }}>{d.high}\u00B0</span>
+                            <span style={{ fontSize: 10, color: "#bbb" }}>{d.low}\u00B0</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                  {isTripType && (
+                    <>
+                      <div>
+                        <div style={{ fontSize: 9, fontWeight: 700, color: "#bbb", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 4 }}>Hotel</div>
+                        <input value={tripDetails.hotel || ""} onChange={e => setTripDetails(d => ({ ...d, hotel: e.target.value }))} onBlur={() => saveTripDetails({})}
+                          placeholder="Hotel name\u2026"
+                          style={{ width: "100%", padding: "6px 10px", border: "1.5px solid #e8e4dc", borderRadius: 8, fontFamily: "'DM Sans', sans-serif", fontSize: 12, outline: "none", boxSizing: "border-box" }} />
+                      </div>
+                      <div>
+                        <div style={{ fontSize: 9, fontWeight: 700, color: "#bbb", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 4 }}>Activities</div>
+                        <div style={{ display: "flex", flexDirection: "column", gap: 3, marginBottom: 5 }}>
+                          {(tripDetails.activities || []).map((act, i) => (
+                            <div key={i} style={{ display: "flex", alignItems: "center", gap: 6, padding: "5px 8px", background: "#faf9f6", borderRadius: 7, border: "1px solid #e8e4dc" }}>
+                              <span style={{ flex: 1, fontSize: 12, color: "#444", fontWeight: 600 }}>{act}</span>
+                              <button onClick={() => { const next = (tripDetails.activities || []).filter((_, j) => j !== i); saveTripDetails({ activities: next }); }}
+                                style={{ background: "none", border: "none", cursor: "pointer", color: "#ccc", fontSize: 14, lineHeight: 1, padding: "0 2px" }}
+                                onMouseEnter={e => e.currentTarget.style.color = "#e05555"}
+                                onMouseLeave={e => e.currentTarget.style.color = "#ccc"}>×</button>
+                            </div>
+                          ))}
+                        </div>
+                        <div style={{ display: "flex", gap: 5 }}>
+                          <input value={newActivity} onChange={e => setNewActivity(e.target.value)}
+                            onKeyDown={e => { if (e.key === "Enter" && newActivity.trim()) { saveTripDetails({ activities: [...(tripDetails.activities || []), newActivity.trim()] }); setNewActivity(""); } }}
+                            placeholder="Add activity\u2026"
+                            style={{ flex: 1, padding: "5px 8px", border: "1.5px solid #e8e4dc", borderRadius: 8, fontFamily: "'DM Sans', sans-serif", fontSize: 12, outline: "none" }} />
+                          <button onClick={() => { if (newActivity.trim()) { saveTripDetails({ activities: [...(tripDetails.activities || []), newActivity.trim()] }); setNewActivity(""); } }}
+                            style={{ padding: "5px 10px", background: "#1a1a1a", color: "#fff", border: "none", borderRadius: 8, cursor: "pointer", fontSize: 13, fontWeight: 700, fontFamily: "'DM Sans', sans-serif" }}>+</button>
+                        </div>
+                      </div>
+                    </>
+                  )}
                 </div>
-                <div>
-                  <div style={{ fontSize: 9, fontWeight: 700, color: "#bbb", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 4 }}>End</div>
-                  <input type="date" value={lbDateEnd} onChange={e => setLbDateEnd(e.target.value)} onBlur={() => save()}
-                    style={{ width: "100%", padding: "6px 6px", border: "1.5px solid #e8e4dc", borderRadius: 8, fontFamily: "'DM Sans', sans-serif", fontSize: 10, outline: "none", boxSizing: "border-box" }} />
+              )}
+            </>
+          )}
+
+          {isInsightType && (
+            <>
+              <button onClick={() => toggleAccordion("insights")} style={{ ...acHdrStyle }}>
+                <span style={{ fontSize: 10, fontWeight: 700, color: "#aaa", textTransform: "uppercase", letterSpacing: "0.1em" }}>Wear Insights</span>
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#ccc" strokeWidth="2.5" strokeLinecap="round" style={{ transform: openAccordions.insights ? "rotate(180deg)" : "none", transition: "transform 0.2s" }}><polyline points="6 9 12 15 18 9"/></svg>
+              </button>
+              {openAccordions.insights && (
+                <div style={{ padding: "12px 16px 14px", display: "flex", flexDirection: "column", gap: 10 }}>
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 7 }}>
+                    <div style={statTileStyle}>
+                      <div style={{ fontSize: 15, fontWeight: 800, color: "#1a1a1a", lineHeight: 1.2 }}>{avgWearCount.toFixed(1)}</div>
+                      <div style={{ fontSize: 9, color: "#aaa", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", marginTop: 3 }}>Avg Wears</div>
+                    </div>
+                    <div style={statTileStyle}>
+                      <div style={{ fontSize: 15, fontWeight: 800, color: "#1a1a1a", lineHeight: 1.2 }}>{unwornPackCount}</div>
+                      <div style={{ fontSize: 9, color: "#aaa", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", marginTop: 3 }}>Unworn</div>
+                    </div>
+                  </div>
+                  <div>
+                    <div style={{ fontSize: 9, fontWeight: 700, color: "#bbb", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 6 }}>Most Worn Pieces</div>
+                    {mostWornPackItems.length === 0 ? (
+                      <div style={{ fontSize: 11, color: "#bbb" }}>Wear data will show up here as you log outfits.</div>
+                    ) : (
+                      <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
+                        {mostWornPackItems.map(item => (
+                          <div key={item.id} style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 8px", background: "#faf9f6", borderRadius: 8 }}>
+                            <div style={{ flex: 1, minWidth: 0, fontSize: 11, fontWeight: 700, color: "#1a1a1a", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{item.name}</div>
+                            <div style={{ fontSize: 10, color: "#888", fontWeight: 700 }}>{item.wornCount}x</div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                  <div>
+                    <div style={{ fontSize: 9, fontWeight: 700, color: "#bbb", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 6 }}>Repeat Pieces Across Looks</div>
+                    {repeatedItems.length === 0 ? (
+                      <div style={{ fontSize: 11, color: "#bbb" }}>No repeat pieces yet.</div>
+                    ) : (
+                      <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
+                        {repeatedItems.slice(0, 4).map(({ item, count }) => (
+                          <div key={item.id} style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 8px", background: "#faf9f6", borderRadius: 8 }}>
+                            <div style={{ flex: 1, minWidth: 0, fontSize: 11, fontWeight: 700, color: "#1a1a1a", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{item.name}</div>
+                            <div style={{ fontSize: 10, color: "#888", fontWeight: 700 }}>{count} looks</div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
                 </div>
-              </div>
-              {/* Destination + Weather */}
-              <div>
-                <div style={{ fontSize: 9, fontWeight: 700, color: "#bbb", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 4 }}>Destination</div>
-                <div style={{ display: "flex", gap: 6 }}>
-                  <input value={lbCity} onChange={e => setLbCity(e.target.value)} placeholder="City (e.g. Orlando, FL)"
-                    onKeyDown={e => { if (e.key === "Enter") fetchWeather(); }}
-                    style={{ flex: 1, padding: "6px 10px", border: "1.5px solid #e8e4dc", borderRadius: 8, fontFamily: "'DM Sans', sans-serif", fontSize: 12, outline: "none" }} />
-                  <button onClick={fetchWeather} disabled={wxLoading || !lbCity.trim()} style={{ ...btnBase, padding: "6px 10px", background: "#f5f3ef", color: "#555", fontSize: 12, border: "none", flexShrink: 0 }}>
-                    {wxLoading ? "\u2026" : "\u26C5"}
+              )}
+            </>
+          )}
+
+          {isInspirationType && (
+            <>
+              <button onClick={() => toggleAccordion("inspiration")} style={{ ...acHdrStyle }}>
+                <span style={{ fontSize: 10, fontWeight: 700, color: "#aaa", textTransform: "uppercase", letterSpacing: "0.1em" }}>Inspiration</span>
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#ccc" strokeWidth="2.5" strokeLinecap="round" style={{ transform: openAccordions.inspiration ? "rotate(180deg)" : "none", transition: "transform 0.2s" }}><polyline points="6 9 12 15 18 9"/></svg>
+              </button>
+              {openAccordions.inspiration && (
+                <div style={{ padding: "12px 16px 14px", display: "flex", flexDirection: "column", gap: 10 }}>
+                  <div style={{ padding: "10px 12px", background: "#faf9f6", borderRadius: 10, border: "1px solid #f0ece4" }}>
+                    <div style={{ fontSize: 10, fontWeight: 700, color: "#bbb", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 5 }}>Linked Moodboard</div>
+                    <div style={{ fontSize: 12, fontWeight: 700, color: linkedMoodboardId && linkedMoodboardIdx >= 0 && moodboards[linkedMoodboardIdx] ? "#1a1a1a" : "#bbb" }}>
+                      {linkedMoodboardId && linkedMoodboardIdx >= 0 && moodboards[linkedMoodboardIdx]
+                        ? (moodboards[linkedMoodboardIdx].name || "Linked Board")
+                        : "No moodboard linked yet"}
+                    </div>
+                  </div>
+                  <button onClick={() => setView("moodboard")} style={{ width: "100%", padding: "8px 10px", background: "#1a1a1a", color: "#fff", border: "none", borderRadius: 10, cursor: "pointer", fontSize: 12, fontWeight: 700, fontFamily: "'DM Sans', sans-serif" }}>
+                    Open Moodboard
+                  </button>
+                  <button onClick={() => setShowLinkModal(true)} style={{ width: "100%", padding: "8px 10px", background: "#f5f3ef", color: "#666", border: "none", borderRadius: 10, cursor: "pointer", fontSize: 12, fontWeight: 700, fontFamily: "'DM Sans', sans-serif" }}>
+                    {linkedMoodboardId ? "Change Linked Board" : "Link a Board"}
                   </button>
                 </div>
-                {lbWeather?.error && <div style={{ fontSize: 11, color: "#e05555", marginTop: 4 }}>{lbWeather.error}</div>}
-                {lbWeather?.days && lbWeather.days.length > 0 && (
-                  <div style={{ marginTop: 6, maxHeight: 140, overflowY: "auto", display: "flex", flexDirection: "column", gap: 3 }}>
-                    {lbWeather.days.filter(d => {
-                      if (!lookbook.dateStart && !lookbook.dateEnd) return true;
-                      return d.date >= (lookbook.dateStart || "0") && d.date <= (lookbook.dateEnd || "9999");
-                    }).slice(0, 14).map(d => (
-                      <div key={d.date} style={{ display: "flex", alignItems: "center", gap: 8, padding: "3px 6px", borderRadius: 7, background: "#faf9f6" }}>
-                        <span style={{ fontSize: 13 }}>{wxIcon(d.code)}</span>
-                        <span style={{ fontSize: 11, fontWeight: 700, color: "#555", flex: 1 }}>{new Date(d.date + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" })}</span>
-                        <span style={{ fontSize: 11, color: "#1a1a1a", fontWeight: 700 }}>{d.high}\u00B0</span>
-                        <span style={{ fontSize: 10, color: "#bbb" }}>{d.low}\u00B0</span>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-              {/* Hotel */}
-              <div>
-                <div style={{ fontSize: 9, fontWeight: 700, color: "#bbb", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 4 }}>Hotel</div>
-                <input value={tripDetails.hotel || ""} onChange={e => setTripDetails(d => ({ ...d, hotel: e.target.value }))} onBlur={() => saveTripDetails({})}
-                  placeholder="Hotel name\u2026"
-                  style={{ width: "100%", padding: "6px 10px", border: "1.5px solid #e8e4dc", borderRadius: 8, fontFamily: "'DM Sans', sans-serif", fontSize: 12, outline: "none", boxSizing: "border-box" }} />
-              </div>
-              {/* Activities */}
-              <div>
-                <div style={{ fontSize: 9, fontWeight: 700, color: "#bbb", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 4 }}>Activities</div>
-                <div style={{ display: "flex", flexDirection: "column", gap: 3, marginBottom: 5 }}>
-                  {(tripDetails.activities || []).map((act, i) => (
-                    <div key={i} style={{ display: "flex", alignItems: "center", gap: 6, padding: "5px 8px", background: "#faf9f6", borderRadius: 7, border: "1px solid #e8e4dc" }}>
-                      <span style={{ flex: 1, fontSize: 12, color: "#444", fontWeight: 600 }}>{act}</span>
-                      <button onClick={() => { const next = (tripDetails.activities || []).filter((_, j) => j !== i); saveTripDetails({ activities: next }); }}
-                        style={{ background: "none", border: "none", cursor: "pointer", color: "#ccc", fontSize: 14, lineHeight: 1, padding: "0 2px" }}
-                        onMouseEnter={e => e.currentTarget.style.color = "#e05555"}
-                        onMouseLeave={e => e.currentTarget.style.color = "#ccc"}>×</button>
-                    </div>
-                  ))}
-                </div>
-                <div style={{ display: "flex", gap: 5 }}>
-                  <input value={newActivity} onChange={e => setNewActivity(e.target.value)}
-                    onKeyDown={e => { if (e.key === "Enter" && newActivity.trim()) { saveTripDetails({ activities: [...(tripDetails.activities || []), newActivity.trim()] }); setNewActivity(""); } }}
-                    placeholder="Add activity\u2026"
-                    style={{ flex: 1, padding: "5px 8px", border: "1.5px solid #e8e4dc", borderRadius: 8, fontFamily: "'DM Sans', sans-serif", fontSize: 12, outline: "none" }} />
-                  <button onClick={() => { if (newActivity.trim()) { saveTripDetails({ activities: [...(tripDetails.activities || []), newActivity.trim()] }); setNewActivity(""); } }}
-                    style={{ padding: "5px 10px", background: "#1a1a1a", color: "#fff", border: "none", borderRadius: 8, cursor: "pointer", fontSize: 13, fontWeight: 700, fontFamily: "'DM Sans', sans-serif" }}>+</button>
-                </div>
-              </div>
-              {/* Other notes */}
-              <div>
-                <div style={{ fontSize: 9, fontWeight: 700, color: "#bbb", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 4 }}>Other Notes</div>
-                <textarea value={tripDetails.notes || ""} onChange={e => setTripDetails(d => ({ ...d, notes: e.target.value }))} onBlur={() => saveTripDetails({})}
-                  placeholder="Reservations, dress codes, reminders\u2026"
-                  style={{ width: "100%", padding: "6px 10px", border: "1.5px solid #e8e4dc", borderRadius: 8, fontFamily: "'DM Sans', sans-serif", fontSize: 12, outline: "none", resize: "vertical", minHeight: 56, boxSizing: "border-box" }} />
-              </div>
-            </div>
+              )}
+            </>
           )}
 
           {/* ── NOTES ── */}
@@ -3583,8 +3742,10 @@ function LookbookViewer({ lookbook, outfits, allItems, closetItems, onClose, onU
           <button onClick={() => toggleAccordion("looks")} style={{ ...acHdrStyle }}>
             <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
               <span style={{ fontSize: 10, fontWeight: 700, color: "#aaa", textTransform: "uppercase", letterSpacing: "0.1em" }}>Looks</span>
-              {(looks.length + plannedSlots.length) > 0 && (
-                <span style={{ fontSize: 9, fontWeight: 700, color: "#fff", background: "#1a1a1a", borderRadius: 20, padding: "1px 7px" }}>{looks.length}/{looks.length + plannedSlots.length}</span>
+              {(looks.length + (isPlanningType ? plannedSlots.length : 0)) > 0 && (
+                <span style={{ fontSize: 9, fontWeight: 700, color: "#fff", background: "#1a1a1a", borderRadius: 20, padding: "1px 7px" }}>
+                  {isPlanningType ? `${looks.length}/${looks.length + plannedSlots.length}` : looks.length}
+                </span>
               )}
             </div>
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#ccc" strokeWidth="2.5" strokeLinecap="round" style={{ transform: openAccordions.looks ? "rotate(180deg)" : "none", transition: "transform 0.2s" }}><polyline points="6 9 12 15 18 9"/></svg>
@@ -3592,7 +3753,7 @@ function LookbookViewer({ lookbook, outfits, allItems, closetItems, onClose, onU
           {openAccordions.looks && (
             <div style={{ padding: "8px 16px 12px", display: "flex", flexDirection: "column", gap: 4 }}>
               {/* Packing list toggle */}
-              {looks.length > 0 && (
+              {isTripType && looks.length > 0 && (
                 <>
                   <button onClick={() => setShowPackList(p => !p)} style={{ width: "100%", padding: "6px 10px", background: showPackList ? "#f0faf4" : "#f5f3ef", border: showPackList ? "1.5px solid #b6e8c8" : "none", borderRadius: 9, cursor: "pointer", fontSize: 11, fontWeight: 700, color: showPackList ? "#2d6a3f" : "#666", fontFamily: "'DM Sans', sans-serif", textAlign: "left", marginBottom: 2 }}>
                     <SvgLuggage size={12} color="currentColor" style={{ marginRight: 5 }} />Packing List ({packItems.length})
@@ -3644,7 +3805,7 @@ function LookbookViewer({ lookbook, outfits, allItems, closetItems, onClose, onU
               })}
 
               {/* Planned slot rows */}
-              {plannedSlots.map((slot, si) => {
+              {isPlanningType && plannedSlots.map((slot, si) => {
                 const slotDateLabel = slot.date ? new Date(slot.date + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" }) : null;
                 const slotWxRow = slot.date ? getWxForDate(slot.date) : null;
                 return (
@@ -3669,8 +3830,10 @@ function LookbookViewer({ lookbook, outfits, allItems, closetItems, onClose, onU
 
               {/* Action buttons */}
               <button onClick={() => setShowAddLooks(true)} style={{ width: "100%", padding: "7px", background: "#f5f3ef", border: "none", borderRadius: 9, cursor: "pointer", fontSize: 11, fontWeight: 700, color: "#666", fontFamily: "'DM Sans', sans-serif", marginTop: 2 }}>+ Add Outfit</button>
-              <button onClick={() => { const next = [...plannedSlots, { id: Date.now() + "_" + Math.random().toString(36).slice(2), name: "", date: "" }]; setPlannedSlots(next); save({ plannedSlots: next }); }}
-                style={{ width: "100%", padding: "7px", background: "transparent", border: "1.5px dashed #d0cbc3", borderRadius: 9, cursor: "pointer", fontSize: 11, fontWeight: 700, color: "#bbb", fontFamily: "'DM Sans', sans-serif" }}>+ Plan a Slot</button>
+              {isPlanningType && (
+                <button onClick={() => { const next = [...plannedSlots, { id: Date.now() + "_" + Math.random().toString(36).slice(2), name: "", date: "" }]; setPlannedSlots(next); save({ plannedSlots: next }); }}
+                  style={{ width: "100%", padding: "7px", background: "transparent", border: "1.5px dashed #d0cbc3", borderRadius: 9, cursor: "pointer", fontSize: 11, fontWeight: 700, color: "#bbb", fontFamily: "'DM Sans', sans-serif" }}>+ Plan a Slot</button>
+              )}
             </div>
           )}
 
@@ -10896,6 +11059,8 @@ export default function App() {
       outfitIds: newLbSelected,
       type: newLbType,
       tags: newLbTags,
+      city: newLbCity,
+      tripDetails: { hotel: "", activities: [], notes: "" },
       lookMeta: {},
     };
     setLookbookModal(false);
@@ -11780,6 +11945,7 @@ export default function App() {
                     <div style={{ display: "grid", gridTemplateColumns: `repeat(auto-fill, minmax(${lbZoom}px, 1fr))`, gap: 16 }}>
                       {filtered.map((lb, i) => {
                         const lbOutfits = (lb.outfitIds || []).map(id => outfitsDb.rows.find(o => o.id === id)).filter(Boolean);
+                        const lbTypeMeta = getLookbookTypeMeta(lb.type);
                         const previewItems = lbOutfits.slice(0, 4).flatMap(o =>
                           (o.layers || o.itemIds || []).slice(0, 1).map(id => allItems.find(x => x.id === id)).filter(Boolean)
                         );
@@ -11810,6 +11976,9 @@ export default function App() {
                               </div>
                             )}
                             <div style={{ padding: "12px 14px 14px" }}>
+                              <div style={{ display: "inline-flex", alignItems: "center", padding: "3px 8px", borderRadius: 20, background: lbTypeMeta.bg, color: lbTypeMeta.color, fontSize: 10, fontWeight: 700, marginBottom: 8 }}>
+                                {lbTypeMeta.label}
+                              </div>
                               <div style={{ fontSize: 15, fontWeight: 700, color: "#1a1a1a", lineHeight: 1.3 }}>{lb.name}</div>
                               <div style={{ display: "flex", gap: 8, marginTop: 4, alignItems: "center", flexWrap: "wrap" }}>
                                 <span style={{ fontSize: 11, color: "#aaa", fontWeight: 600 }}>{lbOutfits.length} look{lbOutfits.length !== 1 ? "s" : ""}</span>
@@ -11940,7 +12109,7 @@ export default function App() {
             lookbooksDb={lookbooksDb.rows}
             createLookbook={async ({id: newId, name, moodboardId}) => {
               const lbId = newId || uid();
-              const newLb = { id: lbId, name, notes: "", coverImage: "", dateStart: "", dateEnd: "", outfitIds: [], lookMeta: {}, moodboardId };
+              const newLb = { id: lbId, name, notes: "", coverImage: "", dateStart: "", dateEnd: "", outfitIds: [], lookMeta: {}, moodboardId, type: "inspiration" };
               let { error } = await supabase.from("lookbooks").insert({ id: lbId, data: newLb });
               if (error) ({ error } = await supabase.from("lookbooks").insert(newLb));
               await lookbooksDb.refresh();
@@ -12320,6 +12489,7 @@ export default function App() {
         {/* ── RIGHT PANEL (lookbooks tab) — packing lists ── */}
         {tab === "lookbooks" && (() => {
           const lbsWithPacking = lookbooksDb.rows.filter(lb => {
+            if ((lb.type || "trip") !== "trip") return false;
             const lbOutfits = (lb.outfitIds || []).map(id => outfitsDb.rows.find(o => o.id === id)).filter(Boolean);
             const allLayerIds = lbOutfits.flatMap(o => o.layers || o.itemIds || []);
             return allLayerIds.length > 0;
@@ -12423,7 +12593,7 @@ export default function App() {
         </div>
         <div style={{ display: "flex", gap: 10, marginBottom: 14 }}>
           <div style={{ flex: 1 }}>
-            <label style={{ display: "block", fontSize: 11, fontWeight: 600, color: "#999", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 6 }}>Start Date</label>
+            <label style={{ display: "block", fontSize: 11, fontWeight: 600, color: "#999", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 6 }}>{newLbType === "trip" ? "Start Date" : newLbType === "event" ? "Event Date" : "Start Date"}</label>
             <input type="date" value={newLbDateStart} onChange={e => setNewLbDateStart(e.target.value)} style={inputStyle} />
           </div>
           <div style={{ flex: 1 }}>
@@ -12432,14 +12602,23 @@ export default function App() {
           </div>
         </div>
         <div style={{ marginBottom: 14 }}>
-          <label style={{ display: "block", fontSize: 11, fontWeight: 600, color: "#999", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 6 }}>City (for weather)</label>
-          <input value={newLbCity} onChange={e => setNewLbCity(e.target.value)} placeholder="e.g. Orlando, FL" style={inputStyle} />
+          <label style={{ display: "block", fontSize: 11, fontWeight: 600, color: "#999", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 6 }}>
+            {newLbType === "trip" ? "Destination (for weather)" : newLbType === "event" ? "Location (optional)" : "Location / City (optional)"}
+          </label>
+          <input value={newLbCity} onChange={e => setNewLbCity(e.target.value)} placeholder={newLbType === "event" ? "e.g. Nashville, TN" : "e.g. Orlando, FL"} style={inputStyle} />
         </div>
         <div style={{ marginBottom: 14 }}>
           <label style={{ display: "block", fontSize: 11, fontWeight: 600, color: "#999", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 6 }}>Lookbook Type</label>
           <select value={newLbType} onChange={e => setNewLbType(e.target.value)} style={inputStyle}>
-            {LOOKBOOK_TYPES.map(type => <option key={type} value={type}>{type[0].toUpperCase() + type.slice(1)}</option>)}
+            {LOOKBOOK_TYPES.map(type => <option key={type} value={type}>{getLookbookTypeMeta(type).label}</option>)}
           </select>
+          <div style={{ fontSize: 11, color: "#aaa", marginTop: 6 }}>
+            {newLbType === "trip" && "Trip lookbooks focus on weather, packing, hotel, and day-by-day planning."}
+            {newLbType === "event" && "Event lookbooks focus on one occasion, its location, and the looks around it."}
+            {newLbType === "season" && "Season lookbooks focus on wardrobe value, repeats, and wear patterns."}
+            {newLbType === "capsule" && "Capsule lookbooks focus on a tight, repeatable set of pieces and looks."}
+            {newLbType === "inspiration" && "Inspiration lookbooks focus on moodboards, references, and styling notes."}
+          </div>
         </div>
         {outfitsDb.rows.length > 0 && (
           <div style={{ marginBottom: 18 }}>
@@ -12678,7 +12857,7 @@ export default function App() {
               style={{ width: "100%", padding: "10px 12px", borderRadius: 10, border: "1.5px solid #e8e4dc", fontSize: 13, fontFamily: "'DM Sans', sans-serif", fontWeight: 600, outline: "none", boxSizing: "border-box", marginBottom: 14 }} autoFocus />
             <button onClick={async () => {
               if (!outfitBulkNewLbName.trim()) return;
-              const newLb = { id: Date.now().toString(36) + Math.random().toString(36).slice(2), name: outfitBulkNewLbName.trim(), outfitIds: [...selectedOutfitIds], type: "collection", tags: [], notes: "", lookMeta: {} };
+              const newLb = { id: Date.now().toString(36) + Math.random().toString(36).slice(2), name: outfitBulkNewLbName.trim(), outfitIds: [...selectedOutfitIds], type: "capsule", tags: [], notes: "", lookMeta: {} };
               await lookbooksDb.update(newLb);
               setOutfitBulkNewLb(false); setOutfitSelectMode(false); setSelectedOutfitIds(new Set());
             }} style={{ width: "100%", padding: "11px 0", background: "#1a1a1a", border: "none", borderRadius: 12, cursor: "pointer", fontFamily: "'DM Sans', sans-serif", fontSize: 13, fontWeight: 700, color: "#fff", marginBottom: 8 }}>Create Lookbook</button>

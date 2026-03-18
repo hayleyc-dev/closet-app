@@ -290,10 +290,9 @@ const globalStyles = `
 
   /* Item card edit btn reveal on hover */
   .item-card:hover .item-card-edit-btn { opacity: 1 !important; }
-  /* Wishlist card: always show label (no height collapse), opacity-only action reveal */
-  .wl-card .item-card-label { max-height: none !important; overflow: visible !important; padding: 8px 10px 10px !important; border-top: 1px solid #f5f2ee !important; }
-  .wl-card .wl-card-actions { opacity: 0; transition: opacity 0.15s; }
-  .wl-card:hover .wl-card-actions { opacity: 1; }
+  /* Wishlist card: restore normal label collapse, action buttons as absolute overlay on image */
+  .wl-card .wl-card-actions { position: absolute; bottom: 0; left: 0; right: 0; background: linear-gradient(to top, rgba(255,255,255,0.97) 60%, transparent); border-radius: 0 0 12px 12px; padding: 18px 8px 8px; display: flex; gap: 4px; align-items: center; opacity: 0; transition: opacity 0.18s; pointer-events: none; }
+  .wl-card:hover .wl-card-actions { opacity: 1; pointer-events: auto; }
   .wl-card:hover .wl-hover-btn { opacity: 1 !important; }
   .palette-del-btn { opacity: 0 !important; transition: opacity 0.15s; }
   div:hover > .palette-del-btn { opacity: 1 !important; }
@@ -5716,8 +5715,8 @@ function WishlistTab({ wishlistDb, wishlistsDb, saveWishlistsMeta, activeWishlis
                       {isSelected && <SvgCheck size={12} color="#fff" />}
                     </div>
                   )}
-                  {/* Image */}
-                  <div className="wl-card-img" style={{ width: "100%", aspectRatio: "1/1", background: "#fff", overflow: "hidden", display: "flex", alignItems: "center", justifyContent: "center", position: "relative" }}>
+                  {/* Image — action buttons overlay bottom of image on hover */}
+                  <div style={{ width: "100%", aspectRatio: "1/1", background: "#fff", overflow: "hidden", display: "flex", alignItems: "center", justifyContent: "center", position: "relative", borderRadius: "14px 14px 0 0" }}>
                     {item.image
                       ? <img src={item.image} alt={item.name} style={{ width: "100%", height: "100%", objectFit: "contain", display: "block", padding: 6 }} />
                       : <SvgHeart size={26} color="#ccc" style={{ opacity: 0.3 }} />
@@ -5725,9 +5724,33 @@ function WishlistTab({ wishlistDb, wishlistsDb, saveWishlistsMeta, activeWishlis
                     {pm && <div style={{ position: "absolute", top: 7, left: 7, fontSize: 9, fontWeight: 700, color: pm.color, background: pm.bg, border: `1px solid ${pm.border}`, borderRadius: 100, padding: "2px 7px" }}>{item.priority}</div>}
                     {item.reason && reasonMeta[item.reason] && <div style={{ position: "absolute", top: 7, right: 7, fontSize: 9, fontWeight: 700, color: reasonMeta[item.reason].color, background: reasonMeta[item.reason].bg, border: `1px solid ${reasonMeta[item.reason].border}`, borderRadius: 100, padding: "2px 7px" }}>{reasonMeta[item.reason].label}</div>}
                     <button onClick={e => { e.stopPropagation(); onEdit(item); }} className="item-card-edit-btn"
-                      style={{ position: "absolute", bottom: 7, right: 7, width: 28, height: 28, borderRadius: "50%", background: "rgba(255,255,255,0.92)", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", backdropFilter: "blur(4px)", boxShadow: "0 1px 4px rgba(0,0,0,0.1)", opacity: 0 }}>
+                      style={{ position: "absolute", bottom: 44, right: 7, width: 28, height: 28, borderRadius: "50%", background: "rgba(255,255,255,0.92)", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", backdropFilter: "blur(4px)", boxShadow: "0 1px 4px rgba(0,0,0,0.1)", opacity: 0, zIndex: 2 }}>
                       <SvgEdit size={12} color="#555" />
                     </button>
+                    {/* Hover action overlay */}
+                    <div className="wl-card-actions">
+                      {item.link && (
+                        <a href={item.link} target="_blank" rel="noreferrer" onClick={e => e.stopPropagation()} title="Buy"
+                          style={{ width: 30, height: 30, borderRadius: 8, background: "rgba(255,255,255,0.9)", display: "flex", alignItems: "center", justifyContent: "center", textDecoration: "none", flexShrink: 0, boxShadow: "0 1px 4px rgba(0,0,0,0.1)" }}>
+                          <SvgCart size={13} color="#555" />
+                        </a>
+                      )}
+                      <button onClick={e => { e.stopPropagation(); openPurchaseModal(item); }} title="Mark as purchased"
+                        style={{ width: 30, height: 30, borderRadius: 8, background: "rgba(240,250,244,0.95)", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, boxShadow: "0 1px 4px rgba(0,0,0,0.1)" }}>
+                        <SvgShop size={13} color="#3aaa6e" />
+                      </button>
+                      {onCreateLook && (
+                        <button onClick={e => { e.stopPropagation(); onCreateLook(item); }} title="Create look"
+                          style={{ width: 30, height: 30, borderRadius: 8, background: "rgba(255,255,255,0.9)", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, boxShadow: "0 1px 4px rgba(0,0,0,0.1)" }}>
+                          <SvgHanger size={13} color="#555" />
+                        </button>
+                      )}
+                      <div style={{ flex: 1 }} />
+                      <button onClick={e => { e.stopPropagation(); wishlistDb.remove(item.id); }} title="Delete"
+                        style={{ width: 30, height: 30, borderRadius: 8, background: "rgba(254,242,242,0.95)", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, boxShadow: "0 1px 4px rgba(0,0,0,0.1)" }}>
+                        <SvgTrash size={13} color="#e05555" />
+                      </button>
+                    </div>
                   </div>
                   <div className="item-card-label">
                     <div className="item-card-name">{item.name}</div>
@@ -5737,34 +5760,6 @@ function WishlistTab({ wishlistDb, wishlistsDb, saveWishlistsMeta, activeWishlis
                         : <span style={{ fontSize: 11, color: "#c0b8b0" }}>{item.brand || item.category || ""}</span>
                       }
                       {item.store && <span style={{ fontSize: 10, color: "#1a1a1a", fontWeight: 600 }}>{item.store}</span>}
-                    </div>
-                    {/* Hover-only action row */}
-                    <div className="wl-card-actions" style={{ display: "flex", gap: 4, alignItems: "center" }}>
-                      {item.link && (
-                        <a href={item.link} target="_blank" rel="noreferrer" onClick={e => e.stopPropagation()} title="Buy"
-                          className="wl-hover-btn"
-                          style={{ width: 30, height: 30, borderRadius: 8, background: "#f5f2ed", display: "flex", alignItems: "center", justifyContent: "center", textDecoration: "none", opacity: 0, transition: "opacity 0.15s", flexShrink: 0 }}>
-                          <SvgCart size={13} color="#555" />
-                        </a>
-                      )}
-                      <button onClick={e => { e.stopPropagation(); openPurchaseModal(item); }} title="Mark as purchased"
-                        className="wl-hover-btn"
-                        style={{ width: 30, height: 30, borderRadius: 8, background: "#f0faf4", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", opacity: 0, transition: "opacity 0.15s", flexShrink: 0 }}>
-                        <SvgShop size={13} color="#3aaa6e" />
-                      </button>
-                      {onCreateLook && (
-                        <button onClick={e => { e.stopPropagation(); onCreateLook(item); }} title="Create look"
-                          className="wl-hover-btn"
-                          style={{ width: 30, height: 30, borderRadius: 8, background: "#f5f2ed", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", opacity: 0, transition: "opacity 0.15s", flexShrink: 0 }}>
-                          <SvgHanger size={13} color="#555" />
-                        </button>
-                      )}
-                      <div style={{ flex: 1 }} />
-                      <button onClick={e => { e.stopPropagation(); wishlistDb.remove(item.id); }} title="Delete"
-                        className="wl-hover-btn"
-                        style={{ width: 30, height: 30, borderRadius: 8, background: "#fef2f2", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", opacity: 0, transition: "opacity 0.15s", flexShrink: 0 }}>
-                        <SvgTrash size={13} color="#e05555" />
-                      </button>
                     </div>
                   </div>
                 </div>
@@ -8577,7 +8572,8 @@ function OutfitCalendar({ outfits, calendar, onSaveCalendar, month, onMonthChang
   const [weatherGeoError, setWeatherGeoError] = useState("");
 
   const geocodeCity = async (cityName) => {
-    const res = await fetch("https://geocoding-api.open-meteo.com/v1/search?name=" + encodeURIComponent(cityName) + "&count=1&language=en&format=json");
+    const cleaned = cityName.replace(/,\s*[A-Z]{2}$/, "").trim();
+    const res = await fetch("https://geocoding-api.open-meteo.com/v1/search?name=" + encodeURIComponent(cleaned) + "&count=1&language=en&format=json");
     const data = await res.json();
     if (data.results && data.results.length > 0) {
       return { lat: data.results[0].latitude, lon: data.results[0].longitude, name: data.results[0].name + (data.results[0].admin1 ? ", " + data.results[0].admin1 : "") };

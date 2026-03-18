@@ -8524,7 +8524,7 @@ const NAV_ITEMS = [
 
 
 // ── OutfitCalendar ───────────────────────────────────────────────────────────
-function OutfitCalendar({ outfits, calendar, onSaveCalendar, month, onMonthChange, weather, onSetWeather, onOpenOutfit, allItems }) {
+function OutfitCalendar({ outfits, calendar, onSaveCalendar, month, onMonthChange, weather, onSetWeather, onOpenOutfit, allItems, events, onSaveEvents }) {
   // calendar shape: { [dateStr]: string[] }  (array of outfit IDs)
   // migrate old shape where value was a single string
   const normalizeDay = (val) => {
@@ -8535,16 +8535,26 @@ function OutfitCalendar({ outfits, calendar, onSaveCalendar, month, onMonthChang
 
   const [assignPicker, setAssignPicker] = useState(null);
   const [searchQ, setSearchQ] = useState("");
-  // per-day active look index
   const [activeLooks, setActiveLooks] = useState({});
-  // drag state
   const [draggingInfo, setDraggingInfo] = useState(null);
   const [dragOver, setDragOver] = useState(null);
-  // day detail popup
-  const [dayPopup, setDayPopup] = useState(null); // dateStr
-  const [dayPopupTab, setDayPopupTab] = useState(0); // active outfit index in popup
+  const [dayPopup, setDayPopup] = useState(null);
+  const [dayPopupTab, setDayPopupTab] = useState(0);
   const [dayAddSearch, setDayAddSearch] = useState("");
   const [showDayAdd, setShowDayAdd] = useState(false);
+  // week/month toggle
+  const [calView, setCalView] = useState("month");
+  const [weekAnchor, setWeekAnchor] = useState(() => new Date().toISOString().slice(0, 10));
+  // event planning modal
+  const [showEventModal, setShowEventModal] = useState(false);
+  const [editingEvent, setEditingEvent] = useState(null);
+  const [eventName, setEventName] = useState("");
+  const [eventType, setEventType] = useState("event");
+  const [eventStart, setEventStart] = useState("");
+  const [eventEnd, setEventEnd] = useState("");
+  // plan my week modal
+  const [showPlanWeekModal, setShowPlanWeekModal] = useState(false);
+  const [planWeekSuggestions, setPlanWeekSuggestions] = useState({});
 
   const { year, month: mo } = month;
   const firstDay = new Date(year, mo, 1).getDay();
@@ -8656,6 +8666,78 @@ function OutfitCalendar({ outfits, calendar, onSaveCalendar, month, onMonthChang
     !searchQ || (o.name || "").toLowerCase().includes(searchQ.toLowerCase())
   );
 
+  // Event helpers
+  const EVENT_COLORS = { trip: "#4a7fc1", event: "#9b72cf", work: "#3aaa6e", other: "#e8823a" };
+  const eventsOnDate = (dateStr) => (events || []).filter(ev => ev.startDate <= dateStr && ev.endDate >= dateStr);
+  const saveEvent = () => {
+    if (!eventName.trim() || !eventStart || !eventEnd) return;
+    const ev = { id: editingEvent?.id || ("ev_" + Date.now()), name: eventName.trim(), type: eventType, startDate: eventStart, endDate: eventEnd };
+    const updated = editingEvent ? (events || []).map(e => e.id === ev.id ? ev : e) : [...(events || []), ev];
+    onSaveEvents(updated);
+    setShowEventModal(false); setEditingEvent(null); setEventName(""); setEventType("event"); setEventStart(""); setEventEnd("");
+  };
+  const deleteEvent = (id) => { onSaveEvents((events || []).filter(e => e.id !== id)); };
+  const openNewEvent = (dateStr) => { setEditingEvent(null); setEventName(""); setEventType("event"); setEventStart(dateStr || ""); setEventEnd(dateStr || ""); setShowEventModal(true); };
+  const openEditEvent = (ev) => { setEditingEvent(ev); setEventName(ev.name); setEventType(ev.type); setEventStart(ev.startDate); setEventEnd(ev.endDate); setShowEventModal(true); };
+
+  // Weather warning helper
+  const getWeatherWarning = (outfit, wx) => {
+    if (!wx || !outfit) return null;
+    const seasons = outfit.seasons || [];
+    if (seasons.length === 0) return null;
+    const isWinterOnly = seasons.length > 0 && seasons.every(s => s === "Winter" || s === "Holiday");
+    const isSummerOnly = seasons.length > 0 && seasons.every(s => s === "Summer");
+    if (isWinterOnly && wx.high > 78) return "Too warm for this look";
+    if (isSummerOnly && wx.high < 45) return "Too cold for this look";
+    return null;
+  };
+
+  // Plan My Week
+  const planWeek = () => {
+    const anchor = new Date(weekAnchor + "T00:00:00");
+    const dow = new Date().getDay();
+    const weekStart = new Date(); weekStart.setDate(new Date().getDate() - dow);
+    const weekDays = Array.from({ length: 7 }, (_, i) => { const d = new Date(weekStart); d.setDate(weekStart.getDate() + i); return d.toISOString().slice(0, 10); });
+    const unplanned = weekDays.filter(ds => getIds(ds).length === 0);
+    const usedIds = new Set();
+    const suggestions = {};
+    unplanned.forEach(ds => {
+      const wx = getWeatherForDate(ds);
+      let candidates = outfits.filter(o => !usedIds.has(o.id));
+      if (wx) {
+        const high = wx.high;
+        const target = high >= 75 ? "Summer" : high >= 55 ? "Spring" : high >= 40 ? "Fall" : "Winter";
+        const matched = candidates.filter(o => (o.seasons || []).includes(target));
+        if (matched.length > 0) candidates = matched;
+      }
+      if (candidates.length > 0) {
+        const pick = candidates[Math.floor(Math.random() * candidates.length)];
+        suggestions[ds] = pick.id; usedIds.add(pick.id);
+      }
+    });
+    setPlanWeekSuggestions(suggestions); setShowPlanWeekModal(true);
+  };
+  const applyPlanWeek = () => {
+    let updated = { ...calendar };
+    Object.entries(planWeekSuggestions).forEach(([ds, id]) => {
+      const ids = normalizeDay(updated[ds]);
+      if (!ids.includes(id)) updated[ds] = [...ids, id];
+    });
+    onSaveCalendar(updated); setShowPlanWeekModal(false);
+  };
+
+  // Week view helpers
+  const getWeekDays = (anchorStr) => {
+    const d = new Date(anchorStr + "T00:00:00");
+    const dow = d.getDay();
+    const start = new Date(d); start.setDate(d.getDate() - dow);
+    return Array.from({ length: 7 }, (_, i) => { const day = new Date(start); day.setDate(start.getDate() + i); return day.toISOString().slice(0, 10); });
+  };
+  const weekDays = getWeekDays(weekAnchor);
+  const prevWeek = () => { const d = new Date(weekAnchor + "T00:00:00"); d.setDate(d.getDate() - 7); setWeekAnchor(d.toISOString().slice(0, 10)); };
+  const nextWeek = () => { const d = new Date(weekAnchor + "T00:00:00"); d.setDate(d.getDate() + 7); setWeekAnchor(d.toISOString().slice(0, 10)); };
+  const weekLabel = (() => { const s = new Date(weekDays[0] + "T00:00:00"); const e = new Date(weekDays[6] + "T00:00:00"); return s.toLocaleDateString("en-US", { month: "short", day: "numeric" }) + " – " + e.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }); })();
+
   const cells = [];
   for (let i = 0; i < firstDay; i++) cells.push(null);
   for (let d = 1; d <= daysInMonth; d++) cells.push(d);
@@ -8663,20 +8745,30 @@ function OutfitCalendar({ outfits, calendar, onSaveCalendar, month, onMonthChang
   return (
     <div>
       {/* Calendar header */}
-      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 16 }}>
-        <button onClick={prevMonth} style={{ width: 30, height: 30, borderRadius: "50%", border: "1px solid #e0dbd2", background: "#fff", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>
-          <SvgArrowL size={12} color="#666" />
+      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12, flexWrap: "wrap" }}>
+        {/* View toggle */}
+        <div style={{ display: "flex", background: "#f5f2ed", borderRadius: 10, padding: 3, gap: 2, flexShrink: 0 }}>
+          {["month", "week"].map(v => (
+            <button key={v} onClick={() => setCalView(v)} style={{ padding: "5px 12px", border: "none", borderRadius: 8, fontFamily: "'DM Sans', sans-serif", fontSize: 11, fontWeight: 700, cursor: "pointer", background: calView === v ? "#fff" : "transparent", color: calView === v ? "#1a1a1a" : "#aaa", boxShadow: calView === v ? "0 1px 4px rgba(0,0,0,0.1)" : "none", transition: "all 0.15s", textTransform: "capitalize" }}>{v}</button>
+          ))}
+        </div>
+        {/* Nav arrows + title */}
+        <button onClick={calView === "week" ? prevWeek : prevMonth} style={{ width: 28, height: 28, borderRadius: "50%", border: "1px solid #e0dbd2", background: "#fff", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+          <SvgArrowL size={11} color="#666" />
         </button>
-        <div style={{ flex: 1, fontSize: 15, fontWeight: 800, color: "#1a1a1a", textAlign: "center" }}>{monthName}</div>
-        <button onClick={nextMonth} style={{ width: 30, height: 30, borderRadius: "50%", border: "1px solid #e0dbd2", background: "#fff", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>
-          <SvgArrowR size={12} color="#666" />
+        <div style={{ flex: 1, fontSize: 14, fontWeight: 800, color: "#1a1a1a", textAlign: "center", minWidth: 120 }}>{calView === "week" ? weekLabel : monthName}</div>
+        <button onClick={calView === "week" ? nextWeek : nextMonth} style={{ width: 28, height: 28, borderRadius: "50%", border: "1px solid #e0dbd2", background: "#fff", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+          <SvgArrowR size={11} color="#666" />
         </button>
-        <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 2 }}>
-          <button onClick={() => setShowWeatherConfig(true)} style={{
-            padding: "6px 12px", borderRadius: 10, border: "1px solid #e0dbd2", background: "#fff",
-            cursor: "pointer", fontSize: 12, fontWeight: 600, color: "#666", fontFamily: "'DM Sans', sans-serif",
-            display: "flex", alignItems: "center", gap: 5
-          }}>
+        {/* Action buttons */}
+        <button onClick={planWeek} style={{ padding: "6px 11px", borderRadius: 10, border: "1px solid #e0dbd2", background: "#fff", cursor: "pointer", fontSize: 11, fontWeight: 700, color: "#2d6a3f", fontFamily: "'DM Sans', sans-serif", display: "flex", alignItems: "center", gap: 4, flexShrink: 0 }}>
+          ✦ Plan Week
+        </button>
+        <button onClick={() => openNewEvent("")} style={{ padding: "6px 11px", borderRadius: 10, border: "1px solid #e0dbd2", background: "#fff", cursor: "pointer", fontSize: 11, fontWeight: 700, color: "#666", fontFamily: "'DM Sans', sans-serif", flexShrink: 0 }}>
+          + Event
+        </button>
+        <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 2, flexShrink: 0 }}>
+          <button onClick={() => setShowWeatherConfig(true)} style={{ padding: "6px 11px", borderRadius: 10, border: "1px solid #e0dbd2", background: "#fff", cursor: "pointer", fontSize: 11, fontWeight: 700, color: "#666", fontFamily: "'DM Sans', sans-serif", display: "flex", alignItems: "center", gap: 4 }}>
             {weatherLoading ? "…" : "⛅ Weather"}
           </button>
           {weather && <div style={{ fontSize: 10, color: "#bbb", fontWeight: 600 }}>{weather.city}</div>}
@@ -8719,14 +8811,61 @@ function OutfitCalendar({ outfits, calendar, onSaveCalendar, month, onMonthChang
       </div>
 
       {/* Day labels */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 4, marginBottom: 4 }}>
-        {["Sun","Mon","Tue","Wed","Thu","Fri","Sat"].map(d => (
-          <div key={d} style={{ textAlign: "center", fontSize: 10, fontWeight: 700, color: "#bbb", textTransform: "uppercase", letterSpacing: "0.06em", padding: "4px 0" }}>{d}</div>
-        ))}
-      </div>
+      {calView === "month" && (
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 4, marginBottom: 4 }}>
+          {["Sun","Mon","Tue","Wed","Thu","Fri","Sat"].map(d => (
+            <div key={d} style={{ textAlign: "center", fontSize: 10, fontWeight: 700, color: "#bbb", textTransform: "uppercase", letterSpacing: "0.06em", padding: "4px 0" }}>{d}</div>
+          ))}
+        </div>
+      )}
 
-      {/* Calendar grid */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 4 }}>
+      {/* Week view */}
+      {calView === "week" && (
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 6 }}>
+          {weekDays.map(dateStr => {
+            const ids = getIds(dateStr);
+            const wx = getWeatherForDate(dateStr);
+            const isToday = dateStr === todayStr;
+            const dayEvts = eventsOnDate(dateStr);
+            const d = new Date(dateStr + "T00:00:00");
+            const dayLabel = d.toLocaleDateString("en-US", { weekday: "short" });
+            const dayNum = d.getDate();
+            return (
+              <div key={dateStr} onClick={() => { setDayPopup(dateStr); setDayPopupTab(0); setShowDayAdd(false); setDayAddSearch(""); }}
+                style={{ borderRadius: 12, border: isToday ? "2px solid #1a1a1a" : "1.5px solid #e8e4dc", background: "#fff", cursor: "pointer", minHeight: 180, padding: "8px 6px 6px", display: "flex", flexDirection: "column", gap: 4 }}
+                onMouseEnter={e => e.currentTarget.style.boxShadow = "0 2px 8px rgba(0,0,0,0.08)"} onMouseLeave={e => e.currentTarget.style.boxShadow = "none"}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 2 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
+                    <div style={{ fontSize: 10, fontWeight: 700, color: "#aaa", textTransform: "uppercase" }}>{dayLabel}</div>
+                    <div style={{ width: 22, height: 22, borderRadius: "50%", background: isToday ? "#1a1a1a" : "transparent", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                      <span style={{ fontSize: 12, fontWeight: 900, color: isToday ? "#fff" : "#555" }}>{dayNum}</span>
+                    </div>
+                  </div>
+                  {wx && <div style={{ fontSize: 10, color: "#888", fontWeight: 700 }}>{weatherIcon(wx.code)} {wx.high}°</div>}
+                </div>
+                {dayEvts.map(ev => (
+                  <div key={ev.id} onClick={e => { e.stopPropagation(); openEditEvent(ev); }} style={{ borderRadius: 6, background: EVENT_COLORS[ev.type] || "#888", color: "#fff", fontSize: 9, fontWeight: 700, padding: "2px 6px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", cursor: "pointer" }}>{ev.name}</div>
+                ))}
+                {ids.slice(0, 2).map(id => {
+                  const o = outfits.find(x => x.id === id);
+                  if (!o) return null;
+                  const warn = getWeatherWarning(o, wx);
+                  return (
+                    <div key={id} style={{ borderRadius: 8, overflow: "hidden", background: "#f5f2ed", flex: 1, position: "relative", minHeight: 60 }}>
+                      {o.previewImage ? <img src={o.previewImage} alt={o.name} style={{ width: "100%", height: "100%", objectFit: "contain" }} /> : <div style={{ padding: 4, fontSize: 9, fontWeight: 700, color: "#999" }}>{o.name}</div>}
+                      {warn && <div style={{ position: "absolute", top: 2, right: 2, background: "#f59e0b", borderRadius: 4, padding: "1px 4px", fontSize: 8, fontWeight: 800, color: "#fff" }}>⚠</div>}
+                    </div>
+                  );
+                })}
+                {ids.length === 0 && <div style={{ flex: 1, borderRadius: 8, background: "#faf9f6", display: "flex", alignItems: "center", justifyContent: "center", minHeight: 60, opacity: 0.5 }}><span style={{ fontSize: 18 }}>+</span></div>}
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Month Calendar grid */}
+      {calView === "month" && <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 4 }}>
         {cells.map((day, idx) => {
           if (!day) return <div key={"blank-" + idx} />;
           const dateStr = year + "-" + String(mo + 1).padStart(2, "0") + "-" + String(day).padStart(2, "0");
@@ -8737,7 +8876,8 @@ function OutfitCalendar({ outfits, calendar, onSaveCalendar, month, onMonthChang
           const isToday = dateStr === todayStr;
           const wx = getWeatherForDate(dateStr);
           const isDragOver = dragOver === dateStr;
-          const isPicker = assignPicker === dateStr;
+          const dayEvts = eventsOnDate(dateStr);
+          const weatherWarn = activeOutfit ? getWeatherWarning(activeOutfit, wx) : null;
 
           return (
             <div key={dateStr}
@@ -8755,7 +8895,7 @@ function OutfitCalendar({ outfits, calendar, onSaveCalendar, month, onMonthChang
               style={{
                 borderRadius: 10,
                 border: isToday ? "2px solid #1a1a1a" : isDragOver ? "2px dashed #2d6a3f" : "1.5px solid #e8e4dc",
-                background: isDragOver ? "#f0faf4" : isToday ? "#fafaf8" : "#fff",
+                background: isDragOver ? "#f0faf4" : "#fff",
                 cursor: "pointer", minHeight: 80, padding: "5px 5px 4px",
                 display: "flex", flexDirection: "column",
                 transition: "box-shadow 0.12s, border-color 0.1s, background 0.1s",
@@ -8765,15 +8905,24 @@ function OutfitCalendar({ outfits, calendar, onSaveCalendar, month, onMonthChang
               onMouseLeave={e => e.currentTarget.style.boxShadow = "none"}
             >
               {/* Day number + weather */}
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 3 }}>
-                <div style={{ fontSize: 11, fontWeight: isToday ? 900 : 700, color: isToday ? "#1a1a1a" : "#888" }}>{day}</div>
-                {wx && (
-                  <div style={{ fontSize: 11, color: "#555", textAlign: "right", lineHeight: 1.2, fontWeight: 800 }}>
-                    <div>{weatherIcon(wx.code)}</div>
-                    <div style={{ fontSize: 10 }}>{wx.high}°</div>
-                  </div>
-                )}
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 2 }}>
+                <div style={{ width: 18, height: 18, borderRadius: "50%", background: isToday ? "#1a1a1a" : "transparent", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                  <span style={{ fontSize: 10, fontWeight: 900, color: isToday ? "#fff" : "#888" }}>{day}</span>
+                </div>
+                <div style={{ display: "flex", alignItems: "center", gap: 3 }}>
+                  {weatherWarn && <span style={{ fontSize: 9, background: "#f59e0b", color: "#fff", borderRadius: 4, padding: "1px 3px", fontWeight: 800 }}>⚠</span>}
+                  {wx && (
+                    <div style={{ fontSize: 10, color: "#555", textAlign: "right", lineHeight: 1.2, fontWeight: 800 }}>
+                      <div>{weatherIcon(wx.code)}</div>
+                      <div style={{ fontSize: 9 }}>{wx.high}°</div>
+                    </div>
+                  )}
+                </div>
               </div>
+              {/* Event banners */}
+              {dayEvts.map(ev => (
+                <div key={ev.id} onClick={e => { e.stopPropagation(); openEditEvent(ev); }} style={{ borderRadius: 4, background: EVENT_COLORS[ev.type] || "#888", color: "#fff", fontSize: 8, fontWeight: 700, padding: "1px 4px", marginBottom: 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", cursor: "pointer" }}>{ev.name}</div>
+              ))}
 
               {/* Outfit area */}
               {activeOutfit ? (
@@ -8813,7 +8962,7 @@ function OutfitCalendar({ outfits, calendar, onSaveCalendar, month, onMonthChang
             </div>
           );
         })}
-      </div>
+      </div>}
 
 
       {/* ── Day Detail Popup ── */}
@@ -8844,13 +8993,16 @@ function OutfitCalendar({ outfits, calendar, onSaveCalendar, month, onMonthChang
                 <div>
                   <div style={{ fontSize: 18, fontWeight: 900, color: "#1a1a1a" }}>{dateLabel}</div>
                   {wx && (
-                    <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 4 }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 4, flexWrap: "wrap" }}>
                       <span style={{ fontSize: 20, fontWeight: 800 }}>{weatherIcon(wx.code)}</span>
                       <span style={{ fontSize: 14, fontWeight: 700, color: "#1a1a1a" }}>{wx.high}° / {wx.low}°</span>
-                      <span style={{ fontSize: 13, color: "#888" }}>{weatherDesc(wx.code)} · Orlando, FL</span>
+                      <span style={{ fontSize: 13, color: "#888" }}>{weatherDesc(wx.code)}{weather?.city ? " · " + weather.city : ""}</span>
+                      {focusedOutfit && getWeatherWarning(focusedOutfit, wx) && (
+                        <span style={{ background: "#fef3c7", color: "#92400e", borderRadius: 8, padding: "3px 10px", fontSize: 12, fontWeight: 700 }}>⚠ {getWeatherWarning(focusedOutfit, wx)}</span>
+                      )}
                     </div>
                   )}
-                  {!wx && <div style={{ fontSize: 12, color: "#bbb", marginTop: 4 }}>No weather data — click Refresh Weather</div>}
+                  {!wx && <div style={{ fontSize: 12, color: "#bbb", marginTop: 4 }}>No weather data — click ⛅ Weather to load</div>}
                 </div>
                 <button onClick={() => setDayPopup(null)} style={{ width: 32, height: 32, borderRadius: "50%", background: "#f5f2ed", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>
                   <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
@@ -8983,6 +9135,82 @@ function OutfitCalendar({ outfits, calendar, onSaveCalendar, month, onMonthChang
           </div>
         );
       })()}
+
+      {/* Event Modal */}
+      {showEventModal && (
+        <div onClick={() => setShowEventModal(false)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", zIndex: 1100, display: "flex", alignItems: "center", justifyContent: "center", backdropFilter: "blur(3px)" }}>
+          <div onClick={e => e.stopPropagation()} style={{ background: "#fff", borderRadius: 20, padding: "26px 28px", width: "min(400px, 94vw)", boxShadow: "0 20px 60px rgba(0,0,0,0.2)" }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
+              <div style={{ fontSize: 16, fontWeight: 800, color: "#1a1a1a" }}>{editingEvent ? "Edit Event" : "Add Event"}</div>
+              <button onClick={() => setShowEventModal(false)} style={{ background: "none", border: "none", cursor: "pointer", color: "#aaa", fontSize: 18 }}>×</button>
+            </div>
+            <div style={{ marginBottom: 14 }}>
+              <label style={{ display: "block", fontSize: 11, fontWeight: 700, color: "#888", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 6 }}>Name</label>
+              <input value={eventName} onChange={e => setEventName(e.target.value)} placeholder="e.g. Paris Trip" style={{ width: "100%", padding: "9px 12px", border: "1.5px solid #e8e4dc", borderRadius: 10, fontFamily: "'DM Sans', sans-serif", fontSize: 14, boxSizing: "border-box", outline: "none" }} />
+            </div>
+            <div style={{ marginBottom: 14 }}>
+              <label style={{ display: "block", fontSize: 11, fontWeight: 700, color: "#888", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 8 }}>Type</label>
+              <div style={{ display: "flex", gap: 8 }}>
+                {[["trip","✈ Trip","#4a7fc1"],["event","★ Event","#9b72cf"],["work","💼 Work","#3aaa6e"],["other","• Other","#e8823a"]].map(([val, lbl, clr]) => (
+                  <button key={val} onClick={() => setEventType(val)} style={{ flex: 1, padding: "7px 0", borderRadius: 10, border: eventType === val ? `2px solid ${clr}` : "1.5px solid #e8e4dc", background: eventType === val ? clr : "#fafaf8", color: eventType === val ? "#fff" : "#888", fontFamily: "'DM Sans', sans-serif", fontSize: 11, fontWeight: 700, cursor: "pointer" }}>{lbl}</button>
+                ))}
+              </div>
+            </div>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 20 }}>
+              <div>
+                <label style={{ display: "block", fontSize: 11, fontWeight: 700, color: "#888", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 6 }}>Start</label>
+                <input type="date" value={eventStart} onChange={e => setEventStart(e.target.value)} style={{ width: "100%", padding: "9px 10px", border: "1.5px solid #e8e4dc", borderRadius: 10, fontFamily: "'DM Sans', sans-serif", fontSize: 13, boxSizing: "border-box", outline: "none" }} />
+              </div>
+              <div>
+                <label style={{ display: "block", fontSize: 11, fontWeight: 700, color: "#888", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 6 }}>End</label>
+                <input type="date" value={eventEnd} onChange={e => setEventEnd(e.target.value)} style={{ width: "100%", padding: "9px 10px", border: "1.5px solid #e8e4dc", borderRadius: 10, fontFamily: "'DM Sans', sans-serif", fontSize: 13, boxSizing: "border-box", outline: "none" }} />
+              </div>
+            </div>
+            <div style={{ display: "flex", gap: 8 }}>
+              {editingEvent && <button onClick={() => { deleteEvent(editingEvent.id); setShowEventModal(false); }} style={{ padding: "10px 16px", background: "#fef2f2", color: "#e05555", border: "none", borderRadius: 10, cursor: "pointer", fontFamily: "'DM Sans', sans-serif", fontSize: 13, fontWeight: 700 }}>Delete</button>}
+              <button onClick={saveEvent} disabled={!eventName.trim() || !eventStart || !eventEnd} style={{ flex: 1, padding: "11px", background: !eventName.trim() || !eventStart || !eventEnd ? "#ccc" : "#1a1a1a", color: "#fff", border: "none", borderRadius: 12, cursor: "pointer", fontSize: 14, fontWeight: 700, fontFamily: "'DM Sans', sans-serif" }}>Save Event</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Plan My Week Modal */}
+      {showPlanWeekModal && (
+        <div onClick={() => setShowPlanWeekModal(false)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", zIndex: 1100, display: "flex", alignItems: "center", justifyContent: "center", backdropFilter: "blur(3px)" }}>
+          <div onClick={e => e.stopPropagation()} style={{ background: "#fff", borderRadius: 20, padding: "26px 28px", width: "min(480px, 94vw)", maxHeight: "80vh", overflowY: "auto", boxShadow: "0 20px 60px rgba(0,0,0,0.2)" }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
+              <div style={{ fontSize: 16, fontWeight: 800, color: "#1a1a1a" }}>✦ Plan My Week</div>
+              <button onClick={() => setShowPlanWeekModal(false)} style={{ background: "none", border: "none", cursor: "pointer", color: "#aaa", fontSize: 18 }}>×</button>
+            </div>
+            <div style={{ fontSize: 13, color: "#888", marginBottom: 18 }}>Suggested outfits for unplanned days this week{weather ? " (matched to forecast)" : ""}:</div>
+            {Object.keys(planWeekSuggestions).length === 0 ? (
+              <div style={{ textAlign: "center", padding: "20px 0", color: "#bbb", fontSize: 13 }}>All days this week already have outfits planned!</div>
+            ) : (
+              <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 20 }}>
+                {Object.entries(planWeekSuggestions).map(([ds, id]) => {
+                  const o = outfits.find(x => x.id === id);
+                  const wx = getWeatherForDate(ds);
+                  const label = new Date(ds + "T00:00:00").toLocaleDateString("en-US", { weekday: "long", month: "short", day: "numeric" });
+                  return (
+                    <div key={ds} style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 12px", borderRadius: 12, border: "1.5px solid #e8e4dc", background: "#fafaf8" }}>
+                      {o?.previewImage ? <img src={o.previewImage} alt="" style={{ width: 48, height: 54, objectFit: "contain", borderRadius: 8, background: "#f5f2ed" }} /> : <div style={{ width: 48, height: 54, borderRadius: 8, background: "#f5f2ed" }} />}
+                      <div style={{ flex: 1 }}>
+                        <div style={{ fontSize: 12, fontWeight: 700, color: "#1a1a1a" }}>{label}</div>
+                        <div style={{ fontSize: 12, color: "#555", marginTop: 1 }}>{o?.name || "Unknown"}</div>
+                        {wx && <div style={{ fontSize: 10, color: "#aaa", marginTop: 2 }}>{weatherIcon(wx.code)} {wx.high}°/{wx.low}°</div>}
+                      </div>
+                      <button onClick={() => setPlanWeekSuggestions(s => { const n = { ...s }; delete n[ds]; return n; })} style={{ background: "none", border: "none", cursor: "pointer", color: "#ccc", fontSize: 16 }}>×</button>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+            {Object.keys(planWeekSuggestions).length > 0 && (
+              <button onClick={applyPlanWeek} style={{ width: "100%", padding: "11px", background: "#1a1a1a", color: "#fff", border: "none", borderRadius: 12, cursor: "pointer", fontSize: 14, fontWeight: 700, fontFamily: "'DM Sans', sans-serif" }}>Apply Suggestions</button>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -9513,6 +9741,8 @@ export default function App() {
   };
   const [calendarMonth, setCalendarMonth] = useState(() => { const n = new Date(); return { year: n.getFullYear(), month: n.getMonth() }; });
   const [calendarWeather, setCalendarWeather] = useState(null);
+  const [calendarEvents, setCalendarEvents] = useState(() => { try { return JSON.parse(localStorage.getItem("wardrobe_cal_events_v1") || "[]"); } catch { return []; } });
+  const saveCalendarEvents = (evts) => { setCalendarEvents(evts); try { localStorage.setItem("wardrobe_cal_events_v1", JSON.stringify(evts)); } catch {} };
   const [itemDetail, setItemDetail] = useState(null); // closet item detail popup
   const [closetSort, setClosetSort] = useState(() => { try { return localStorage.getItem("wardrobe_default_sort_v1") || "default"; } catch { return "default"; } });
   const [closetSeasonFilter, setClosetSeasonFilter] = useState(() => { try { return localStorage.getItem("wardrobe_default_season_v1") || "All"; } catch { return "All"; } });
@@ -10303,6 +10533,8 @@ export default function App() {
                     weather={calendarWeather}
                     onSetWeather={setCalendarWeather}
                     onOpenOutfit={setOutfitPopup}
+                    events={calendarEvents}
+                    onSaveEvents={saveCalendarEvents}
                   />
                 ) : filteredOutfits.length === 0 ? (
                   <div style={{ textAlign: "center", padding: "80px 24px" }}>

@@ -10067,6 +10067,25 @@ export default function App() {
               <div className="fade-up">
                 {/* Outfits toolbar */}
                 <div style={{ display: "flex", gap: 8, marginBottom: 20, flexWrap: "wrap", alignItems: "center" }}>
+                  {outfitsView === "grid" && (<>
+                    <select value={outfitSeasonFilter} onChange={e => setOutfitSeasonFilter(e.target.value)} className="pill-select">
+                      <option value="All">All Seasons</option>
+                      <option value="Spring">Spring</option>
+                      <option value="Summer">Summer</option>
+                      <option value="Fall">Fall</option>
+                      <option value="Winter">Winter</option>
+                      <option value="Holiday">Holiday</option>
+                    </select>
+                  </>)}
+                  <div style={{ flex: 1 }} />
+                  {outfitsView === "grid" && (<>
+                    <select value={outfitSort} onChange={e => setOutfitSort(e.target.value)} className="pill-select">
+                      <option value="default">Sort: Default</option>
+                      <option value="az">Sort: A – Z</option>
+                      <option value="newest">Sort: Newest</option>
+                      <option value="pieces">Sort: Most Pieces</option>
+                    </select>
+                  </>)}
                   {/* Grid / Calendar toggle */}
                   <div style={{ display: "flex", background: "#f0ece4", borderRadius: 10, padding: 3, gap: 0 }}>
                     {[["grid","Grid"],["calendar","Calendar"]].map(([v,lbl]) => (
@@ -10079,29 +10098,14 @@ export default function App() {
                       }}>{lbl}</button>
                     ))}
                   </div>
-                  {outfitsView === "grid" && (<>
-                    <select value={outfitSeasonFilter} onChange={e => setOutfitSeasonFilter(e.target.value)} className="pill-select">
-                      <option value="All">All Seasons</option>
-                      <option value="Spring">Spring</option>
-                      <option value="Summer">Summer</option>
-                      <option value="Fall">Fall</option>
-                      <option value="Winter">Winter</option>
-                      <option value="Holiday">Holiday</option>
-                    </select>
-                    <div style={{ flex: 1 }} />
-                    <select value={outfitSort} onChange={e => setOutfitSort(e.target.value)} className="pill-select">
-                      <option value="default">Sort: Default</option>
-                      <option value="az">Sort: A – Z</option>
-                      <option value="newest">Sort: Newest</option>
-                      <option value="pieces">Sort: Most Pieces</option>
-                    </select>
+                  {outfitsView === "grid" && (
                     <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                       <SvgBox size={12} color="#bbb" />
                       <input type="range" min={140} max={300} step={10} value={outfitZoom} onChange={e => setOutfitZoom(Number(e.target.value))}
                         style={{ width: 80, accentColor: "#1a1a1a", cursor: "pointer" }} />
                       <SvgBox size={17} color="#bbb" />
                     </div>
-                  </>)}
+                  )}
                 </div>
 
                 {outfitsView === "calendar" ? (

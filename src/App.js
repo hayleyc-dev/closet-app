@@ -6337,7 +6337,7 @@ function BulkListModal({ items, search, setSearch, selected, setSelected, platfo
 
 // ── Moodboard ─────────────────────────────────────────────────────────────────
 // ── MoodboardInfoPanel — reads active board from Moodboard via localStorage ──
-function MoodboardInfoPanel({ activeIdx, setActiveIdx, boards: boardsProp, updateBoards, updateBoardById, removeBoardById, lookbooksDb, createLookbook, addMoodboardToLookbook, onGoToLookbook }) {
+function MoodboardInfoPanel({ activeIdx, setActiveIdx, boards: boardsProp, updateBoards, updateBoardById, removeBoardById, lookbooksDb, createLookbook, addMoodboardToLookbook, onGoToLookbook, closetItems }) {
   const ARCHIVE_KEY = "wardrobe_moodboards_archived_v1";
 
   const data = boardsProp || [];
@@ -6373,6 +6373,71 @@ function MoodboardInfoPanel({ activeIdx, setActiveIdx, boards: boardsProp, updat
     if(clean.length===6) return "#"+clean;
     return null;
   };
+
+  const generatePalette = () => {
+    if (!board) return;
+    const imageItems = (board.items||[]).filter(i=>i.type!=="text"&&i.src);
+    if (imageItems.length===0) return;
+    const buckets = {};
+    let pending = imageItems.length;
+    const finish = () => {
+      if (--pending > 0) return;
+      const sorted = Object.entries(buckets).sort((a,b)=>b[1]-a[1]);
+      const colors = sorted.slice(0,6).map(([hex])=>hex);
+      if (colors.length > 0) save(data.map((b,i)=>i===activeIdx?{...b,palette:colors}:b));
+    };
+    imageItems.forEach(item => {
+      try {
+        const img = new Image();
+        img.crossOrigin = "anonymous";
+        img.onload = () => {
+          try {
+            const c = document.createElement("canvas"); c.width=40; c.height=40;
+            const ctx = c.getContext("2d"); ctx.drawImage(img,0,0,40,40);
+            const data2 = ctx.getImageData(0,0,40,40).data;
+            for (let p=0;p<data2.length;p+=16) {
+              const r=Math.round(data2[p]/32)*32, g=Math.round(data2[p+1]/32)*32, b=Math.round(data2[p+2]/32)*32, a=data2[p+3];
+              if (a<128) continue;
+              if (r>220&&g>220&&b>220) continue; // skip near-white
+              if (r<20&&g<20&&b<20) continue; // skip near-black
+              const hex=`#${r.toString(16).padStart(2,"0")}${g.toString(16).padStart(2,"0")}${b.toString(16).padStart(2,"0")}`;
+              buckets[hex]=(buckets[hex]||0)+1;
+            }
+          } catch {}
+          finish();
+        };
+        img.onerror = finish;
+        img.src = item.src;
+      } catch { finish(); }
+    });
+  };
+
+  // Closet color matching
+  const closetSuggestions = (() => {
+    if (!board?.palette?.length || !(closetItems||[]).length) return [];
+    const paletteHexes = board.palette.map(h=>h.toLowerCase());
+    // Simple matching: check if closet item color name maps to a palette hue
+    const colorNameToHues = {
+      "black":["#000","#1a1a1a","#202020"],"white":["#fff","#ffffff","#f0f0f0"],
+      "red":["#c00","#e00","#c80"],"pink":["#f080a0","#e06080","#e0a0b0"],
+      "orange":["#e06000","#e08000","#f0a000"],"yellow":["#e0e000","#f0c000","#e0c000"],
+      "green":["#008000","#406040","#608060","#204020"],"blue":["#0060c0","#2060c0","#4080e0"],
+      "navy":["#002060","#002040","#203060"],"purple":["#800080","#6040a0","#8060c0"],
+      "brown":["#604020","#805040","#a06040"],"beige":["#e0d0a0","#d0c080","#c0b060"],
+      "gray":["#808080","#a0a0a0","#606060"],"grey":["#808080","#a0a0a0","#606060"],
+      "cream":["#f0e8c0","#e8dca0","#e0d080"],"tan":["#c0a060","#d0b060","#c0a040"],
+    };
+    return (closetItems||[]).filter(item=>{
+      if (!item.image||!item.color) return false;
+      const colorKey = item.color.toLowerCase();
+      const hues = colorNameToHues[colorKey]||[];
+      return paletteHexes.some(ph=>hues.some(h=>{
+        const r1=parseInt(ph.slice(1,3)||"00",16),g1=parseInt(ph.slice(3,5)||"00",16),b1=parseInt(ph.slice(5,7)||"00",16);
+        const r2=parseInt(h.slice(1,3)||"00",16),g2=parseInt(h.slice(3,5)||"00",16),b2=parseInt(h.slice(5,7)||"00",16);
+        return Math.abs(r1-r2)+Math.abs(g1-g2)+Math.abs(b1-b2)<120;
+      }));
+    }).slice(0,8);
+  })();
 
   const archiveBoard = () => {
     if (!board) return;
@@ -6419,18 +6484,24 @@ function MoodboardInfoPanel({ activeIdx, setActiveIdx, boards: boardsProp, updat
     <div className="right-card">
       <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:10}}>
         <div className="right-card-title" style={{marginBottom:0}}>Board</div>
-        <button onClick={() => {
-          const updated = [...data, {id:uid(), name:`Board ${data.length+1}`, items:[], bg:"#ffffff"}];
-          save(updated); setActiveIdx(updated.length-1);
-        }} style={{padding:"4px 10px",background:"#1a1a1a",color:"#fff",border:"none",borderRadius:8,cursor:"pointer",fontSize:11,fontWeight:700,fontFamily:"'DM Sans',sans-serif"}}>+ New</button>
+        <div style={{display:"flex",gap:6,alignItems:"center"}}>
+          <button onClick={() => save(data.map((b,i) => i===activeIdx ? {...b, pinned:!b.pinned} : b))} title={board?.pinned ? "Unpin board" : "Pin board"}
+            style={{padding:"4px 8px",background:"none",border:"1px solid #e0dbd2",borderRadius:8,cursor:"pointer",fontSize:14,lineHeight:1,color:board?.pinned?"#f0c840":"#ccc",fontFamily:"'DM Sans',sans-serif"}}>
+            {board?.pinned?"★":"☆"}
+          </button>
+          <button onClick={() => {
+            const updated = [...data, {id:uid(), name:`Board ${data.length+1}`, items:[], bg:"#ffffff", pinned:false, tags:[]}];
+            save(updated); setActiveIdx(updated.length-1);
+          }} style={{padding:"4px 10px",background:"#1a1a1a",color:"#fff",border:"none",borderRadius:8,cursor:"pointer",fontSize:11,fontWeight:700,fontFamily:"'DM Sans',sans-serif"}}>+ New</button>
+        </div>
       </div>
       <select
         value={activeIdx}
         onChange={e => setActiveIdx(Number(e.target.value))}
         style={{width:"100%",padding:"8px 32px 8px 12px",border:"1.5px solid #e0dbd2",borderRadius:10,fontFamily:"'DM Sans',sans-serif",fontSize:13,fontWeight:700,background:"#fafaf8",color:"#1a1a1a",outline:"none",cursor:"pointer",appearance:"auto",boxSizing:"border-box"}}
       >
-        {data.map((b,i) => (
-          <option key={b.id} value={i}>{b.name}</option>
+        {[...data.map((b,i)=>({b,i}))].sort((a,z)=>(z.b.pinned?1:0)-(a.b.pinned?1:0)).map(({b,i}) => (
+          <option key={b.id} value={i}>{b.pinned?"★ ":""}{b.name}</option>
         ))}
       </select>
     </div>
@@ -6453,12 +6524,36 @@ function MoodboardInfoPanel({ activeIdx, setActiveIdx, boards: boardsProp, updat
             placeholder="Mood, theme, inspiration…" rows={3}
             style={{width:"100%",padding:"7px 10px",border:"1px solid #e0dbd2",borderRadius:10,fontFamily:"'DM Sans',sans-serif",fontSize:12,outline:"none",background:"#fafal8",resize:"none",lineHeight:1.5,boxSizing:"border-box"}} />
         </div>
+        <div>
+          <label style={{display:"block",fontSize:10,fontWeight:700,color:"#aaa",textTransform:"uppercase",letterSpacing:"0.08em",marginBottom:5}}>Tags</label>
+          <div style={{display:"flex",flexWrap:"wrap",gap:4}}>
+            {["Inspiration","Planning","Travel","Seasonal","Wishlist","Archive"].map(tag => {
+              const active = (board.tags||[]).includes(tag);
+              return (
+                <button key={tag} onClick={() => {
+                  const tags = board.tags||[];
+                  const next = active ? tags.filter(t=>t!==tag) : [...tags,tag];
+                  save(data.map((b,i)=>i===activeIdx?{...b,tags:next}:b));
+                }} style={{padding:"3px 8px",borderRadius:20,fontSize:10,fontWeight:700,cursor:"pointer",background:active?"#1a1a1a":"#f5f3ef",color:active?"#fff":"#888",border:active?"none":"1px solid #e0dbd2",fontFamily:"'DM Sans',sans-serif"}}>
+                  {tag}
+                </button>
+              );
+            })}
+          </div>
+        </div>
       </div>
     </div>
 
     {/* ── Color Palette ── */}
     <div className="right-card" style={{marginTop:12}}>
-      <div className="right-card-title">Color Palette</div>
+      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:8}}>
+        <div className="right-card-title" style={{marginBottom:0}}>Color Palette</div>
+        <button onClick={generatePalette} title="Generate palette from board images"
+          style={{padding:"3px 8px",background:"#f5f3ef",border:"1px solid #e0dbd2",borderRadius:8,cursor:"pointer",fontSize:10,fontWeight:700,color:"#666",fontFamily:"'DM Sans',sans-serif",display:"flex",alignItems:"center",gap:4}}>
+          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><path d="M12 2l1.5 4h4l-3 3 1.5 4L12 11l-4 2 1.5-4-3-3h4z"/></svg>
+          Generate
+        </button>
+      </div>
       <div style={{display:"grid",gridTemplateColumns:"repeat(4,52px)",rowGap:6,columnGap:6,marginBottom:12}}>
         {palette.map((color,idx) => (
           <div key={idx} style={{position:"relative",width:52,height:52,lineHeight:0,flexShrink:0}}>
@@ -6498,7 +6593,25 @@ function MoodboardInfoPanel({ activeIdx, setActiveIdx, boards: boardsProp, updat
           />
         </div>
       )}
-      {palette.length===0 && <div style={{fontSize:11,color:"#ccc",textAlign:"center",padding:"8px 0"}}>Tap + to build your palette</div>}
+      {palette.length===0 && <div style={{fontSize:11,color:"#ccc",textAlign:"center",padding:"8px 0"}}>Tap + to build your palette · or Generate from images</div>}
+    </div>
+
+    {/* ── Closet Suggestions ── */}
+    <div className="right-card" style={{marginTop:12}}>
+      <div className="right-card-title">From Your Closet</div>
+      {closetSuggestions.length === 0 ? (
+        <div style={{fontSize:11,color:"#ccc",textAlign:"center",padding:"8px 0",lineHeight:1.6}}>
+          {palette.length===0 ? "Build a color palette to see matching pieces" : "No closet items match this palette yet"}
+        </div>
+      ) : (
+        <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
+          {closetSuggestions.map(item=>(
+            <div key={item.id} title={item.name} style={{width:48,height:60,borderRadius:10,overflow:"hidden",background:"#f5f2ed",border:"1.5px solid #e8e4dc",flexShrink:0}}>
+              <img src={item.image} alt={item.name} style={{width:"100%",height:"100%",objectFit:"contain"}} />
+            </div>
+          ))}
+        </div>
+      )}
     </div>
 
     {/* ── Lookbooks ── */}
@@ -6647,6 +6760,12 @@ function Moodboard({ closetItems = [], activeIdx, setActiveIdx, boards: boardsPr
   const [showClosetPicker, setShowClosetPicker] = useState(false);
   const [editingTextId, setEditingTextId] = useState(null);
   const [editingTextVal, setEditingTextVal] = useState("");
+  const [editingBoardName, setEditingBoardName] = useState(false);
+  const [boardNameVal, setBoardNameVal] = useState("");
+  const [mbView, setMbView] = useState("canvas"); // "canvas" | "grid"
+  const [zoom, setZoom] = useState(1.0);
+  const [multiSelectedIds, setMultiSelectedIds] = useState(new Set());
+  const [cropState, setCropState] = useState(null); // {id, origSrc, displayW, displayH, cropRect: {x,y,w,h}}
 
   // ── Undo/redo history ──
   const history = useRef([]);   // array of board item snapshots
@@ -6736,63 +6855,109 @@ function Moodboard({ closetItems = [], activeIdx, setActiveIdx, boards: boardsPr
     setSelectedId(newItem.id);
   };
 
-  const removeItem = (id) => { updateBoard(items => items.filter(i => i.id!==id)); setSelectedId(null); };
-  const bringForward = (id) => { const maxZ=Math.max(...items.map(i=>i.zIndex||0)); updateBoard(items=>items.map(i=>i.id===id?{...i,zIndex:maxZ+1}:i)); };
-  const sendBackward = (id) => { const minZ=Math.min(...items.map(i=>i.zIndex||0)); updateBoard(items=>items.map(i=>i.id===id?{...i,zIndex:minZ-1}:i)); };
+  const removeItem = (id) => { updateBoard(items => items.filter(i => i.id!==id)); setSelectedId(null); setMultiSelectedIds(new Set()); };
+  const bringForward = (id) => { const maxZ=Math.max(...items.map(i=>i.zIndex||0)); updateBoard(items=>items.map(i=>i.id===id?{...i,zIndex:maxZ+1000}:i)); };
+  const sendBackward = (id) => { const minZ=Math.min(...items.map(i=>i.zIndex||0)); updateBoard(items=>items.map(i=>i.id===id?{...i,zIndex:minZ-1000}:i)); };
+  const bringForwardOne = (id) => {
+    const item=items.find(i=>i.id===id); if(!item) return;
+    const curZ=item.zIndex||0;
+    const above=items.filter(i=>i.id!==id&&(i.zIndex||0)>curZ);
+    if(above.length===0) return;
+    const nextZ=Math.min(...above.map(i=>i.zIndex||0));
+    updateBoard(items=>items.map(i=>i.id===id?{...i,zIndex:nextZ+1}:i));
+  };
+  const sendBackwardOne = (id) => {
+    const item=items.find(i=>i.id===id); if(!item) return;
+    const curZ=item.zIndex||0;
+    const below=items.filter(i=>i.id!==id&&(i.zIndex||0)<curZ);
+    if(below.length===0) return;
+    const prevZ=Math.max(...below.map(i=>i.zIndex||0));
+    updateBoard(items=>items.map(i=>i.id===id?{...i,zIndex:prevZ-1}:i));
+  };
+  const toggleLock = (id) => { updateBoard(items=>items.map(i=>i.id===id?{...i,locked:!i.locked}:i)); };
   const updateItem = (id, patch) => { updateBoard(items=>items.map(i=>i.id===id?{...i,...patch}:i)); };
   const duplicateItem = (id) => { const item=items.find(i=>i.id===id); if(!item)return; const copy={...item,id:uid(),x:item.x+20,y:item.y+20,zIndex:Math.floor(Date.now()/1000000)}; updateBoard(items=>[...items,copy]); setSelectedId(copy.id); };
 
   // ── Keyboard shortcuts ──
   useEffect(() => {
     const onKey = (e) => {
-      if (editingTextId) return; // don't intercept while typing
+      if (editingTextId) return;
       const tag = document.activeElement?.tagName;
       if (tag === "INPUT" || tag === "TEXTAREA") return;
       if ((e.metaKey || e.ctrlKey) && e.key === "z") { e.preventDefault(); undo(); return; }
       if ((e.metaKey || e.ctrlKey) && (e.key === "y" || (e.shiftKey && e.key === "z"))) { e.preventDefault(); redo(); return; }
       if (!selectedId) return;
-      if (e.key === "Delete" || e.key === "Backspace") { e.preventDefault(); removeItem(selectedId); return; }
-      if (e.key === "Escape") { setSelectedId(null); return; }
+      const selItem = items.find(i=>i.id===selectedId);
+      if (e.key === "Delete" || e.key === "Backspace") {
+        e.preventDefault();
+        if (selItem?.locked) return; // can't delete locked
+        if (multiSelectedIds.size > 1) { updateBoard(its=>its.filter(i=>!multiSelectedIds.has(i.id))); setSelectedId(null); setMultiSelectedIds(new Set()); }
+        else removeItem(selectedId);
+        return;
+      }
+      if (e.key === "Escape") { setSelectedId(null); setMultiSelectedIds(new Set()); return; }
+      if (selItem?.locked) return; // skip nudge for locked
       const NUDGE = e.shiftKey ? 10 : 1;
-      if (e.key === "ArrowLeft")  { e.preventDefault(); updateItem(selectedId, { x: (items.find(i=>i.id===selectedId)?.x||0) - NUDGE }); return; }
-      if (e.key === "ArrowRight") { e.preventDefault(); updateItem(selectedId, { x: (items.find(i=>i.id===selectedId)?.x||0) + NUDGE }); return; }
-      if (e.key === "ArrowUp")    { e.preventDefault(); updateItem(selectedId, { y: (items.find(i=>i.id===selectedId)?.y||0) - NUDGE }); return; }
-      if (e.key === "ArrowDown")  { e.preventDefault(); updateItem(selectedId, { y: (items.find(i=>i.id===selectedId)?.y||0) + NUDGE }); return; }
+      if (e.key === "ArrowLeft")  { e.preventDefault(); updateItem(selectedId, { x: (selItem?.x||0) - NUDGE }); return; }
+      if (e.key === "ArrowRight") { e.preventDefault(); updateItem(selectedId, { x: (selItem?.x||0) + NUDGE }); return; }
+      if (e.key === "ArrowUp")    { e.preventDefault(); updateItem(selectedId, { y: (selItem?.y||0) - NUDGE }); return; }
+      if (e.key === "ArrowDown")  { e.preventDefault(); updateItem(selectedId, { y: (selItem?.y||0) + NUDGE }); return; }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [selectedId, items, editingTextId]);
+  }, [selectedId, items, editingTextId, multiSelectedIds]);
 
   // ── Mouse interaction ──
   const onMouseDown = (e, id, mode) => {
     e.stopPropagation(); e.preventDefault();
     const item = items.find(i=>i.id===id);
     if (!item) return;
+    // Shift-click: toggle multi-select
+    if (mode === "drag" && e.shiftKey) {
+      setMultiSelectedIds(prev => { const next=new Set(prev); if(next.has(id)) next.delete(id); else next.add(id); return next; });
+      setSelectedId(id);
+      return;
+    }
     setSelectedId(id);
-    bringForward(id);
+    if (item.locked) return; // locked: select only, no drag/resize/rotate
+    if (!e.shiftKey) {
+      // Non-shift drag: clear multi-select unless this item is already in it
+      if (!multiSelectedIds.has(id)) setMultiSelectedIds(new Set());
+    }
     if (mode === "drag") {
-      dragging.current = {id, startX:e.clientX-item.x, startY:e.clientY-item.y};
+      // If item is in a multi-selection, drag all of them together
+      const ids = multiSelectedIds.size > 1 && multiSelectedIds.has(id) ? [...multiSelectedIds] : [id];
+      if (ids.length > 1) {
+        const offsets = {};
+        ids.forEach(sid => { const si=items.find(i=>i.id===sid); if(si) offsets[sid]={ox:e.clientX/zoom-si.x, oy:e.clientY/zoom-si.y}; });
+        dragging.current = {id, multiOffsets:offsets};
+      } else {
+        dragging.current = {id, startX:e.clientX/zoom-item.x, startY:e.clientY/zoom-item.y};
+      }
     } else if (mode === "resize") {
       resizing.current = {id, startX:e.clientX, startY:e.clientY, startW:item.w, startH:item.h};
     } else if (mode === "rotate") {
       const canvas = canvasRef.current;
       const canvasRect = canvas?.getBoundingClientRect();
-      // item center in page coords
-      const cx = (canvasRect?.left||0) + item.x + item.w/2;
-      const cy = (canvasRect?.top||0)  + item.y + item.h/2;
+      const cx = (canvasRect?.left||0) + (item.x + item.w/2) * zoom;
+      const cy = (canvasRect?.top||0)  + (item.y + item.h/2) * zoom;
       rotating.current = {id, cx, cy, startAngle: Math.atan2(e.clientY-cy, e.clientX-cx) * 180/Math.PI, startRotation: item.rotation||0};
     }
   };
 
   const onMouseMove = (e) => {
     if (dragging.current) {
-      const {id,startX,startY}=dragging.current;
+      const {id,startX,startY,multiOffsets}=dragging.current;
       skipHistory.current = true;
-      setBoards(bs=>bs.map((b,i)=>i!==activeIdx?b:{...b,items:(b.items||[]).map(it=>it.id===id?{...it,x:e.clientX-startX,y:e.clientY-startY}:it)}));
+      if (multiOffsets) {
+        setBoards(bs=>bs.map((b,i)=>i!==activeIdx?b:{...b,items:(b.items||[]).map(it=>{ const off=multiOffsets[it.id]; return off?{...it,x:e.clientX/zoom-off.ox,y:e.clientY/zoom-off.oy}:it; })}));
+      } else {
+        setBoards(bs=>bs.map((b,i)=>i!==activeIdx?b:{...b,items:(b.items||[]).map(it=>it.id===id?{...it,x:e.clientX/zoom-startX,y:e.clientY/zoom-startY}:it)}));
+      }
       skipHistory.current = false;
     } else if (resizing.current) {
       const {id,startX,startY,startW,startH}=resizing.current;
-      const dx=e.clientX-startX; const dy=e.clientY-startY;
+      const dx=(e.clientX-startX)/zoom; const dy=(e.clientY-startY)/zoom;
       skipHistory.current = true;
       setBoards(bs=>bs.map((b,i)=>i!==activeIdx?b:{...b,items:(b.items||[]).map(it=>it.id===id?{...it,w:Math.max(60,startW+dx),h:Math.max(40,startH+dy)}:it)}));
       skipHistory.current = false;
@@ -6808,7 +6973,6 @@ function Moodboard({ closetItems = [], activeIdx, setActiveIdx, boards: boardsPr
 
   const onMouseUp = () => {
     if (dragging.current || resizing.current || rotating.current) {
-      // Push to history on release
       pushHistory(items);
     }
     dragging.current = null; resizing.current = null; rotating.current = null;
@@ -6866,8 +7030,77 @@ function Moodboard({ closetItems = [], activeIdx, setActiveIdx, boards: boardsPr
     </div>
   );
 
+  // Board grid view
+  if (mbView === "grid") {
+    const sorted = [...boards.map((b,i)=>({b,i}))].sort((a,z)=>(z.b.pinned?1:0)-(a.b.pinned?1:0));
+    return (
+      <div style={{display:"flex",flexDirection:"column",height:"calc(100vh - 160px)",padding:"0 4px"}}>
+        <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:16}}>
+          <div style={{fontFamily:"'Cormorant Garamond',serif",fontSize:20,fontWeight:300,fontStyle:"italic",color:"#888"}}>All Boards</div>
+          <button onClick={()=>setMbView("canvas")} style={{padding:"7px 14px",background:"#f5f3ef",border:"none",borderRadius:10,cursor:"pointer",fontSize:11,fontWeight:700,color:"#666",fontFamily:"'DM Sans',sans-serif",display:"flex",alignItems:"center",gap:6}}>
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="9" y1="21" x2="9" y2="9"/></svg>
+            Canvas
+          </button>
+        </div>
+        <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:12,overflowY:"auto",paddingBottom:8}}>
+          {sorted.map(({b,i})=>(
+            <div key={b.id} onClick={()=>{setActiveIdx(i);setMbView("canvas");}} style={{borderRadius:16,overflow:"hidden",cursor:"pointer",border:"1.5px solid #e8e4dc",background:"#fff",transition:"box-shadow 0.15s",boxShadow:"0 2px 8px rgba(0,0,0,0.06)"}}
+              onMouseEnter={e=>e.currentTarget.style.boxShadow="0 6px 20px rgba(0,0,0,0.14)"}
+              onMouseLeave={e=>e.currentTarget.style.boxShadow="0 2px 8px rgba(0,0,0,0.06)"}>
+              <div style={{height:90,background:b.bg||"#ffffff",display:"flex",alignItems:"center",justifyContent:"center",position:"relative"}}>
+                {b.pinned&&<span style={{position:"absolute",top:6,right:8,color:"#f0c840",fontSize:14}}>★</span>}
+                <div style={{fontSize:11,color:"#ccc",opacity:(b.items||[]).length>0?0:1}}>
+                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#ddd" strokeWidth="1.5" strokeLinecap="round"><path d="M12 2l1.5 4h4l-3 3 1.5 4L12 11l-4 2 1.5-4-3-3h4z"/></svg>
+                </div>
+                {(b.items||[]).length>0&&<div style={{fontSize:10,fontWeight:700,color:"rgba(0,0,0,0.3)"}}>{(b.items||[]).length} item{(b.items||[]).length!==1?"s":""}</div>}
+              </div>
+              <div style={{padding:"10px 12px"}}>
+                <div style={{fontSize:12,fontWeight:800,color:"#1a1a1a",marginBottom:4,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{b.name||"Untitled"}</div>
+                {(b.tags||[]).length>0&&(
+                  <div style={{display:"flex",flexWrap:"wrap",gap:3}}>
+                    {(b.tags||[]).map(t=><span key={t} style={{fontSize:9,fontWeight:700,padding:"1px 5px",borderRadius:20,background:"#f5f3ef",color:"#888"}}>{t}</span>)}
+                  </div>
+                )}
+              </div>
+            </div>
+          ))}
+          <div onClick={()=>{const updated=[...boards,{id:uid(),name:`Board ${boards.length+1}`,items:[],bg:"#ffffff",pinned:false,tags:[]}];setBoards(updated);setActiveIdx(updated.length-1);setMbView("canvas");}} style={{borderRadius:16,border:"1.5px dashed #d0cac0",background:"#fafaf8",cursor:"pointer",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:8,padding:"24px 12px",minHeight:120,transition:"background 0.12s"}}
+            onMouseEnter={e=>e.currentTarget.style.background="#f0ece4"}
+            onMouseLeave={e=>e.currentTarget.style.background="#fafaf8"}>
+            <div style={{fontSize:24,color:"#ccc",lineHeight:1}}>+</div>
+            <div style={{fontSize:11,fontWeight:700,color:"#bbb",fontFamily:"'DM Sans',sans-serif"}}>New Board</div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div style={{display:"flex",flexDirection:"column",height:"calc(100vh - 160px)",userSelect:"none",padding:"0 4px"}}>
+
+      {/* Inline board name */}
+      {board && (
+        <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:8,minHeight:26,flexWrap:"wrap"}}>
+          {editingBoardName ? (
+            <input autoFocus value={boardNameVal} onChange={e=>setBoardNameVal(e.target.value)}
+              onBlur={()=>{updateBoardMeta({name:boardNameVal});setEditingBoardName(false);}}
+              onKeyDown={e=>{if(e.key==="Enter"||e.key==="Escape"){updateBoardMeta({name:boardNameVal});setEditingBoardName(false);}e.stopPropagation();}}
+              style={{fontSize:15,fontWeight:800,color:"#1a1a1a",border:"none",borderBottom:"2px solid #1a1a1a",outline:"none",background:"transparent",fontFamily:"'DM Sans',sans-serif",padding:"2px 0",minWidth:80}} />
+          ) : (
+            <div onClick={()=>{setEditingBoardName(true);setBoardNameVal(board.name||"");}}
+              style={{fontSize:15,fontWeight:800,color:"#1a1a1a",cursor:"text",padding:"2px 6px",borderRadius:6,borderBottom:"1.5px solid transparent"}}
+              onMouseEnter={e=>e.currentTarget.style.background="#f5f3ef"}
+              onMouseLeave={e=>e.currentTarget.style.background="transparent"}
+              title="Click to rename">
+              {board.name||"Untitled Board"}
+            </div>
+          )}
+          {board.pinned&&<span style={{color:"#f0c840",fontSize:12}}>★</span>}
+          {(board.tags||[]).map(t=>(
+            <span key={t} style={{fontSize:9,fontWeight:700,padding:"2px 6px",borderRadius:20,background:"#f5f3ef",color:"#888",border:"1px solid #e0dbd2"}}>{t}</span>
+          ))}
+        </div>
+      )}
 
       {/* Toolbar */}
       <div style={{display:"flex",gap:8,marginBottom:10,flexWrap:"wrap",alignItems:"center"}}>
@@ -6877,6 +7110,14 @@ function Moodboard({ closetItems = [], activeIdx, setActiveIdx, boards: boardsPr
         <button onClick={()=>setShowUrlImport(u=>!u)} style={{padding:"8px 14px",background:showUrlImport?"#f0f4ff":"#f5f3ef",border:showUrlImport?"1.5px solid #a0b4f0":"none",borderRadius:10,cursor:"pointer",fontFamily:"'DM Sans',sans-serif",fontSize:12,fontWeight:700,color:showUrlImport?"#3a5fe0":"#666",display:"flex",alignItems:"center",gap:8}}><SvgLink size={13} color="currentColor" />URL</button>
         <button onClick={()=>setShowClosetPicker(p=>!p)} style={{padding:"8px 14px",background:showClosetPicker?"#f0faf4":"#f5f3ef",border:showClosetPicker?"1.5px solid #b6e8c8":"none",borderRadius:10,cursor:"pointer",fontFamily:"'DM Sans',sans-serif",fontSize:12,fontWeight:700,color:showClosetPicker?"#2d6a3f":"#666",display:"flex",alignItems:"center",gap:8}}><SvgHanger size={13} color="currentColor" />From Closet</button>
         <div style={{display:"flex",gap:6,marginLeft:"auto",alignItems:"center"}}>
+          <button onClick={()=>setMbView("grid")} title="Board grid" style={{padding:"7px 10px",background:"#f5f3ef",border:"none",borderRadius:8,cursor:"pointer",fontSize:11,fontWeight:700,color:"#666",fontFamily:"'DM Sans',sans-serif",display:"flex",alignItems:"center",gap:5}}>
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
+          </button>
+          <div style={{display:"flex",alignItems:"center",gap:2,background:"#f5f3ef",borderRadius:8,padding:"2px 4px"}}>
+            <button onClick={()=>setZoom(z=>Math.max(0.25,z-0.25))} style={{width:22,height:22,border:"none",background:"none",cursor:"pointer",fontSize:14,color:"#666",display:"flex",alignItems:"center",justifyContent:"center",fontFamily:"'DM Sans',sans-serif"}}>−</button>
+            <span style={{fontSize:10,fontWeight:700,color:"#888",minWidth:30,textAlign:"center"}}>{Math.round(zoom*100)}%</span>
+            <button onClick={()=>setZoom(z=>Math.min(2.0,z+0.25))} style={{width:22,height:22,border:"none",background:"none",cursor:"pointer",fontSize:14,color:"#666",display:"flex",alignItems:"center",justifyContent:"center",fontFamily:"'DM Sans',sans-serif"}}>+</button>
+          </div>
           <button onClick={undo} title="Undo (⌘Z)" style={{padding:"7px 10px",background:"#f5f3ef",border:"none",borderRadius:8,cursor:"pointer",fontSize:11,fontWeight:700,color:"#666",fontFamily:"'DM Sans',sans-serif",display:"flex",alignItems:"center",gap:5}}>
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><path d="M3 7v6h6"/><path d="M21 17a9 9 0 00-9-9 9 9 0 00-6 2.3L3 13"/></svg>
           </button>
@@ -6950,56 +7191,127 @@ function Moodboard({ closetItems = [], activeIdx, setActiveIdx, boards: boardsPr
       )}
 
       {/* Selected item toolbar */}
-      {selectedItem && (
+      {/* Multi-select toolbar */}
+      {multiSelectedIds.size > 1 && (
+        <div style={{display:"flex",gap:6,marginBottom:8,alignItems:"center",padding:"8px 12px",background:"#f0f6ff",borderRadius:12,border:"1px solid #c8ddf8"}}>
+          <span style={{fontSize:10,fontWeight:700,color:"#3a6fd8",flexShrink:0}}>{multiSelectedIds.size} SELECTED</span>
+          <button onClick={()=>bringForward(selectedId)} style={{padding:"5px 10px",fontSize:11,background:"#e8f0fe",border:"none",borderRadius:8,cursor:"pointer",fontWeight:700,color:"#3a6fd8",fontFamily:"'DM Sans',sans-serif"}}>↑↑ Front</button>
+          <button onClick={()=>sendBackward(selectedId)} style={{padding:"5px 10px",fontSize:11,background:"#e8f0fe",border:"none",borderRadius:8,cursor:"pointer",fontWeight:700,color:"#3a6fd8",fontFamily:"'DM Sans',sans-serif"}}>↓↓ Back</button>
+          <button onClick={()=>{updateBoard(its=>its.filter(i=>!multiSelectedIds.has(i.id)));setSelectedId(null);setMultiSelectedIds(new Set());}} style={{padding:"5px 10px",fontSize:11,background:"#fef2f2",border:"none",borderRadius:8,cursor:"pointer",fontWeight:700,color:"#e05555",fontFamily:"'DM Sans',sans-serif",marginLeft:"auto"}}>Remove All</button>
+          <button onClick={()=>{setSelectedId(null);setMultiSelectedIds(new Set());}} style={{padding:"5px 8px",fontSize:11,background:"#f5f3ef",border:"none",borderRadius:8,cursor:"pointer",color:"#888",fontFamily:"'DM Sans',sans-serif"}}>✕</button>
+        </div>
+      )}
+      {selectedItem && multiSelectedIds.size <= 1 && (
         <div style={{display:"flex",gap:6,marginBottom:8,alignItems:"center",flexWrap:"wrap",padding:"8px 12px",background:"#faf9f6",borderRadius:12,border:"1px solid #e8e4dc"}}>
           <span style={{fontSize:10,fontWeight:700,color:"#aaa",flexShrink:0}}>SELECTED</span>
-          <button onClick={()=>bringForward(selectedId)} style={{padding:"5px 10px",fontSize:11,background:"#f5f2ed",border:"none",borderRadius:8,cursor:"pointer",fontWeight:700,color:"#555",fontFamily:"'DM Sans',sans-serif"}}><SvgArrowUp size={12} color="#555" style={{marginRight:4}} />Fwd</button>
-          <button onClick={()=>sendBackward(selectedId)} style={{padding:"5px 10px",fontSize:11,background:"#f5f2ed",border:"none",borderRadius:8,cursor:"pointer",fontWeight:700,color:"#555",fontFamily:"'DM Sans',sans-serif"}}><SvgArrowDn size={12} color="#555" style={{marginRight:4}} />Back</button>
+          {/* 4-level z-order */}
+          <button onClick={()=>bringForward(selectedId)} title="Bring to front" style={{padding:"5px 8px",fontSize:11,background:"#f5f2ed",border:"none",borderRadius:8,cursor:"pointer",fontWeight:700,color:"#555",fontFamily:"'DM Sans',sans-serif"}}>↑↑</button>
+          <button onClick={()=>bringForwardOne(selectedId)} title="Forward one" style={{padding:"5px 8px",fontSize:11,background:"#f5f2ed",border:"none",borderRadius:8,cursor:"pointer",fontWeight:700,color:"#555",fontFamily:"'DM Sans',sans-serif"}}>↑</button>
+          <button onClick={()=>sendBackwardOne(selectedId)} title="Back one" style={{padding:"5px 8px",fontSize:11,background:"#f5f2ed",border:"none",borderRadius:8,cursor:"pointer",fontWeight:700,color:"#555",fontFamily:"'DM Sans',sans-serif"}}>↓</button>
+          <button onClick={()=>sendBackward(selectedId)} title="Send to back" style={{padding:"5px 8px",fontSize:11,background:"#f5f2ed",border:"none",borderRadius:8,cursor:"pointer",fontWeight:700,color:"#555",fontFamily:"'DM Sans',sans-serif"}}>↓↓</button>
           <button onClick={()=>duplicateItem(selectedId)} style={{padding:"5px 10px",fontSize:11,background:"#f5f2ed",border:"none",borderRadius:8,cursor:"pointer",fontWeight:700,color:"#555",fontFamily:"'DM Sans',sans-serif"}}><SvgCopy size={12} color="#555" style={{marginRight:4}} />Dupe</button>
-          {selectedItem.type !== "text" && (
+          {/* Lock/unlock */}
+          <button onClick={()=>toggleLock(selectedId)} title={selectedItem.locked?"Unlock":"Lock"}
+            style={{padding:"5px 10px",fontSize:11,background:selectedItem.locked?"#fff9e6":"#f5f2ed",border:selectedItem.locked?"1px solid #f0c840":"none",borderRadius:8,cursor:"pointer",fontWeight:700,color:selectedItem.locked?"#a07000":"#555",fontFamily:"'DM Sans',sans-serif"}}>
+            {selectedItem.locked?"🔒":"🔓"}
+          </button>
+          {!selectedItem.locked && selectedItem.type !== "text" && (
             <>
               <button onClick={()=>updateItem(selectedId,{flipH:!selectedItem.flipH})} style={{padding:"5px 10px",fontSize:11,background:selectedItem.flipH?"#1a1a1a":"#f5f2ed",border:"none",borderRadius:8,cursor:"pointer",fontWeight:700,color:selectedItem.flipH?"#fff":"#555",fontFamily:"'DM Sans',sans-serif"}}>⇆ Flip</button>
               <label style={{fontSize:10,fontWeight:700,color:"#aaa",flexShrink:0}}>Opacity</label>
               <input type="range" min="0.1" max="1" step="0.05" value={selectedItem.opacity??1}
                 onChange={e=>updateItem(selectedId,{opacity:parseFloat(e.target.value)})}
-                style={{width:72}} />
+                style={{width:64}} />
+              <button onClick={()=>{ setCropState({id:selectedId,origSrc:selectedItem.src,displayW:selectedItem.w,displayH:selectedItem.h,cropRect:{x:0,y:0,w:selectedItem.w,h:selectedItem.h}}); }} style={{padding:"5px 10px",fontSize:11,background:"#f0f6ff",border:"1px solid #c8ddf8",borderRadius:8,cursor:"pointer",fontWeight:700,color:"#3a6fd8",fontFamily:"'DM Sans',sans-serif"}}>Crop</button>
             </>
           )}
-          {selectedItem.type === "text" && (
+          {!selectedItem.locked && selectedItem.type === "text" && (
             <>
+              <select value={selectedItem.fontFamily||"DM Sans"} onChange={e=>updateItem(selectedId,{fontFamily:e.target.value})}
+                style={{padding:"4px 6px",border:"1px solid #e0dbd2",borderRadius:8,fontFamily:"'DM Sans',sans-serif",fontSize:10,fontWeight:700,background:"#fafaf8",outline:"none",cursor:"pointer"}}>
+                <option value="DM Sans">DM Sans</option>
+                <option value="'Cormorant Garamond',serif">Cormorant</option>
+                <option value="Georgia,serif">Georgia</option>
+                <option value="monospace">Mono</option>
+              </select>
               <label style={{fontSize:10,fontWeight:700,color:"#aaa",flexShrink:0}}>Size</label>
-              <input type="range" min="10" max="48" step="1" value={selectedItem.fontSize??14}
+              <input type="range" min="10" max="72" step="1" value={selectedItem.fontSize??14}
                 onChange={e=>updateItem(selectedId,{fontSize:parseInt(e.target.value)})}
-                style={{width:64}} />
+                style={{width:60}} />
               <input type="color" value={selectedItem.color??"#1a1a1a"} onChange={e=>updateItem(selectedId,{color:e.target.value})}
                 style={{width:26,height:26,border:"none",borderRadius:6,cursor:"pointer",padding:0}} title="Text color" />
+              <button onClick={()=>updateItem(selectedId,{bold:!selectedItem.bold})}
+                style={{padding:"5px 8px",fontSize:12,background:selectedItem.bold?"#1a1a1a":"#f5f3ef",color:selectedItem.bold?"#fff":"#555",border:"none",borderRadius:8,cursor:"pointer",fontWeight:800,fontFamily:"'DM Sans',sans-serif"}}>B</button>
+              <button onClick={()=>updateItem(selectedId,{italic:!selectedItem.italic})}
+                style={{padding:"5px 8px",fontSize:12,background:selectedItem.italic?"#1a1a1a":"#f5f3ef",color:selectedItem.italic?"#fff":"#555",border:"none",borderRadius:8,cursor:"pointer",fontWeight:700,fontStyle:"italic",fontFamily:"Georgia,serif"}}>I</button>
               <button onClick={()=>updateItem(selectedId,{transparentBg:!selectedItem.transparentBg})}
                 style={{padding:"5px 10px",fontSize:11,background:selectedItem.transparentBg?"#1a1a1a":"#f5f3ef",color:selectedItem.transparentBg?"#fff":"#555",border:"none",borderRadius:8,cursor:"pointer",fontWeight:700,fontFamily:"'DM Sans',sans-serif"}}>
-                {selectedItem.transparentBg?"◻ No BG":"◼ BG"}
+                {selectedItem.transparentBg?"No BG":"BG"}
               </button>
               {!selectedItem.transparentBg && (
                 <input type="color" value={selectedItem.bg??"#fff9e6"} onChange={e=>updateItem(selectedId,{bg:e.target.value})}
                   style={{width:26,height:26,border:"none",borderRadius:6,cursor:"pointer",padding:0}} title="Background color" />
               )}
-              <button onClick={()=>updateItem(selectedId,{bold:!selectedItem.bold})}
-                style={{padding:"5px 10px",fontSize:12,background:selectedItem.bold?"#1a1a1a":"#f5f3ef",color:selectedItem.bold?"#fff":"#555",border:"none",borderRadius:8,cursor:"pointer",fontWeight:800,fontFamily:"'DM Sans',sans-serif"}}>B</button>
             </>
           )}
           <button onClick={()=>removeItem(selectedId)} style={{padding:"5px 10px",fontSize:11,background:"#fef2f2",border:"none",borderRadius:8,cursor:"pointer",fontWeight:700,color:"#e05555",fontFamily:"'DM Sans',sans-serif",marginLeft:"auto"}}><SvgTrash size={12} color="#e05555" style={{marginRight:4}} />Remove</button>
         </div>
       )}
 
+      {/* Crop overlay */}
+      {cropState && (() => {
+        const cs = cropState;
+        const applyCrop = () => {
+          const {id,origSrc,displayW,displayH,cropRect:{x,y,w,h}} = cs;
+          const img = new Image();
+          img.crossOrigin = "anonymous";
+          img.onload = () => {
+            const scaleX = img.naturalWidth / displayW;
+            const scaleY = img.naturalHeight / displayH;
+            const c = document.createElement("canvas");
+            c.width = Math.round(w * scaleX); c.height = Math.round(h * scaleY);
+            c.getContext("2d").drawImage(img, x*scaleX, y*scaleY, w*scaleX, h*scaleY, 0, 0, c.width, c.height);
+            updateItem(id, {src: c.toDataURL("image/jpeg",0.92), w: Math.round(w), h: Math.round(h)});
+            setCropState(null);
+          };
+          img.onerror = () => { updateItem(id, {w: Math.round(w), h: Math.round(h)}); setCropState(null); };
+          img.src = origSrc;
+        };
+        return (
+          <div style={{position:"relative",flex:1,background:"rgba(0,0,0,0.7)",borderRadius:20,overflow:"hidden",minHeight:400,display:"flex",alignItems:"center",justifyContent:"center"}}>
+            <div style={{position:"relative",display:"inline-block"}}>
+              <img src={cs.origSrc} alt="" draggable={false} style={{display:"block",maxWidth:"100%",maxHeight:"60vh",opacity:0.5}} />
+              <div style={{position:"absolute",left:cs.cropRect.x,top:cs.cropRect.y,width:cs.cropRect.w,height:cs.cropRect.h,border:"2px solid #fff",boxSizing:"border-box",cursor:"move"}}
+                onMouseDown={e=>{e.stopPropagation();const ox=e.clientX-cs.cropRect.x,oy=e.clientY-cs.cropRect.y;const mv=(ev)=>setCropState(p=>({...p,cropRect:{...p.cropRect,x:Math.max(0,Math.min(ev.clientX-ox,p.displayW-p.cropRect.w)),y:Math.max(0,Math.min(ev.clientY-oy,p.displayH-p.cropRect.h))}}));const up=()=>{window.removeEventListener("mousemove",mv);window.removeEventListener("mouseup",up);};window.addEventListener("mousemove",mv);window.addEventListener("mouseup",up);}}>
+                <div style={{position:"absolute",inset:0,background:"rgba(255,255,255,0.1)"}} />
+                {/* Corner handles */}
+                {[{s:"nw",x:0,y:0},{s:"ne",x:"100%",y:0},{s:"sw",x:0,y:"100%"},{s:"se",x:"100%",y:"100%"}].map(({s,x,y})=>(
+                  <div key={s} onMouseDown={e=>{e.stopPropagation();const startX=e.clientX,startY=e.clientY,startR=cs.cropRect;const mv=(ev)=>{const dx=ev.clientX-startX,dy=ev.clientY-startY;let nr={...startR};if(s.includes("e"))nr.w=Math.max(30,startR.w+dx);if(s.includes("s"))nr.h=Math.max(30,startR.h+dy);if(s.includes("w")){nr.x=startR.x+dx;nr.w=Math.max(30,startR.w-dx);}if(s.includes("n")){nr.y=startR.y+dy;nr.h=Math.max(30,startR.h-dy);}setCropState(p=>({...p,cropRect:nr}));};const up=()=>{window.removeEventListener("mousemove",mv);window.removeEventListener("mouseup",up);};window.addEventListener("mousemove",mv);window.addEventListener("mouseup",up);}}
+                    style={{position:"absolute",left:x,top:y,width:12,height:12,background:"#fff",borderRadius:2,transform:"translate(-50%,-50%)",cursor:`${s}-resize`,zIndex:10}} />
+                ))}
+              </div>
+            </div>
+            <div style={{position:"absolute",bottom:16,left:"50%",transform:"translateX(-50%)",display:"flex",gap:8}}>
+              <button onClick={applyCrop} style={{padding:"10px 24px",background:"#1a1a1a",color:"#fff",border:"none",borderRadius:10,cursor:"pointer",fontSize:13,fontWeight:700,fontFamily:"'DM Sans',sans-serif"}}>Apply Crop</button>
+              <button onClick={()=>setCropState(null)} style={{padding:"10px 20px",background:"#f5f3ef",color:"#555",border:"none",borderRadius:10,cursor:"pointer",fontSize:13,fontWeight:600,fontFamily:"'DM Sans',sans-serif"}}>Cancel</button>
+            </div>
+          </div>
+        );
+      })()}
+
       {/* Canvas */}
+      {!cropState && (
+      <div style={{flex:1,position:"relative",overflow:"hidden",borderRadius:20,border:"1.5px solid #e8e4dc",minHeight:400}}>
       <div
         ref={canvasRef}
-        onMouseDown={e=>{if(e.target===canvasRef.current){setSelectedId(null); if(editingTextId){setEditingTextId(null); updateItem(editingTextId,{text:editingTextVal}); setEditingTextId(null);}}}}
+        onMouseDown={e=>{if(e.target===canvasRef.current){setSelectedId(null);setMultiSelectedIds(new Set()); if(editingTextId){setEditingTextId(null); updateItem(editingTextId,{text:editingTextVal}); setEditingTextId(null);}}}}
         onMouseMove={onMouseMove}
         onMouseUp={onMouseUp}
         onTouchMove={onTouchMove}
         onTouchEnd={onTouchEnd}
         onDragOver={e=>e.preventDefault()}
         onDrop={e=>{e.preventDefault();importImages(e.dataTransfer.files);}}
-        style={{flex:1,position:"relative",background:board?.bg||"#ffffff",borderRadius:20,border:"1.5px solid #e8e4dc",overflow:"hidden",cursor:"default",minHeight:400}}
+        style={{position:"absolute",top:0,left:0,width:`${100/zoom}%`,height:`${100/zoom}%`,background:board?.bg||"#ffffff",cursor:"default",transform:`scale(${zoom})`,transformOrigin:"top left"}}
       >
         {items.length===0&&(
           <div style={{position:"absolute",inset:0,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",pointerEvents:"none",gap:10}}>
@@ -7011,19 +7323,16 @@ function Moodboard({ closetItems = [], activeIdx, setActiveIdx, boards: boardsPr
 
         {[...items].sort((a,b)=>(a.zIndex||0)-(b.zIndex||0)).map(item=>{
           const isSelected = item.id === selectedId;
+          const isMulti = multiSelectedIds.has(item.id);
           const isEditingText = item.id === editingTextId;
+          const selColor = item.locked ? "#f0c840" : isMulti ? "#3a6fd8" : "#2d6a3f";
 
           if (item.type === "text") {
             return (
               <div key={item.id}
                 onMouseDown={e=>{ if(!isEditingText) onMouseDown(e,item.id,"drag"); }}
                 onTouchStart={e=>{ if(!isEditingText) onTouchStart(e,item.id,"drag"); }}
-                onDoubleClick={e=>{
-                  e.stopPropagation();
-                  setEditingTextId(item.id);
-                  setEditingTextVal(item.text||"");
-                  setSelectedId(item.id);
-                }}
+                onDoubleClick={e=>{ if(item.locked) return; e.stopPropagation(); setEditingTextId(item.id); setEditingTextVal(item.text||""); setSelectedId(item.id); }}
                 style={{
                   position:"absolute",left:item.x,top:item.y,
                   width:item.w,minHeight:item.h,
@@ -7031,44 +7340,37 @@ function Moodboard({ closetItems = [], activeIdx, setActiveIdx, boards: boardsPr
                   zIndex:item.zIndex||1,
                   background:item.transparentBg?"transparent":(item.bg||"#fff9e6"),
                   borderRadius:10,padding:"10px 14px",
-                  cursor:isEditingText?"text":"move",
-                  outline:isSelected?"2px solid #2d6a3f":"2px solid transparent",
+                  cursor:item.locked?"not-allowed":isEditingText?"text":"move",
+                  outline:(isSelected||isMulti)?`2px solid ${selColor}`:"2px solid transparent",
                   outlineOffset:2,
-                  boxShadow:item.transparentBg?"none":(isSelected?"0 4px 20px rgba(0,0,0,0.15)":"0 2px 8px rgba(0,0,0,0.08)"),
+                  boxShadow:item.transparentBg?"none":((isSelected||isMulti)?"0 4px 20px rgba(0,0,0,0.15)":"0 2px 8px rgba(0,0,0,0.08)"),
                   fontSize:item.fontSize||14,
                   fontWeight:item.bold?800:500,
+                  fontStyle:item.italic?"italic":"normal",
                   color:item.color||"#1a1a1a",
-                  fontFamily:"'DM Sans',sans-serif",
+                  fontFamily:item.fontFamily||"'DM Sans',sans-serif",
                   lineHeight:1.5,
                   wordBreak:"break-word",
                   userSelect:isEditingText?"text":"none",
                 }}
               >
                 {isEditingText ? (
-                  <textarea
-                    ref={editingTextRef}
-                    autoFocus
-                    value={editingTextVal}
+                  <textarea ref={editingTextRef} autoFocus value={editingTextVal}
                     onChange={e=>setEditingTextVal(e.target.value)}
                     onBlur={()=>{ updateItem(item.id,{text:editingTextVal}); setEditingTextId(null); }}
                     onKeyDown={e=>{ if(e.key==="Escape"||((e.metaKey||e.ctrlKey)&&e.key==="Enter")){ updateItem(item.id,{text:editingTextVal}); setEditingTextId(null); } e.stopPropagation(); }}
-                    style={{
-                      width:"100%",minHeight:40,background:"transparent",border:"none",outline:"none",
-                      fontFamily:"'DM Sans',sans-serif",fontSize:item.fontSize||14,fontWeight:item.bold?800:500,
-                      color:item.color||"#1a1a1a",resize:"none",lineHeight:1.5,padding:0,
-                    }}
+                    style={{width:"100%",minHeight:40,background:"transparent",border:"none",outline:"none",fontFamily:item.fontFamily||"'DM Sans',sans-serif",fontSize:item.fontSize||14,fontWeight:item.bold?800:500,fontStyle:item.italic?"italic":"normal",color:item.color||"#1a1a1a",resize:"none",lineHeight:1.5,padding:0}}
                   />
                 ) : item.text}
-                {isSelected&&!isEditingText&&(
+                {item.locked&&<span style={{position:"absolute",top:3,left:4,fontSize:9,opacity:0.6}}>🔒</span>}
+                {isSelected&&!isEditingText&&!item.locked&&(
                   <>
-                    {/* Resize handle */}
                     <div onMouseDown={e=>onMouseDown(e,item.id,"resize")} onTouchStart={e=>onTouchStart(e,item.id,"resize")}
                       style={{position:"absolute",bottom:0,right:0,width:18,height:18,cursor:"se-resize",display:"flex",alignItems:"center",justifyContent:"center"}}>
-                      <div style={{width:8,height:8,borderRight:"2px solid #2d6a3f",borderBottom:"2px solid #2d6a3f",borderRadius:1}} />
+                      <div style={{width:8,height:8,borderRight:`2px solid ${selColor}`,borderBottom:`2px solid ${selColor}`,borderRadius:1}} />
                     </div>
-                    {/* Rotation handle — top center */}
                     <div onMouseDown={e=>onMouseDown(e,item.id,"rotate")} onTouchStart={e=>onTouchStart(e,item.id,"rotate")}
-                      style={{position:"absolute",top:-22,left:"50%",transform:"translateX(-50%)",width:16,height:16,borderRadius:"50%",background:"#2d6a3f",cursor:"grab",display:"flex",alignItems:"center",justifyContent:"center",boxShadow:"0 1px 4px rgba(0,0,0,0.2)"}}>
+                      style={{position:"absolute",top:-22,left:"50%",transform:"translateX(-50%)",width:16,height:16,borderRadius:"50%",background:selColor,cursor:"grab",display:"flex",alignItems:"center",justifyContent:"center",boxShadow:"0 1px 4px rgba(0,0,0,0.2)"}}>
                       <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3" strokeLinecap="round"><path d="M21 7v6h-6"/><path d="M3 17a9 9 0 019-9 9 9 0 016 2.3l3 2.7"/></svg>
                     </div>
                   </>
@@ -7086,27 +7388,26 @@ function Moodboard({ closetItems = [], activeIdx, setActiveIdx, boards: boardsPr
                 width:item.w,height:item.h,
                 transform:`rotate(${item.rotation||0}deg)`,
                 zIndex:item.zIndex||1,
-                cursor:"move",
-                outline:isSelected?"2px solid #2d6a3f":"2px solid transparent",
+                cursor:item.locked?"not-allowed":"move",
+                outline:(isSelected||isMulti)?`2px solid ${selColor}`:"2px solid transparent",
                 outlineOffset:3,
                 opacity:item.opacity??1,
-                boxShadow:isSelected?"0 4px 24px rgba(0,0,0,0.18)":"0 2px 10px rgba(0,0,0,0.08)",
+                boxShadow:(isSelected||isMulti)?"0 4px 24px rgba(0,0,0,0.18)":"0 2px 10px rgba(0,0,0,0.08)",
                 borderRadius:4,
                 overflow:item.transparent?"visible":"hidden",
               }}
             >
               <img src={item.src} alt="" draggable={false}
                 style={{width:"100%",height:"100%",objectFit:item.transparent?"contain":"cover",display:"block",pointerEvents:"none",background:item.transparent?"transparent":undefined,transform:item.flipH?"scaleX(-1)":"none"}} />
-              {isSelected&&(
+              {item.locked&&<span style={{position:"absolute",top:4,left:4,fontSize:10,opacity:0.7,background:"rgba(255,255,255,0.7)",borderRadius:4,padding:"1px 3px"}}>🔒</span>}
+              {isSelected&&!item.locked&&(
                 <>
-                  {/* Resize handle */}
                   <div onMouseDown={e=>onMouseDown(e,item.id,"resize")} onTouchStart={e=>onTouchStart(e,item.id,"resize")}
-                    style={{position:"absolute",bottom:0,right:0,width:22,height:22,cursor:"se-resize",background:"rgba(45,106,63,0.85)",display:"flex",alignItems:"center",justifyContent:"center",borderRadius:"4px 0 4px 0"}}>
+                    style={{position:"absolute",bottom:0,right:0,width:22,height:22,cursor:"se-resize",background:`rgba(45,106,63,0.85)`,display:"flex",alignItems:"center",justifyContent:"center",borderRadius:"4px 0 4px 0"}}>
                     <div style={{width:8,height:8,borderRight:"2px solid #fff",borderBottom:"2px solid #fff",borderRadius:1}} />
                   </div>
-                  {/* Rotation handle — top center */}
                   <div onMouseDown={e=>onMouseDown(e,item.id,"rotate")} onTouchStart={e=>onTouchStart(e,item.id,"rotate")}
-                    style={{position:"absolute",top:-22,left:"50%",transform:"translateX(-50%)",width:18,height:18,borderRadius:"50%",background:"#2d6a3f",cursor:"grab",display:"flex",alignItems:"center",justifyContent:"center",boxShadow:"0 1px 4px rgba(0,0,0,0.2)"}}>
+                    style={{position:"absolute",top:-22,left:"50%",transform:"translateX(-50%)",width:18,height:18,borderRadius:"50%",background:selColor,cursor:"grab",display:"flex",alignItems:"center",justifyContent:"center",boxShadow:"0 1px 4px rgba(0,0,0,0.2)"}}>
                     <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3" strokeLinecap="round"><path d="M21 7v6h-6"/><path d="M3 17a9 9 0 019-9 9 9 0 016 2.3l3 2.7"/></svg>
                   </div>
                 </>
@@ -7115,6 +7416,8 @@ function Moodboard({ closetItems = [], activeIdx, setActiveIdx, boards: boardsPr
           );
         })}
       </div>
+      </div>
+      )}
     </div>
   );
 }
@@ -11282,6 +11585,7 @@ export default function App() {
           {tab === "moodboard" && <MoodboardInfoPanel
             activeIdx={moodboardActiveIdx} setActiveIdx={setMoodboardActiveIdx}
             boards={moodboardsDb.boards} updateBoards={moodboardsDb.updateBoards} updateBoardById={moodboardsDb.updateBoardById} removeBoardById={moodboardsDb.removeBoardById}
+            closetItems={itemsDb.rows}
             lookbooksDb={lookbooksDb.rows}
             createLookbook={async ({id: newId, name, moodboardId}) => {
               const lbId = newId || uid();

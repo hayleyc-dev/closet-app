@@ -11245,7 +11245,7 @@ export default function App() {
                                 })}
                               </div>
                             )}
-                            <div style={{ padding: "12px 14px 4px" }}>
+                            <div style={{ padding: "12px 14px 14px" }}>
                               <div style={{ fontSize: 15, fontWeight: 700, color: "#1a1a1a", lineHeight: 1.3 }}>{lb.name}</div>
                               <div style={{ display: "flex", gap: 8, marginTop: 4, alignItems: "center", flexWrap: "wrap" }}>
                                 <span style={{ fontSize: 11, color: "#aaa", fontWeight: 600 }}>{lbOutfits.length} look{lbOutfits.length !== 1 ? "s" : ""}</span>
@@ -11261,11 +11261,16 @@ export default function App() {
                               </button>
                               <button onClick={e => { e.stopPropagation(); lookbooksDb.update({ ...lb, pinned: !lb.pinned }); }} title={lb.pinned ? "Unpin" : "Pin to Home"}
                                 style={{ width: 30, height: 30, borderRadius: "50%", background: lb.pinned ? "#1a1a1a" : "#f5f2ed", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                                <SvgPushPin size={12} color={lb.pinned ? "#fff" : "#666"} />
+                                <svg width="13" height="13" viewBox="0 0 24 24" fill={lb.pinned ? "#fff" : "none"} stroke={lb.pinned ? "#fff" : "#666"} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                  <line x1="12" y1="17" x2="12" y2="22"/>
+                                  <path d="M5 17h14"/>
+                                  <path d="M15 5h1a2 2 0 012 2v2a2 2 0 01-2 2H8a2 2 0 01-2-2V7a2 2 0 012-2h1"/>
+                                  <rect x="9" y="2" width="6" height="4" rx="1" fill={lb.pinned ? "#fff" : "#666"} stroke="none"/>
+                                </svg>
                               </button>
                               <button onClick={e => { e.stopPropagation(); if (window.confirm(`Archive "${lb.name}"? Restore from Settings → Data.`)) { archiveLookbook(lb); } }} title="Archive"
                                 style={{ width: 30, height: 30, borderRadius: "50%", background: "#f5f2ed", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                                <SvgArrowDn size={12} color="#666" />
+                                <SvgDownload size={13} color="#666" />
                               </button>
                               <button onClick={e => { e.stopPropagation(); if (window.confirm(`Delete "${lb.name}"?`)) { lookbooksDb.remove(lb.id); } }} title="Delete"
                                 style={{ width: 30, height: 30, borderRadius: "50%", background: "#fef2f2", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>

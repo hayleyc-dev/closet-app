@@ -10074,6 +10074,12 @@ export default function App() {
                 {/* Outfits toolbar */}
                 <div style={{ display: "flex", gap: 8, marginBottom: 20, flexWrap: "wrap", alignItems: "center" }}>
                   {outfitsView === "grid" && (<>
+                    <select value={outfitSort} onChange={e => setOutfitSort(e.target.value)} className="pill-select">
+                      <option value="default">Sort: Default</option>
+                      <option value="az">Sort: A – Z</option>
+                      <option value="newest">Sort: Newest</option>
+                      <option value="pieces">Sort: Most Pieces</option>
+                    </select>
                     <select value={outfitSeasonFilter} onChange={e => setOutfitSeasonFilter(e.target.value)} className="pill-select">
                       <option value="All">All Seasons</option>
                       <option value="Spring">Spring</option>
@@ -10084,14 +10090,6 @@ export default function App() {
                     </select>
                   </>)}
                   <div style={{ flex: 1 }} />
-                  {outfitsView === "grid" && (<>
-                    <select value={outfitSort} onChange={e => setOutfitSort(e.target.value)} className="pill-select">
-                      <option value="default">Sort: Default</option>
-                      <option value="az">Sort: A – Z</option>
-                      <option value="newest">Sort: Newest</option>
-                      <option value="pieces">Sort: Most Pieces</option>
-                    </select>
-                  </>)}
                   {/* Grid / Calendar toggle */}
                   <div style={{ display: "flex", background: "#f0ece4", borderRadius: 10, padding: 3, gap: 0 }}>
                     {[["grid","Grid"],["calendar","Calendar"]].map(([v,lbl]) => (

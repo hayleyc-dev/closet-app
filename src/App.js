@@ -9323,11 +9323,11 @@ function OutfitCalendar({ outfits, calendar, onSaveCalendar, month, onMonthChang
 
                 {/* Outfit name — hover only, as gradient fade */}
                 {ids.length > 0 && hoveredDay === dateStr && (
-                  <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, padding: "16px 6px 5px", background: "linear-gradient(to top, rgba(0,0,0,0.38) 0%, transparent 100%)", display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 4, pointerEvents: "auto" }} onClick={e => e.stopPropagation()}>
-                    <div style={{ flex: 1, fontSize: 7, color: "rgba(255,255,255,0.88)", fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontFamily: "'DM Sans', sans-serif", letterSpacing: "0.02em" }}>
+                  <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, padding: "5px 6px", background: "#fff", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 4, pointerEvents: "auto" }} onClick={e => e.stopPropagation()}>
+                    <div style={{ flex: 1, fontSize: 7, color: "#1a1a1a", fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontFamily: "'DM Sans', sans-serif" }}>
                       {outfits.find(o=>o.id===ids[0])?.name || ""}
                     </div>
-                    <button onClick={e => { e.stopPropagation(); removeOutfitFromDay(dateStr, ids[0]); }} style={{ width: 12, height: 12, borderRadius: "50%", border: "none", background: "rgba(255,255,255,0.18)", color: "rgba(255,255,255,0.7)", cursor: "pointer", fontSize: 8, display: "flex", alignItems: "center", justifyContent: "center", padding: 0, flexShrink: 0 }}>×</button>
+                    <button onClick={e => { e.stopPropagation(); removeOutfitFromDay(dateStr, ids[0]); }} style={{ width: 12, height: 12, borderRadius: "50%", border: "none", background: "none", color: "#1a1a1a", cursor: "pointer", fontSize: 10, display: "flex", alignItems: "center", justifyContent: "center", padding: 0, flexShrink: 0, lineHeight: 1 }}>×</button>
                   </div>
                 )}
                 {/* Empty hint */}

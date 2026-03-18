@@ -10775,7 +10775,7 @@ export default function App() {
     home: ["", ""],
     closet: ["My Closet", ""],
     outfits: ["My Outfits", ""],
-    lookbooks: ["Lookbooks", "Curated collections"],
+    lookbooks: ["Lookbooks", ""],
     stats: ["Style Profile", "Your wardrobe in focus"],
     moodboard: ["Moodboard", "Inspire yourself"],
     seller: ["Seller Dashboard", "What's for sale"],
@@ -11018,10 +11018,10 @@ export default function App() {
                     <input className="closet-search" value={lbSearch} onChange={e => setLbSearch(e.target.value)} placeholder="Search lookbooks…" />
                   </div>
                 </div>
-                <div className="sidebar-section">
-                  <div className="sidebar-label">Occasion</div>
-                  {LOOKBOOK_OCCASIONS.map(tag => (
-                    <button key={tag} className={"sidebar-btn" + (lbTagFilter === tag ? " active" : "")} onClick={() => setLbTagFilter(tag)}>{tag}</button>
+                <div style={{ background: "#fff", borderRadius: 16, border: "1px solid #ece8e0", padding: "18px 16px", marginBottom: 12 }}>
+                  <div style={{ fontSize: 10, fontWeight: 700, color: "#c0b8b0", textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 10 }}>Type</div>
+                  {["All", ...LOOKBOOK_TYPES.map(t => t[0].toUpperCase() + t.slice(1))].map(typeLabel => (
+                    <button key={typeLabel} className={"sidebar-btn" + (lbTypeFilter === typeLabel ? " active" : "")} onClick={() => setLbTypeFilter(typeLabel)}>{typeLabel}</button>
                   ))}
                 </div>
               </>)}
@@ -11367,25 +11367,16 @@ export default function App() {
             {tab === "lookbooks" && (
               <div className="fade-up">
                 <div style={{ display: "flex", gap: 10, marginBottom: 18, alignItems: "center", justifyContent: "space-between", flexWrap: "wrap" }}>
-                  <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                    {["All", ...LOOKBOOK_TYPES.map(type => type[0].toUpperCase() + type.slice(1))].map(typeLabel => (
-                      <button key={typeLabel} className={"filter-pill" + (lbTypeFilter === typeLabel ? " active" : "")} onClick={() => setLbTypeFilter(typeLabel)}>
-                        {typeLabel}
-                      </button>
-                    ))}
-                  </div>
-                  <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-                    <select value={lbSort} onChange={e => setLbSort(e.target.value)} className="pill-select">
-                      <option value="newest">Newest</option>
-                      <option value="az">A – Z</option>
-                      <option value="most">Most Outfits</option>
-                    </select>
-                    <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                      <SvgBox size={11} color="#bbb" />
-                      <input type="range" min={160} max={340} step={10} value={lbZoom} onChange={e => setLbZoom(Number(e.target.value))}
-                        style={{ width: 72, accentColor: "#1a1a1a", cursor: "pointer" }} />
-                      <SvgBox size={16} color="#bbb" />
-                    </div>
+                  <select value={lbSort} onChange={e => setLbSort(e.target.value)} className="pill-select">
+                    <option value="newest">Newest</option>
+                    <option value="az">A – Z</option>
+                    <option value="most">Most Outfits</option>
+                  </select>
+                  <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                    <SvgBox size={11} color="#bbb" />
+                    <input type="range" min={160} max={340} step={10} value={lbZoom} onChange={e => setLbZoom(Number(e.target.value))}
+                      style={{ width: 72, accentColor: "#1a1a1a", cursor: "pointer" }} />
+                    <SvgBox size={16} color="#bbb" />
                   </div>
                 </div>
 
@@ -11397,12 +11388,10 @@ export default function App() {
                   };
                   let filtered = lookbooksDb.rows.filter(lb => {
                     const matchSearch = !lbSearch || lb.name.toLowerCase().includes(lbSearch.toLowerCase());
-                    const selectedOccasions = LOOKBOOK_OCCASION_ALIASES[lbTagFilter] || [lbTagFilter];
-                    const matchTag = lbTagFilter === "All" || selectedOccasions.some(t => (lb.tags || []).includes(t));
                     const typeLabel = (lb.type || "").toString();
                     const normalizedTypeLabel = typeLabel ? typeLabel[0].toUpperCase() + typeLabel.slice(1) : "";
                     const matchType = lbTypeFilter === "All" || normalizedTypeLabel === lbTypeFilter;
-                    return matchSearch && matchTag && matchType;
+                    return matchSearch && matchType;
                   });
                   if (lbSort === "az") filtered = [...filtered].sort((a, b) => a.name.localeCompare(b.name));
                   else if (lbSort === "most") filtered = [...filtered].sort((a, b) => (b.outfitIds || []).length - (a.outfitIds || []).length);

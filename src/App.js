@@ -8740,33 +8740,62 @@ function OutfitCalendar({ outfits, calendar, onSaveCalendar, month, onMonthChang
   for (let i = 0; i < firstDay; i++) cells.push(null);
   for (let d = 1; d <= daysInMonth; d++) cells.push(d);
 
+  // Season helpers
+  const getSeason = (dateStr) => {
+    const d = new Date(dateStr + "T00:00:00"); const m = d.getMonth() + 1; const dy = d.getDate();
+    if ((m === 3 && dy >= 20) || m === 4 || m === 5 || (m === 6 && dy <= 20)) return "Spring";
+    if ((m === 6 && dy >= 21) || m === 7 || m === 8 || (m === 9 && dy <= 21)) return "Summer";
+    if ((m === 9 && dy >= 22) || m === 10 || m === 11 || (m === 12 && dy <= 20)) return "Fall";
+    return "Winter";
+  };
+  const SEASON_COLORS = { Spring: "#b8e0b8", Summer: "#ffd97d", Fall: "#e8a870", Winter: "#a8c8e8" };
+  const SEASON_STARTS = [[3,20,"Spring"],[6,21,"Summer"],[9,22,"Fall"],[12,21,"Winter"]];
+  const isSeasonStart = (dateStr) => {
+    const d = new Date(dateStr + "T00:00:00"); const m = d.getMonth()+1; const dy = d.getDate();
+    return SEASON_STARTS.find(([sm,sd]) => m===sm && dy===sd)?.[2] || null;
+  };
+  // Heatmap: normalize wear count by day-of-week across all calendar entries
+  const dowCounts = (() => {
+    const c = [0,0,0,0,0,0,0];
+    Object.keys(calendar).forEach(ds => { if (normalizeDay(calendar[ds]).length > 0) c[new Date(ds+"T00:00:00").getDay()]++; });
+    const mx = Math.max(...c, 1); return c.map(v => v/mx);
+  })();
+  // Month-at-a-glance: unique outfit preview images planned this month
+  const glanceImages = (() => {
+    const seen = new Set(); const imgs = [];
+    for (let d = 1; d <= daysInMonth; d++) {
+      const ds = year+"-"+String(mo+1).padStart(2,"0")+"-"+String(d).padStart(2,"0");
+      getIds(ds).forEach(id => { const o = outfits.find(x=>x.id===id); if(o?.previewImage && !seen.has(o.previewImage)){seen.add(o.previewImage);imgs.push(o.previewImage);} });
+    }
+    return imgs;
+  })();
+  // Go to today
+  const goToToday = () => { const t = new Date(); onMonthChange({ year: t.getFullYear(), month: t.getMonth() }); setWeekAnchor(t.toISOString().slice(0,10)); };
+
   return (
     <div>
       {/* Calendar header */}
-      <div style={{ marginBottom: 20 }}>
-        {/* Month title row */}
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
-          <button onClick={calView === "week" ? prevWeek : prevMonth} style={{ width: 28, height: 28, borderRadius: "50%", border: "none", background: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", color: "#bbb" }}>
-            <SvgArrowL size={11} color="#bbb" />
+      <div style={{ marginBottom: 16 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
+          <button onClick={calView === "week" ? prevWeek : prevMonth} style={{ width: 28, height: 28, borderRadius: "50%", border: "1px solid #e8e4dc", background: "#fff", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+            <SvgArrowL size={11} color="#888" />
           </button>
-          <div style={{ textAlign: "center" }}>
-            <div style={{ fontFamily: "'Cormorant Garamond', serif", fontStyle: "italic", fontWeight: 300, fontSize: 32, color: "#1a1a1a", lineHeight: 1, letterSpacing: "-0.01em" }}>{calView === "week" ? weekLabel : monthName}</div>
-          </div>
-          <button onClick={calView === "week" ? nextWeek : nextMonth} style={{ width: 28, height: 28, borderRadius: "50%", border: "none", background: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>
-            <SvgArrowR size={11} color="#bbb" />
+          <div style={{ fontSize: 16, fontWeight: 800, color: "#1a1a1a", flex: 1, textAlign: "center", fontFamily: "'DM Sans', sans-serif" }}>{calView === "week" ? weekLabel : monthName}</div>
+          <button onClick={calView === "week" ? nextWeek : nextMonth} style={{ width: 28, height: 28, borderRadius: "50%", border: "1px solid #e8e4dc", background: "#fff", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+            <SvgArrowR size={11} color="#888" />
           </button>
         </div>
-        {/* Toolbar row */}
         <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 6, flexWrap: "wrap" }}>
           <div style={{ display: "flex", background: "#f5f2ed", borderRadius: 8, padding: 2, gap: 1 }}>
-            {["month", "week"].map(v => (
-              <button key={v} onClick={() => setCalView(v)} style={{ padding: "4px 10px", border: "none", borderRadius: 6, fontFamily: "'DM Sans', sans-serif", fontSize: 10, fontWeight: 700, cursor: "pointer", background: calView === v ? "#fff" : "transparent", color: calView === v ? "#1a1a1a" : "#bbb", boxShadow: calView === v ? "0 1px 3px rgba(0,0,0,0.08)" : "none", textTransform: "capitalize" }}>{v}</button>
+            {["month","week"].map(v => (
+              <button key={v} onClick={() => setCalView(v)} style={{ padding: "4px 10px", border: "none", borderRadius: 6, fontFamily: "'DM Sans', sans-serif", fontSize: 10, fontWeight: 700, cursor: "pointer", background: calView===v?"#fff":"transparent", color: calView===v?"#1a1a1a":"#aaa", boxShadow: calView===v?"0 1px 3px rgba(0,0,0,0.08)":"none", textTransform: "capitalize" }}>{v}</button>
             ))}
           </div>
-          <div style={{ width: 1, height: 16, background: "#e8e4dc" }} />
-          <button onClick={planWeek} style={{ padding: "5px 10px", borderRadius: 8, border: "1px solid #e8e4dc", background: "#fff", cursor: "pointer", fontSize: 10, fontWeight: 700, color: "#2d6a3f", fontFamily: "'DM Sans', sans-serif" }}>✦ Plan Week</button>
-          <button onClick={() => openNewEvent("")} style={{ padding: "5px 10px", borderRadius: 8, border: "1px solid #e8e4dc", background: "#fff", cursor: "pointer", fontSize: 10, fontWeight: 700, color: "#888", fontFamily: "'DM Sans', sans-serif" }}>+ Event</button>
-          <button onClick={() => setShowWeatherConfig(true)} style={{ padding: "5px 10px", borderRadius: 8, border: "1px solid #e8e4dc", background: "#fff", cursor: "pointer", fontSize: 10, fontWeight: 700, color: "#888", fontFamily: "'DM Sans', sans-serif" }}>
+          <button onClick={goToToday} style={{ padding: "4px 10px", borderRadius: 8, border: "1px solid #e8e4dc", background: "#fff", cursor: "pointer", fontSize: 10, fontWeight: 700, color: "#1a1a1a", fontFamily: "'DM Sans', sans-serif" }}>Today</button>
+          <div style={{ width: 1, height: 14, background: "#e8e4dc" }} />
+          <button onClick={planWeek} style={{ padding: "4px 10px", borderRadius: 8, border: "1px solid #e8e4dc", background: "#fff", cursor: "pointer", fontSize: 10, fontWeight: 700, color: "#2d6a3f", fontFamily: "'DM Sans', sans-serif" }}>✦ Plan Week</button>
+          <button onClick={() => openNewEvent("")} style={{ padding: "4px 10px", borderRadius: 8, border: "1px solid #e8e4dc", background: "#fff", cursor: "pointer", fontSize: 10, fontWeight: 700, color: "#888", fontFamily: "'DM Sans', sans-serif" }}>+ Event</button>
+          <button onClick={() => setShowWeatherConfig(true)} style={{ padding: "4px 10px", borderRadius: 8, border: "1px solid #e8e4dc", background: "#fff", cursor: "pointer", fontSize: 10, fontWeight: 700, color: "#888", fontFamily: "'DM Sans', sans-serif" }}>
             {weatherLoading ? "…" : `⛅${weather ? " " + weather.city : " Weather"}`}
           </button>
         </div>
@@ -8809,71 +8838,101 @@ function OutfitCalendar({ outfits, calendar, onSaveCalendar, month, onMonthChang
 
       {/* Day labels */}
       {calView === "month" && (
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 4, marginBottom: 6 }}>
-          {["S","M","T","W","T","F","S"].map((d, i) => (
-            <div key={i} style={{ textAlign: "center", fontFamily: "'Cormorant Garamond', serif", fontStyle: "italic", fontSize: 13, fontWeight: 400, color: "#ccc", padding: "2px 0" }}>{d}</div>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 4, marginBottom: 4 }}>
+          {["Sun","Mon","Tue","Wed","Thu","Fri","Sat"].map(d => (
+            <div key={d} style={{ textAlign: "center", fontSize: 9, fontWeight: 700, color: "#bbb", textTransform: "uppercase", letterSpacing: "0.07em", padding: "3px 0", fontFamily: "'DM Sans', sans-serif" }}>{d}</div>
           ))}
         </div>
       )}
 
-      {/* Week view */}
+      {/* Week view — horizontal spread */}
       {calView === "week" && (
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 6 }}>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 5, alignItems: "stretch" }}>
           {weekDays.map(dateStr => {
             const ids = getIds(dateStr);
             const wx = getWeatherForDate(dateStr);
             const isToday = dateStr === todayStr;
+            const isPast = dateStr < todayStr;
             const dayEvts = eventsOnDate(dateStr);
+            const seasonMark = isSeasonStart(dateStr);
             const d = new Date(dateStr + "T00:00:00");
-            const dayAbbr = d.toLocaleDateString("en-US", { weekday: "short" }).slice(0, 2).toUpperCase();
+            const dayName = d.toLocaleDateString("en-US", { weekday: "short" }).toUpperCase();
             const dayNum = d.getDate();
-            const primaryId = ids[0];
-            const primaryOutfit = primaryId ? outfits.find(o => o.id === primaryId) : null;
-            const hasImg = !!primaryOutfit?.previewImage;
-            const warn = primaryOutfit ? getWeatherWarning(primaryOutfit, wx) : null;
+            const dow = d.getDay();
+            const heatAlpha = dowCounts[dow] * 0.08;
             return (
               <div key={dateStr} onClick={() => { setDayPopup(dateStr); setDayPopupTab(0); setShowDayAdd(false); setDayAddSearch(""); }}
-                style={{ borderRadius: 10, border: "1px solid #ede9e2", background: "#fff", cursor: "pointer", minHeight: 220, overflow: "hidden", position: "relative", transition: "box-shadow 0.12s" }}
-                onMouseEnter={e => e.currentTarget.style.boxShadow = "0 3px 14px rgba(0,0,0,0.08)"} onMouseLeave={e => e.currentTarget.style.boxShadow = "none"}>
-                {/* Full-bleed background image */}
-                {hasImg && <img src={primaryOutfit.previewImage} alt={primaryOutfit.name} style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", pointerEvents: "none" }} />}
-                {hasImg && <div style={{ position: "absolute", inset: 0, background: "linear-gradient(to bottom, rgba(0,0,0,0.22) 0%, transparent 40%, transparent 55%, rgba(0,0,0,0.42) 100%)", pointerEvents: "none" }} />}
-                {/* Content */}
-                <div style={{ position: "relative", zIndex: 2, padding: "8px 7px", height: "100%", display: "flex", flexDirection: "column", boxSizing: "border-box", minHeight: 220 }}>
-                  {/* Header */}
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-                    <div>
-                      <div style={{ fontFamily: "'Cormorant Garamond', serif", fontStyle: "italic", fontSize: 11, color: hasImg ? "rgba(255,255,255,0.7)" : "#bbb", lineHeight: 1, marginBottom: 1 }}>{dayAbbr}</div>
-                      <div style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 22, fontWeight: isToday ? 600 : 300, color: hasImg ? "#fff" : (isToday ? "#1a1a1a" : "#888"), lineHeight: 1 }}>{dayNum}</div>
-                      {isToday && <div style={{ width: 4, height: 4, borderRadius: "50%", background: hasImg ? "rgba(255,255,255,0.7)" : "#1a1a1a", marginTop: 3 }} />}
-                    </div>
-                    <div style={{ textAlign: "right" }}>
-                      {wx && <div style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 13, color: hasImg ? "rgba(255,255,255,0.85)" : "#bbb", fontWeight: 400, lineHeight: 1 }}>{wx.high}°</div>}
-                      {warn && <div style={{ marginTop: 3, fontSize: 8, background: "#f59e0b", color: "#fff", borderRadius: 3, padding: "1px 4px", fontWeight: 800 }}>⚠</div>}
-                    </div>
+                style={{
+                  borderRadius: 10,
+                  border: isToday ? "2px solid #1a1a1a" : "1px solid #ede9e2",
+                  background: dayEvts.length > 0 ? `color-mix(in srgb, ${EVENT_COLORS[dayEvts[0].type]} 10%, white)` : `rgba(220,120,60,${heatAlpha})`,
+                  cursor: "pointer", minHeight: 280, overflow: "hidden", position: "relative",
+                  transition: "box-shadow 0.12s",
+                  opacity: isPast ? 0.6 : 1,
+                  filter: isPast ? "saturate(0.5)" : "none",
+                  display: "flex", flexDirection: "column",
+                }}
+                onMouseEnter={e => { e.currentTarget.style.boxShadow = "0 4px 16px rgba(0,0,0,0.1)"; if(isPast) e.currentTarget.style.opacity="0.85"; }}
+                onMouseLeave={e => { e.currentTarget.style.boxShadow = "none"; if(isPast) e.currentTarget.style.opacity="0.6"; }}>
+                {/* Season marker */}
+                {seasonMark && <div style={{ height: 3, background: SEASON_COLORS[seasonMark] }} />}
+                {/* Day header */}
+                <div style={{ padding: "8px 8px 6px", borderBottom: "1px solid rgba(0,0,0,0.05)", flexShrink: 0 }}>
+                  <div style={{ fontSize: 8, fontWeight: 800, color: "#bbb", letterSpacing: "0.1em", fontFamily: "'DM Sans', sans-serif", marginBottom: 2 }}>{dayName}</div>
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                    <div style={{ fontSize: 20, fontWeight: isToday ? 900 : 700, color: isToday ? "#1a1a1a" : "#555", fontFamily: "'DM Sans', sans-serif", lineHeight: 1 }}>{dayNum}</div>
+                    {wx && <div style={{ fontSize: 10, color: "#aaa", fontWeight: 700, fontFamily: "'DM Sans', sans-serif" }}>{wx.high}°</div>}
                   </div>
-                  {/* Event banners */}
-                  {dayEvts.map(ev => (
-                    <div key={ev.id} onClick={e => { e.stopPropagation(); openEditEvent(ev); }} style={{ marginTop: 4, borderRadius: 4, background: EVENT_COLORS[ev.type], color: "#fff", fontSize: 8, fontWeight: 700, padding: "2px 6px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{ev.name}</div>
-                  ))}
-                  <div style={{ flex: 1 }} />
-                  {/* Bottom — outfit info or empty */}
-                  {primaryOutfit && !hasImg && (
-                    <div style={{ background: "#f5f2ed", borderRadius: 8, padding: "10px 8px", textAlign: "center" }}>
-                      <div style={{ fontFamily: "'Cormorant Garamond', serif", fontStyle: "italic", fontSize: 12, color: "#888" }}>{primaryOutfit.name}</div>
-                    </div>
-                  )}
-                  {hasImg && (
-                    <div>
-                      <div style={{ fontFamily: "'Cormorant Garamond', serif", fontStyle: "italic", fontSize: 12, color: "rgba(255,255,255,0.9)", lineHeight: 1.3, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{primaryOutfit.name}</div>
-                      {ids.length > 1 && <div style={{ fontFamily: "'Cormorant Garamond', serif", fontStyle: "italic", fontSize: 10, color: "rgba(255,255,255,0.55)", marginTop: 2 }}>+{ids.length - 1} more</div>}
-                    </div>
-                  )}
-                  {!primaryOutfit && <div style={{ display: "flex", alignItems: "center", justifyContent: "center", minHeight: 80, color: "#e4e0d8", fontSize: 22, fontWeight: 300 }}>+</div>}
+                  {isToday && <div style={{ width: 18, height: 2, background: "#1a1a1a", borderRadius: 1, marginTop: 3 }} />}
                 </div>
+                {/* Event blocks — full-width wash labels */}
+                {dayEvts.map(ev => (
+                  <div key={ev.id} onClick={e => { e.stopPropagation(); openEditEvent(ev); }}
+                    style={{ margin: "4px 6px 0", borderRadius: 6, background: EVENT_COLORS[ev.type], color: "#fff", fontSize: 9, fontWeight: 700, padding: "4px 8px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontFamily: "'DM Sans', sans-serif", cursor: "pointer" }}>{ev.name}</div>
+                ))}
+                {/* Outfit stack area */}
+                <div style={{ flex: 1, position: "relative", margin: "6px 6px 6px" }}>
+                  {ids.length > 0 ? (
+                    ids.slice(0, 3).map((id, si) => {
+                      const o = outfits.find(x => x.id === id);
+                      const offset = si * 5;
+                      return (
+                        <div key={id} style={{ position: "absolute", top: offset, left: offset, right: -offset, bottom: -offset, borderRadius: 8, overflow: "hidden", background: "#f0ece6", boxShadow: si > 0 ? "0 -2px 6px rgba(0,0,0,0.1)" : "none", zIndex: ids.length - si }}>
+                          {o?.previewImage
+                            ? <img src={o.previewImage} alt={o.name} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                            : <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", padding: 8 }}><span style={{ fontSize: 10, color: "#999", fontWeight: 700, fontFamily: "'DM Sans', sans-serif", textAlign: "center" }}>{o?.name || ""}</span></div>
+                          }
+                        </div>
+                      );
+                    })
+                  ) : (
+                    <div style={{ position: "absolute", inset: 0, borderRadius: 8, backgroundImage: "repeating-linear-gradient(45deg, transparent, transparent 3px, rgba(0,0,0,0.018) 3px, rgba(0,0,0,0.018) 6px)", background: "#faf8f5", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                      <span style={{ fontSize: 20, color: "#ddd" }}>+</span>
+                    </div>
+                  )}
+                </div>
+                {/* Outfit name at bottom */}
+                {ids.length > 0 && (
+                  <div style={{ padding: "0 8px 8px", flexShrink: 0 }}>
+                    <div style={{ fontSize: 9, fontWeight: 700, color: "#555", fontFamily: "'DM Sans', sans-serif", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                      {outfits.find(o => o.id === ids[0])?.name || ""}
+                      {ids.length > 1 && <span style={{ color: "#bbb", fontWeight: 600 }}> +{ids.length - 1}</span>}
+                    </div>
+                    {getWeatherWarning(outfits.find(o=>o.id===ids[0]), wx) && <div style={{ fontSize: 8, color: "#f59e0b", fontWeight: 700, fontFamily: "'DM Sans', sans-serif", marginTop: 1 }}>⚠ {getWeatherWarning(outfits.find(o=>o.id===ids[0]), wx)}</div>}
+                  </div>
+                )}
               </div>
             );
           })}
+        </div>
+      )}
+
+      {/* Month at a glance */}
+      {calView === "month" && glanceImages.length > 0 && (
+        <div style={{ display: "flex", gap: 3, marginBottom: 8, overflowX: "auto", paddingBottom: 2, scrollbarWidth: "none" }}>
+          {glanceImages.map((img, i) => (
+            <img key={i} src={img} alt="" style={{ width: 22, height: 26, borderRadius: 5, objectFit: "cover", flexShrink: 0, border: "1px solid #ede9e2" }} />
+          ))}
         </div>
       )}
 
@@ -8883,81 +8942,88 @@ function OutfitCalendar({ outfits, calendar, onSaveCalendar, month, onMonthChang
           if (!day) return <div key={"blank-" + idx} />;
           const dateStr = year + "-" + String(mo + 1).padStart(2, "0") + "-" + String(day).padStart(2, "0");
           const ids = getIds(dateStr);
-          const activeIdx = Math.min(activeLooks[dateStr] || 0, ids.length - 1);
-          const activeOutfitId = ids[activeIdx];
-          const activeOutfit = activeOutfitId ? outfits.find(o => o.id === activeOutfitId) : null;
           const isToday = dateStr === todayStr;
+          const isPast = dateStr < todayStr;
           const wx = getWeatherForDate(dateStr);
           const isDragOver = dragOver === dateStr;
           const dayEvts = eventsOnDate(dateStr);
-          const weatherWarn = activeOutfit ? getWeatherWarning(activeOutfit, wx) : null;
+          const seasonMark = isSeasonStart(dateStr);
+          const dow = new Date(dateStr + "T00:00:00").getDay();
+          const heatAlpha = dowCounts[dow] * 0.08; // subtle warm tint based on historical wear
 
-          const hasImg = !!activeOutfit?.previewImage;
           return (
             <div key={dateStr}
               onClick={() => { setDayPopup(dateStr); setDayPopupTab(0); setShowDayAdd(false); setDayAddSearch(""); }}
               onDragOver={e => { e.preventDefault(); setDragOver(dateStr); }}
               onDragLeave={() => setDragOver(null)}
               onDrop={e => { e.preventDefault(); setDragOver(null); if (draggingInfo) { moveOutfitToDay(draggingInfo.outfitId, draggingInfo.fromDate, dateStr); setDraggingInfo(null); } }}
-              style={{ borderRadius: 8, border: isDragOver ? "1.5px dashed #2d6a3f" : "1px solid #ede9e2", background: isDragOver ? "#f0faf4" : "#fff", cursor: "pointer", minHeight: 90, overflow: "hidden", position: "relative", transition: "box-shadow 0.12s" }}
-              onMouseEnter={e => e.currentTarget.style.boxShadow = "0 2px 12px rgba(0,0,0,0.07)"}
-              onMouseLeave={e => e.currentTarget.style.boxShadow = "none"}
+              style={{
+                borderRadius: 8,
+                border: isToday ? "2px solid #1a1a1a" : isDragOver ? "1.5px dashed #2d6a3f" : "1px solid #ede9e2",
+                background: isDragOver ? "#f0faf4" : dayEvts.length > 0 ? `color-mix(in srgb, ${EVENT_COLORS[dayEvts[0].type]} 12%, white)` : `rgba(220,120,60,${heatAlpha})`,
+                cursor: "pointer", minHeight: 88, overflow: "hidden", position: "relative",
+                transition: "box-shadow 0.12s",
+                opacity: isPast ? 0.55 : 1,
+                filter: isPast ? "saturate(0.45)" : "none",
+              }}
+              onMouseEnter={e => { e.currentTarget.style.boxShadow = "0 2px 10px rgba(0,0,0,0.08)"; if(isPast) e.currentTarget.style.opacity="0.8"; }}
+              onMouseLeave={e => { e.currentTarget.style.boxShadow = "none"; if(isPast) e.currentTarget.style.opacity="0.55"; }}
             >
-              {/* Full-bleed outfit image */}
-              {hasImg && (
-                <img src={activeOutfit.previewImage} alt={activeOutfit.name} draggable
-                  onDragStart={e => { e.stopPropagation(); setDraggingInfo({ outfitId: activeOutfitId, fromDate: dateStr }); }}
-                  onDragEnd={() => setDraggingInfo(null)}
-                  style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", pointerEvents: "none" }} />
-              )}
-              {/* Gradient overlay */}
-              {hasImg && <div style={{ position: "absolute", inset: 0, background: "linear-gradient(to bottom, rgba(0,0,0,0.18) 0%, transparent 45%, transparent 55%, rgba(0,0,0,0.28) 100%)", pointerEvents: "none" }} />}
+              {/* Season start marker */}
+              {seasonMark && <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 2, background: SEASON_COLORS[seasonMark], zIndex: 3 }} />}
+              {seasonMark && <div style={{ position: "absolute", top: 2, left: "50%", transform: "translateX(-50%)", background: SEASON_COLORS[seasonMark], color: "#fff", fontSize: 6, fontWeight: 800, padding: "1px 4px", borderRadius: "0 0 4px 4px", zIndex: 3, whiteSpace: "nowrap", fontFamily: "'DM Sans', sans-serif", textTransform: "uppercase", letterSpacing: "0.05em" }}>{seasonMark}</div>}
 
-              {/* Content layer */}
-              <div style={{ position: "relative", zIndex: 2, padding: "5px 5px 4px", height: "100%", display: "flex", flexDirection: "column", boxSizing: "border-box", minHeight: 90 }}>
+              {/* Unplanned future: linen texture overlay */}
+              {ids.length === 0 && !isPast && (
+                <div style={{ position: "absolute", inset: 0, backgroundImage: "repeating-linear-gradient(45deg, transparent, transparent 3px, rgba(0,0,0,0.018) 3px, rgba(0,0,0,0.018) 6px)", pointerEvents: "none" }} />
+              )}
+
+              {/* Stacked outfit images */}
+              {ids.length > 0 && (
+                <div style={{ position: "absolute", inset: "22px 0 18px 0" }} onClick={e => e.stopPropagation()}>
+                  {ids.slice(0,3).map((id, si) => {
+                    const o = outfits.find(x => x.id === id);
+                    const offset = si * 4;
+                    return (
+                      <div key={id} draggable={si === 0}
+                        onDragStart={si === 0 ? e => { e.stopPropagation(); setDraggingInfo({ outfitId: id, fromDate: dateStr }); } : undefined}
+                        onDragEnd={si === 0 ? () => setDraggingInfo(null) : undefined}
+                        style={{ position: "absolute", top: offset, left: offset, right: -offset, bottom: -offset, borderRadius: 5, overflow: "hidden", background: "#f0ece6", boxShadow: si > 0 ? "0 -1px 3px rgba(0,0,0,0.12)" : "none", zIndex: ids.length - si }}>
+                        {o?.previewImage
+                          ? <img src={o.previewImage} alt={o.name} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                          : <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center" }}><span style={{ fontSize: 8, color: "#bbb", fontWeight: 700, fontFamily: "'DM Sans', sans-serif" }}>{o?.name || ""}</span></div>
+                        }
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+
+              {/* Content overlay */}
+              <div style={{ position: "relative", zIndex: 10, padding: "4px 5px 3px", display: "flex", flexDirection: "column", height: "100%", boxSizing: "border-box", minHeight: 88 }}>
                 {/* Day number + weather */}
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-                  <div style={{ textAlign: "center" }}>
-                    <div style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 15, fontWeight: isToday ? 600 : 400, color: hasImg ? "rgba(255,255,255,0.95)" : (isToday ? "#1a1a1a" : "#aaa"), lineHeight: 1 }}>{day}</div>
-                    {isToday && <div style={{ width: 3, height: 3, borderRadius: "50%", background: hasImg ? "rgba(255,255,255,0.8)" : "#1a1a1a", margin: "2px auto 0" }} />}
-                  </div>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <div style={{ fontSize: 10, fontWeight: isToday ? 900 : 700, color: ids.length > 0 ? "rgba(255,255,255,0.95)" : (isToday ? "#1a1a1a" : "#888"), fontFamily: "'DM Sans', sans-serif", background: isToday ? "#1a1a1a" : "transparent", borderRadius: isToday ? 10 : 0, padding: isToday ? "1px 5px" : 0, lineHeight: 1.4 }}>{day}</div>
                   <div style={{ display: "flex", alignItems: "center", gap: 2 }}>
-                    {weatherWarn && <span style={{ fontSize: 8, background: "#f59e0b", color: "#fff", borderRadius: 3, padding: "1px 3px", fontWeight: 800 }}>⚠</span>}
-                    {wx && <div style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 11, color: hasImg ? "rgba(255,255,255,0.85)" : "#ccc", fontWeight: 400 }}>{wx.high}°</div>}
+                    {ids.length > 0 && getWeatherWarning(outfits.find(o=>o.id===ids[0]), wx) && <span style={{ fontSize: 7, background: "#f59e0b", color: "#fff", borderRadius: 3, padding: "1px 3px", fontWeight: 800 }}>⚠</span>}
+                    {wx && <div style={{ fontSize: 8, color: ids.length > 0 ? "rgba(255,255,255,0.85)" : "#ccc", fontWeight: 700, fontFamily: "'DM Sans', sans-serif" }}>{wx.high}°</div>}
                   </div>
                 </div>
 
-                {/* Event banners */}
-                {dayEvts.length > 0 && <div style={{ marginTop: 2 }}>{dayEvts.map(ev => (
-                  <div key={ev.id} onClick={e => { e.stopPropagation(); openEditEvent(ev); }} style={{ borderRadius: 3, background: EVENT_COLORS[ev.type], color: "#fff", fontSize: 7, fontWeight: 700, padding: "1px 4px", marginBottom: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", opacity: 0.9 }}>{ev.name}</div>
-                ))}</div>}
-
                 <div style={{ flex: 1 }} />
 
-                {/* Bottom — outfit name or empty state */}
-                {activeOutfit && !hasImg && (
-                  <div style={{ background: "#f5f2ed", borderRadius: 6, padding: "8px 4px", display: "flex", alignItems: "center", justifyContent: "center", flex: 1, marginTop: 4 }}>
-                    <span style={{ fontFamily: "'Cormorant Garamond', serif", fontStyle: "italic", fontSize: 10, color: "#888", textAlign: "center", lineHeight: 1.3 }}>{activeOutfit.name}</span>
+                {/* Bottom: outfit name + remove, or empty hint */}
+                {ids.length > 0 ? (
+                  <div style={{ display: "flex", alignItems: "center", gap: 1 }} onClick={e => e.stopPropagation()}>
+                    <div style={{ flex: 1, fontSize: 7, color: "rgba(255,255,255,0.88)", fontWeight: 700, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontFamily: "'DM Sans', sans-serif" }}>
+                      {outfits.find(o=>o.id===ids[0])?.name || ""}
+                      {ids.length > 1 && <span style={{ opacity: 0.7 }}> +{ids.length-1}</span>}
+                    </div>
+                    <button onClick={e => { e.stopPropagation(); removeOutfitFromDay(dateStr, ids[0]); }} style={{ width: 12, height: 12, borderRadius: "50%", border: "none", background: "rgba(255,255,255,0.25)", color: "#fff", cursor: "pointer", fontSize: 8, display: "flex", alignItems: "center", justifyContent: "center", padding: 0, flexShrink: 0 }}>×</button>
                   </div>
-                )}
-                {hasImg && (
-                  <div style={{ marginBottom: 2 }}>
-                    <div style={{ fontFamily: "'Cormorant Garamond', serif", fontStyle: "italic", fontSize: 10, color: "rgba(255,255,255,0.88)", lineHeight: 1.2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{activeOutfit.name}</div>
-                  </div>
-                )}
-                {!activeOutfit && <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", minHeight: 50, color: "#e4e0d8", fontSize: 16, fontWeight: 300 }}>+</div>}
-
-                {/* Multi-look nav + remove */}
-                {activeOutfit && (
-                  <div style={{ display: "flex", alignItems: "center", gap: 1, marginTop: 2 }} onClick={e => e.stopPropagation()}>
-                    {ids.length > 1 && (<>
-                      <button onClick={e => { e.stopPropagation(); setActiveLooks(a => ({ ...a, [dateStr]: (activeIdx - 1 + ids.length) % ids.length })); }} style={{ width: 13, height: 13, borderRadius: "50%", border: "none", background: hasImg ? "rgba(255,255,255,0.3)" : "#e8e4dc", color: hasImg ? "#fff" : "#666", cursor: "pointer", fontSize: 8, display: "flex", alignItems: "center", justifyContent: "center", padding: 0, flexShrink: 0 }}>‹</button>
-                      <div style={{ fontSize: 7, color: hasImg ? "rgba(255,255,255,0.7)" : "#bbb", flex: 1, textAlign: "center", fontWeight: 600 }}>{activeIdx + 1}/{ids.length}</div>
-                      <button onClick={e => { e.stopPropagation(); setActiveLooks(a => ({ ...a, [dateStr]: (activeIdx + 1) % ids.length })); }} style={{ width: 13, height: 13, borderRadius: "50%", border: "none", background: hasImg ? "rgba(255,255,255,0.3)" : "#e8e4dc", color: hasImg ? "#fff" : "#666", cursor: "pointer", fontSize: 8, display: "flex", alignItems: "center", justifyContent: "center", padding: 0, flexShrink: 0 }}>›</button>
-                    </>)}
-                    <button onClick={e => { e.stopPropagation(); removeOutfitFromDay(dateStr, activeOutfitId); }} style={{ width: 13, height: 13, borderRadius: "50%", border: "none", background: hasImg ? "rgba(255,255,255,0.25)" : "#fde8e8", color: hasImg ? "#fff" : "#c0392b", cursor: "pointer", fontSize: 8, display: "flex", alignItems: "center", justifyContent: "center", padding: 0, marginLeft: "auto", flexShrink: 0 }}>×</button>
-                  </div>
-                )}
+                ) : !isPast ? (
+                  <div style={{ fontSize: 14, color: "#d8d2ca", textAlign: "center", lineHeight: 1 }}>+</div>
+                ) : null}
               </div>
             </div>
           );

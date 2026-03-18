@@ -7207,9 +7207,12 @@ function SettingsTab({
   restoreOutfit,
   deleteOutfit,
   supabaseArchivedOutfits = [],
+  homeCity, setHomeCity,
 }) {
   const [settingsTab, setSettingsTab] = useState("appearance");
   const [themeId, setThemeId] = useState(() => { try { return localStorage.getItem(THEME_KEY) || "parchment"; } catch { return "parchment"; } });
+  const [homeCityInput, setHomeCityInput] = useState(homeCity || "");
+  const [homeCitySaved, setHomeCitySaved] = useState(false);
 
   // Wear counts
   const [wornItems, setWornItems] = useState(() => itemsDb.rows.filter(i => (i.wornCount || 0) > 0).sort((a,b) => (b.wornCount||0)-(a.wornCount||0)));
@@ -7497,6 +7500,31 @@ function SettingsTab({
 
       {/* ════════════ PREFERENCES ════════════ */}
       {settingsTab === "preferences" && (<>
+
+        {/* Home Location */}
+        <Card>
+          <SectionLabel>Home Location</SectionLabel>
+          <div style={{ fontSize: 12, color: "#888", marginBottom: 12, lineHeight: 1.5 }}>
+            Used for weather across the app — Home tab and outfit calendar. You can still override the city in the calendar for travel.
+          </div>
+          <div style={{ display: "flex", gap: 8 }}>
+            <input
+              value={homeCityInput}
+              onChange={e => { setHomeCityInput(e.target.value); setHomeCitySaved(false); }}
+              onKeyDown={e => { if (e.key === "Enter") { const c = homeCityInput.trim(); if (c) { setHomeCity(c); setHomeCitySaved(true); setTimeout(() => setHomeCitySaved(false), 2000); } } }}
+              placeholder="e.g. New York, NY"
+              style={{ flex: 1, padding: "9px 11px", borderRadius: 10, border: "1.5px solid #e0dbd2", fontSize: 13, fontFamily: "'DM Sans', sans-serif", background: "#fafaf8", color: "#1a1a1a", outline: "none" }}
+            />
+            <button
+              onClick={() => { const c = homeCityInput.trim(); if (!c) return; setHomeCity(c); setHomeCitySaved(true); setTimeout(() => setHomeCitySaved(false), 2000); }}
+              disabled={!homeCityInput.trim()}
+              style={{ padding: "9px 16px", borderRadius: 10, background: homeCitySaved ? "#3aaa6e" : "#1a1a1a", border: "none", color: "#fff", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "'DM Sans', sans-serif", flexShrink: 0, transition: "background 0.2s", opacity: !homeCityInput.trim() ? 0.5 : 1 }}
+            >
+              {homeCitySaved ? "Saved ✓" : "Save"}
+            </button>
+          </div>
+          {homeCity && <div style={{ fontSize: 11, color: "#aaa", marginTop: 8 }}>Current: {homeCity}</div>}
+        </Card>
 
         {/* Default Landing Tab */}
         <Card>
@@ -8050,7 +8078,7 @@ function SectionHeader({ title, action }) {
   );
 }
 
-function HomeTab({ outfitCalendar, outfitsDb, itemsDb, lookbooksDb, wishlistDb, setTab, setActiveLookbook, setActiveLookbookView, setOutfitPopup }) {
+function HomeTab({ outfitCalendar, outfitsDb, itemsDb, lookbooksDb, wishlistDb, setTab, setActiveLookbook, setActiveLookbookView, setOutfitPopup, homeCity: homeCityProp, setHomeCity: setHomeCityProp }) {
   const now = new Date();
   const hour = now.getHours();
   const greeting = hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening";
@@ -8101,8 +8129,9 @@ function HomeTab({ outfitCalendar, outfitsDb, itemsDb, lookbooksDb, wishlistDb, 
   const cardStyle = { background: "#fff", borderRadius: 16, border: "1.5px solid #e8e4dc", overflow: "hidden", boxShadow: "0 2px 12px rgba(0,0,0,0.04)" };
 
   // ── Weather ──────────────────────────────────────────────────────────────
-  const [homeCity, setHomeCity] = useState(() => localStorage.getItem("wardrobe_home_city") || "");
-  const [homeCityInput, setHomeCityInput] = useState(() => localStorage.getItem("wardrobe_home_city") || "");
+  const homeCity = homeCityProp || "";
+  const setHomeCity = (c) => { if (setHomeCityProp) setHomeCityProp(c); };
+  const [homeCityInput, setHomeCityInput] = useState(homeCity);
   const [homeWeather, setHomeWeather] = useState(null);
   const [wxLoading, setWxLoading] = useState(false);
 
@@ -8126,7 +8155,7 @@ function HomeTab({ outfitCalendar, outfitsDb, itemsDb, lookbooksDb, wishlistDb, 
     setWxLoading(false);
   }, []);
 
-  useEffect(() => { if (homeCity) fetchHomeWeather(homeCity); }, []); // eslint-disable-line
+  useEffect(() => { if (homeCity) { setHomeCityInput(homeCity); fetchHomeWeather(homeCity); } }, [homeCity]); // eslint-disable-line
 
   const wxIcon = (code) => {
     if (code === 0) return "☀️";
@@ -8351,7 +8380,7 @@ function HomeTab({ outfitCalendar, outfitsDb, itemsDb, lookbooksDb, wishlistDb, 
                 </div>
               </>
             ) : (
-              <form onSubmit={e => { e.preventDefault(); const c = homeCityInput.trim(); if (!c) return; setHomeCity(c); localStorage.setItem("wardrobe_home_city", c); fetchHomeWeather(c); }} style={{ display: "grid", gap: 8 }}>
+              <form onSubmit={e => { e.preventDefault(); const c = homeCityInput.trim(); if (!c) return; setHomeCity(c); try { localStorage.setItem("wardrobe_home_city", c); } catch {} fetchHomeWeather(c); }} style={{ display: "grid", gap: 8 }}>
                 <input value={homeCityInput} onChange={e => setHomeCityInput(e.target.value)} placeholder="City for weather" style={{ width: "100%", padding: "9px 11px", borderRadius: 10, border: "1.5px solid #e8e4dc", fontSize: 12, fontFamily: "'DM Sans', sans-serif", background: "#fff", color: "#1a1a1a", outline: "none" }} />
                 <button type="submit" disabled={wxLoading} style={{ padding: "9px 12px", borderRadius: 10, background: "#1a1a1a", border: "none", color: "#fff", fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: "'DM Sans', sans-serif", opacity: wxLoading ? 0.6 : 1 }}>
                   {wxLoading ? "Loading…" : "Set City"}
@@ -8659,7 +8688,7 @@ const NAV_ITEMS = [
 
 
 // ── OutfitCalendar ───────────────────────────────────────────────────────────
-function OutfitCalendar({ outfits, calendar, onSaveCalendar, month, onMonthChange, weather, onSetWeather, onOpenOutfit, allItems, events, onSaveEvents }) {
+function OutfitCalendar({ outfits, calendar, onSaveCalendar, month, onMonthChange, weather, onSetWeather, onOpenOutfit, allItems, events, onSaveEvents, defaultCity }) {
   // calendar shape: { [dateStr]: string[] }  (array of outfit IDs)
   // migrate old shape where value was a single string
   const normalizeDay = (val) => {
@@ -8713,7 +8742,7 @@ function OutfitCalendar({ outfits, calendar, onSaveCalendar, month, onMonthChang
 
   const [weatherLoading, setWeatherLoading] = useState(false);
   const [showWeatherConfig, setShowWeatherConfig] = useState(false);
-  const [weatherCity, setWeatherCity] = useState("Orlando, FL");
+  const [weatherCity, setWeatherCity] = useState(() => defaultCity || "Orlando, FL");
   const todayISO = new Date().toISOString().slice(0, 10);
   const [weatherDateStart, setWeatherDateStart] = useState(todayISO);
   const [weatherDateEnd, setWeatherDateEnd] = useState(() => {
@@ -9970,6 +9999,8 @@ export default function App() {
   const [outfitSearch, setOutfitSearch] = useState("");
   const [outfitSort, setOutfitSortState] = useState(() => { try { return localStorage.getItem("wardrobe_outfit_sort_v1") || "default"; } catch { return "default"; } });
   const setOutfitSort = v => { setOutfitSortState(v); try { localStorage.setItem("wardrobe_outfit_sort_v1", v); } catch {} };
+  const [homeCity, setHomeCityState] = useState(() => { try { return localStorage.getItem("wardrobe_home_city") || ""; } catch { return ""; } });
+  const setHomeCity = (c) => { setHomeCityState(c); try { localStorage.setItem("wardrobe_home_city", c); } catch {} };
   const [upcomingEvents, setUpcomingEvents] = useState(() => { try { return JSON.parse(localStorage.getItem("wardrobe_upcoming_events_v1") || "[]"); } catch { return []; } });
   const [eventDraftName, setEventDraftName] = useState("");
   const [eventDraftDate, setEventDraftDate] = useState("");
@@ -10588,6 +10619,8 @@ export default function App() {
               setActiveLookbook={setActiveLookbook}
               setActiveLookbookView={setActiveLookbookView}
               setOutfitPopup={setOutfitPopup}
+              homeCity={homeCity}
+              setHomeCity={setHomeCity}
             />
           )}
 
@@ -10882,6 +10915,7 @@ export default function App() {
                     onOpenOutfit={setOutfitPopup}
                     events={calendarEvents}
                     onSaveEvents={saveCalendarEvents}
+                    defaultCity={homeCity}
                   />
                 ) : filteredOutfits.length === 0 ? (
                   <div style={{ textAlign: "center", padding: "80px 24px" }}>
@@ -11156,6 +11190,7 @@ export default function App() {
                 allItemsForExport={itemsDb.rows}
                 monthlyBudget={monthlyBudget} setMonthlyBudget={setMonthlyBudget}
                 annualBudget={annualBudget} setAnnualBudget={setAnnualBudget}
+                homeCity={homeCity} setHomeCity={setHomeCity}
                 restoreLookbook={async (lb) => {
                   try {
                     let { error } = await supabase.from("lookbooks").insert({ id: lb.id, data: lb });

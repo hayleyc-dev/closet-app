@@ -3469,18 +3469,6 @@ function LookbookViewer({ lookbook, outfits, allItems, closetItems, onClose, onU
                   </div>
                 )}
               </div>
-              {/* Tags */}
-              <div style={{ display: "flex", flexWrap: "wrap", gap: 5 }}>
-                {["Travel","Work Week","Event","Disney","Sport","Weekend","Vacation"].map(t => {
-                  const on = lbTags.includes(t);
-                  return (
-                    <button key={t} onClick={() => { const next = on ? lbTags.filter(x => x !== t) : [...lbTags, t]; setLbTags(next); save({ tags: next }); }}
-                      style={{ padding: "4px 10px", borderRadius: 20, border: "1px solid", borderColor: on ? "#1a1a1a" : "#e0dbd2", background: on ? "#1a1a1a" : "#fff", color: on ? "#fff" : "#888", fontFamily: "'DM Sans', sans-serif", fontSize: 11, fontWeight: 700, cursor: "pointer" }}>
-                      {t}
-                    </button>
-                  );
-                })}
-              </div>
             </div>
           )}
 

@@ -8615,6 +8615,17 @@ function OutfitCalendar({ outfits, calendar, onSaveCalendar, month, onMonthChang
   // plan my week modal
   const [showPlanWeekModal, setShowPlanWeekModal] = useState(false);
   const [planWeekSuggestions, setPlanWeekSuggestions] = useState({});
+  // hover state for outfit name tooltip
+  const [hoveredDay, setHoveredDay] = useState(null);
+  // custom markers
+  const [calMarkers, setCalMarkers] = useState(() => { try { return JSON.parse(localStorage.getItem("wardrobe_cal_markers_v1") || "[]"); } catch { return []; } });
+  const saveMarkers = (m) => { setCalMarkers(m); try { localStorage.setItem("wardrobe_cal_markers_v1", JSON.stringify(m)); } catch {} };
+  const [showMarkerModal, setShowMarkerModal] = useState(false);
+  const [editingMarker, setEditingMarker] = useState(null);
+  const [markerLabel, setMarkerLabel] = useState("");
+  const [markerColor, setMarkerColor] = useState("#f9a8d4");
+  const [markerDate, setMarkerDate] = useState("");
+  const MARKER_COLORS = ["#b8e0b8","#ffd97d","#e8a870","#a8c8e8","#f9a8d4","#c4b5fd","#6ee7b7","#fca5a5","#93c5fd","#fde68a"];
 
   const { year, month: mo } = month;
   const firstDay = new Date(year, mo, 1).getDay();
@@ -8740,6 +8751,17 @@ function OutfitCalendar({ outfits, calendar, onSaveCalendar, month, onMonthChang
   const deleteEvent = (id) => { onSaveEvents((events || []).filter(e => e.id !== id)); };
   const openNewEvent = (dateStr) => { setEditingEvent(null); setEventName(""); setEventType("event"); setEventStart(dateStr || ""); setEventEnd(dateStr || ""); setShowEventModal(true); };
   const openEditEvent = (ev) => { setEditingEvent(ev); setEventName(ev.name); setEventType(ev.type); setEventStart(ev.startDate); setEventEnd(ev.endDate); setShowEventModal(true); };
+  // Custom marker helpers
+  const markersOnDate = (dateStr) => calMarkers.filter(m => m.date === dateStr);
+  const openNewMarker = (dateStr) => { setEditingMarker(null); setMarkerLabel(""); setMarkerColor("#f9a8d4"); setMarkerDate(dateStr || todayStr); setShowMarkerModal(true); };
+  const openEditMarker = (mk) => { setEditingMarker(mk); setMarkerLabel(mk.label); setMarkerColor(mk.color); setMarkerDate(mk.date); setShowMarkerModal(true); };
+  const saveMarker = () => {
+    if (!markerLabel.trim() || !markerDate) return;
+    const m = { id: editingMarker?.id || ("mk_" + Date.now()), date: markerDate, label: markerLabel.trim(), color: markerColor };
+    saveMarkers(editingMarker ? calMarkers.map(x => x.id === m.id ? m : x) : [...calMarkers, m]);
+    setShowMarkerModal(false);
+  };
+  const deleteMarker = (id) => { saveMarkers(calMarkers.filter(m => m.id !== id)); setShowMarkerModal(false); };
 
   // Weather warning helper
   const getWeatherWarning = (outfit, wx) => {
@@ -8858,6 +8880,7 @@ function OutfitCalendar({ outfits, calendar, onSaveCalendar, month, onMonthChang
           <div style={{ width: 1, height: 14, background: "#e8e4dc" }} />
           <button onClick={planWeek} style={{ padding: "4px 10px", borderRadius: 8, border: "1px solid #e8e4dc", background: "#fff", cursor: "pointer", fontSize: 10, fontWeight: 700, color: "#2d6a3f", fontFamily: "'DM Sans', sans-serif" }}>✦ Plan Week</button>
           <button onClick={() => openNewEvent("")} style={{ padding: "4px 10px", borderRadius: 8, border: "1px solid #e8e4dc", background: "#fff", cursor: "pointer", fontSize: 10, fontWeight: 700, color: "#888", fontFamily: "'DM Sans', sans-serif" }}>+ Event</button>
+          <button onClick={() => openNewMarker("")} style={{ padding: "4px 10px", borderRadius: 8, border: "1px solid #e8e4dc", background: "#fff", cursor: "pointer", fontSize: 10, fontWeight: 700, color: "#888", fontFamily: "'DM Sans', sans-serif" }}>+ Marker</button>
           <button onClick={() => setShowWeatherConfig(true)} style={{ padding: "4px 10px", borderRadius: 8, border: "1px solid #e8e4dc", background: "#fff", cursor: "pointer", fontSize: 10, fontWeight: 700, color: "#888", fontFamily: "'DM Sans', sans-serif" }}>
             {weatherLoading ? "…" : `⛅${weather ? " " + weather.city : " Weather"}`}
           </button>
@@ -8928,7 +8951,7 @@ function OutfitCalendar({ outfits, calendar, onSaveCalendar, month, onMonthChang
                 style={{
                   borderRadius: 10,
                   border: isToday ? "2px solid #1a1a1a" : "1px solid #ede9e2",
-                  background: dayEvts.length > 0 ? `color-mix(in srgb, ${EVENT_COLORS[dayEvts[0].type]} 10%, white)` : `rgba(220,120,60,${heatAlpha})`,
+                  background: "#fff",
                   cursor: "pointer", minHeight: 280, overflow: "hidden", position: "relative",
                   transition: "box-shadow 0.12s",
                   opacity: isPast ? 0.6 : 1,
@@ -8939,6 +8962,10 @@ function OutfitCalendar({ outfits, calendar, onSaveCalendar, month, onMonthChang
                 onMouseLeave={e => { e.currentTarget.style.boxShadow = "none"; if(isPast) e.currentTarget.style.opacity="0.6"; }}>
                 {/* Season marker */}
                 {seasonMark && <div style={{ height: 3, background: SEASON_COLORS[seasonMark] }} />}
+                {/* Custom markers */}
+                {markersOnDate(dateStr).map(mk => (
+                  <div key={mk.id} onClick={e => { e.stopPropagation(); openEditMarker(mk); }} style={{ height: 3, background: mk.color, cursor: "pointer" }} />
+                ))}
                 {/* Day header */}
                 <div style={{ padding: "8px 8px 6px", borderBottom: "1px solid rgba(0,0,0,0.05)", flexShrink: 0 }}>
                   <div style={{ fontSize: 8, fontWeight: 800, color: "#bbb", letterSpacing: "0.1em", fontFamily: "'DM Sans', sans-serif", marginBottom: 2 }}>{dayName}</div>
@@ -8948,10 +8975,15 @@ function OutfitCalendar({ outfits, calendar, onSaveCalendar, month, onMonthChang
                   </div>
                   {isToday && <div style={{ width: 18, height: 2, background: "#1a1a1a", borderRadius: 1, marginTop: 3 }} />}
                 </div>
+                {/* Marker labels */}
+                {markersOnDate(dateStr).map(mk => (
+                  <div key={mk.id} onClick={e => { e.stopPropagation(); openEditMarker(mk); }}
+                    style={{ margin: "2px 6px 0", borderRadius: 6, background: mk.color, color: "#fff", fontSize: 9, fontWeight: 700, padding: "3px 8px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontFamily: "'DM Sans', sans-serif", cursor: "pointer" }}>{mk.label}</div>
+                ))}
                 {/* Event blocks — full-width wash labels */}
                 {dayEvts.map(ev => (
                   <div key={ev.id} onClick={e => { e.stopPropagation(); openEditEvent(ev); }}
-                    style={{ margin: "4px 6px 0", borderRadius: 6, background: EVENT_COLORS[ev.type], color: "#fff", fontSize: 9, fontWeight: 700, padding: "4px 8px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontFamily: "'DM Sans', sans-serif", cursor: "pointer" }}>{ev.name}</div>
+                    style={{ margin: "2px 6px 0", borderRadius: 6, background: EVENT_COLORS[ev.type], color: "#fff", fontSize: 9, fontWeight: 700, padding: "3px 8px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontFamily: "'DM Sans', sans-serif", cursor: "pointer" }}>{ev.name}</div>
                 ))}
                 {/* Outfit stack area */}
                 <div style={{ flex: 1, position: "relative", margin: "6px 6px 6px" }}>
@@ -9023,50 +9055,68 @@ function OutfitCalendar({ outfits, calendar, onSaveCalendar, month, onMonthChang
               style={{
                 borderRadius: 8,
                 border: isToday ? "2px solid #1a1a1a" : isDragOver ? "1.5px dashed #2d6a3f" : "1px solid #ede9e2",
-                background: isDragOver ? "#f0faf4" : dayEvts.length > 0 ? `color-mix(in srgb, ${EVENT_COLORS[dayEvts[0].type]} 12%, white)` : `rgba(220,120,60,${heatAlpha})`,
+                background: isDragOver ? "#f0faf4" : "#fff",
                 cursor: "pointer", minHeight: 88, overflow: "hidden", position: "relative",
                 transition: "box-shadow 0.12s",
                 opacity: isPast ? 0.55 : 1,
                 filter: isPast ? "saturate(0.45)" : "none",
               }}
-              onMouseEnter={e => { e.currentTarget.style.boxShadow = "0 2px 10px rgba(0,0,0,0.08)"; if(isPast) e.currentTarget.style.opacity="0.8"; }}
-              onMouseLeave={e => { e.currentTarget.style.boxShadow = "none"; if(isPast) e.currentTarget.style.opacity="0.55"; }}
+              onMouseEnter={e => { setHoveredDay(dateStr); e.currentTarget.style.boxShadow = "0 2px 10px rgba(0,0,0,0.08)"; if(isPast) e.currentTarget.style.opacity="0.8"; }}
+              onMouseLeave={e => { setHoveredDay(null); e.currentTarget.style.boxShadow = "none"; if(isPast) e.currentTarget.style.opacity="0.55"; }}
             >
               {/* Season start marker */}
-              {seasonMark && <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 2, background: SEASON_COLORS[seasonMark], zIndex: 3 }} />}
-              {seasonMark && <div style={{ position: "absolute", top: 2, left: "50%", transform: "translateX(-50%)", background: SEASON_COLORS[seasonMark], color: "#fff", fontSize: 6, fontWeight: 800, padding: "1px 4px", borderRadius: "0 0 4px 4px", zIndex: 3, whiteSpace: "nowrap", fontFamily: "'DM Sans', sans-serif", textTransform: "uppercase", letterSpacing: "0.05em" }}>{seasonMark}</div>}
+              {seasonMark && <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 2, background: SEASON_COLORS[seasonMark], zIndex: 4 }} />}
+              {seasonMark && <div style={{ position: "absolute", top: 2, left: "50%", transform: "translateX(-50%)", background: SEASON_COLORS[seasonMark], color: "#fff", fontSize: 6, fontWeight: 800, padding: "1px 4px", borderRadius: "0 0 4px 4px", zIndex: 4, whiteSpace: "nowrap", fontFamily: "'DM Sans', sans-serif", textTransform: "uppercase", letterSpacing: "0.05em" }}>{seasonMark}</div>}
 
-              {/* Unplanned future: linen texture overlay */}
+              {/* Custom marker bars */}
+              {markersOnDate(dateStr).map((mk, mki) => {
+                const topOff = (seasonMark ? 12 : 0) + mki * 10;
+                return (<>
+                  <div key={mk.id + "_bar"} onClick={e => { e.stopPropagation(); openEditMarker(mk); }} style={{ position: "absolute", top: topOff, left: 0, right: 0, height: 2, background: mk.color, zIndex: 4, cursor: "pointer" }} />
+                  <div key={mk.id + "_lbl"} onClick={e => { e.stopPropagation(); openEditMarker(mk); }} style={{ position: "absolute", top: topOff + 2, left: "50%", transform: "translateX(-50%)", background: mk.color, color: "#fff", fontSize: 6, fontWeight: 800, padding: "1px 4px", borderRadius: "0 0 4px 4px", zIndex: 4, whiteSpace: "nowrap", fontFamily: "'DM Sans', sans-serif", textTransform: "uppercase", letterSpacing: "0.05em", cursor: "pointer" }}>{mk.label}</div>
+                </>);
+              })}
+
+              {/* Outfit image — fills full cell */}
+              {ids.length > 0 && (() => {
+                const o = outfits.find(x => x.id === ids[0]);
+                return (
+                  <div draggable onDragStart={e => { e.stopPropagation(); setDraggingInfo({ outfitId: ids[0], fromDate: dateStr }); }} onDragEnd={() => setDraggingInfo(null)}
+                    style={{ position: "absolute", inset: 0, zIndex: 1 }} onClick={e => e.stopPropagation()}>
+                    {o?.previewImage
+                      ? <img src={o.previewImage} alt={o.name} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
+                      : <div style={{ width: "100%", height: "100%", background: "#f5f3ef", display: "flex", alignItems: "center", justifyContent: "center" }}><span style={{ fontSize: 8, color: "#ccc", fontWeight: 700, fontFamily: "'DM Sans', sans-serif", textAlign: "center", padding: 4 }}>{o?.name || ""}</span></div>
+                    }
+                    {ids.length > 1 && <div style={{ position: "absolute", top: 4, right: 4, background: "rgba(26,26,26,0.7)", color: "#fff", borderRadius: 8, padding: "1px 5px", fontSize: 7, fontWeight: 800, fontFamily: "'DM Sans', sans-serif" }}>+{ids.length - 1}</div>}
+                  </div>
+                );
+              })()}
+
+              {/* Unplanned future: linen texture */}
               {ids.length === 0 && !isPast && (
-                <div style={{ position: "absolute", inset: 0, backgroundImage: "repeating-linear-gradient(45deg, transparent, transparent 3px, rgba(0,0,0,0.018) 3px, rgba(0,0,0,0.018) 6px)", pointerEvents: "none" }} />
+                <div style={{ position: "absolute", inset: 0, backgroundImage: "repeating-linear-gradient(45deg, transparent, transparent 3px, rgba(0,0,0,0.018) 3px, rgba(0,0,0,0.018) 6px)", background: "#fff", pointerEvents: "none", zIndex: 1 }} />
               )}
 
-              {/* Stacked outfit images */}
-              {ids.length > 0 && (
-                <div style={{ position: "absolute", inset: "22px 0 18px 0" }} onClick={e => e.stopPropagation()}>
-                  {ids.slice(0,3).map((id, si) => {
-                    const o = outfits.find(x => x.id === id);
-                    const offset = si * 4;
-                    return (
-                      <div key={id} draggable={si === 0}
-                        onDragStart={si === 0 ? e => { e.stopPropagation(); setDraggingInfo({ outfitId: id, fromDate: dateStr }); } : undefined}
-                        onDragEnd={si === 0 ? () => setDraggingInfo(null) : undefined}
-                        style={{ position: "absolute", top: offset, left: offset, right: -offset, bottom: -offset, borderRadius: 5, overflow: "hidden", background: "#f0ece6", boxShadow: si > 0 ? "0 -1px 3px rgba(0,0,0,0.12)" : "none", zIndex: ids.length - si }}>
-                        {o?.previewImage
-                          ? <img src={o.previewImage} alt={o.name} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-                          : <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center" }}><span style={{ fontSize: 8, color: "#bbb", fontWeight: 700, fontFamily: "'DM Sans', sans-serif" }}>{o?.name || ""}</span></div>
-                        }
-                      </div>
-                    );
-                  })}
+              {/* Event pills — visible even on empty days */}
+              {dayEvts.length > 0 && (
+                <div style={{ position: "absolute", bottom: ids.length > 0 ? 0 : 18, left: 0, right: 0, zIndex: 5 }}>
+                  {dayEvts.slice(0, 2).map(ev => (
+                    <div key={ev.id} onClick={e => { e.stopPropagation(); openEditEvent(ev); }}
+                      style={{ height: 3, background: EVENT_COLORS[ev.type], marginBottom: 1, opacity: 0.9, cursor: "pointer" }} />
+                  ))}
+                  {dayEvts.length > 0 && hoveredDay === dateStr && (
+                    <div style={{ background: EVENT_COLORS[dayEvts[0].type], color: "#fff", fontSize: 7, fontWeight: 700, padding: "2px 6px", fontFamily: "'DM Sans', sans-serif", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                      {dayEvts[0].name}{dayEvts.length > 1 ? ` +${dayEvts.length - 1}` : ""}
+                    </div>
+                  )}
                 </div>
               )}
 
               {/* Content overlay */}
-              <div style={{ position: "relative", zIndex: 10, padding: "4px 5px 3px", display: "flex", flexDirection: "column", height: "100%", boxSizing: "border-box", minHeight: 88 }}>
+              <div style={{ position: "relative", zIndex: 10, padding: "4px 5px 3px", display: "flex", flexDirection: "column", height: "100%", boxSizing: "border-box", minHeight: 88, pointerEvents: "none" }}>
                 {/* Day number + weather */}
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                  <div style={{ fontSize: 10, fontWeight: isToday ? 900 : 700, color: ids.length > 0 ? "rgba(255,255,255,0.95)" : (isToday ? "#1a1a1a" : "#888"), fontFamily: "'DM Sans', sans-serif", background: isToday ? "#1a1a1a" : "transparent", borderRadius: isToday ? 10 : 0, padding: isToday ? "1px 5px" : 0, lineHeight: 1.4 }}>{day}</div>
+                  <div style={{ fontSize: 10, fontWeight: isToday ? 900 : 700, color: isToday ? "#fff" : ids.length > 0 ? "rgba(255,255,255,0.9)" : "#999", fontFamily: "'DM Sans', sans-serif", background: isToday ? "#1a1a1a" : ids.length > 0 ? "rgba(0,0,0,0.28)" : "transparent", borderRadius: 10, padding: "1px 5px", lineHeight: 1.4 }}>{day}</div>
                   <div style={{ display: "flex", alignItems: "center", gap: 2 }}>
                     {ids.length > 0 && getWeatherWarning(outfits.find(o=>o.id===ids[0]), wx) && <span style={{ fontSize: 7, background: "#f59e0b", color: "#fff", borderRadius: 3, padding: "1px 3px", fontWeight: 800 }}>⚠</span>}
                     {wx && <div style={{ fontSize: 8, color: ids.length > 0 ? "rgba(255,255,255,0.85)" : "#ccc", fontWeight: 700, fontFamily: "'DM Sans', sans-serif" }}>{wx.high}°</div>}
@@ -9075,18 +9125,19 @@ function OutfitCalendar({ outfits, calendar, onSaveCalendar, month, onMonthChang
 
                 <div style={{ flex: 1 }} />
 
-                {/* Bottom: outfit name + remove, or empty hint */}
-                {ids.length > 0 ? (
-                  <div style={{ display: "flex", alignItems: "center", gap: 1 }} onClick={e => e.stopPropagation()}>
-                    <div style={{ flex: 1, fontSize: 7, color: "rgba(255,255,255,0.88)", fontWeight: 700, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontFamily: "'DM Sans', sans-serif" }}>
+                {/* Outfit name — hover only */}
+                {ids.length > 0 && hoveredDay === dateStr && (
+                  <div style={{ display: "flex", alignItems: "center", gap: 1, pointerEvents: "auto" }} onClick={e => e.stopPropagation()}>
+                    <div style={{ flex: 1, fontSize: 7, color: "#fff", fontWeight: 700, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontFamily: "'DM Sans', sans-serif", background: "rgba(0,0,0,0.32)", borderRadius: 4, padding: "2px 5px" }}>
                       {outfits.find(o=>o.id===ids[0])?.name || ""}
-                      {ids.length > 1 && <span style={{ opacity: 0.7 }}> +{ids.length-1}</span>}
                     </div>
-                    <button onClick={e => { e.stopPropagation(); removeOutfitFromDay(dateStr, ids[0]); }} style={{ width: 12, height: 12, borderRadius: "50%", border: "none", background: "rgba(255,255,255,0.25)", color: "#fff", cursor: "pointer", fontSize: 8, display: "flex", alignItems: "center", justifyContent: "center", padding: 0, flexShrink: 0 }}>×</button>
+                    <button onClick={e => { e.stopPropagation(); removeOutfitFromDay(dateStr, ids[0]); }} style={{ width: 14, height: 14, borderRadius: "50%", border: "none", background: "rgba(0,0,0,0.35)", color: "#fff", cursor: "pointer", fontSize: 9, display: "flex", alignItems: "center", justifyContent: "center", padding: 0, flexShrink: 0 }}>×</button>
                   </div>
-                ) : !isPast ? (
+                )}
+                {/* Empty hint */}
+                {ids.length === 0 && !isPast && (
                   <div style={{ fontSize: 14, color: "#d8d2ca", textAlign: "center", lineHeight: 1 }}>+</div>
-                ) : null}
+                )}
               </div>
             </div>
           );
@@ -9337,6 +9388,43 @@ function OutfitCalendar({ outfits, calendar, onSaveCalendar, month, onMonthChang
             {Object.keys(planWeekSuggestions).length > 0 && (
               <button onClick={applyPlanWeek} style={{ width: "100%", padding: "11px", background: "#1a1a1a", color: "#fff", border: "none", borderRadius: 12, cursor: "pointer", fontSize: 14, fontWeight: 700, fontFamily: "'DM Sans', sans-serif" }}>Apply Suggestions</button>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* Custom Marker Modal */}
+      {showMarkerModal && (
+        <div onClick={() => setShowMarkerModal(false)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", zIndex: 1100, display: "flex", alignItems: "center", justifyContent: "center", backdropFilter: "blur(3px)" }}>
+          <div onClick={e => e.stopPropagation()} style={{ background: "#fff", borderRadius: 20, padding: "26px 28px", width: "min(360px, 94vw)", boxShadow: "0 20px 60px rgba(0,0,0,0.2)" }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
+              <div style={{ fontSize: 16, fontWeight: 800, color: "#1a1a1a" }}>{editingMarker ? "Edit Marker" : "Add Marker"}</div>
+              <button onClick={() => setShowMarkerModal(false)} style={{ background: "none", border: "none", cursor: "pointer", color: "#aaa", fontSize: 18 }}>×</button>
+            </div>
+            <div style={{ marginBottom: 14 }}>
+              <label style={{ display: "block", fontSize: 11, fontWeight: 700, color: "#888", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 6 }}>Label</label>
+              <input value={markerLabel} onChange={e => setMarkerLabel(e.target.value)} placeholder="e.g. First Day of Spring" autoFocus
+                style={{ width: "100%", padding: "9px 12px", border: "1.5px solid #e8e4dc", borderRadius: 10, fontFamily: "'DM Sans', sans-serif", fontSize: 14, boxSizing: "border-box", outline: "none" }} />
+            </div>
+            <div style={{ marginBottom: 14 }}>
+              <label style={{ display: "block", fontSize: 11, fontWeight: 700, color: "#888", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 6 }}>Date</label>
+              <input type="date" value={markerDate} onChange={e => setMarkerDate(e.target.value)}
+                style={{ width: "100%", padding: "9px 12px", border: "1.5px solid #e8e4dc", borderRadius: 10, fontFamily: "'DM Sans', sans-serif", fontSize: 14, boxSizing: "border-box", outline: "none" }} />
+            </div>
+            <div style={{ marginBottom: 20 }}>
+              <label style={{ display: "block", fontSize: 11, fontWeight: 700, color: "#888", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 8 }}>Color</label>
+              <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+                {MARKER_COLORS.map(c => (
+                  <button key={c} onClick={() => setMarkerColor(c)} style={{ width: 28, height: 28, borderRadius: "50%", background: c, border: markerColor === c ? "3px solid #1a1a1a" : "3px solid transparent", cursor: "pointer", padding: 0, boxSizing: "border-box", transition: "border 0.1s" }} />
+                ))}
+                <input type="color" value={markerColor} onChange={e => setMarkerColor(e.target.value)}
+                  style={{ width: 28, height: 28, borderRadius: "50%", border: "2px solid #e8e4dc", padding: 0, cursor: "pointer", background: markerColor }} title="Custom color" />
+              </div>
+              {markerLabel && <div style={{ marginTop: 10, display: "inline-flex", alignItems: "center", background: markerColor, color: "#fff", borderRadius: 6, padding: "3px 10px", fontSize: 10, fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.08em", fontFamily: "'DM Sans', sans-serif" }}>{markerLabel}</div>}
+            </div>
+            <div style={{ display: "flex", gap: 8 }}>
+              {editingMarker && <button onClick={() => deleteMarker(editingMarker.id)} style={{ padding: "10px 16px", background: "#fef2f2", color: "#e05555", border: "none", borderRadius: 10, cursor: "pointer", fontFamily: "'DM Sans', sans-serif", fontSize: 13, fontWeight: 700 }}>Delete</button>}
+              <button onClick={saveMarker} disabled={!markerLabel.trim() || !markerDate} style={{ flex: 1, padding: "11px", background: !markerLabel.trim() || !markerDate ? "#ccc" : "#1a1a1a", color: "#fff", border: "none", borderRadius: 12, cursor: "pointer", fontSize: 14, fontWeight: 700, fontFamily: "'DM Sans', sans-serif" }}>Save Marker</button>
+            </div>
           </div>
         </div>
       )}

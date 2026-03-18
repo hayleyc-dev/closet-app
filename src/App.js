@@ -8290,6 +8290,31 @@ function HomeTab({ outfitCalendar, outfitsDb, itemsDb, lookbooksDb, wishlistDb, 
     },
   ];
 
+  const EditorialSectionHeader = ({ eyebrow, title, subtitle, action }) => (
+    <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 16, marginBottom: 16, flexWrap: "wrap" }}>
+      <div>
+        {eyebrow && (
+          <div style={{ fontSize: 10, fontWeight: 700, color: "#b8aea1", textTransform: "uppercase", letterSpacing: "0.14em", marginBottom: 4 }}>
+            {eyebrow}
+          </div>
+        )}
+        <div style={{ fontFamily: "'Cormorant Garamond', serif", fontStyle: "italic", fontWeight: 300, fontSize: 30, color: "#1a1a1a", lineHeight: 1 }}>
+          {title}
+        </div>
+        {subtitle && (
+          <div style={{ fontSize: 12, color: "#9f978b", marginTop: 6, lineHeight: 1.5 }}>
+            {subtitle}
+          </div>
+        )}
+      </div>
+      {action && (
+        <button onClick={action.onClick} style={{ fontSize: 12, fontWeight: 700, color: "#8f8679", background: "none", border: "none", cursor: "pointer", fontFamily: "'DM Sans', sans-serif", padding: 0, letterSpacing: "0.04em" }}>
+          {action.label}
+        </button>
+      )}
+    </div>
+  );
+
   return (
     <div className="fade-up" style={{ width: "100%" }}>
 
@@ -8380,7 +8405,11 @@ function HomeTab({ outfitCalendar, outfitsDb, itemsDb, lookbooksDb, wishlistDb, 
 
       {/* ── Today's Outfit ── */}
       <div style={{ marginBottom: 28 }}>
-        <SectionHeader title="Today's Outfit" />
+        <EditorialSectionHeader
+          eyebrow="Daily Dressing"
+          title="Today's Outfit"
+          subtitle="A focused place for the look that sets the tone for the rest of the day."
+        />
         {todayOutfits.length === 0 ? (
           <div style={{ ...cardStyle, padding: "22px 20px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16, flexWrap: "wrap" }}>
             <div>
@@ -8437,11 +8466,16 @@ function HomeTab({ outfitCalendar, outfitsDb, itemsDb, lookbooksDb, wishlistDb, 
         <div style={{ background: "#fff", borderRadius: 20, border: "1.5px solid #e8e4dc", padding: "20px 22px 0", boxShadow: "0 2px 12px rgba(0,0,0,0.04)" }}>
           {/* Header */}
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 18 }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              <SvgCalendar size={15} color="#1a1a1a" />
-              <span style={{ fontSize: 14, fontWeight: 700, color: "#1a1a1a" }}>This Week</span>
+            <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+              <div style={{ width: 34, height: 34, borderRadius: "50%", background: "#f6f1ea", border: "1px solid #ece2d6", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                <SvgCalendar size={15} color="#7e7266" />
+              </div>
+              <div>
+                <div style={{ fontSize: 10, fontWeight: 700, color: "#b8aea1", textTransform: "uppercase", letterSpacing: "0.14em", marginBottom: 2 }}>Wardrobe Rhythm</div>
+                <div style={{ fontFamily: "'Cormorant Garamond', serif", fontStyle: "italic", fontWeight: 300, fontSize: 27, color: "#1a1a1a", lineHeight: 1 }}>This Week</div>
+              </div>
             </div>
-            <span style={{ fontSize: 13, fontWeight: 600, color: "#aaa" }}>{weekLogged}<span style={{ color: "#ddd" }}>/7</span> days</span>
+            <span style={{ fontSize: 12, fontWeight: 700, color: "#9f978b", letterSpacing: "0.04em" }}>{weekLogged}<span style={{ color: "#d9d1c8" }}>/7</span> days logged</span>
           </div>
           {/* Day columns */}
           <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 8, marginBottom: 0 }}>
@@ -8494,13 +8528,17 @@ function HomeTab({ outfitCalendar, outfitsDb, itemsDb, lookbooksDb, wishlistDb, 
 
       {/* ── Needs attention ── */}
       <div style={{ marginBottom: 28 }}>
-        <SectionHeader title="Needs Attention" />
+        <EditorialSectionHeader
+          eyebrow="Closet Edit"
+          title="Needs Attention"
+          subtitle="A few small fixes here will make the whole wardrobe feel sharper."
+        />
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 12 }}>
           {homeTasks.map(task => (
             <button
               key={task.id}
               onClick={task.onClick}
-              style={{ textAlign: "left", background: task.bg, borderRadius: 16, border: `1.5px solid ${task.border}`, padding: "16px 16px 14px", cursor: "pointer", fontFamily: "'DM Sans', sans-serif" }}
+              style={{ textAlign: "left", background: `linear-gradient(180deg, #fff 0%, ${task.bg} 100%)`, borderRadius: 16, border: `1.5px solid ${task.border}`, padding: "16px 16px 14px", cursor: "pointer", fontFamily: "'DM Sans', sans-serif", boxShadow: "0 10px 24px rgba(40,28,18,0.05)" }}
             >
               <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 12, marginBottom: 8 }}>
                 <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: "0.08em", textTransform: "uppercase", color: "#8c847a" }}>{task.label}</div>
@@ -8515,26 +8553,31 @@ function HomeTab({ outfitCalendar, outfitsDb, itemsDb, lookbooksDb, wishlistDb, 
       {/* ── New In ── */}
       {newInItems.length > 0 && (
         <div style={{ marginBottom: 36 }}>
-          <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 16 }}>
-            <div>
-              <div style={{ fontFamily: "'Cormorant Garamond', serif", fontStyle: "italic", fontWeight: 300, fontSize: 28, color: "#1a1a1a", lineHeight: 1.1 }}>New In</div>
-              <div style={{ fontSize: 11, color: "#aaa", fontWeight: 600, letterSpacing: "0.08em", textTransform: "uppercase", marginTop: 2 }}>Added in the last 30 days</div>
-            </div>
-            <button onClick={() => setTab("closet")} style={{ fontSize: 12, fontWeight: 600, color: "#888", background: "none", border: "none", cursor: "pointer", fontFamily: "'DM Sans', sans-serif", padding: 0 }}>View all →</button>
-          </div>
+          <EditorialSectionHeader
+            eyebrow="Recent Arrivals"
+            title="New In"
+            subtitle="Pieces added in the last 30 days, still fresh enough to shape your current style mood."
+            action={{ label: "View all →", onClick: () => setTab("closet") }}
+          />
           <div style={{ display: "flex", gap: 14, overflowX: "auto", paddingBottom: 6, scrollbarWidth: "none", msOverflowStyle: "none" }}>
-            {newInItems.map(item => (
-              <div key={item.id} onClick={() => setTab("closet")} style={{ flex: "0 0 auto", width: 160, cursor: "pointer" }}>
+            {newInItems.map((item, idx) => (
+              <div key={item.id} onClick={() => setTab("closet")} style={{ flex: "0 0 auto", width: idx === 0 ? 220 : 160, cursor: "pointer" }}>
                 <div style={{
-                  width: 160, aspectRatio: "3/4", borderRadius: 16, overflow: "hidden",
+                  width: idx === 0 ? 220 : 160, aspectRatio: idx === 0 ? "4/5" : "3/4", borderRadius: 18, overflow: "hidden",
                   background: item.image ? `url(${item.image}) center/cover no-repeat` : "#f0ece4",
                   display: "flex", alignItems: "center", justifyContent: "center",
                   marginBottom: 8, boxShadow: "0 4px 16px rgba(0,0,0,0.07)",
                   transition: "transform 0.18s, box-shadow 0.18s",
+                  position: "relative",
                 }}
                   onMouseEnter={e => { e.currentTarget.style.transform = "translateY(-3px)"; e.currentTarget.style.boxShadow = "0 8px 24px rgba(0,0,0,0.12)"; }}
                   onMouseLeave={e => { e.currentTarget.style.transform = "translateY(0)"; e.currentTarget.style.boxShadow = "0 4px 16px rgba(0,0,0,0.07)"; }}>
                   {!item.image && <HangerIcon size={28} color="#ccc" />}
+                  {idx === 0 && (
+                    <div style={{ position: "absolute", left: 10, top: 10, background: "rgba(255,255,255,0.88)", color: "#6f6558", borderRadius: 100, padding: "5px 10px", fontSize: 10, fontWeight: 800, letterSpacing: "0.08em", textTransform: "uppercase" }}>
+                      Featured
+                    </div>
+                  )}
                 </div>
                 <div style={{ fontSize: 12, fontWeight: 700, color: "#1a1a1a", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{item.name || "Untitled"}</div>
                 {item.brand && <div style={{ fontSize: 11, color: "#aaa", fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{item.brand}</div>}
@@ -8548,7 +8591,12 @@ function HomeTab({ outfitCalendar, outfitsDb, itemsDb, lookbooksDb, wishlistDb, 
       {/* ── Upcoming trips + packing ── */}
       {upcomingTrips.length > 0 && (
         <div style={{ marginBottom: 28 }}>
-          <SectionHeader title="Upcoming Trips" action={{ label: "All lookbooks →", onClick: () => setTab("lookbooks") }} />
+          <EditorialSectionHeader
+            eyebrow="Travel Wardrobe"
+            title="Upcoming Trips"
+            subtitle="A more editorial view of where your wardrobe is headed next."
+            action={{ label: "All lookbooks →", onClick: () => setTab("lookbooks") }}
+          />
           <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
             {upcomingTrips.map(lb => {
               const dateStr = [fmtDate(lb.dateStart), fmtDate(lb.dateEnd)].filter(Boolean).join(" – ");
@@ -8591,7 +8639,12 @@ function HomeTab({ outfitCalendar, outfitsDb, itemsDb, lookbooksDb, wishlistDb, 
 
       {/* ── Pinned Lookbooks ── */}
       <div style={{ marginBottom: 28 }}>
-        <SectionHeader title="Pinned Lookbooks" action={{ label: "All lookbooks →", onClick: () => setTab("lookbooks") }} />
+        <EditorialSectionHeader
+          eyebrow="Saved Stories"
+          title="Pinned Lookbooks"
+          subtitle="The boards and travel edits that deserve the front row on Home."
+          action={{ label: "All lookbooks →", onClick: () => setTab("lookbooks") }}
+        />
         {pinnedLookbooks.length === 0 ? (
           <div style={{ ...cardStyle, border: "1.5px dashed #e8e4dc", padding: 22, textAlign: "center", color: "#bbb", fontSize: 13 }}>
             Pin lookbooks from the Lookbooks tab
@@ -8605,7 +8658,7 @@ function HomeTab({ outfitCalendar, outfitsDb, itemsDb, lookbooksDb, wishlistDb, 
               );
               const lbDateStr = (lb.dateStart || lb.dateEnd) ? [fmtDate(lb.dateStart), fmtDate(lb.dateEnd)].filter(Boolean).join(" – ") : null;
               return (
-                <div key={lb.id} style={{ ...cardStyle, cursor: "pointer", minWidth: 170, maxWidth: 200, flex: "0 0 auto" }}>
+                <div key={lb.id} style={{ ...cardStyle, cursor: "pointer", minWidth: 170, maxWidth: 210, flex: "0 0 auto", borderRadius: 18, position: "relative" }}>
                   {lb.coverImage ? (
                     <div style={{ aspectRatio: "4/5", background: `url(${lb.coverImage}) center/cover no-repeat` }} />
                   ) : (
@@ -8620,6 +8673,7 @@ function HomeTab({ outfitCalendar, outfitsDb, itemsDb, lookbooksDb, wishlistDb, 
                       })}
                     </div>
                   )}
+                  <div style={{ position: "absolute", inset: "auto 0 0 0", height: 90, background: "linear-gradient(to top, rgba(26,26,26,0.18), transparent)", pointerEvents: "none" }} />
                   <div style={{ padding: "10px 12px 12px" }}>
                     <div style={{ fontSize: 13, fontWeight: 700, color: "#1a1a1a", lineHeight: 1.3, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{lb.name}</div>
                     <div style={{ fontSize: 11, color: "#aaa", fontWeight: 600, marginTop: 3 }}>{lbOutfits.length} outfit{lbOutfits.length !== 1 ? "s" : ""}</div>
@@ -9267,13 +9321,13 @@ function OutfitCalendar({ outfits, calendar, onSaveCalendar, month, onMonthChang
 
                 <div style={{ flex: 1 }} />
 
-                {/* Outfit name — hover only */}
+                {/* Outfit name — hover only, as gradient fade */}
                 {ids.length > 0 && hoveredDay === dateStr && (
-                  <div style={{ display: "flex", alignItems: "center", gap: 1, pointerEvents: "auto" }} onClick={e => e.stopPropagation()}>
-                    <div style={{ flex: 1, fontSize: 7, color: "#fff", fontWeight: 700, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontFamily: "'DM Sans', sans-serif", background: "rgba(0,0,0,0.32)", borderRadius: 4, padding: "2px 5px" }}>
+                  <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, padding: "16px 6px 5px", background: "linear-gradient(to top, rgba(0,0,0,0.38) 0%, transparent 100%)", display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 4, pointerEvents: "auto" }} onClick={e => e.stopPropagation()}>
+                    <div style={{ flex: 1, fontSize: 7, color: "rgba(255,255,255,0.88)", fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontFamily: "'DM Sans', sans-serif", letterSpacing: "0.02em" }}>
                       {outfits.find(o=>o.id===ids[0])?.name || ""}
                     </div>
-                    <button onClick={e => { e.stopPropagation(); removeOutfitFromDay(dateStr, ids[0]); }} style={{ width: 14, height: 14, borderRadius: "50%", border: "none", background: "rgba(0,0,0,0.35)", color: "#fff", cursor: "pointer", fontSize: 9, display: "flex", alignItems: "center", justifyContent: "center", padding: 0, flexShrink: 0 }}>×</button>
+                    <button onClick={e => { e.stopPropagation(); removeOutfitFromDay(dateStr, ids[0]); }} style={{ width: 12, height: 12, borderRadius: "50%", border: "none", background: "rgba(255,255,255,0.18)", color: "rgba(255,255,255,0.7)", cursor: "pointer", fontSize: 8, display: "flex", alignItems: "center", justifyContent: "center", padding: 0, flexShrink: 0 }}>×</button>
                   </div>
                 )}
                 {/* Empty hint */}

@@ -12050,21 +12050,6 @@ export default function App() {
             {LOOKBOOK_TYPES.map(type => <option key={type} value={type}>{type[0].toUpperCase() + type.slice(1)}</option>)}
           </select>
         </div>
-        <div style={{ marginBottom: 14 }}>
-          <label style={{ display: "block", fontSize: 11, fontWeight: 600, color: "#999", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 8 }}>Tags</label>
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-            {LOOKBOOK_OCCASIONS.filter(t => t !== "All").map(t => {
-              const on = newLbTags.includes(t);
-              return (
-                <button key={t} onClick={() => setNewLbTags(s => on ? s.filter(x => x !== t) : [...s, t])} style={{
-                  padding: "4px 12px", borderRadius: 20, border: "1px solid", fontFamily: "'DM Sans', sans-serif",
-                  borderColor: on ? "#1a1a1a" : "#e0dbd2", background: on ? "#1a1a1a" : "#fff",
-                  color: on ? "#fff" : "#888", fontSize: 12, fontWeight: 700, cursor: "pointer"
-                }}>{t}</button>
-              );
-            })}
-          </div>
-        </div>
         {outfitsDb.rows.length > 0 && (
           <div style={{ marginBottom: 18 }}>
             <label style={{ display: "block", fontSize: 11, fontWeight: 600, color: "#999", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 10 }}>Add Looks (optional)</label>

@@ -9097,7 +9097,7 @@ function OutfitCalendar({ outfits, calendar, onSaveCalendar, month, onMonthChang
                     <div style={{ flex: 1, position: "relative", overflow: "hidden" }}>
                       {o ? (
                         o.previewImage
-                          ? <img src={o.previewImage} alt={o.name} style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
+                          ? <img src={o.previewImage} alt={o.name} style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "contain", display: "block" }} />
                           : <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", background: "#f5f3ef" }}><span style={{ fontSize: 10, color: "#aaa", fontWeight: 700, fontFamily: "'DM Sans', sans-serif", textAlign: "center", padding: 8 }}>{o.name}</span></div>
                       ) : (
                         <div style={{ position: "absolute", inset: 0, backgroundImage: "repeating-linear-gradient(45deg, transparent, transparent 3px, rgba(0,0,0,0.018) 3px, rgba(0,0,0,0.018) 6px)", background: "#faf8f5", display: "flex", alignItems: "center", justifyContent: "center" }}>

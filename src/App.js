@@ -275,6 +275,10 @@ const globalStyles = `
   .outfit-card-btns { opacity: 0; transition: opacity 0.15s; }
   .outfit-card:hover .outfit-card-btns { opacity: 1; }
 
+  /* Lookbook card hover actions */
+  .lb-card-actions { max-height: 0; overflow: hidden; padding: 0; border-top: none; transition: max-height 0.2s ease, padding 0.2s ease; }
+  .lb-card:hover .lb-card-actions { max-height: 60px; padding: 8px 14px 12px; border-top: 1px solid #f5f2ee; }
+
   /* Right rail cards */
   .right-card { background: #fff; border-radius: 16px; border: 1px solid #ece8e0; padding: 18px 16px; }
   .right-card-title { font-size: 10px; font-weight: 700; color: #c0b8b0; text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 14px; }
@@ -10252,6 +10256,7 @@ export default function App() {
   };
   const [lbSearch, setLbSearch] = useState("");
   const [lbSort, setLbSort] = useState("newest");
+  const [lbPreview, setLbPreview] = useState(null); // lookbook preview popup
   const [lbZoom, setLbZoom] = useState(210);
   const [lbTagFilter, setLbTagFilter] = useState("All");
   const [lbTypeFilter, setLbTypeFilter] = useState("All");
@@ -11220,22 +11225,11 @@ export default function App() {
                           ? [fmtDate(lb.dateStart), fmtDate(lb.dateEnd)].filter(Boolean).join(" – ")
                           : null;
                         return (
-                          <div key={lb.id} className="card fade-up" onClick={() => setActiveLookbook(lb)} style={{
+                          <div key={lb.id} className="card fade-up lb-card" onClick={() => setLbPreview(lb)} style={{
                             background: "#fff", borderRadius: 20, border: "1.5px solid #e8e4dc", overflow: "hidden",
                             boxShadow: "0 2px 12px rgba(0,0,0,0.04)", cursor: "pointer",
                             animationDelay: `${i * 0.06}s`, opacity: 0, position: "relative"
                           }}>
-                            {/* Pin + Archive + Delete buttons */}
-                            <button onClick={e => { e.stopPropagation(); lookbooksDb.update({ ...lb, pinned: !lb.pinned }); }} title={lb.pinned ? "Unpin from Home" : "Pin to Home"}
-                              style={{ position: "absolute", top: 8, right: 72, zIndex: 2, width: 26, height: 26, borderRadius: "50%", background: lb.pinned ? "#1a1a1a" : "rgba(255,255,255,0.92)", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 1px 4px rgba(0,0,0,0.1)" }}>
-                              <SvgPushPin size={12} color={lb.pinned ? "#fff" : "#888"} />
-                            </button>
-                            <button onClick={e => { e.stopPropagation(); if (window.confirm(`Archive "${lb.name}"? Restore from Settings → Data.`)) { archiveLookbook(lb); } }} title="Archive lookbook"
-                              style={{ position: "absolute", top: 8, right: 40, zIndex: 2, width: 26, height: 26, borderRadius: "50%", background: "rgba(255,255,255,0.92)", border: "none", cursor: "pointer", fontSize: 13, color: "#888", display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 1px 4px rgba(0,0,0,0.1)" }}>
-                              <SvgArrowDn size={12} color="#888" />
-                            </button>
-                            <button onClick={e => { e.stopPropagation(); lookbooksDb.remove(lb.id); }} title="Delete lookbook"
-                              style={{ position: "absolute", top: 8, right: 8, zIndex: 2, width: 26, height: 26, borderRadius: "50%", background: "rgba(255,255,255,0.92)", border: "none", cursor: "pointer", fontSize: 13, color: "#e05555", display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 1px 4px rgba(0,0,0,0.1)" }}><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4h6v2"/></svg></button>
                             {/* Cover */}
                             {lb.coverImage ? (
                               <div style={{ aspectRatio: "4/5", background: `url(${lb.coverImage}) center/cover no-repeat` }} />
@@ -11251,13 +11245,32 @@ export default function App() {
                                 })}
                               </div>
                             )}
-                            <div style={{ padding: "12px 14px 14px" }}>
+                            <div style={{ padding: "12px 14px 4px" }}>
                               <div style={{ fontSize: 15, fontWeight: 700, color: "#1a1a1a", lineHeight: 1.3 }}>{lb.name}</div>
                               <div style={{ display: "flex", gap: 8, marginTop: 4, alignItems: "center", flexWrap: "wrap" }}>
-                                <span style={{ fontSize: 11, color: "#aaa", fontWeight: 600 }}>{lbOutfits.length} outfit{lbOutfits.length !== 1 ? "s" : ""}</span>
+                                <span style={{ fontSize: 11, color: "#aaa", fontWeight: 600 }}>{lbOutfits.length} look{lbOutfits.length !== 1 ? "s" : ""}</span>
                                 {totalVal > 0 && <span style={{ fontSize: 11, color: "#aaa" }}>· ${totalVal.toFixed(0)} total</span>}
                               </div>
                               {dateStr && <div style={{ fontSize: 11, color: "#b0a898", marginTop: 4, fontWeight: 600, display:"flex", alignItems:"center", gap:5 }}><SvgCalendar size={11} color="#b0a898" style={{marginRight:4, verticalAlign:"middle", flexShrink:0}} />{dateStr}</div>}
+                            </div>
+                            {/* Hover action buttons */}
+                            <div className="lb-card-actions" style={{ display: "flex", gap: 6 }}>
+                              <button onClick={e => { e.stopPropagation(); setActiveLookbook(lb); }} title="Edit lookbook"
+                                style={{ width: 30, height: 30, borderRadius: "50%", background: "#f5f2ed", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#444" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                              </button>
+                              <button onClick={e => { e.stopPropagation(); lookbooksDb.update({ ...lb, pinned: !lb.pinned }); }} title={lb.pinned ? "Unpin" : "Pin to Home"}
+                                style={{ width: 30, height: 30, borderRadius: "50%", background: lb.pinned ? "#1a1a1a" : "#f5f2ed", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                                <SvgPushPin size={12} color={lb.pinned ? "#fff" : "#666"} />
+                              </button>
+                              <button onClick={e => { e.stopPropagation(); if (window.confirm(`Archive "${lb.name}"? Restore from Settings → Data.`)) { archiveLookbook(lb); } }} title="Archive"
+                                style={{ width: 30, height: 30, borderRadius: "50%", background: "#f5f2ed", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                                <SvgArrowDn size={12} color="#666" />
+                              </button>
+                              <button onClick={e => { e.stopPropagation(); if (window.confirm(`Delete "${lb.name}"?`)) { lookbooksDb.remove(lb.id); } }} title="Delete"
+                                style={{ width: 30, height: 30, borderRadius: "50%", background: "#fef2f2", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                                <SvgTrash size={13} color="#e05555" />
+                              </button>
                             </div>
                           </div>
                         );
@@ -11265,10 +11278,73 @@ export default function App() {
                     </div>
                   );
                 })()}
-              </div>
+
+              {/* Lookbook Preview Popup */}
+              {lbPreview && (() => {
+                const previewLb = lbPreview;
+                const previewLooks = (previewLb.outfitIds || []).map(id => outfitsDb.rows.find(o => o.id === id)).filter(Boolean);
+                const fmtDate = (d) => { if (!d) return null; const dt = new Date(d + "T00:00:00"); return dt.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }); };
+                const dateStr = (previewLb.dateStart || previewLb.dateEnd) ? [fmtDate(previewLb.dateStart), fmtDate(previewLb.dateEnd)].filter(Boolean).join(" – ") : null;
+                return (
+                  <div onClick={() => setLbPreview(null)} style={{ position: "fixed", inset: 0, zIndex: 1000, background: "rgba(0,0,0,0.45)", display: "flex", alignItems: "center", justifyContent: "center", padding: 24 }}>
+                    <div onClick={e => e.stopPropagation()} style={{ background: "#fff", borderRadius: 24, width: "100%", maxWidth: 720, maxHeight: "88vh", display: "flex", flexDirection: "column", overflow: "hidden", boxShadow: "0 24px 80px rgba(0,0,0,0.18)" }}>
+                      {/* Header */}
+                      <div style={{ padding: "20px 24px 16px", borderBottom: "1px solid #f0ece6", display: "flex", alignItems: "flex-start", justifyContent: "space-between", flexShrink: 0 }}>
+                        <div>
+                          <div style={{ fontSize: 20, fontWeight: 700, color: "#1a1a1a", lineHeight: 1.2 }}>{previewLb.name}</div>
+                          <div style={{ display: "flex", gap: 10, marginTop: 6, alignItems: "center", flexWrap: "wrap" }}>
+                            <span style={{ fontSize: 12, color: "#aaa", fontWeight: 600 }}>{previewLooks.length} look{previewLooks.length !== 1 ? "s" : ""}</span>
+                            {previewLb.type && <span style={{ fontSize: 11, color: "#b0a898", background: "#f5f2ed", borderRadius: 20, padding: "2px 9px", fontWeight: 600, textTransform: "capitalize" }}>{previewLb.type}</span>}
+                            {dateStr && <span style={{ fontSize: 11, color: "#b0a898", fontWeight: 600, display: "flex", alignItems: "center", gap: 4 }}><SvgCalendar size={11} color="#b0a898" />{dateStr}</span>}
+                          </div>
+                        </div>
+                        <div style={{ display: "flex", gap: 8, alignItems: "center", flexShrink: 0, marginLeft: 16 }}>
+                          <button onClick={() => { setLbPreview(null); setActiveLookbook(previewLb); }} style={{ padding: "8px 16px", background: "#1a1a1a", color: "#fff", border: "none", borderRadius: 100, fontFamily: "'DM Sans', sans-serif", fontSize: 12, fontWeight: 700, cursor: "pointer" }}>Open</button>
+                          <button onClick={() => setLbPreview(null)} style={{ width: 32, height: 32, borderRadius: "50%", background: "#f5f2ed", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#666" strokeWidth="2.5" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                          </button>
+                        </div>
+                      </div>
+                      {/* Scrollable looks grid */}
+                      <div style={{ overflowY: "auto", padding: "20px 24px 24px", flex: 1 }}>
+                        {previewLooks.length === 0 ? (
+                          <div style={{ textAlign: "center", padding: "48px 0", color: "#bbb", fontSize: 13 }}>No looks added yet.</div>
+                        ) : (
+                          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))", gap: 12 }}>
+                            {previewLooks.map((outfit, oi) => {
+                              const outfitItems = (outfit.layers || outfit.itemIds || []).map(id => allItems.find(x => x.id === id)).filter(Boolean);
+                              return (
+                                <div key={outfit.id} style={{ borderRadius: 16, overflow: "hidden", border: "1.5px solid #e8e4dc", background: "#fff", boxShadow: "0 1px 6px rgba(0,0,0,0.04)" }}>
+                                  {outfit.previewImage ? (
+                                    <div style={{ aspectRatio: "4/5", background: `url(${outfit.previewImage}) center/contain no-repeat #f5f3ef` }} />
+                                  ) : (
+                                    <div style={{ display: "grid", gridTemplateColumns: outfitItems.length === 1 ? "1fr" : "1fr 1fr", aspectRatio: "4/5" }}>
+                                      {(outfitItems.length === 0 ? [null] : outfitItems).slice(0, 4).map((item, ii) => (
+                                        <div key={ii} style={{ background: item?.image ? `url(${item.image}) center/contain no-repeat #f5f3ef` : "#f5f3ef", display: "flex", alignItems: "center", justifyContent: "center", borderRight: ii % 2 === 0 && outfitItems.length > 1 ? "1.5px solid #fff" : "none", borderBottom: ii < 2 && outfitItems.length > 2 ? "1.5px solid #fff" : "none" }}>
+                                          {!item?.image && <HangerIcon size={16} color="#ddd" />}
+                                        </div>
+                                      ))}
+                                    </div>
+                                  )}
+                                  <div style={{ padding: "8px 10px 10px" }}>
+                                    <div style={{ fontSize: 12, fontWeight: 700, color: "#1a1a1a", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{outfit.name}</div>
+                                    {outfitItems.length > 0 && <div style={{ fontSize: 10, color: "#bbb", marginTop: 2 }}>{outfitItems.length} piece{outfitItems.length !== 1 ? "s" : ""}</div>}
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })()}
+            </div>
             )}
 
             {/* STATS */}
+
             {tab === "stats" && <StatsTab itemsDb={itemsDb} outfitsDb={outfitsDb} lookbooksDb={lookbooksDb} wishlistDb={wishlistDb} outfitCalendar={outfitCalendar} onViewItem={item => setItemDetail(item)} monthlyBudget={monthlyBudget} annualBudget={annualBudget} />}
 
             {/* SELLER DASHBOARD */}

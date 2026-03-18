@@ -8733,7 +8733,7 @@ function OutfitCalendar({ outfits, calendar, onSaveCalendar, month, onMonthChang
   const MARKER_COLORS = ["#b8e0b8","#ffd97d","#e8a870","#a8c8e8","#f9a8d4","#c4b5fd","#6ee7b7","#fca5a5","#93c5fd","#fde68a"];
 
   const { year, month: mo } = month;
-  const firstDay = new Date(year, mo, 1).getDay();
+  const firstDay = (new Date(year, mo, 1).getDay() + 6) % 7; // 0=Mon…6=Sun
   const daysInMonth = new Date(year, mo + 1, 0).getDate();
   const todayStr = new Date().toISOString().slice(0, 10);
   const monthName = new Date(year, mo, 1).toLocaleDateString("en-US", { month: "long", year: "numeric" });
@@ -8917,7 +8917,7 @@ function OutfitCalendar({ outfits, calendar, onSaveCalendar, month, onMonthChang
   // Week view helpers
   const getWeekDays = (anchorStr) => {
     const d = new Date(anchorStr + "T00:00:00");
-    const dow = d.getDay();
+    const dow = (d.getDay() + 6) % 7; // 0=Mon…6=Sun
     const start = new Date(d); start.setDate(d.getDate() - dow);
     return Array.from({ length: 7 }, (_, i) => { const day = new Date(start); day.setDate(start.getDate() + i); return day.toISOString().slice(0, 10); });
   };
@@ -9030,7 +9030,7 @@ function OutfitCalendar({ outfits, calendar, onSaveCalendar, month, onMonthChang
       {/* Day labels */}
       {calView === "month" && (
         <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 4, marginBottom: 4 }}>
-          {["Sun","Mon","Tue","Wed","Thu","Fri","Sat"].map(d => (
+          {["Mon","Tue","Wed","Thu","Fri","Sat","Sun"].map(d => (
             <div key={d} style={{ textAlign: "center", fontSize: 9, fontWeight: 700, color: "#bbb", textTransform: "uppercase", letterSpacing: "0.07em", padding: "3px 0", fontFamily: "'DM Sans', sans-serif" }}>{d}</div>
           ))}
         </div>

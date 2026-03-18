@@ -4473,7 +4473,7 @@ function StatsTab({ itemsDb, outfitsDb, lookbooksDb, wishlistDb, outfitCalendar,
   const wishItems = (wishlistDb && wishlistDb.rows) || [];
   const now = new Date();
   const thisMonth = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,"0")}`;
-  const [statsView, setStatsView] = useState("profile");
+  const [statsView, setStatsView] = useState("identity");
 
   // ── helpers ──
   const parsePrice = (p) => parseFloat((p||"").replace(/[^0-9.]/g,"")) || 0;
@@ -4654,6 +4654,99 @@ function StatsTab({ itemsDb, outfitsDb, lookbooksDb, wishlistDb, outfitCalendar,
   })();
 
   const healthLabel = healthScore >= 80 ? ["Thriving","#3aaa6e"] : healthScore >= 60 ? ["Healthy","#2090c0"] : healthScore >= 40 ? ["Growing","#a07000"] : ["Needs Love","#e05555"];
+  const weekLogged = weekStrip.filter(d=>d.outfitIds.length>0).length;
+  const topGapInsights = gapInsights.slice(0, 3);
+  const neglectedValue = [...unworn]
+    .filter(i => parsePrice(i.price) > 0)
+    .sort((a,b)=>parsePrice(b.price)-parsePrice(a.price))
+    .slice(0, 4);
+  const inferredStyleWords = (() => {
+    const words = [];
+    const label = displayArchetype?.label || "";
+    if (label.includes("Professional")) words.push("Polished", "Structured");
+    if (label.includes("Romantic")) words.push("Intentional", "Feminine");
+    if (label.includes("Casual")) words.push("Relaxed", "Effortless");
+    if (label.includes("Athlete")) words.push("Functional", "Sporty");
+    if (label.includes("Dreamer")) words.push("Playful", "Expressive");
+    if (label.includes("Adventurer")) words.push("Versatile", "Practical");
+    if (label.includes("Elegante")) words.push("Refined", "Elevated");
+    if (label.includes("Trendsetter")) words.push("Bold", "Trend-led");
+    if (topColors[0]) {
+      if (["Black","White","Cream","Grey","Brown","Navy","Beige","Tan"].includes(topColors[0][0])) words.push("Neutral-led");
+      else words.push("Color-aware");
+    }
+    if (topOccasions[0]) {
+      if (["WFH","Event","Date Night"].includes(topOccasions[0][0])) words.push("Put-together");
+      if (["Weekend","Travel"].includes(topOccasions[0][0])) words.push("Easygoing");
+    }
+    return [...new Set(words)].slice(0, 5);
+  })();
+  const styleThesis = (() => {
+    const colorLead = topColors[0]?.[0]?.toLowerCase();
+    const occasionLead = topOccasions[0]?.[0];
+    const formulaLead = outfitFormula[0]?.[0];
+    const opener = displayArchetype?.desc || "Your closet has a clear point of view.";
+    const colorText = colorLead ? ` It leans ${colorLead} first` : "";
+    const occasionText = occasionLead ? ` and is most built around ${occasionLead.toLowerCase()} dressing.` : ".";
+    const formulaText = formulaLead ? ` Your signature formula is ${formulaLead.toLowerCase()}.` : "";
+    return `${opener}${colorText}${occasionText}${formulaText}`;
+  })();
+  const styleSpectrum = (() => {
+    const neutralCount = topColors.reduce((sum, [color, count]) => (
+      ["Black","White","Cream","Grey","Brown","Navy","Beige","Tan"].includes(color) ? sum + count : sum
+    ), 0);
+    const neutralPct = items.length ? Math.round((neutralCount / items.length) * 100) : 0;
+    const structuredOccasions = topOccasions
+      .filter(([name]) => ["WFH","Event","Date Night"].includes(name))
+      .reduce((sum, [, count]) => sum + count, 0);
+    const relaxedOccasions = topOccasions
+      .filter(([name]) => ["Weekend","Travel","Sport"].includes(name))
+      .reduce((sum, [, count]) => sum + count, 0);
+    return [
+      { left: "Minimal", right: "Maximal", value: Math.max(20, Math.min(80, 100 - Math.min((topColors.length || 1) * 15, 80))) },
+      { left: "Classic", right: "Trend-led", value: displayArchetype?.label === "The Trendsetter" ? 75 : displayArchetype?.label === "The Professional" ? 30 : 45 },
+      { left: "Structured", right: "Relaxed", value: structuredOccasions + relaxedOccasions > 0 ? Math.round((relaxedOccasions / (structuredOccasions + relaxedOccasions)) * 100) : 50 },
+      { left: "Neutral", right: "Colorful", value: 100 - neutralPct },
+    ];
+  })();
+  const duplicateSignals = (() => {
+    const signals = [];
+    if (topColors[0]) {
+      const [color, count] = topColors[0];
+      const pct = Math.round((count / items.length) * 100);
+      if (pct >= 40) signals.push({ label: `${color} dominates`, detail: `${pct}% of your closet sits in ${color.toLowerCase()}.` });
+    }
+    if (topCategories[0]) {
+      const [cat, count] = topCategories[0];
+      const pct = Math.round((count / items.length) * 100);
+      if (pct >= 30) signals.push({ label: `${cat} are overrepresented`, detail: `${count} pieces, or ${pct}% of your closet.` });
+    }
+    if ((catCounts["Shoes"]||0) >= 5 && (catCounts["Bags"]||0) <= 1) {
+      signals.push({ label: "Accessorizing is lopsided", detail: `You have ${catCounts["Shoes"]||0} pairs of shoes but only ${catCounts["Bags"]||0} bag${(catCounts["Bags"]||0) !== 1 ? "s" : ""}.` });
+    }
+    if (wishlistOverlap.length >= 3) {
+      signals.push({ label: "Wishlist repeats what you own", detail: `${wishlistOverlap.length} wishlist pieces overlap with your current closet.` });
+    }
+    return signals.slice(0, 4);
+  })();
+  const nextAdditions = (() => {
+    const recs = [];
+    const primaryGap = gaps.find(g => g.count === 0) || gaps[0];
+    if (primaryGap) recs.push({ label: "Practical gap", value: primaryGap.cat, note: primaryGap.count === 0 ? "You don't have this category yet." : `You only have ${primaryGap.count}.` });
+    if ((catCounts["Accessories"]||0) < 3) recs.push({ label: "Styling piece", value: "Accessories", note: "Small add-ons will remix your closet fastest." });
+    else if ((catCounts["Bags"]||0) < 2) recs.push({ label: "Styling piece", value: "Versatile bag", note: "A flexible bag will connect more looks." });
+    else recs.push({ label: "Styling piece", value: "Layering piece", note: "A blazer, cardigan, or jacket will stretch outfit formulas." });
+    if (displayArchetype?.label === "The Romantic") recs.push({ label: "Personality piece", value: "Statement evening piece", note: "Lean into the dressed-up side of your closet." });
+    else if (displayArchetype?.label === "The Trendsetter") recs.push({ label: "Personality piece", value: "Conversation-starting accent", note: "One bold piece will keep the closet from feeling too basic." });
+    else if (displayArchetype?.label === "The Athlete") recs.push({ label: "Personality piece", value: "Elevated off-duty piece", note: "Bridge activewear and everyday dressing." });
+    else recs.push({ label: "Personality piece", value: "Joy piece", note: "Choose one item that feels more expressive than purely practical." });
+    return recs;
+  })();
+  const spendingStats = [
+    { label:"Closet Value", value:`$${totalValue.toFixed(0)}`, color:"#1a1a1a", bg:"#fafaf8" },
+    { label:"Avg Item Price", value: items.filter(i=>parsePrice(i.price)>0).length>0?`$${(totalValue/items.filter(i=>parsePrice(i.price)>0).length).toFixed(0)}`:"—", color:"#2090c0", bg:"#f0f8ff" },
+    { label:"Added This Month", value:items.filter(i=>(i.purchaseDate||"").startsWith(thisMonth)).length, color:"#3aaa6e", bg:"#f0faf4" },
+  ];
 
   // ── UI helpers ──
   const SI = ({ d }) => <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight:6, verticalAlign:"middle", display:"inline-block", flexShrink:0 }}>{d}</svg>;
@@ -9529,11 +9622,11 @@ function OutfitCalendar({ outfits, calendar, onSaveCalendar, month, onMonthChang
 
 const EVENT_TYPE_OPTIONS = [["trip","✈ Trip","#4a7fc1"],["event","★ Event","#9b72cf"],["work","💼 Work","#3aaa6e"],["other","• Other","#e8823a"]];
 function UpcomingEventsCard({ events, onAdd, onRemove, onSelect, onEdit }) {
-  const [name, setName] = React.useState("");
-  const [type, setType] = React.useState("event");
-  const [startDate, setStartDate] = React.useState("");
-  const [endDate, setEndDate] = React.useState("");
-  const [multiDay, setMultiDay] = React.useState(false);
+  const [name, setName] = useState("");
+  const [type, setType] = useState("event");
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
+  const [multiDay, setMultiDay] = useState(false);
   const typeColor = EVENT_TYPE_OPTIONS.find(([v]) => v === type)?.[2] || "#9b72cf";
   const canAdd = name.trim() && startDate;
   const handleAdd = () => {

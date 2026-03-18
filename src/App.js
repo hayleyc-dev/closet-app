@@ -290,12 +290,11 @@ const globalStyles = `
 
   /* Item card edit btn reveal on hover */
   .item-card:hover .item-card-edit-btn { opacity: 1 !important; }
-  /* Wishlist card hover-only action buttons */
-  .wl-card { overflow: visible !important; }
+  /* Wishlist card: always show label (no height collapse), opacity-only action reveal */
+  .wl-card .item-card-label { max-height: none !important; overflow: visible !important; padding: 8px 10px 10px !important; border-top: 1px solid #f5f2ee !important; }
+  .wl-card .wl-card-actions { opacity: 0; transition: opacity 0.15s; }
+  .wl-card:hover .wl-card-actions { opacity: 1; }
   .wl-card:hover .wl-hover-btn { opacity: 1 !important; }
-  .wl-card .wl-card-actions { max-height: 0; overflow: hidden; margin-top: 0; transition: max-height 0.2s ease, margin-top 0.2s ease; }
-  .wl-card:hover .wl-card-actions { max-height: 50px; margin-top: 8px; }
-  .wl-card .wl-card-img { border-radius: 12px 12px 0 0; overflow: hidden; }
   .palette-del-btn { opacity: 0 !important; transition: opacity 0.15s; }
   div:hover > .palette-del-btn { opacity: 1 !important; }
 

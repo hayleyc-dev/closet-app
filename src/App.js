@@ -9031,7 +9031,7 @@ function OutfitCalendar({ outfits, calendar, onSaveCalendar, month, onMonthChang
       {calView === "month" && (
         <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 4, marginBottom: 4 }}>
           {["Mon","Tue","Wed","Thu","Fri","Sat","Sun"].map(d => (
-            <div key={d} style={{ textAlign: "center", fontSize: 9, fontWeight: 700, color: "#bbb", textTransform: "uppercase", letterSpacing: "0.07em", padding: "3px 0", fontFamily: "'DM Sans', sans-serif" }}>{d}</div>
+            <div key={d} style={{ textAlign: "center", fontSize: 12, fontWeight: 800, color: "#999", textTransform: "uppercase", letterSpacing: "0.08em", padding: "5px 0", fontFamily: "'DM Sans', sans-serif" }}>{d}</div>
           ))}
         </div>
       )}

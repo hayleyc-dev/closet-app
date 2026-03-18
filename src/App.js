@@ -3985,8 +3985,9 @@ function OutfitBuilder({ itemsDb, wishlistDb, onSave, onClose, initial, seedItem
         <button onClick={onClose} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 22, color: "#888", lineHeight: 1, padding: 0 }}><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
         <span style={{ fontWeight: 700, fontSize: 15, color: "#1a1a1a" }}>{name || "Build a Look"}</span>
         <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
-          <button onClick={() => setShowDraftPanel(p => !p)} style={{ ...btnBase, padding: "7px 14px", fontSize: 12, background: showDraftPanel ? "#f0f0f0" : "#f5f3ef", color: "#555", position: "relative" }}>
-            Drafts {outfitDrafts.length > 0 && <span style={{ marginLeft: 4, background: "#1a1a1a", color: "#fff", borderRadius: 10, padding: "1px 6px", fontSize: 10, fontWeight: 800 }}>{outfitDrafts.length}</span>}
+          <button onClick={() => setShowDraftPanel(p => !p)} title="Drafts" style={{ ...btnBase, padding: "7px 10px", fontSize: 12, background: showDraftPanel ? "#f0f0f0" : "#f5f3ef", color: "#555", position: "relative", display: "flex", alignItems: "center", gap: 6 }}>
+            <SvgFolder size={14} color="#888" />
+            {outfitDrafts.length > 0 && <span style={{ background: "#1a1a1a", color: "#fff", borderRadius: 10, padding: "1px 6px", fontSize: 10, fontWeight: 800 }}>{outfitDrafts.length}</span>}
           </button>
           <button onClick={saveOutfitDraft} style={{ ...btnBase, padding: "7px 14px", fontSize: 12, background: draftSaved ? "#f0faf4" : "#f5f3ef", color: draftSaved ? "#2d6a3f" : "#555" }}>
             {draftSaved ? "✓ Saved" : "Save Draft"}

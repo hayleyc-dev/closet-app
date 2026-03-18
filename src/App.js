@@ -2336,7 +2336,7 @@ function OccasionPill({ tag, selected, onClick, small }) {
 }
 
 // ── Outfit Detail Popup ──────────────────────────────────────────────────────
-function OutfitDetailPopup({ outfit, allItems, wishlistIds = new Set(), allOutfits, lookbooks, onClose, onEdit, onDelete, onMarkWorn, onDuplicate, onAddToLookbook, onGoToLookbook, onItemClick }) {
+function OutfitDetailPopup({ outfit, allItems, wishlistIds = new Set(), allOutfits, lookbooks, onClose, onEdit, onDelete, onArchive, onMarkWorn, onDuplicate, onAddToLookbook, onGoToLookbook, onItemClick }) {
   const [addingToLb, setAddingToLb] = useState(false);
   const [selectedLb, setSelectedLb] = useState("");
   const [exported, setExported] = useState(false);
@@ -2456,8 +2456,8 @@ function OutfitDetailPopup({ outfit, allItems, wishlistIds = new Set(), allOutfi
                 <button onClick={() => { setRightTab("lookbooks"); setAddingToLb(true); }} style={{ width: 32, height: 32, borderRadius: "50%", background: "#f5f2ed", border: "none", cursor: "pointer", color: "#666", display: "flex", alignItems: "center", justifyContent: "center" }} title="Add to lookbook"><SvgGrid size={13} color="#666" /></button>
               )}
               <button onClick={onDuplicate} style={{ width: 32, height: 32, borderRadius: "50%", background: "#f5f2ed", border: "none", cursor: "pointer", color: "#666", display: "flex", alignItems: "center", justifyContent: "center" }} title="Duplicate"><SvgCopy size={12} color="currentColor" /></button>
+              <button onClick={onArchive} title="Archive" style={{ width: 32, height: 32, borderRadius: "50%", background: "#f5f2ed", border: "none", cursor: "pointer", color: "#666", display: "flex", alignItems: "center", justifyContent: "center" }}><SvgDownload size={13} color="#666" /></button>
               <button onClick={onDelete} style={{ width: 32, height: 32, borderRadius: "50%", background: "#fef2f2", border: "none", cursor: "pointer", color: "#e05555", display: "flex", alignItems: "center", justifyContent: "center" }}><SvgTrash size={14} color="#e05555" /></button>
-              {outfit.previewImage && <button onClick={exportPreview} style={{ padding: "6px 12px", borderRadius: 10, background: exported ? "#f0faf4" : "#f5f3ef", border: "none", cursor: "pointer", fontSize: 12, fontWeight: 700, color: exported ? "#2d6a3f" : "#666", fontFamily: "'DM Sans', sans-serif" }}>{exported ? <><SvgCheck size={12} color="currentColor" style={{marginRight:6}} />Saved</> : <><SvgDownload size={12} color="currentColor" style={{marginRight:6}} />Export</>}</button>}
             </div>
             {/* Tab toggle */}
             <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
@@ -10952,7 +10952,8 @@ export default function App() {
           lookbooks={lookbooksDb.rows}
           onClose={() => setOutfitPopup(null)}
           onEdit={() => { openEditOutfit(outfitPopup); setOutfitPopup(null); }}
-          onDelete={() => { archiveOutfit(outfitPopup); }}
+          onArchive={() => { archiveOutfit(outfitPopup); setOutfitPopup(null); }}
+          onDelete={() => { if (window.confirm(`Permanently delete "${outfitPopup.name}"?`)) { outfitsDb.remove(outfitPopup.id); setOutfitPopup(null); } }}
           onMarkWorn={() => markOutfitWorn(outfitPopup)}
           onDuplicate={() => { duplicateOutfit(outfitPopup); setOutfitPopup(null); }}
           onAddToLookbook={addOutfitToLookbook}

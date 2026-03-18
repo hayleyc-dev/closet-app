@@ -9671,7 +9671,7 @@ export default function App() {
   const PAGE_TITLES = {
     home: ["", ""],
     closet: ["My Closet", ""],
-    outfits: ["My Outfits", `${outfitsDb.rows.length} looks`],
+    outfits: ["My Outfits", ""],
     lookbooks: ["Lookbooks", "Curated collections"],
     stats: ["Style Profile", "Your wardrobe in focus"],
     moodboard: ["Moodboard", "Inspire yourself"],

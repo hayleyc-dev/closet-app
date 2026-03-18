@@ -8743,34 +8743,34 @@ function OutfitCalendar({ outfits, calendar, onSaveCalendar, month, onMonthChang
   return (
     <div>
       {/* Calendar header */}
-      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12, flexWrap: "wrap" }}>
-        {/* View toggle */}
-        <div style={{ display: "flex", background: "#f5f2ed", borderRadius: 10, padding: 3, gap: 2, flexShrink: 0 }}>
-          {["month", "week"].map(v => (
-            <button key={v} onClick={() => setCalView(v)} style={{ padding: "5px 12px", border: "none", borderRadius: 8, fontFamily: "'DM Sans', sans-serif", fontSize: 11, fontWeight: 700, cursor: "pointer", background: calView === v ? "#fff" : "transparent", color: calView === v ? "#1a1a1a" : "#aaa", boxShadow: calView === v ? "0 1px 4px rgba(0,0,0,0.1)" : "none", transition: "all 0.15s", textTransform: "capitalize" }}>{v}</button>
-          ))}
-        </div>
-        {/* Nav arrows + title */}
-        <button onClick={calView === "week" ? prevWeek : prevMonth} style={{ width: 28, height: 28, borderRadius: "50%", border: "1px solid #e0dbd2", background: "#fff", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-          <SvgArrowL size={11} color="#666" />
-        </button>
-        <div style={{ flex: 1, fontSize: 14, fontWeight: 800, color: "#1a1a1a", textAlign: "center", minWidth: 120 }}>{calView === "week" ? weekLabel : monthName}</div>
-        <button onClick={calView === "week" ? nextWeek : nextMonth} style={{ width: 28, height: 28, borderRadius: "50%", border: "1px solid #e0dbd2", background: "#fff", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-          <SvgArrowR size={11} color="#666" />
-        </button>
-        {/* Action buttons */}
-        <button onClick={planWeek} style={{ padding: "6px 11px", borderRadius: 10, border: "1px solid #e0dbd2", background: "#fff", cursor: "pointer", fontSize: 11, fontWeight: 700, color: "#2d6a3f", fontFamily: "'DM Sans', sans-serif", display: "flex", alignItems: "center", gap: 4, flexShrink: 0 }}>
-          ✦ Plan Week
-        </button>
-        <button onClick={() => openNewEvent("")} style={{ padding: "6px 11px", borderRadius: 10, border: "1px solid #e0dbd2", background: "#fff", cursor: "pointer", fontSize: 11, fontWeight: 700, color: "#666", fontFamily: "'DM Sans', sans-serif", flexShrink: 0 }}>
-          + Event
-        </button>
-        <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 2, flexShrink: 0 }}>
-          <button onClick={() => setShowWeatherConfig(true)} style={{ padding: "6px 11px", borderRadius: 10, border: "1px solid #e0dbd2", background: "#fff", cursor: "pointer", fontSize: 11, fontWeight: 700, color: "#666", fontFamily: "'DM Sans', sans-serif", display: "flex", alignItems: "center", gap: 4 }}>
-            {weatherLoading ? "…" : "⛅ Weather"}
+      <div style={{ marginBottom: 20 }}>
+        {/* Month title row */}
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
+          <button onClick={calView === "week" ? prevWeek : prevMonth} style={{ width: 28, height: 28, borderRadius: "50%", border: "none", background: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", color: "#bbb" }}>
+            <SvgArrowL size={11} color="#bbb" />
           </button>
-          {weather && <div style={{ fontSize: 10, color: "#bbb", fontWeight: 600 }}>{weather.city}</div>}
+          <div style={{ textAlign: "center" }}>
+            <div style={{ fontFamily: "'Cormorant Garamond', serif", fontStyle: "italic", fontWeight: 300, fontSize: 32, color: "#1a1a1a", lineHeight: 1, letterSpacing: "-0.01em" }}>{calView === "week" ? weekLabel : monthName}</div>
+          </div>
+          <button onClick={calView === "week" ? nextWeek : nextMonth} style={{ width: 28, height: 28, borderRadius: "50%", border: "none", background: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>
+            <SvgArrowR size={11} color="#bbb" />
+          </button>
         </div>
+        {/* Toolbar row */}
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 6, flexWrap: "wrap" }}>
+          <div style={{ display: "flex", background: "#f5f2ed", borderRadius: 8, padding: 2, gap: 1 }}>
+            {["month", "week"].map(v => (
+              <button key={v} onClick={() => setCalView(v)} style={{ padding: "4px 10px", border: "none", borderRadius: 6, fontFamily: "'DM Sans', sans-serif", fontSize: 10, fontWeight: 700, cursor: "pointer", background: calView === v ? "#fff" : "transparent", color: calView === v ? "#1a1a1a" : "#bbb", boxShadow: calView === v ? "0 1px 3px rgba(0,0,0,0.08)" : "none", textTransform: "capitalize" }}>{v}</button>
+            ))}
+          </div>
+          <div style={{ width: 1, height: 16, background: "#e8e4dc" }} />
+          <button onClick={planWeek} style={{ padding: "5px 10px", borderRadius: 8, border: "1px solid #e8e4dc", background: "#fff", cursor: "pointer", fontSize: 10, fontWeight: 700, color: "#2d6a3f", fontFamily: "'DM Sans', sans-serif" }}>✦ Plan Week</button>
+          <button onClick={() => openNewEvent("")} style={{ padding: "5px 10px", borderRadius: 8, border: "1px solid #e8e4dc", background: "#fff", cursor: "pointer", fontSize: 10, fontWeight: 700, color: "#888", fontFamily: "'DM Sans', sans-serif" }}>+ Event</button>
+          <button onClick={() => setShowWeatherConfig(true)} style={{ padding: "5px 10px", borderRadius: 8, border: "1px solid #e8e4dc", background: "#fff", cursor: "pointer", fontSize: 10, fontWeight: 700, color: "#888", fontFamily: "'DM Sans', sans-serif" }}>
+            {weatherLoading ? "…" : `⛅${weather ? " " + weather.city : " Weather"}`}
+          </button>
+        </div>
+      </div>
 
         {/* Weather config modal */}
         {showWeatherConfig && (
@@ -8810,9 +8810,9 @@ function OutfitCalendar({ outfits, calendar, onSaveCalendar, month, onMonthChang
 
       {/* Day labels */}
       {calView === "month" && (
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 4, marginBottom: 4 }}>
-          {["Sun","Mon","Tue","Wed","Thu","Fri","Sat"].map(d => (
-            <div key={d} style={{ textAlign: "center", fontSize: 10, fontWeight: 700, color: "#bbb", textTransform: "uppercase", letterSpacing: "0.06em", padding: "4px 0" }}>{d}</div>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 4, marginBottom: 6 }}>
+          {["S","M","T","W","T","F","S"].map((d, i) => (
+            <div key={i} style={{ textAlign: "center", fontFamily: "'Cormorant Garamond', serif", fontStyle: "italic", fontSize: 13, fontWeight: 400, color: "#ccc", padding: "2px 0" }}>{d}</div>
           ))}
         </div>
       )}
@@ -8826,36 +8826,52 @@ function OutfitCalendar({ outfits, calendar, onSaveCalendar, month, onMonthChang
             const isToday = dateStr === todayStr;
             const dayEvts = eventsOnDate(dateStr);
             const d = new Date(dateStr + "T00:00:00");
-            const dayLabel = d.toLocaleDateString("en-US", { weekday: "short" });
+            const dayAbbr = d.toLocaleDateString("en-US", { weekday: "short" }).slice(0, 2).toUpperCase();
             const dayNum = d.getDate();
+            const primaryId = ids[0];
+            const primaryOutfit = primaryId ? outfits.find(o => o.id === primaryId) : null;
+            const hasImg = !!primaryOutfit?.previewImage;
+            const warn = primaryOutfit ? getWeatherWarning(primaryOutfit, wx) : null;
             return (
               <div key={dateStr} onClick={() => { setDayPopup(dateStr); setDayPopupTab(0); setShowDayAdd(false); setDayAddSearch(""); }}
-                style={{ borderRadius: 12, border: isToday ? "2px solid #1a1a1a" : "1.5px solid #e8e4dc", background: "#fff", cursor: "pointer", minHeight: 180, padding: "8px 6px 6px", display: "flex", flexDirection: "column", gap: 4 }}
-                onMouseEnter={e => e.currentTarget.style.boxShadow = "0 2px 8px rgba(0,0,0,0.08)"} onMouseLeave={e => e.currentTarget.style.boxShadow = "none"}>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 2 }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
-                    <div style={{ fontSize: 10, fontWeight: 700, color: "#aaa", textTransform: "uppercase" }}>{dayLabel}</div>
-                    <div style={{ width: 22, height: 22, borderRadius: "50%", background: isToday ? "#1a1a1a" : "transparent", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                      <span style={{ fontSize: 12, fontWeight: 900, color: isToday ? "#fff" : "#555" }}>{dayNum}</span>
+                style={{ borderRadius: 10, border: "1px solid #ede9e2", background: "#fff", cursor: "pointer", minHeight: 220, overflow: "hidden", position: "relative", transition: "box-shadow 0.12s" }}
+                onMouseEnter={e => e.currentTarget.style.boxShadow = "0 3px 14px rgba(0,0,0,0.08)"} onMouseLeave={e => e.currentTarget.style.boxShadow = "none"}>
+                {/* Full-bleed background image */}
+                {hasImg && <img src={primaryOutfit.previewImage} alt={primaryOutfit.name} style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", pointerEvents: "none" }} />}
+                {hasImg && <div style={{ position: "absolute", inset: 0, background: "linear-gradient(to bottom, rgba(0,0,0,0.22) 0%, transparent 40%, transparent 55%, rgba(0,0,0,0.42) 100%)", pointerEvents: "none" }} />}
+                {/* Content */}
+                <div style={{ position: "relative", zIndex: 2, padding: "8px 7px", height: "100%", display: "flex", flexDirection: "column", boxSizing: "border-box", minHeight: 220 }}>
+                  {/* Header */}
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+                    <div>
+                      <div style={{ fontFamily: "'Cormorant Garamond', serif", fontStyle: "italic", fontSize: 11, color: hasImg ? "rgba(255,255,255,0.7)" : "#bbb", lineHeight: 1, marginBottom: 1 }}>{dayAbbr}</div>
+                      <div style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 22, fontWeight: isToday ? 600 : 300, color: hasImg ? "#fff" : (isToday ? "#1a1a1a" : "#888"), lineHeight: 1 }}>{dayNum}</div>
+                      {isToday && <div style={{ width: 4, height: 4, borderRadius: "50%", background: hasImg ? "rgba(255,255,255,0.7)" : "#1a1a1a", marginTop: 3 }} />}
+                    </div>
+                    <div style={{ textAlign: "right" }}>
+                      {wx && <div style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 13, color: hasImg ? "rgba(255,255,255,0.85)" : "#bbb", fontWeight: 400, lineHeight: 1 }}>{wx.high}°</div>}
+                      {warn && <div style={{ marginTop: 3, fontSize: 8, background: "#f59e0b", color: "#fff", borderRadius: 3, padding: "1px 4px", fontWeight: 800 }}>⚠</div>}
                     </div>
                   </div>
-                  {wx && <div style={{ fontSize: 10, color: "#888", fontWeight: 700 }}>{weatherIcon(wx.code)} {wx.high}°</div>}
-                </div>
-                {dayEvts.map(ev => (
-                  <div key={ev.id} onClick={e => { e.stopPropagation(); openEditEvent(ev); }} style={{ borderRadius: 6, background: EVENT_COLORS[ev.type] || "#888", color: "#fff", fontSize: 9, fontWeight: 700, padding: "2px 6px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", cursor: "pointer" }}>{ev.name}</div>
-                ))}
-                {ids.slice(0, 2).map(id => {
-                  const o = outfits.find(x => x.id === id);
-                  if (!o) return null;
-                  const warn = getWeatherWarning(o, wx);
-                  return (
-                    <div key={id} style={{ borderRadius: 8, overflow: "hidden", background: "#f5f2ed", flex: 1, position: "relative", minHeight: 60 }}>
-                      {o.previewImage ? <img src={o.previewImage} alt={o.name} style={{ width: "100%", height: "100%", objectFit: "contain" }} /> : <div style={{ padding: 4, fontSize: 9, fontWeight: 700, color: "#999" }}>{o.name}</div>}
-                      {warn && <div style={{ position: "absolute", top: 2, right: 2, background: "#f59e0b", borderRadius: 4, padding: "1px 4px", fontSize: 8, fontWeight: 800, color: "#fff" }}>⚠</div>}
+                  {/* Event banners */}
+                  {dayEvts.map(ev => (
+                    <div key={ev.id} onClick={e => { e.stopPropagation(); openEditEvent(ev); }} style={{ marginTop: 4, borderRadius: 4, background: EVENT_COLORS[ev.type], color: "#fff", fontSize: 8, fontWeight: 700, padding: "2px 6px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{ev.name}</div>
+                  ))}
+                  <div style={{ flex: 1 }} />
+                  {/* Bottom — outfit info or empty */}
+                  {primaryOutfit && !hasImg && (
+                    <div style={{ background: "#f5f2ed", borderRadius: 8, padding: "10px 8px", textAlign: "center" }}>
+                      <div style={{ fontFamily: "'Cormorant Garamond', serif", fontStyle: "italic", fontSize: 12, color: "#888" }}>{primaryOutfit.name}</div>
                     </div>
-                  );
-                })}
-                {ids.length === 0 && <div style={{ flex: 1, borderRadius: 8, background: "#faf9f6", display: "flex", alignItems: "center", justifyContent: "center", minHeight: 60, opacity: 0.5 }}><span style={{ fontSize: 18 }}>+</span></div>}
+                  )}
+                  {hasImg && (
+                    <div>
+                      <div style={{ fontFamily: "'Cormorant Garamond', serif", fontStyle: "italic", fontSize: 12, color: "rgba(255,255,255,0.9)", lineHeight: 1.3, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{primaryOutfit.name}</div>
+                      {ids.length > 1 && <div style={{ fontFamily: "'Cormorant Garamond', serif", fontStyle: "italic", fontSize: 10, color: "rgba(255,255,255,0.55)", marginTop: 2 }}>+{ids.length - 1} more</div>}
+                    </div>
+                  )}
+                  {!primaryOutfit && <div style={{ display: "flex", alignItems: "center", justifyContent: "center", minHeight: 80, color: "#e4e0d8", fontSize: 22, fontWeight: 300 }}>+</div>}
+                </div>
               </div>
             );
           })}
@@ -8877,86 +8893,73 @@ function OutfitCalendar({ outfits, calendar, onSaveCalendar, month, onMonthChang
           const dayEvts = eventsOnDate(dateStr);
           const weatherWarn = activeOutfit ? getWeatherWarning(activeOutfit, wx) : null;
 
+          const hasImg = !!activeOutfit?.previewImage;
           return (
             <div key={dateStr}
               onClick={() => { setDayPopup(dateStr); setDayPopupTab(0); setShowDayAdd(false); setDayAddSearch(""); }}
               onDragOver={e => { e.preventDefault(); setDragOver(dateStr); }}
               onDragLeave={() => setDragOver(null)}
-              onDrop={e => {
-                e.preventDefault();
-                setDragOver(null);
-                if (draggingInfo) {
-                  moveOutfitToDay(draggingInfo.outfitId, draggingInfo.fromDate, dateStr);
-                  setDraggingInfo(null);
-                }
-              }}
-              style={{
-                borderRadius: 10,
-                border: isToday ? "2px solid #1a1a1a" : isDragOver ? "2px dashed #2d6a3f" : "1.5px solid #e8e4dc",
-                background: isDragOver ? "#f0faf4" : "#fff",
-                cursor: "pointer", minHeight: 80, padding: "5px 5px 4px",
-                display: "flex", flexDirection: "column",
-                transition: "box-shadow 0.12s, border-color 0.1s, background 0.1s",
-                position: "relative",
-              }}
-              onMouseEnter={e => e.currentTarget.style.boxShadow = "0 2px 8px rgba(0,0,0,0.08)"}
+              onDrop={e => { e.preventDefault(); setDragOver(null); if (draggingInfo) { moveOutfitToDay(draggingInfo.outfitId, draggingInfo.fromDate, dateStr); setDraggingInfo(null); } }}
+              style={{ borderRadius: 8, border: isDragOver ? "1.5px dashed #2d6a3f" : "1px solid #ede9e2", background: isDragOver ? "#f0faf4" : "#fff", cursor: "pointer", minHeight: 90, overflow: "hidden", position: "relative", transition: "box-shadow 0.12s" }}
+              onMouseEnter={e => e.currentTarget.style.boxShadow = "0 2px 12px rgba(0,0,0,0.07)"}
               onMouseLeave={e => e.currentTarget.style.boxShadow = "none"}
             >
-              {/* Day number + weather */}
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 2 }}>
-                <div style={{ width: 18, height: 18, borderRadius: "50%", background: isToday ? "#1a1a1a" : "transparent", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                  <span style={{ fontSize: 10, fontWeight: 900, color: isToday ? "#fff" : "#888" }}>{day}</span>
-                </div>
-                <div style={{ display: "flex", alignItems: "center", gap: 3 }}>
-                  {weatherWarn && <span style={{ fontSize: 9, background: "#f59e0b", color: "#fff", borderRadius: 4, padding: "1px 3px", fontWeight: 800 }}>⚠</span>}
-                  {wx && (
-                    <div style={{ fontSize: 10, color: "#555", textAlign: "right", lineHeight: 1.2, fontWeight: 800 }}>
-                      <div>{weatherIcon(wx.code)}</div>
-                      <div style={{ fontSize: 9 }}>{wx.high}°</div>
-                    </div>
-                  )}
-                </div>
-              </div>
-              {/* Event banners */}
-              {dayEvts.map(ev => (
-                <div key={ev.id} onClick={e => { e.stopPropagation(); openEditEvent(ev); }} style={{ borderRadius: 4, background: EVENT_COLORS[ev.type] || "#888", color: "#fff", fontSize: 8, fontWeight: 700, padding: "1px 4px", marginBottom: 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", cursor: "pointer" }}>{ev.name}</div>
-              ))}
-
-              {/* Outfit area */}
-              {activeOutfit ? (
-                <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 2 }}>
-                  <div
-                    draggable
-                    onDragStart={e => { e.stopPropagation(); setDraggingInfo({ outfitId: activeOutfitId, fromDate: dateStr }); }}
-                    onDragEnd={() => setDraggingInfo(null)}
-                    style={{ flex: 1, borderRadius: 6, overflow: "hidden", background: "#f5f2ed", display: "flex", alignItems: "center", justifyContent: "center", minHeight: 36, cursor: "grab" }}
-                    onClick={e => { e.stopPropagation(); onOpenOutfit(activeOutfit); }}
-                  >
-                    {activeOutfit.previewImage
-                      ? <img src={activeOutfit.previewImage} alt={activeOutfit.name} style={{ width: "100%", height: "100%", objectFit: "contain", pointerEvents: "none" }} />
-                      : <div style={{ fontSize: 8, fontWeight: 700, color: "#999", textAlign: "center", padding: 2, lineHeight: 1.3, overflow: "hidden" }}>{activeOutfit.name}</div>
-                    }
-                  </div>
-                  {/* Look name */}
-                  <div style={{ fontSize: 9, fontWeight: 800, color: "#1a1a1a", textAlign: "center", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", lineHeight: 1.3, padding: "0 2px" }}>{activeOutfit.name}</div>
-                  {/* Remove button + look toggles */}
-                  <div style={{ display: "flex", alignItems: "center", gap: 2 }} onClick={e => e.stopPropagation()}>
-                    {ids.length > 1 && (<>
-                      <button onClick={e => { e.stopPropagation(); setActiveLooks(a => ({ ...a, [dateStr]: (activeIdx - 1 + ids.length) % ids.length })); }}
-                        style={{ width: 14, height: 14, borderRadius: "50%", border: "none", background: "#e8e4dc", cursor: "pointer", fontSize: 9, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, padding: 0 }}>‹</button>
-                      <div style={{ fontSize: 8, color: "#aaa", fontWeight: 700, flex: 1, textAlign: "center" }}>{activeIdx + 1}/{ids.length}</div>
-                      <button onClick={e => { e.stopPropagation(); setActiveLooks(a => ({ ...a, [dateStr]: (activeIdx + 1) % ids.length })); }}
-                        style={{ width: 14, height: 14, borderRadius: "50%", border: "none", background: "#e8e4dc", cursor: "pointer", fontSize: 9, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, padding: 0 }}>›</button>
-                    </>)}
-                    <button onClick={e => { e.stopPropagation(); removeOutfitFromDay(dateStr, activeOutfitId); }}
-                      style={{ width: 14, height: 14, borderRadius: "50%", border: "none", background: "#fde8e8", color: "#c0392b", cursor: "pointer", fontSize: 9, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, padding: 0, marginLeft: "auto" }}>×</button>
-                  </div>
-                </div>
-              ) : (
-                <div style={{ flex: 1, borderRadius: 6, background: "#faf9f6", display: "flex", alignItems: "center", justifyContent: "center", minHeight: 36 }}>
-                  <span style={{ fontSize: 16, opacity: 0.2 }}>+</span>
-                </div>
+              {/* Full-bleed outfit image */}
+              {hasImg && (
+                <img src={activeOutfit.previewImage} alt={activeOutfit.name} draggable
+                  onDragStart={e => { e.stopPropagation(); setDraggingInfo({ outfitId: activeOutfitId, fromDate: dateStr }); }}
+                  onDragEnd={() => setDraggingInfo(null)}
+                  style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", pointerEvents: "none" }} />
               )}
+              {/* Gradient overlay */}
+              {hasImg && <div style={{ position: "absolute", inset: 0, background: "linear-gradient(to bottom, rgba(0,0,0,0.18) 0%, transparent 45%, transparent 55%, rgba(0,0,0,0.28) 100%)", pointerEvents: "none" }} />}
+
+              {/* Content layer */}
+              <div style={{ position: "relative", zIndex: 2, padding: "5px 5px 4px", height: "100%", display: "flex", flexDirection: "column", boxSizing: "border-box", minHeight: 90 }}>
+                {/* Day number + weather */}
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+                  <div style={{ textAlign: "center" }}>
+                    <div style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 15, fontWeight: isToday ? 600 : 400, color: hasImg ? "rgba(255,255,255,0.95)" : (isToday ? "#1a1a1a" : "#aaa"), lineHeight: 1 }}>{day}</div>
+                    {isToday && <div style={{ width: 3, height: 3, borderRadius: "50%", background: hasImg ? "rgba(255,255,255,0.8)" : "#1a1a1a", margin: "2px auto 0" }} />}
+                  </div>
+                  <div style={{ display: "flex", alignItems: "center", gap: 2 }}>
+                    {weatherWarn && <span style={{ fontSize: 8, background: "#f59e0b", color: "#fff", borderRadius: 3, padding: "1px 3px", fontWeight: 800 }}>⚠</span>}
+                    {wx && <div style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 11, color: hasImg ? "rgba(255,255,255,0.85)" : "#ccc", fontWeight: 400 }}>{wx.high}°</div>}
+                  </div>
+                </div>
+
+                {/* Event banners */}
+                {dayEvts.length > 0 && <div style={{ marginTop: 2 }}>{dayEvts.map(ev => (
+                  <div key={ev.id} onClick={e => { e.stopPropagation(); openEditEvent(ev); }} style={{ borderRadius: 3, background: EVENT_COLORS[ev.type], color: "#fff", fontSize: 7, fontWeight: 700, padding: "1px 4px", marginBottom: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", opacity: 0.9 }}>{ev.name}</div>
+                ))}</div>}
+
+                <div style={{ flex: 1 }} />
+
+                {/* Bottom — outfit name or empty state */}
+                {activeOutfit && !hasImg && (
+                  <div style={{ background: "#f5f2ed", borderRadius: 6, padding: "8px 4px", display: "flex", alignItems: "center", justifyContent: "center", flex: 1, marginTop: 4 }}>
+                    <span style={{ fontFamily: "'Cormorant Garamond', serif", fontStyle: "italic", fontSize: 10, color: "#888", textAlign: "center", lineHeight: 1.3 }}>{activeOutfit.name}</span>
+                  </div>
+                )}
+                {hasImg && (
+                  <div style={{ marginBottom: 2 }}>
+                    <div style={{ fontFamily: "'Cormorant Garamond', serif", fontStyle: "italic", fontSize: 10, color: "rgba(255,255,255,0.88)", lineHeight: 1.2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{activeOutfit.name}</div>
+                  </div>
+                )}
+                {!activeOutfit && <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", minHeight: 50, color: "#e4e0d8", fontSize: 16, fontWeight: 300 }}>+</div>}
+
+                {/* Multi-look nav + remove */}
+                {activeOutfit && (
+                  <div style={{ display: "flex", alignItems: "center", gap: 1, marginTop: 2 }} onClick={e => e.stopPropagation()}>
+                    {ids.length > 1 && (<>
+                      <button onClick={e => { e.stopPropagation(); setActiveLooks(a => ({ ...a, [dateStr]: (activeIdx - 1 + ids.length) % ids.length })); }} style={{ width: 13, height: 13, borderRadius: "50%", border: "none", background: hasImg ? "rgba(255,255,255,0.3)" : "#e8e4dc", color: hasImg ? "#fff" : "#666", cursor: "pointer", fontSize: 8, display: "flex", alignItems: "center", justifyContent: "center", padding: 0, flexShrink: 0 }}>‹</button>
+                      <div style={{ fontSize: 7, color: hasImg ? "rgba(255,255,255,0.7)" : "#bbb", flex: 1, textAlign: "center", fontWeight: 600 }}>{activeIdx + 1}/{ids.length}</div>
+                      <button onClick={e => { e.stopPropagation(); setActiveLooks(a => ({ ...a, [dateStr]: (activeIdx + 1) % ids.length })); }} style={{ width: 13, height: 13, borderRadius: "50%", border: "none", background: hasImg ? "rgba(255,255,255,0.3)" : "#e8e4dc", color: hasImg ? "#fff" : "#666", cursor: "pointer", fontSize: 8, display: "flex", alignItems: "center", justifyContent: "center", padding: 0, flexShrink: 0 }}>›</button>
+                    </>)}
+                    <button onClick={e => { e.stopPropagation(); removeOutfitFromDay(dateStr, activeOutfitId); }} style={{ width: 13, height: 13, borderRadius: "50%", border: "none", background: hasImg ? "rgba(255,255,255,0.25)" : "#fde8e8", color: hasImg ? "#fff" : "#c0392b", cursor: "pointer", fontSize: 8, display: "flex", alignItems: "center", justifyContent: "center", padding: 0, marginLeft: "auto", flexShrink: 0 }}>×</button>
+                  </div>
+                )}
+              </div>
             </div>
           );
         })}

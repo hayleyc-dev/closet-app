@@ -9063,8 +9063,8 @@ function OutfitCalendar({ outfits, calendar, onSaveCalendar, month, onMonthChang
                   filter: isPast ? "saturate(0.5)" : "none",
                   display: "flex", flexDirection: "column",
                 }}
-                onMouseEnter={e => { e.currentTarget.style.boxShadow = "0 4px 16px rgba(0,0,0,0.1)"; if(isPast) e.currentTarget.style.opacity="0.85"; }}
-                onMouseLeave={e => { e.currentTarget.style.boxShadow = "none"; if(isPast) e.currentTarget.style.opacity="0.6"; }}>
+                onMouseEnter={e => { setHoveredDay(dateStr); e.currentTarget.style.boxShadow = "0 4px 16px rgba(0,0,0,0.1)"; if(isPast) e.currentTarget.style.opacity="0.85"; }}
+                onMouseLeave={e => { setHoveredDay(null); e.currentTarget.style.boxShadow = "none"; if(isPast) e.currentTarget.style.opacity="0.6"; }}>
                 {/* Season marker */}
                 {seasonMark && <div style={{ height: 3, background: SEASON_COLORS[seasonMark] }} />}
                 {/* Custom markers */}
@@ -9090,37 +9090,34 @@ function OutfitCalendar({ outfits, calendar, onSaveCalendar, month, onMonthChang
                   <div key={ev.id} onClick={e => { e.stopPropagation(); openEditEvent(ev); }}
                     style={{ margin: "2px 6px 0", borderRadius: 6, background: EVENT_COLORS[ev.type], color: "#fff", fontSize: 9, fontWeight: 700, padding: "3px 8px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontFamily: "'DM Sans', sans-serif", cursor: "pointer" }}>{ev.name}</div>
                 ))}
-                {/* Outfit stack area */}
-                <div style={{ flex: 1, position: "relative", margin: "6px 6px 6px" }}>
-                  {ids.length > 0 ? (
-                    ids.slice(0, 3).map((id, si) => {
-                      const o = outfits.find(x => x.id === id);
-                      const offset = si * 5;
-                      return (
-                        <div key={id} style={{ position: "absolute", top: offset, left: offset, right: -offset, bottom: -offset, borderRadius: 8, overflow: "hidden", background: "#f0ece6", boxShadow: si > 0 ? "0 -2px 6px rgba(0,0,0,0.1)" : "none", zIndex: ids.length - si }}>
-                          {o?.previewImage
-                            ? <img src={o.previewImage} alt={o.name} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-                            : <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", padding: 8 }}><span style={{ fontSize: 10, color: "#999", fontWeight: 700, fontFamily: "'DM Sans', sans-serif", textAlign: "center" }}>{o?.name || ""}</span></div>
-                          }
+                {/* Outfit image — fills remaining space */}
+                {(() => {
+                  const o = ids.length > 0 ? outfits.find(x => x.id === ids[0]) : null;
+                  return (
+                    <div style={{ flex: 1, position: "relative", overflow: "hidden" }}>
+                      {o ? (
+                        o.previewImage
+                          ? <img src={o.previewImage} alt={o.name} style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
+                          : <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", background: "#f5f3ef" }}><span style={{ fontSize: 10, color: "#aaa", fontWeight: 700, fontFamily: "'DM Sans', sans-serif", textAlign: "center", padding: 8 }}>{o.name}</span></div>
+                      ) : (
+                        <div style={{ position: "absolute", inset: 0, backgroundImage: "repeating-linear-gradient(45deg, transparent, transparent 3px, rgba(0,0,0,0.018) 3px, rgba(0,0,0,0.018) 6px)", background: "#faf8f5", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                          <span style={{ fontSize: 20, color: "#ddd" }}>+</span>
                         </div>
-                      );
-                    })
-                  ) : (
-                    <div style={{ position: "absolute", inset: 0, borderRadius: 8, backgroundImage: "repeating-linear-gradient(45deg, transparent, transparent 3px, rgba(0,0,0,0.018) 3px, rgba(0,0,0,0.018) 6px)", background: "#faf8f5", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                      <span style={{ fontSize: 20, color: "#ddd" }}>+</span>
+                      )}
+                      {/* Multiple outfits badge */}
+                      {ids.length > 1 && (
+                        <div style={{ position: "absolute", top: 6, right: 6, background: "rgba(0,0,0,0.6)", color: "#fff", borderRadius: 999, padding: "2px 6px", fontSize: 9, fontWeight: 700 }}>+{ids.length - 1}</div>
+                      )}
+                      {/* Name — hover only, white bg black text */}
+                      {o && hoveredDay === dateStr && (
+                        <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, background: "#fff", padding: "5px 8px" }}>
+                          <div style={{ fontSize: 9, fontWeight: 700, color: "#1a1a1a", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontFamily: "'DM Sans', sans-serif" }}>{o.name}</div>
+                          {getWeatherWarning(o, wx) && <div style={{ fontSize: 8, color: "#f59e0b", fontWeight: 700, marginTop: 1 }}>⚠ {getWeatherWarning(o, wx)}</div>}
+                        </div>
+                      )}
                     </div>
-                  )}
-                </div>
-                {/* Outfit name at bottom */}
-                {ids.length > 0 && (
-                  <div style={{ padding: "0 8px 8px", flexShrink: 0 }}>
-                    <div style={{ fontSize: 9, fontWeight: 700, color: "#555", fontFamily: "'DM Sans', sans-serif", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                      {outfits.find(o => o.id === ids[0])?.name || ""}
-                      {ids.length > 1 && <span style={{ color: "#bbb", fontWeight: 600 }}> +{ids.length - 1}</span>}
-                    </div>
-                    {getWeatherWarning(outfits.find(o=>o.id===ids[0]), wx) && <div style={{ fontSize: 8, color: "#f59e0b", fontWeight: 700, fontFamily: "'DM Sans', sans-serif", marginTop: 1 }}>⚠ {getWeatherWarning(outfits.find(o=>o.id===ids[0]), wx)}</div>}
-                  </div>
-                )}
+                  );
+                })()}
               </div>
             );
           })}

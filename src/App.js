@@ -9824,6 +9824,13 @@ export default function App() {
   const [eventDraftDate, setEventDraftDate] = useState("");
   const [outfitPopup, setOutfitPopup] = useState(null); // outfit object
   const [outfitsView, setOutfitsView] = useState("grid"); // "grid" | "calendar"
+  const [outfitSelectMode, setOutfitSelectMode] = useState(false);
+  const [selectedOutfitIds, setSelectedOutfitIds] = useState(new Set());
+  const [outfitBulkLbPicker, setOutfitBulkLbPicker] = useState(false);
+  const [outfitBulkNewLb, setOutfitBulkNewLb] = useState(false);
+  const [outfitBulkNewLbName, setOutfitBulkNewLbName] = useState("");
+  const [outfitBulkCalModal, setOutfitBulkCalModal] = useState(false);
+  const [outfitBulkCalDate, setOutfitBulkCalDate] = useState(() => new Date().toISOString().slice(0, 10));
   const OUTFIT_CALENDAR_KEY = "wardrobe_outfit_calendar_v1";
   const [outfitCalendar, setOutfitCalendar] = useState(() => { try { return JSON.parse(localStorage.getItem("wardrobe_outfit_calendar_v1") || "{}"); } catch { return {}; } });
   const saveOutfitCalendar = (cal) => { setOutfitCalendar(cal); localStorage.setItem("wardrobe_outfit_calendar_v1", JSON.stringify(cal)); };
@@ -10393,6 +10400,14 @@ export default function App() {
                   )}
                 </div>
               )}
+              {tab === "outfits" && outfitsView === "grid" && (
+                <button onClick={() => { if (outfitSelectMode) { setOutfitSelectMode(false); setSelectedOutfitIds(new Set()); } else { setOutfitSelectMode(true); } }} style={{
+                  padding: "10px 16px", borderRadius: 14, background: outfitSelectMode ? "#e8e4dc" : "#f0ece4",
+                  border: "none", cursor: "pointer", fontSize: 13, fontWeight: 600,
+                  color: outfitSelectMode ? "#1a1a1a" : "#666",
+                  fontFamily: "'DM Sans', sans-serif",
+                }}>{outfitSelectMode ? "Cancel" : "Select"}</button>
+              )}
               {tab !== "stats" && tab !== "moodboard" && tab !== "home" && tab !== "settings" && (
                 <button className="btn-primary" onClick={() => {
                   if (tab === "outfits") openNewOutfit();
@@ -10685,6 +10700,23 @@ export default function App() {
                   )}
                 </div>
 
+                {/* Bulk action bar */}
+                {outfitSelectMode && outfitsView === "grid" && (
+                  <div style={{ display: "flex", gap: 8, padding: "10px 14px", background: "#f8f6f2", borderRadius: 14, marginBottom: 14, alignItems: "center", flexWrap: "wrap", border: "1px solid #ede9e2" }}>
+                    <button onClick={() => { const allIds = new Set(filteredOutfits.map(o => o.id)); setSelectedOutfitIds(prev => prev.size === filteredOutfits.length ? new Set() : allIds); }} style={{ padding: "5px 12px", borderRadius: 20, border: "1.5px solid #d0ccc4", background: "#fff", cursor: "pointer", fontSize: 12, fontWeight: 700, color: "#1a1a1a", fontFamily: "'DM Sans', sans-serif" }}>
+                      {selectedOutfitIds.size === filteredOutfits.length && filteredOutfits.length > 0 ? "Deselect All" : `Select All (${filteredOutfits.length})`}
+                    </button>
+                    {selectedOutfitIds.size > 0 && (<>
+                      <span style={{ fontSize: 12, color: "#aaa", fontWeight: 600, fontFamily: "'DM Sans', sans-serif" }}>{selectedOutfitIds.size} selected</span>
+                      <div style={{ width: 1, height: 20, background: "#e0dbd3" }} />
+                      <button onClick={() => { if (window.confirm(`Delete ${selectedOutfitIds.size} outfit${selectedOutfitIds.size > 1 ? "s" : ""}?`)) { [...selectedOutfitIds].forEach(id => outfitsDb.remove(id)); setSelectedOutfitIds(new Set()); setOutfitSelectMode(false); } }} style={{ padding: "5px 12px", borderRadius: 20, border: "1.5px solid #fca5a5", background: "#fef2f2", cursor: "pointer", fontSize: 12, fontWeight: 700, color: "#e05555", fontFamily: "'DM Sans', sans-serif" }}>Delete</button>
+                      <button onClick={() => setOutfitBulkLbPicker(true)} style={{ padding: "5px 12px", borderRadius: 20, border: "1.5px solid #d0ccc4", background: "#fff", cursor: "pointer", fontSize: 12, fontWeight: 700, color: "#1a1a1a", fontFamily: "'DM Sans', sans-serif" }}>Add to Lookbook</button>
+                      <button onClick={() => { setOutfitBulkNewLbName(""); setOutfitBulkNewLb(true); }} style={{ padding: "5px 12px", borderRadius: 20, border: "1.5px solid #d0ccc4", background: "#fff", cursor: "pointer", fontSize: 12, fontWeight: 700, color: "#1a1a1a", fontFamily: "'DM Sans', sans-serif" }}>New Lookbook</button>
+                      <button onClick={() => setOutfitBulkCalModal(true)} style={{ padding: "5px 12px", borderRadius: 20, border: "1.5px solid #d0ccc4", background: "#fff", cursor: "pointer", fontSize: 12, fontWeight: 700, color: "#1a1a1a", fontFamily: "'DM Sans', sans-serif" }}>Add to Calendar</button>
+                    </>)}
+                  </div>
+                )}
+
                 {outfitsView === "calendar" ? (
                   <OutfitCalendar
                     outfits={outfitsDb.rows}
@@ -10732,11 +10764,25 @@ export default function App() {
                       const outfitItems = (outfit.layers || outfit.itemIds || []).map(id => allItems.find(x => x.id === id)).filter(Boolean);
                       const tags = outfit.tags || [];
                       const outfitSeasons = outfit.seasons || [];
+                      const isSelected = selectedOutfitIds.has(outfit.id);
                       return (
-                        <div key={outfit.id} className="card fade-up outfit-card" onClick={() => setOutfitPopup(outfit)} style={{
-                          background: "#fff", borderRadius: 20, border: "1.5px solid #e8e4dc", overflow: "hidden",
-                          boxShadow: "0 2px 12px rgba(0,0,0,0.04)", animationDelay: `${i * 0.05}s`, opacity: 0, cursor: "pointer", position: "relative"
+                        <div key={outfit.id} className={"card fade-up" + (outfitSelectMode ? "" : " outfit-card")} onClick={() => {
+                          if (outfitSelectMode) { setSelectedOutfitIds(prev => { const n = new Set(prev); n.has(outfit.id) ? n.delete(outfit.id) : n.add(outfit.id); return n; }); }
+                          else { setOutfitPopup(outfit); }
+                        }} style={{
+                          background: "#fff", borderRadius: 20,
+                          border: isSelected ? "2px solid #1a1a1a" : "1.5px solid #e8e4dc",
+                          overflow: "hidden",
+                          boxShadow: isSelected ? "0 0 0 3px rgba(26,26,26,0.08)" : "0 2px 12px rgba(0,0,0,0.04)",
+                          animationDelay: `${i * 0.05}s`, opacity: 0, cursor: "pointer", position: "relative",
+                          transition: "border 0.12s, box-shadow 0.12s"
                         }}>
+                          {/* Select mode checkbox */}
+                          {outfitSelectMode && (
+                            <div style={{ position: "absolute", top: 8, right: 8, zIndex: 10, width: 22, height: 22, borderRadius: "50%", background: isSelected ? "#1a1a1a" : "rgba(255,255,255,0.92)", border: `2px solid ${isSelected ? "#1a1a1a" : "#ccc"}`, display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 1px 4px rgba(0,0,0,0.12)", pointerEvents: "none" }}>
+                              {isSelected && <svg width="11" height="11" viewBox="0 0 12 12" fill="none"><polyline points="2,6 5,9 10,3" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>}
+                            </div>
+                          )}
                           {/* Lookbook badge */}
                           {(() => { const lbCount = lookbooksDb.rows.filter(lb => (lb.outfitIds || []).includes(outfit.id)).length; return lbCount > 0 ? <div style={{ position: "absolute", top: 8, left: 8, zIndex: 2, background: "rgba(124,111,224,0.92)", color: "#fff", borderRadius: 20, padding: "2px 8px", fontSize: 10, fontWeight: 700, backdropFilter: "blur(4px)" }}>▤ {lbCount}</div> : null; })()}
                           {/* Preview: use saved previewImage if available, else item collage */}
@@ -10765,6 +10811,7 @@ export default function App() {
                             </div>
                           )}
                           {/* Hover-expand label */}
+                          {!outfitSelectMode && (
                           <div className="outfit-card-label">
                             <div style={{ fontSize: 12, fontWeight: 700, color: "#1a1a1a", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", marginBottom: tags[0] ? 4 : 0 }}>{outfit.name}</div>
                             {tags[0] && (() => { const oc = OCCASION_COLORS[tags[0]] || { bg: "#f5f3ef", color: "#888" }; return <div style={{ display: "inline-block", background: oc.bg, color: oc.color, borderRadius: 20, padding: "2px 8px", fontSize: 10, fontWeight: 700 }}>{tags[0]}</div>; })()}
@@ -10775,6 +10822,11 @@ export default function App() {
                               <button onClick={e => { e.stopPropagation(); if (window.confirm(`Delete "${outfit.name}"?`)) outfitsDb.remove(outfit.id); }} title="Delete" style={{ width: 32, height: 32, borderRadius: "50%", background: "#fef2f2", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}><SvgTrash size={14} color="#e05555" /></button>
                             </div>
                           </div>
+                          )}
+                          {/* Select mode name label */}
+                          {outfitSelectMode && (
+                            <div style={{ padding: "8px 10px", fontSize: 11, fontWeight: 700, color: "#1a1a1a", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontFamily: "'DM Sans', sans-serif" }}>{outfit.name}</div>
+                          )}
                         </div>
                       );
                     })}
@@ -11507,6 +11559,68 @@ export default function App() {
           </div>
         );
       })()}
+
+      {/* Bulk lookbook picker */}
+      {outfitBulkLbPicker && (
+        <div onClick={() => setOutfitBulkLbPicker(false)} style={{ position: "fixed", inset: 0, zIndex: 600, background: "rgba(0,0,0,0.35)", display: "flex", alignItems: "center", justifyContent: "center", backdropFilter: "blur(6px)" }}>
+          <div onClick={e => e.stopPropagation()} style={{ background: "#fff", borderRadius: 20, padding: "24px 22px", width: 320, boxShadow: "0 12px 48px rgba(0,0,0,0.18)", maxHeight: "70vh", overflowY: "auto" }}>
+            <div style={{ fontSize: 15, fontWeight: 800, color: "#1a1a1a", marginBottom: 4 }}>Add to Lookbook</div>
+            <div style={{ fontSize: 12, color: "#aaa", marginBottom: 16 }}>{selectedOutfitIds.size} outfits selected</div>
+            {lookbooksDb.rows.length === 0 ? (
+              <div style={{ fontSize: 13, color: "#bbb", textAlign: "center", padding: "20px 0" }}>No lookbooks yet — create one in the Lookbooks tab.</div>
+            ) : (
+              lookbooksDb.rows.map(lb => (
+                <button key={lb.id} onClick={async () => {
+                  for (const id of selectedOutfitIds) { await addOutfitToLookbook(id, lb.id); }
+                  setOutfitBulkLbPicker(false); setOutfitSelectMode(false); setSelectedOutfitIds(new Set());
+                }} style={{ display: "block", width: "100%", textAlign: "left", padding: "9px 12px", marginBottom: 6, background: "#f7f5f2", border: "none", borderRadius: 10, cursor: "pointer", fontFamily: "'DM Sans', sans-serif", fontSize: 13, fontWeight: 600, color: "#1a1a1a" }}>
+                  {lb.name}
+                </button>
+              ))
+            )}
+            <button onClick={() => setOutfitBulkLbPicker(false)} style={{ marginTop: 12, width: "100%", padding: "9px 0", background: "#f5f3ef", border: "none", borderRadius: 10, cursor: "pointer", fontFamily: "'DM Sans', sans-serif", fontSize: 12, fontWeight: 700, color: "#888" }}>Cancel</button>
+          </div>
+        </div>
+      )}
+
+      {/* Bulk new lookbook modal */}
+      {outfitBulkNewLb && (
+        <div onClick={() => setOutfitBulkNewLb(false)} style={{ position: "fixed", inset: 0, zIndex: 600, background: "rgba(0,0,0,0.35)", display: "flex", alignItems: "center", justifyContent: "center", backdropFilter: "blur(6px)" }}>
+          <div onClick={e => e.stopPropagation()} style={{ background: "#fff", borderRadius: 20, padding: "24px 22px", width: 320, boxShadow: "0 12px 48px rgba(0,0,0,0.18)" }}>
+            <div style={{ fontSize: 15, fontWeight: 800, color: "#1a1a1a", marginBottom: 4 }}>New Lookbook</div>
+            <div style={{ fontSize: 12, color: "#aaa", marginBottom: 16 }}>{selectedOutfitIds.size} outfit{selectedOutfitIds.size > 1 ? "s" : ""} will be added</div>
+            <input value={outfitBulkNewLbName} onChange={e => setOutfitBulkNewLbName(e.target.value)} placeholder="Lookbook name…" onKeyDown={e => { if (e.key === "Enter") e.currentTarget.blur(); }}
+              style={{ width: "100%", padding: "10px 12px", borderRadius: 10, border: "1.5px solid #e8e4dc", fontSize: 13, fontFamily: "'DM Sans', sans-serif", fontWeight: 600, outline: "none", boxSizing: "border-box", marginBottom: 14 }} autoFocus />
+            <button onClick={async () => {
+              if (!outfitBulkNewLbName.trim()) return;
+              const newLb = { id: Date.now().toString(36) + Math.random().toString(36).slice(2), name: outfitBulkNewLbName.trim(), outfitIds: [...selectedOutfitIds], type: "collection", tags: [], notes: "", lookMeta: {} };
+              await lookbooksDb.update(newLb);
+              setOutfitBulkNewLb(false); setOutfitSelectMode(false); setSelectedOutfitIds(new Set());
+            }} style={{ width: "100%", padding: "11px 0", background: "#1a1a1a", border: "none", borderRadius: 12, cursor: "pointer", fontFamily: "'DM Sans', sans-serif", fontSize: 13, fontWeight: 700, color: "#fff", marginBottom: 8 }}>Create Lookbook</button>
+            <button onClick={() => setOutfitBulkNewLb(false)} style={{ width: "100%", padding: "9px 0", background: "#f5f3ef", border: "none", borderRadius: 10, cursor: "pointer", fontFamily: "'DM Sans', sans-serif", fontSize: 12, fontWeight: 700, color: "#888" }}>Cancel</button>
+          </div>
+        </div>
+      )}
+
+      {/* Bulk add to calendar modal */}
+      {outfitBulkCalModal && (
+        <div onClick={() => setOutfitBulkCalModal(false)} style={{ position: "fixed", inset: 0, zIndex: 600, background: "rgba(0,0,0,0.35)", display: "flex", alignItems: "center", justifyContent: "center", backdropFilter: "blur(6px)" }}>
+          <div onClick={e => e.stopPropagation()} style={{ background: "#fff", borderRadius: 20, padding: "24px 22px", width: 320, boxShadow: "0 12px 48px rgba(0,0,0,0.18)" }}>
+            <div style={{ fontSize: 15, fontWeight: 800, color: "#1a1a1a", marginBottom: 4 }}>Add to Calendar</div>
+            <div style={{ fontSize: 12, color: "#aaa", marginBottom: 16 }}>{selectedOutfitIds.size} outfit{selectedOutfitIds.size > 1 ? "s" : ""} → pick a date</div>
+            <input type="date" value={outfitBulkCalDate} onChange={e => setOutfitBulkCalDate(e.target.value)}
+              style={{ width: "100%", padding: "10px 12px", borderRadius: 10, border: "1.5px solid #e8e4dc", fontSize: 13, fontFamily: "'DM Sans', sans-serif", fontWeight: 600, outline: "none", boxSizing: "border-box", marginBottom: 14 }} />
+            <button onClick={() => {
+              if (!outfitBulkCalDate) return;
+              const existing = outfitCalendar[outfitBulkCalDate] || [];
+              const toAdd = [...selectedOutfitIds].filter(id => !existing.includes(id));
+              saveOutfitCalendar({ ...outfitCalendar, [outfitBulkCalDate]: [...existing, ...toAdd] });
+              setOutfitBulkCalModal(false); setOutfitSelectMode(false); setSelectedOutfitIds(new Set());
+            }} style={{ width: "100%", padding: "11px 0", background: "#1a1a1a", border: "none", borderRadius: 12, cursor: "pointer", fontFamily: "'DM Sans', sans-serif", fontSize: 13, fontWeight: 700, color: "#fff", marginBottom: 8 }}>Add to Calendar</button>
+            <button onClick={() => setOutfitBulkCalModal(false)} style={{ width: "100%", padding: "9px 0", background: "#f5f3ef", border: "none", borderRadius: 10, cursor: "pointer", fontFamily: "'DM Sans', sans-serif", fontSize: 12, fontWeight: 700, color: "#888" }}>Cancel</button>
+          </div>
+        </div>
+      )}
 
       {/* Outfit Detail Popup */}
       {outfitPopup && (

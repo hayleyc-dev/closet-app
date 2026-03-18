@@ -291,9 +291,11 @@ const globalStyles = `
   /* Item card edit btn reveal on hover */
   .item-card:hover .item-card-edit-btn { opacity: 1 !important; }
   /* Wishlist card hover-only action buttons */
+  .wl-card { overflow: visible !important; }
   .wl-card:hover .wl-hover-btn { opacity: 1 !important; }
   .wl-card .wl-card-actions { max-height: 0; overflow: hidden; margin-top: 0; transition: max-height 0.2s ease, margin-top 0.2s ease; }
   .wl-card:hover .wl-card-actions { max-height: 50px; margin-top: 8px; }
+  .wl-card .wl-card-img { border-radius: 12px 12px 0 0; overflow: hidden; }
   .palette-del-btn { opacity: 0 !important; transition: opacity 0.15s; }
   div:hover > .palette-del-btn { opacity: 1 !important; }
 
@@ -1722,6 +1724,28 @@ function AddItemModal({ onSave, onSaveWish, onCancel, initial, editMode, initial
             <div style={{ marginBottom: 12 }}>
               <label style={{ display: "block", fontSize: 11, fontWeight: 600, color: "#999", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 5 }}>Product Link</label>
               <input style={{ ...inputStyle, width: "100%" }} value={form.link || ""} onChange={e => setForm(f => ({ ...f, link: e.target.value }))} placeholder="https://zara.com/..." />
+            </div>
+          )}
+
+          {/* Wishlist-only: reason */}
+          {dest === "wishlist" && (
+            <div style={{ marginBottom: 12 }}>
+              <label style={{ display: "block", fontSize: 11, fontWeight: 600, color: "#999", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 6 }}>Reason</label>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                {["Replace", "Gap", "Trend", "Trip", "Dream Item"].map(r => {
+                  const val = r.toLowerCase();
+                  const active = form.reason === val;
+                  return (
+                    <button key={r} type="button" onClick={() => setForm(f => ({ ...f, reason: f.reason === val ? "" : val }))} style={{
+                      padding: "5px 12px", borderRadius: 100,
+                      border: active ? "none" : "1px solid #e0dbd2",
+                      background: active ? "#1a1a1a" : "#fff",
+                      color: active ? "#fff" : "#555",
+                      fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "'DM Sans', sans-serif",
+                    }}>{r}</button>
+                  );
+                })}
+              </div>
             </div>
           )}
 
@@ -5694,7 +5718,7 @@ function WishlistTab({ wishlistDb, wishlistsDb, saveWishlistsMeta, activeWishlis
                     </div>
                   )}
                   {/* Image */}
-                  <div style={{ width: "100%", aspectRatio: "1/1", background: "#fff", overflow: "hidden", display: "flex", alignItems: "center", justifyContent: "center", position: "relative" }}>
+                  <div className="wl-card-img" style={{ width: "100%", aspectRatio: "1/1", background: "#fff", overflow: "hidden", display: "flex", alignItems: "center", justifyContent: "center", position: "relative" }}>
                     {item.image
                       ? <img src={item.image} alt={item.name} style={{ width: "100%", height: "100%", objectFit: "contain", display: "block", padding: 6 }} />
                       : <SvgHeart size={26} color="#ccc" style={{ opacity: 0.3 }} />

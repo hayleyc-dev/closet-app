@@ -8806,7 +8806,6 @@ function OutfitCalendar({ outfits, calendar, onSaveCalendar, month, onMonthChang
             </div>
           </div>
         )}
-      </div>
 
       {/* Day labels */}
       {calView === "month" && (

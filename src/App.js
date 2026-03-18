@@ -1881,7 +1881,7 @@ function AddItemModal({ onSave, onSaveWish, onCancel, initial, editMode, initial
 // Clean minimal card: photo dominant (3:4), name + brand + chips below
 function ItemCard({ item, onClick, onCreateLook, onEdit, onDelete, onAddToCapsule }) {
   return (
-    <div className="item-card wl-card" onClick={onClick}
+    <div className="item-card" onClick={onClick}
       style={{ cursor: "pointer", borderRadius: 16, overflow: "hidden", background: "#fff", position: "relative" }}>
       {/* Image */}
       <div style={{ width: "100%", aspectRatio: "1/1", background: "#fff", overflow: "hidden", display: "flex", alignItems: "center", justifyContent: "center" }}>

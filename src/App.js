@@ -2789,6 +2789,12 @@ function LookbookViewer({ lookbook, outfits, allItems, closetItems, onClose, onU
     hotel: "", activities: [], notes: ""
   });
   const [newActivity, setNewActivity] = useState("");
+  const [plannedSlots, setPlannedSlots] = useState(() => lookbook.plannedSlots || []);
+  const [openAccordions, setOpenAccordions] = useState({ overview: true, trip: false, notes: false, looks: true });
+  const toggleAccordion = (key) => setOpenAccordions(a => ({ ...a, [key]: !a[key] }));
+  const [editingSlotId, setEditingSlotId] = useState(null);
+  const [slotDragIdx, setSlotDragIdx] = useState(null);
+  const [slotDragOver, setSlotDragOver] = useState(null);
 
   const looks = lookIds.map(id => outfits.find(o => o.id === id)).filter(Boolean);
   const availableToAdd = outfits.filter(o => !lookIds.includes(o.id));
@@ -2822,7 +2828,7 @@ function LookbookViewer({ lookbook, outfits, allItems, closetItems, onClose, onU
       onUpdate({
         ...lookbook, name: lbName, notes, outfitIds: lookIds, lookMeta,
         tags: lbTags, city: lbCity, coverImage, moodboardId: linkedMoodboardId,
-        tripDetails, dateStart: lbDateStart, dateEnd: lbDateEnd, ...overrides
+        tripDetails, dateStart: lbDateStart, dateEnd: lbDateEnd, plannedSlots, ...overrides
       });
     } catch(e) { console.error("save error:", e); }
   };
@@ -2993,6 +2999,17 @@ function LookbookViewer({ lookbook, outfits, allItems, closetItems, onClose, onU
     return Object.values(seen);
   })();
 
+  // Items used in 2+ looks (repeats)
+  const itemUsageCount = {};
+  looks.forEach(look => {
+    (look.layers || look.itemIds || []).forEach(id => {
+      itemUsageCount[id] = (itemUsageCount[id] || 0) + 1;
+    });
+  });
+  const repeatCount = Object.values(itemUsageCount).filter(c => c > 1).length;
+  const statTileStyle = { background: "#faf9f6", borderRadius: 10, padding: "10px 8px", textAlign: "center" };
+  const acHdrStyle = { width: "100%", display: "flex", justifyContent: "space-between", alignItems: "center", background: "none", border: "none", borderBottom: "1.5px solid #f0ece4", cursor: "pointer", padding: "10px 16px", fontFamily: "'DM Sans', sans-serif" };
+
   return (
     <div className="lookbook-overlay">
       <style>{globalStyles}</style>
@@ -3126,6 +3143,47 @@ function LookbookViewer({ lookbook, outfits, allItems, closetItems, onClose, onU
         </div>
       </div>
 
+      {/* ── HERO HEADER ── */}
+      {(lbCity || dateStr || lbTags.length > 0 || lbWeather?.days) && (
+        <div style={{ background: "#fff", borderBottom: "1.5px solid #f0ece4", padding: "10px 20px", display: "flex", alignItems: "center", gap: 10, flexShrink: 0, flexWrap: "wrap" }}>
+          {lbCity && (
+            <div style={{ display: "flex", alignItems: "center", gap: 5, padding: "4px 12px", background: "#f5f3ef", borderRadius: 20 }}>
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#888" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/></svg>
+              <span style={{ fontSize: 12, fontWeight: 700, color: "#555" }}>{lbCity}</span>
+            </div>
+          )}
+          {(lbDateStart || lbDateEnd) && (
+            <div style={{ display: "flex", alignItems: "center", gap: 5, padding: "4px 12px", background: "#f5f3ef", borderRadius: 20 }}>
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#888" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+              <span style={{ fontSize: 12, fontWeight: 700, color: "#555" }}>
+                {[fmtDate(lbDateStart), fmtDate(lbDateEnd)].filter(Boolean).join(" \u2013 ")}
+                {tripDays ? ` \u00B7 ${tripDays}d ${tripNights}n` : ""}
+              </span>
+            </div>
+          )}
+          {lbTags.map(t => (
+            <div key={t} style={{ padding: "4px 10px", background: "#1a1a1a", borderRadius: 20, fontSize: 11, fontWeight: 700, color: "#fff" }}>{t}</div>
+          ))}
+          {lbWeather?.days && (() => {
+            const wxDays = lbWeather.days.filter(d => {
+              if (!lbDateStart && !lbDateEnd) return true;
+              return d.date >= (lbDateStart || "0") && d.date <= (lbDateEnd || "9999");
+            }).slice(0, 6);
+            return wxDays.length > 0 ? (
+              <div style={{ display: "flex", gap: 4, marginLeft: "auto" }}>
+                {wxDays.map(d => (
+                  <div key={d.date} style={{ display: "flex", flexDirection: "column", alignItems: "center", padding: "3px 8px", background: "#faf9f6", borderRadius: 10, gap: 1, minWidth: 38 }}>
+                    <span style={{ fontSize: 14 }}>{wxIcon(d.code)}</span>
+                    <span style={{ fontSize: 9, fontWeight: 700, color: "#666" }}>{new Date(d.date + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" })}</span>
+                    <span style={{ fontSize: 9, color: "#888" }}>{d.high}\u00B0/{d.low}\u00B0</span>
+                  </div>
+                ))}
+              </div>
+            ) : null;
+          })()}
+        </div>
+      )}
+
       <div style={{ display: "flex", flex: 1, overflow: "hidden" }}>
         {/* ── MAIN CONTENT ── */}
         <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
@@ -3252,7 +3310,7 @@ function LookbookViewer({ lookbook, outfits, allItems, closetItems, onClose, onU
 
           ) : (
             /* ── GRID VIEW ── */
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: 14, padding: 20, overflowY: "auto", flex: 1 }}>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: 14, padding: 20, overflowY: "auto", flex: 1, alignContent: "start" }}>
               {looks.map((look, i) => {
                 const pieces = (look.layers || look.itemIds || []).map(id => allItems.find(x => x.id === id)).filter(Boolean);
                 const meta = lookMeta[look.id] || {};
@@ -3261,16 +3319,19 @@ function LookbookViewer({ lookbook, outfits, allItems, closetItems, onClose, onU
                   <div key={look.id} style={{ cursor: "pointer", background: "#fff", borderRadius: 16, overflow: "hidden", border: "1.5px solid #e8e4dc", boxShadow: "0 2px 12px rgba(0,0,0,0.04)", position: "relative" }}>
                     <div onClick={() => { setIdx(i); setView("editorial"); }}>
                       {look.previewImage ? (
-                        <div style={{ height: 180, background: "url(" + look.previewImage + ") center/contain no-repeat #f5f3ef" }}>
+                        <div style={{ height: 180, background: "url(" + look.previewImage + ") center/contain no-repeat #f5f3ef", position: "relative" }}>
                           {metaWx && <div style={{ position: "absolute", top: 8, right: 8, background: "rgba(0,0,0,0.55)", borderRadius: 10, padding: "3px 8px", color: "#fff", fontSize: 11, fontWeight: 700 }}>{wxIcon(metaWx.code)} {metaWx.high}\u00B0</div>}
+                          {meta.day && <div style={{ position: "absolute", top: 8, left: 8, background: "rgba(0,0,0,0.55)", borderRadius: 10, padding: "3px 8px", color: "#fff", fontSize: 10, fontWeight: 700 }}>{meta.day}</div>}
                         </div>
                       ) : (
-                        <div style={{ display: "grid", gridTemplateColumns: pieces.length >= 2 ? "1fr 1fr" : "1fr", height: 140 }}>
+                        <div style={{ display: "grid", gridTemplateColumns: pieces.length >= 2 ? "1fr 1fr" : "1fr", height: 140, position: "relative" }}>
                           {pieces.slice(0, 4).map(item => (
                             <div key={item.id} style={{ background: item.image ? "url(" + item.image + ") center/contain no-repeat #f5f3ef" : "#f5f3ef", display: "flex", alignItems: "center", justifyContent: "center" }}>
                               {!item.image && <HangerIcon size={20} color="#ccc" />}
                             </div>
                           ))}
+                          {metaWx && <div style={{ position: "absolute", top: 8, right: 8, background: "rgba(0,0,0,0.55)", borderRadius: 10, padding: "3px 8px", color: "#fff", fontSize: 11, fontWeight: 700 }}>{wxIcon(metaWx.code)} {metaWx.high}\u00B0</div>}
+                          {meta.day && <div style={{ position: "absolute", top: 8, left: 8, background: "rgba(0,0,0,0.55)", borderRadius: 10, padding: "3px 8px", color: "#fff", fontSize: 10, fontWeight: 700 }}>{meta.day}</div>}
                         </div>
                       )}
                       <div style={{ padding: "8px 10px 4px" }}>
@@ -3288,227 +3349,342 @@ function LookbookViewer({ lookbook, outfits, allItems, closetItems, onClose, onU
                   </div>
                 );
               })}
+
+              {/* ── PLANNED SLOT CARDS (dotted placeholders) ── */}
+              {plannedSlots.map((slot, si) => {
+                const slotWx = slot.date ? getWxForDate(slot.date) : null;
+                const slotDate = slot.date ? new Date(slot.date + "T00:00:00") : null;
+                const slotDateLabel = slotDate ? slotDate.toLocaleDateString("en-US", { month: "short", day: "numeric" }) : null;
+                const slotDayLabel = slotDate ? slotDate.toLocaleDateString("en-US", { weekday: "short" }) : null;
+                return (
+                  <div key={slot.id}
+                    draggable
+                    onDragStart={() => setSlotDragIdx(si)}
+                    onDragEnter={() => setSlotDragOver(si)}
+                    onDragEnd={() => {
+                      if (slotDragIdx !== null && slotDragOver !== null && slotDragIdx !== slotDragOver) {
+                        const next = [...plannedSlots];
+                        const [moved] = next.splice(slotDragIdx, 1);
+                        next.splice(slotDragOver, 0, moved);
+                        setPlannedSlots(next);
+                        save({ plannedSlots: next });
+                      }
+                      setSlotDragIdx(null); setSlotDragOver(null);
+                    }}
+                    onDragOver={e => e.preventDefault()}
+                    style={{ borderRadius: 16, border: `2px dashed ${slotDragOver === si ? "#888" : "#d0cbc3"}`, background: slotDragOver === si ? "#f5f3ef" : "#faf9f6", overflow: "hidden", position: "relative", cursor: "grab", transition: "border-color 0.15s" }}>
+                    {/* Weather / date badges */}
+                    <div style={{ height: 160, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 8, padding: 14, position: "relative" }}>
+                      {slotDateLabel && (
+                        <div style={{ position: "absolute", top: 8, left: 8, display: "flex", gap: 4 }}>
+                          <div style={{ background: "rgba(0,0,0,0.65)", borderRadius: 8, padding: "2px 8px", fontSize: 10, fontWeight: 700, color: "#fff" }}>{slotDayLabel} {slotDateLabel}</div>
+                          {slotWx && <div style={{ background: "rgba(0,0,0,0.65)", borderRadius: 8, padding: "2px 8px", fontSize: 10, fontWeight: 700, color: "#fff" }}>{wxIcon(slotWx.code)} {slotWx.high}\u00B0</div>}
+                        </div>
+                      )}
+                      {!slotDateLabel && slotWx && (
+                        <div style={{ position: "absolute", top: 8, right: 8, background: "rgba(0,0,0,0.65)", borderRadius: 8, padding: "2px 8px", fontSize: 10, fontWeight: 700, color: "#fff" }}>{wxIcon(slotWx.code)} {slotWx.high}\u00B0</div>
+                      )}
+                      <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#d0cbc3" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M20 7H4a2 2 0 00-2 2v10a2 2 0 002 2h16a2 2 0 002-2V9a2 2 0 00-2-2z"/><path d="M16 21V5a2 2 0 00-2-2h-4a2 2 0 00-2 2v16"/></svg>
+                      <button onClick={e => { e.stopPropagation(); setShowAddLooks(true); }}
+                        style={{ padding: "5px 14px", background: "#1a1a1a", color: "#fff", border: "none", borderRadius: 10, cursor: "pointer", fontSize: 11, fontWeight: 700, fontFamily: "'DM Sans', sans-serif" }}>
+                        + Add Outfit
+                      </button>
+                    </div>
+                    <div style={{ padding: "0 10px 10px", borderTop: "1.5px dashed #e0dbd2" }}>
+                      {editingSlotId === slot.id ? (
+                        <input autoFocus value={slot.name}
+                          onChange={e => { const next = plannedSlots.map((s, j) => j === si ? { ...s, name: e.target.value } : s); setPlannedSlots(next); }}
+                          onBlur={() => { setEditingSlotId(null); save({ plannedSlots }); }}
+                          onKeyDown={e => { if (e.key === "Enter") { setEditingSlotId(null); save({ plannedSlots }); } }}
+                          style={{ width: "100%", border: "none", borderBottom: "1.5px solid #1a1a1a", outline: "none", fontSize: 12, fontWeight: 700, color: "#1a1a1a", background: "transparent", fontFamily: "'DM Sans', sans-serif", padding: "5px 0", boxSizing: "border-box" }} />
+                      ) : (
+                        <div onClick={() => setEditingSlotId(slot.id)} style={{ fontSize: 12, fontWeight: 700, color: slot.name ? "#1a1a1a" : "#bbb", cursor: "text", padding: "5px 0" }}>
+                          {slot.name || "Name this look\u2026"}
+                        </div>
+                      )}
+                      <div style={{ display: "flex", gap: 4, marginTop: 3, alignItems: "center" }}>
+                        <input type="date" value={slot.date || ""}
+                          onChange={e => { const next = plannedSlots.map((s, j) => j === si ? { ...s, date: e.target.value } : s); setPlannedSlots(next); save({ plannedSlots: next }); }}
+                          style={{ flex: 1, padding: "3px 6px", border: "1px solid #e8e4dc", borderRadius: 6, fontFamily: "'DM Sans', sans-serif", fontSize: 10, outline: "none", background: "#fff" }} />
+                        <button onClick={() => { const next = plannedSlots.filter((_, j) => j !== si); setPlannedSlots(next); save({ plannedSlots: next }); }}
+                          style={{ background: "none", border: "none", cursor: "pointer", color: "#ddd", padding: "2px 4px", lineHeight: 1 }}
+                          onMouseEnter={e => e.currentTarget.style.color = "#e05555"}
+                          onMouseLeave={e => e.currentTarget.style.color = "#ddd"}>
+                          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+
+              {/* Add Slot tile */}
+              <div onClick={() => { const next = [...plannedSlots, { id: Date.now() + "_" + Math.random().toString(36).slice(2), name: "", date: "" }]; setPlannedSlots(next); save({ plannedSlots: next }); }}
+                style={{ borderRadius: 16, border: "2px dashed #e0dbd2", background: "#fafaf8", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 6, cursor: "pointer", minHeight: 200, transition: "border-color 0.15s, background 0.15s" }}
+                onMouseEnter={e => { e.currentTarget.style.borderColor = "#aaa"; e.currentTarget.style.background = "#f5f3ef"; }}
+                onMouseLeave={e => { e.currentTarget.style.borderColor = "#e0dbd2"; e.currentTarget.style.background = "#fafaf8"; }}>
+                <div style={{ width: 28, height: 28, borderRadius: "50%", background: "#e8e4dc", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                  <span style={{ fontSize: 17, color: "#999", lineHeight: 1 }}>+</span>
+                </div>
+                <div style={{ fontSize: 11, fontWeight: 700, color: "#bbb" }}>Plan a Look</div>
+              </div>
             </div>
           )}
         </div>
 
-        {/* ── RIGHT SIDEBAR ── */}
-        <div style={{ width: 272, background: "#fff", borderLeft: "1.5px solid #e8e4dc", padding: "16px 16px", display: "flex", flexDirection: "column", gap: 16, overflowY: "auto", flexShrink: 0 }}>
+        {/* ── RIGHT SIDEBAR (accordion) ── */}
+        <div style={{ width: 272, background: "#fff", borderLeft: "1.5px solid #e8e4dc", display: "flex", flexDirection: "column", overflowY: "auto", flexShrink: 0 }}>
 
-          {/* Stats */}
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
-            {[
-              { label: "Looks", value: looks.length },
-              { label: "Pieces", value: packItems.length },
-              tripDays ? { label: "Days", value: tripDays } : null,
-              tripNights !== null ? { label: "Nights", value: tripNights } : null,
-            ].filter(Boolean).map(s => (
-              <div key={s.label} style={{ background: "#faf9f6", borderRadius: 10, padding: "10px", textAlign: "center" }}>
-                <div style={{ fontSize: 16, fontWeight: 800, color: "#1a1a1a", lineHeight: 1.2 }}>{s.value}</div>
-                <div style={{ fontSize: 10, color: "#aaa", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.06em", marginTop: 2 }}>{s.label}</div>
-              </div>
-            ))}
-          </div>
-
-          {/* Tags */}
-          <div>
-            <div style={{ fontSize: 11, fontWeight: 700, color: "#aaa", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 8 }}>Tags</div>
-            <div style={{ display: "flex", flexWrap: "wrap", gap: 5 }}>
-              {["Travel","Work Week","Event","Disney","Sport","Weekend","Vacation"].map(t => {
-                const on = lbTags.includes(t);
-                return (
-                  <button key={t} onClick={() => { const next = on ? lbTags.filter(x => x !== t) : [...lbTags, t]; setLbTags(next); save({ tags: next }); }} style={{
-                    padding: "4px 10px", borderRadius: 20, border: "1px solid",
-                    borderColor: on ? "#1a1a1a" : "#e0dbd2",
-                    background: on ? "#1a1a1a" : "#fff",
-                    color: on ? "#fff" : "#888",
-                    fontFamily: "'DM Sans', sans-serif", fontSize: 11, fontWeight: 700, cursor: "pointer"
-                  }}>{t}</button>
-                );
-              })}
-            </div>
-          </div>
-
-          {/* Weather */}
-          <div>
-            <div style={{ fontSize: 11, fontWeight: 700, color: "#aaa", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 8 }}>Trip Weather</div>
-            <div style={{ display: "flex", gap: 6 }}>
-              <input value={lbCity} onChange={e => setLbCity(e.target.value)} placeholder="City (e.g. Orlando, FL)"
-                onKeyDown={e => { if (e.key === "Enter") fetchWeather(); }}
-                style={{ flex: 1, padding: "7px 10px", border: "1.5px solid #e8e4dc", borderRadius: 10, fontFamily: "'DM Sans', sans-serif", fontSize: 12, outline: "none" }} />
-              <button onClick={fetchWeather} disabled={wxLoading || !lbCity.trim()} style={{ ...btnBase, padding: "7px 10px", background: "#f5f3ef", color: "#555", fontSize: 12, border: "none", flexShrink: 0 }}>
-                {wxLoading ? "\u2026" : "\u26C5"}
-              </button>
-            </div>
-            {lbWeather?.error && <div style={{ fontSize: 11, color: "#e05555", marginTop: 6 }}>{lbWeather.error}</div>}
-            {lbWeather?.days && lbWeather.days.length > 0 && (
-              <div style={{ marginTop: 8, maxHeight: 140, overflowY: "auto", display: "flex", flexDirection: "column", gap: 3 }}>
-                {lbWeather.days.filter(d => {
-                  if (!lookbook.dateStart && !lookbook.dateEnd) return true;
-                  return d.date >= (lookbook.dateStart || "0") && d.date <= (lookbook.dateEnd || "9999");
-                }).slice(0, 14).map(d => (
-                  <div key={d.date} style={{ display: "flex", alignItems: "center", gap: 8, padding: "4px 6px", borderRadius: 8, background: "#faf9f6" }}>
-                    <span style={{ fontSize: 14 }}>{wxIcon(d.code)}</span>
-                    <span style={{ fontSize: 11, fontWeight: 700, color: "#555", flex: 1 }}>{new Date(d.date + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" })}</span>
-                    <span style={{ fontSize: 11, color: "#1a1a1a", fontWeight: 700 }}>{d.high}\u00B0</span>
-                    <span style={{ fontSize: 10, color: "#bbb" }}>{d.low}\u00B0</span>
+          {/* ── OVERVIEW ── */}
+          <button onClick={() => toggleAccordion("overview")} style={{ ...acHdrStyle }}>
+            <span style={{ fontSize: 10, fontWeight: 700, color: "#aaa", textTransform: "uppercase", letterSpacing: "0.1em" }}>Overview</span>
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#ccc" strokeWidth="2.5" strokeLinecap="round" style={{ transform: openAccordions.overview ? "rotate(180deg)" : "none", transition: "transform 0.2s" }}><polyline points="6 9 12 15 18 9"/></svg>
+          </button>
+          {openAccordions.overview && (
+            <div style={{ padding: "12px 16px 14px", display: "flex", flexDirection: "column", gap: 12 }}>
+              {/* Stats grid */}
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 7 }}>
+                <div style={statTileStyle}>
+                  <div style={{ fontSize: 15, fontWeight: 800, color: "#1a1a1a", lineHeight: 1.2 }}>
+                    {looks.length}<span style={{ fontSize: 11, fontWeight: 600, color: "#bbb" }}> / {looks.length + plannedSlots.length}</span>
                   </div>
-                ))}
-              </div>
-            )}
-          </div>
-
-          {/* Pack list */}
-          {looks.length > 0 && (
-            <div>
-              <button onClick={() => setShowPackList(p => !p)} style={{ width: "100%", padding: "8px 12px", background: showPackList ? "#f0faf4" : "#f5f3ef", border: showPackList ? "1.5px solid #b6e8c8" : "none", borderRadius: 10, cursor: "pointer", fontSize: 12, fontWeight: 700, color: showPackList ? "#2d6a3f" : "#666", fontFamily: "'DM Sans', sans-serif", textAlign: "left" }}>
-                <SvgLuggage size={13} color="currentColor" style={{ marginRight: 6 }} />{showPackList ? "Hide" : "Packing List"} ({packItems.length} items)
-              </button>
-              {showPackList && (
-                <div style={{ marginTop: 8, background: "#faf9f6", borderRadius: 10, padding: "10px 12px", maxHeight: 220, overflowY: "auto" }}>
-                  <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
-                    <div style={{ fontSize: 11, fontWeight: 700, color: "#aaa", textTransform: "uppercase", letterSpacing: "0.06em" }}>{packItems.filter(i => checkedPack[i.id]).length} / {packItems.length} packed</div>
-                    <button onClick={() => setCheckedPack({})} style={{ fontSize: 10, fontWeight: 700, color: "#aaa", background: "none", border: "none", cursor: "pointer", fontFamily: "'DM Sans', sans-serif" }}>Reset</button>
-                  </div>
-                  {/* Progress bar */}
-                  <div style={{ height: 4, borderRadius: 4, background: "#e8e4dc", marginBottom: 10, overflow: "hidden" }}>
-                    <div style={{ height: "100%", borderRadius: 4, background: "#2d6a3f", width: (packItems.length > 0 ? (packItems.filter(i => checkedPack[i.id]).length / packItems.length * 100) : 0) + "%", transition: "width 0.3s" }} />
-                  </div>
-                  <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
-                    {packItems.map(item => (
-                      <div key={item.id} onClick={() => setCheckedPack(c => ({ ...c, [item.id]: !c[item.id] }))} style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer", opacity: checkedPack[item.id] ? 0.45 : 1 }}>
-                        <div style={{ width: 16, height: 16, borderRadius: 4, border: "2px solid", borderColor: checkedPack[item.id] ? "#2d6a3f" : "#ccc", background: checkedPack[item.id] ? "#2d6a3f" : "transparent", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>
-                          {checkedPack[item.id] && <SvgCheck size={9} color="#fff" />}
-                        </div>
-                        <div style={{ fontSize: 12, color: "#444", fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1, textDecoration: checkedPack[item.id] ? "line-through" : "none" }}>{item.name}</div>
-                        {item.category && <div style={{ fontSize: 10, color: "#bbb", flexShrink: 0 }}>{item.category}</div>}
-                      </div>
-                    ))}
-                  </div>
+                  <div style={{ fontSize: 9, color: "#aaa", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", marginTop: 3 }}>Planned Looks</div>
                 </div>
-              )}
+                <div style={statTileStyle}>
+                  <div style={{ fontSize: 15, fontWeight: 800, color: "#1a1a1a", lineHeight: 1.2 }}>{packItems.length}</div>
+                  <div style={{ fontSize: 9, color: "#aaa", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", marginTop: 3 }}>Packed Pieces</div>
+                </div>
+                {repeatCount > 0 && (
+                  <div style={statTileStyle}>
+                    <div style={{ fontSize: 15, fontWeight: 800, color: "#1a1a1a", lineHeight: 1.2 }}>{repeatCount}</div>
+                    <div style={{ fontSize: 9, color: "#aaa", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", marginTop: 3 }}>Repeats</div>
+                  </div>
+                )}
+                {tripDays && (
+                  <div style={statTileStyle}>
+                    <div style={{ fontSize: 15, fontWeight: 800, color: "#1a1a1a", lineHeight: 1.2 }}>
+                      {tripDays}<span style={{ fontSize: 10, color: "#bbb", fontWeight: 600 }}>d</span> {tripNights}<span style={{ fontSize: 10, color: "#bbb", fontWeight: 600 }}>n</span>
+                    </div>
+                    <div style={{ fontSize: 9, color: "#aaa", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", marginTop: 3 }}>Duration</div>
+                  </div>
+                )}
+              </div>
+              {/* Tags */}
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 5 }}>
+                {["Travel","Work Week","Event","Disney","Sport","Weekend","Vacation"].map(t => {
+                  const on = lbTags.includes(t);
+                  return (
+                    <button key={t} onClick={() => { const next = on ? lbTags.filter(x => x !== t) : [...lbTags, t]; setLbTags(next); save({ tags: next }); }}
+                      style={{ padding: "4px 10px", borderRadius: 20, border: "1px solid", borderColor: on ? "#1a1a1a" : "#e0dbd2", background: on ? "#1a1a1a" : "#fff", color: on ? "#fff" : "#888", fontFamily: "'DM Sans', sans-serif", fontSize: 11, fontWeight: 700, cursor: "pointer" }}>
+                      {t}
+                    </button>
+                  );
+                })}
+              </div>
             </div>
           )}
 
-          {/* Notes */}
-          <div>
-            <div style={{ fontSize: 11, fontWeight: 700, color: "#aaa", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 6 }}>Lookbook Notes</div>
-            <textarea value={notes} onChange={e => setNotes(e.target.value)} onBlur={() => save()}
-              placeholder="Add notes\u2026"
-              style={{ width: "100%", padding: "9px 12px", border: "1.5px solid #e8e4dc", borderRadius: 12, fontFamily: "'DM Sans', sans-serif", fontSize: 12, resize: "vertical", minHeight: 70, outline: "none", boxSizing: "border-box" }} />
-          </div>
-
-          {/* Looks list with drag-to-reorder */}
-          <div>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
-              <div style={{ fontSize: 11, fontWeight: 700, color: "#aaa", textTransform: "uppercase", letterSpacing: "0.08em" }}>Looks</div>
-              <button onClick={() => setShowAddLooks(true)} style={{ fontSize: 11, fontWeight: 700, color: "#888", background: "none", border: "none", cursor: "pointer", fontFamily: "'DM Sans', sans-serif" }}>+ Add</button>
-            </div>
-
-            {/* Draggable looks list */}
-            <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
-              {looks.map((look, i) => {
-                const meta = lookMeta[look.id] || {};
-                const isDraggingOver = dragOver2 === i;
-                return (
-                  <div key={look.id}
-                    draggable
-                    onDragStart={() => handleDragStart(i)}
-                    onDragEnter={() => handleDragEnter(i)}
-                    onDragEnd={handleDrop}
-                    onDragOver={e => e.preventDefault()}
-                    onClick={() => { setIdx(i); setView("editorial"); }}
-                    style={{
-                      display: "flex", alignItems: "center", gap: 8, padding: "7px 10px",
-                      background: idx === i ? "#f0faf4" : isDraggingOver ? "#f5f3ef" : "#fafaf8",
-                      borderRadius: 10,
-                      border: idx === i ? "1.5px solid #3aaa6e" : isDraggingOver ? "1.5px dashed #888" : "1.5px solid #e8e4dc",
-                      cursor: "grab", transition: "border-color 0.12s, background 0.12s"
-                    }}>
-                    <span style={{ color: "#ccc", fontSize: 12, flexShrink: 0 }}>\u2630</span>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontSize: 11, fontWeight: 700, color: "#1a1a1a", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{look.name || ("Look " + (i + 1))}</div>
-                      {(meta.day || meta.occasion) && <div style={{ fontSize: 10, color: "#aaa", marginTop: 1 }}>{[meta.day, meta.occasion].filter(Boolean).join(" \u00B7 ")}</div>}
-                    </div>
-                    <button onClick={e => { e.stopPropagation(); removeLook(look.id); }}
-                      style={{ background: "none", border: "none", color: "#ddd", cursor: "pointer", fontSize: 12, padding: "0 2px", flexShrink: 0 }}
-                      onMouseEnter={e => e.currentTarget.style.color = "#e05555"}
-                      onMouseLeave={e => e.currentTarget.style.color = "#ddd"}>
-                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-                    </button>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-
-          {/* Lookbook Details */}
-          <div>
-            <div style={{ fontSize: 11, fontWeight: 700, color: "#aaa", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 8 }}>Lookbook Details</div>
-            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+          {/* ── TRIP ── */}
+          <button onClick={() => toggleAccordion("trip")} style={{ ...acHdrStyle }}>
+            <span style={{ fontSize: 10, fontWeight: 700, color: "#aaa", textTransform: "uppercase", letterSpacing: "0.1em" }}>Trip</span>
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#ccc" strokeWidth="2.5" strokeLinecap="round" style={{ transform: openAccordions.trip ? "rotate(180deg)" : "none", transition: "transform 0.2s" }}><polyline points="6 9 12 15 18 9"/></svg>
+          </button>
+          {openAccordions.trip && (
+            <div style={{ padding: "12px 16px 14px", display: "flex", flexDirection: "column", gap: 10 }}>
+              {/* Name */}
               <div>
-                <div style={{ fontSize: 10, fontWeight: 700, color: "#bbb", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 4 }}>Name</div>
+                <div style={{ fontSize: 9, fontWeight: 700, color: "#bbb", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 4 }}>Name</div>
                 <input value={lbName} onChange={e => setLbName(e.target.value)} onBlur={() => save()}
-                  style={{ width: "100%", padding: "7px 10px", border: "1.5px solid #e8e4dc", borderRadius: 10, fontFamily: "'DM Sans', sans-serif", fontSize: 12, outline: "none", boxSizing: "border-box" }} />
+                  style={{ width: "100%", padding: "6px 10px", border: "1.5px solid #e8e4dc", borderRadius: 8, fontFamily: "'DM Sans', sans-serif", fontSize: 12, outline: "none", boxSizing: "border-box" }} />
               </div>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+              {/* Dates */}
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 7 }}>
                 <div>
-                  <div style={{ fontSize: 10, fontWeight: 700, color: "#bbb", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 4 }}>Start</div>
+                  <div style={{ fontSize: 9, fontWeight: 700, color: "#bbb", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 4 }}>Start</div>
                   <input type="date" value={lbDateStart} onChange={e => setLbDateStart(e.target.value)} onBlur={() => save()}
-                    style={{ width: "100%", padding: "7px 8px", border: "1.5px solid #e8e4dc", borderRadius: 10, fontFamily: "'DM Sans', sans-serif", fontSize: 11, outline: "none", boxSizing: "border-box" }} />
+                    style={{ width: "100%", padding: "6px 6px", border: "1.5px solid #e8e4dc", borderRadius: 8, fontFamily: "'DM Sans', sans-serif", fontSize: 10, outline: "none", boxSizing: "border-box" }} />
                 </div>
                 <div>
-                  <div style={{ fontSize: 10, fontWeight: 700, color: "#bbb", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 4 }}>End</div>
+                  <div style={{ fontSize: 9, fontWeight: 700, color: "#bbb", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 4 }}>End</div>
                   <input type="date" value={lbDateEnd} onChange={e => setLbDateEnd(e.target.value)} onBlur={() => save()}
-                    style={{ width: "100%", padding: "7px 8px", border: "1.5px solid #e8e4dc", borderRadius: 10, fontFamily: "'DM Sans', sans-serif", fontSize: 11, outline: "none", boxSizing: "border-box" }} />
+                    style={{ width: "100%", padding: "6px 6px", border: "1.5px solid #e8e4dc", borderRadius: 8, fontFamily: "'DM Sans', sans-serif", fontSize: 10, outline: "none", boxSizing: "border-box" }} />
                 </div>
               </div>
-            </div>
-          </div>
-
-          {/* ── TRIP DETAILS ── */}
-          <div>
-            <div style={{ fontSize: 11, fontWeight: 700, color: "#aaa", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 10 }}>Trip Details</div>
-            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+              {/* Destination + Weather */}
+              <div>
+                <div style={{ fontSize: 9, fontWeight: 700, color: "#bbb", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 4 }}>Destination</div>
+                <div style={{ display: "flex", gap: 6 }}>
+                  <input value={lbCity} onChange={e => setLbCity(e.target.value)} placeholder="City (e.g. Orlando, FL)"
+                    onKeyDown={e => { if (e.key === "Enter") fetchWeather(); }}
+                    style={{ flex: 1, padding: "6px 10px", border: "1.5px solid #e8e4dc", borderRadius: 8, fontFamily: "'DM Sans', sans-serif", fontSize: 12, outline: "none" }} />
+                  <button onClick={fetchWeather} disabled={wxLoading || !lbCity.trim()} style={{ ...btnBase, padding: "6px 10px", background: "#f5f3ef", color: "#555", fontSize: 12, border: "none", flexShrink: 0 }}>
+                    {wxLoading ? "\u2026" : "\u26C5"}
+                  </button>
+                </div>
+                {lbWeather?.error && <div style={{ fontSize: 11, color: "#e05555", marginTop: 4 }}>{lbWeather.error}</div>}
+                {lbWeather?.days && lbWeather.days.length > 0 && (
+                  <div style={{ marginTop: 6, maxHeight: 140, overflowY: "auto", display: "flex", flexDirection: "column", gap: 3 }}>
+                    {lbWeather.days.filter(d => {
+                      if (!lookbook.dateStart && !lookbook.dateEnd) return true;
+                      return d.date >= (lookbook.dateStart || "0") && d.date <= (lookbook.dateEnd || "9999");
+                    }).slice(0, 14).map(d => (
+                      <div key={d.date} style={{ display: "flex", alignItems: "center", gap: 8, padding: "3px 6px", borderRadius: 7, background: "#faf9f6" }}>
+                        <span style={{ fontSize: 13 }}>{wxIcon(d.code)}</span>
+                        <span style={{ fontSize: 11, fontWeight: 700, color: "#555", flex: 1 }}>{new Date(d.date + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" })}</span>
+                        <span style={{ fontSize: 11, color: "#1a1a1a", fontWeight: 700 }}>{d.high}\u00B0</span>
+                        <span style={{ fontSize: 10, color: "#bbb" }}>{d.low}\u00B0</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
               {/* Hotel */}
               <div>
-                <div style={{ fontSize: 10, fontWeight: 700, color: "#bbb", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 4 }}>Hotel</div>
+                <div style={{ fontSize: 9, fontWeight: 700, color: "#bbb", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 4 }}>Hotel</div>
                 <input value={tripDetails.hotel || ""} onChange={e => setTripDetails(d => ({ ...d, hotel: e.target.value }))} onBlur={() => saveTripDetails({})}
-                  placeholder="Hotel name…"
-                  style={{ width: "100%", padding: "7px 10px", border: "1.5px solid #e8e4dc", borderRadius: 10, fontFamily: "'DM Sans', sans-serif", fontSize: 12, outline: "none", boxSizing: "border-box" }} />
+                  placeholder="Hotel name\u2026"
+                  style={{ width: "100%", padding: "6px 10px", border: "1.5px solid #e8e4dc", borderRadius: 8, fontFamily: "'DM Sans', sans-serif", fontSize: 12, outline: "none", boxSizing: "border-box" }} />
               </div>
               {/* Activities */}
               <div>
-                <div style={{ fontSize: 10, fontWeight: 700, color: "#bbb", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 4 }}>Activities</div>
-                <div style={{ display: "flex", flexDirection: "column", gap: 4, marginBottom: 6 }}>
+                <div style={{ fontSize: 9, fontWeight: 700, color: "#bbb", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 4 }}>Activities</div>
+                <div style={{ display: "flex", flexDirection: "column", gap: 3, marginBottom: 5 }}>
                   {(tripDetails.activities || []).map((act, i) => (
-                    <div key={i} style={{ display: "flex", alignItems: "center", gap: 6, padding: "6px 10px", background: "#faf9f6", borderRadius: 8, border: "1px solid #e8e4dc" }}>
+                    <div key={i} style={{ display: "flex", alignItems: "center", gap: 6, padding: "5px 8px", background: "#faf9f6", borderRadius: 7, border: "1px solid #e8e4dc" }}>
                       <span style={{ flex: 1, fontSize: 12, color: "#444", fontWeight: 600 }}>{act}</span>
                       <button onClick={() => { const next = (tripDetails.activities || []).filter((_, j) => j !== i); saveTripDetails({ activities: next }); }}
-                        style={{ background: "none", border: "none", cursor: "pointer", color: "#ccc", fontSize: 14, lineHeight: 1, padding: "0 2px", flexShrink: 0 }}
+                        style={{ background: "none", border: "none", cursor: "pointer", color: "#ccc", fontSize: 14, lineHeight: 1, padding: "0 2px" }}
                         onMouseEnter={e => e.currentTarget.style.color = "#e05555"}
                         onMouseLeave={e => e.currentTarget.style.color = "#ccc"}>×</button>
                     </div>
                   ))}
                 </div>
-                <div style={{ display: "flex", gap: 6 }}>
+                <div style={{ display: "flex", gap: 5 }}>
                   <input value={newActivity} onChange={e => setNewActivity(e.target.value)}
                     onKeyDown={e => { if (e.key === "Enter" && newActivity.trim()) { saveTripDetails({ activities: [...(tripDetails.activities || []), newActivity.trim()] }); setNewActivity(""); } }}
-                    placeholder="Add activity…"
-                    style={{ flex: 1, padding: "6px 10px", border: "1.5px solid #e8e4dc", borderRadius: 10, fontFamily: "'DM Sans', sans-serif", fontSize: 12, outline: "none" }} />
+                    placeholder="Add activity\u2026"
+                    style={{ flex: 1, padding: "5px 8px", border: "1.5px solid #e8e4dc", borderRadius: 8, fontFamily: "'DM Sans', sans-serif", fontSize: 12, outline: "none" }} />
                   <button onClick={() => { if (newActivity.trim()) { saveTripDetails({ activities: [...(tripDetails.activities || []), newActivity.trim()] }); setNewActivity(""); } }}
-                    style={{ padding: "6px 10px", background: "#1a1a1a", color: "#fff", border: "none", borderRadius: 10, cursor: "pointer", fontSize: 13, fontWeight: 700, fontFamily: "'DM Sans', sans-serif", flexShrink: 0 }}>+</button>
+                    style={{ padding: "5px 10px", background: "#1a1a1a", color: "#fff", border: "none", borderRadius: 8, cursor: "pointer", fontSize: 13, fontWeight: 700, fontFamily: "'DM Sans', sans-serif" }}>+</button>
                 </div>
               </div>
-              {/* Extra notes */}
+              {/* Other notes */}
               <div>
-                <div style={{ fontSize: 10, fontWeight: 700, color: "#bbb", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 4 }}>Other Notes</div>
+                <div style={{ fontSize: 9, fontWeight: 700, color: "#bbb", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 4 }}>Other Notes</div>
                 <textarea value={tripDetails.notes || ""} onChange={e => setTripDetails(d => ({ ...d, notes: e.target.value }))} onBlur={() => saveTripDetails({})}
-                  placeholder="Reservations, dress codes, reminders…"
-                  style={{ width: "100%", padding: "7px 10px", border: "1.5px solid #e8e4dc", borderRadius: 10, fontFamily: "'DM Sans', sans-serif", fontSize: 12, outline: "none", resize: "vertical", minHeight: 64, boxSizing: "border-box" }} />
+                  placeholder="Reservations, dress codes, reminders\u2026"
+                  style={{ width: "100%", padding: "6px 10px", border: "1.5px solid #e8e4dc", borderRadius: 8, fontFamily: "'DM Sans', sans-serif", fontSize: 12, outline: "none", resize: "vertical", minHeight: 56, boxSizing: "border-box" }} />
               </div>
             </div>
-          </div>
+          )}
+
+          {/* ── NOTES ── */}
+          <button onClick={() => toggleAccordion("notes")} style={{ ...acHdrStyle }}>
+            <span style={{ fontSize: 10, fontWeight: 700, color: "#aaa", textTransform: "uppercase", letterSpacing: "0.1em" }}>Notes</span>
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#ccc" strokeWidth="2.5" strokeLinecap="round" style={{ transform: openAccordions.notes ? "rotate(180deg)" : "none", transition: "transform 0.2s" }}><polyline points="6 9 12 15 18 9"/></svg>
+          </button>
+          {openAccordions.notes && (
+            <div style={{ padding: "12px 16px 14px" }}>
+              <textarea value={notes} onChange={e => setNotes(e.target.value)} onBlur={() => save()}
+                placeholder="Add notes\u2026"
+                style={{ width: "100%", padding: "9px 12px", border: "1.5px solid #e8e4dc", borderRadius: 10, fontFamily: "'DM Sans', sans-serif", fontSize: 12, resize: "vertical", minHeight: 80, outline: "none", boxSizing: "border-box" }} />
+            </div>
+          )}
+
+          {/* ── LOOKS ── */}
+          <button onClick={() => toggleAccordion("looks")} style={{ ...acHdrStyle }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+              <span style={{ fontSize: 10, fontWeight: 700, color: "#aaa", textTransform: "uppercase", letterSpacing: "0.1em" }}>Looks</span>
+              {(looks.length + plannedSlots.length) > 0 && (
+                <span style={{ fontSize: 9, fontWeight: 700, color: "#fff", background: "#1a1a1a", borderRadius: 20, padding: "1px 7px" }}>{looks.length}/{looks.length + plannedSlots.length}</span>
+              )}
+            </div>
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#ccc" strokeWidth="2.5" strokeLinecap="round" style={{ transform: openAccordions.looks ? "rotate(180deg)" : "none", transition: "transform 0.2s" }}><polyline points="6 9 12 15 18 9"/></svg>
+          </button>
+          {openAccordions.looks && (
+            <div style={{ padding: "8px 16px 12px", display: "flex", flexDirection: "column", gap: 4 }}>
+              {/* Packing list toggle */}
+              {looks.length > 0 && (
+                <>
+                  <button onClick={() => setShowPackList(p => !p)} style={{ width: "100%", padding: "6px 10px", background: showPackList ? "#f0faf4" : "#f5f3ef", border: showPackList ? "1.5px solid #b6e8c8" : "none", borderRadius: 9, cursor: "pointer", fontSize: 11, fontWeight: 700, color: showPackList ? "#2d6a3f" : "#666", fontFamily: "'DM Sans', sans-serif", textAlign: "left", marginBottom: 2 }}>
+                    <SvgLuggage size={12} color="currentColor" style={{ marginRight: 5 }} />Packing List ({packItems.length})
+                  </button>
+                  {showPackList && (
+                    <div style={{ marginBottom: 6, background: "#faf9f6", borderRadius: 9, padding: "8px 10px", maxHeight: 200, overflowY: "auto" }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
+                        <div style={{ fontSize: 10, fontWeight: 700, color: "#aaa" }}>{packItems.filter(i => checkedPack[i.id]).length} / {packItems.length} packed</div>
+                        <button onClick={() => setCheckedPack({})} style={{ fontSize: 10, fontWeight: 700, color: "#aaa", background: "none", border: "none", cursor: "pointer", fontFamily: "'DM Sans', sans-serif" }}>Reset</button>
+                      </div>
+                      <div style={{ height: 3, borderRadius: 3, background: "#e8e4dc", marginBottom: 7, overflow: "hidden" }}>
+                        <div style={{ height: "100%", borderRadius: 3, background: "#2d6a3f", width: (packItems.length > 0 ? (packItems.filter(i => checkedPack[i.id]).length / packItems.length * 100) : 0) + "%", transition: "width 0.3s" }} />
+                      </div>
+                      {packItems.map(item => (
+                        <div key={item.id} onClick={() => setCheckedPack(c => ({ ...c, [item.id]: !c[item.id] }))} style={{ display: "flex", alignItems: "center", gap: 7, cursor: "pointer", opacity: checkedPack[item.id] ? 0.45 : 1, padding: "3px 0" }}>
+                          <div style={{ width: 14, height: 14, borderRadius: 3, border: "2px solid", borderColor: checkedPack[item.id] ? "#2d6a3f" : "#ccc", background: checkedPack[item.id] ? "#2d6a3f" : "transparent", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                            {checkedPack[item.id] && <SvgCheck size={8} color="#fff" />}
+                          </div>
+                          <div style={{ fontSize: 11, color: "#444", fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1, textDecoration: checkedPack[item.id] ? "line-through" : "none" }}>{item.name}</div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </>
+              )}
+
+              {/* Real looks (draggable) */}
+              {looks.map((look, i) => {
+                const meta = lookMeta[look.id] || {};
+                const isDraggingOver = dragOver2 === i;
+                return (
+                  <div key={look.id}
+                    draggable onDragStart={() => handleDragStart(i)} onDragEnter={() => handleDragEnter(i)} onDragEnd={handleDrop} onDragOver={e => e.preventDefault()}
+                    onClick={() => { setIdx(i); setView("editorial"); }}
+                    style={{ display: "flex", alignItems: "center", gap: 7, padding: "6px 8px", background: idx === i ? "#f0faf4" : isDraggingOver ? "#f5f3ef" : "#fafaf8", borderRadius: 9, border: idx === i ? "1.5px solid #3aaa6e" : isDraggingOver ? "1.5px dashed #888" : "1.5px solid #e8e4dc", cursor: "grab", transition: "all 0.12s" }}>
+                    <span style={{ color: "#ccc", fontSize: 11, flexShrink: 0 }}>\u2630</span>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: 11, fontWeight: 700, color: "#1a1a1a", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{look.name || ("Look " + (i + 1))}</div>
+                      {(meta.day || meta.occasion) && <div style={{ fontSize: 9, color: "#aaa", marginTop: 1 }}>{[meta.day, meta.occasion].filter(Boolean).join(" \u00B7 ")}</div>}
+                    </div>
+                    <button onClick={e => { e.stopPropagation(); removeLook(look.id); }}
+                      style={{ background: "none", border: "none", color: "#ddd", cursor: "pointer", padding: "0 2px", flexShrink: 0 }}
+                      onMouseEnter={e => e.currentTarget.style.color = "#e05555"}
+                      onMouseLeave={e => e.currentTarget.style.color = "#ddd"}>
+                      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                    </button>
+                  </div>
+                );
+              })}
+
+              {/* Planned slot rows */}
+              {plannedSlots.map((slot, si) => {
+                const slotDateLabel = slot.date ? new Date(slot.date + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" }) : null;
+                const slotWxRow = slot.date ? getWxForDate(slot.date) : null;
+                return (
+                  <div key={slot.id} style={{ display: "flex", alignItems: "center", gap: 7, padding: "6px 8px", background: "#faf9f6", borderRadius: 9, border: "1.5px dashed #d0cbc3" }}>
+                    <span style={{ color: "#d0cbc3", fontSize: 10, flexShrink: 0 }}>&#9633;</span>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: 11, fontWeight: 700, color: slot.name ? "#888" : "#ccc", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{slot.name || "Empty slot"}</div>
+                      <div style={{ fontSize: 9, color: "#bbb", marginTop: 1, display: "flex", gap: 6 }}>
+                        {slotDateLabel && <span>{slotDateLabel}</span>}
+                        {slotWxRow && <span>{wxIcon(slotWxRow.code)} {slotWxRow.high}\u00B0</span>}
+                      </div>
+                    </div>
+                    <button onClick={() => { const next = plannedSlots.filter((_, j) => j !== si); setPlannedSlots(next); save({ plannedSlots: next }); }}
+                      style={{ background: "none", border: "none", color: "#ddd", cursor: "pointer", padding: "0 2px", flexShrink: 0 }}
+                      onMouseEnter={e => e.currentTarget.style.color = "#e05555"}
+                      onMouseLeave={e => e.currentTarget.style.color = "#ddd"}>
+                      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                    </button>
+                  </div>
+                );
+              })}
+
+              {/* Action buttons */}
+              <button onClick={() => setShowAddLooks(true)} style={{ width: "100%", padding: "7px", background: "#f5f3ef", border: "none", borderRadius: 9, cursor: "pointer", fontSize: 11, fontWeight: 700, color: "#666", fontFamily: "'DM Sans', sans-serif", marginTop: 2 }}>+ Add Outfit</button>
+              <button onClick={() => { const next = [...plannedSlots, { id: Date.now() + "_" + Math.random().toString(36).slice(2), name: "", date: "" }]; setPlannedSlots(next); save({ plannedSlots: next }); }}
+                style={{ width: "100%", padding: "7px", background: "transparent", border: "1.5px dashed #d0cbc3", borderRadius: 9, cursor: "pointer", fontSize: 11, fontWeight: 700, color: "#bbb", fontFamily: "'DM Sans', sans-serif" }}>+ Plan a Slot</button>
+            </div>
+          )}
 
         </div>
       </div>

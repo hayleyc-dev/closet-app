@@ -47,6 +47,7 @@ const SvgCastle = ({size=14,color="currentColor"}) => (
 );
 const SvgGrid     = ({size=16,color="currentColor"}) => <Ico size={size} color={color}><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></Ico>;
 const SvgBox      = ({size=16,color="currentColor"}) => <Ico size={size} color={color}><path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></Ico>;
+const SvgFolder   = ({size=16,color="currentColor"}) => <Ico size={size} color={color}><path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/></Ico>;
 const SvgShop     = ({size=14,color="currentColor"}) => <Ico size={size} color={color}><path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 01-8 0"/></Ico>;
 const SvgCalendar = ({size=14,color="currentColor"}) => <Ico size={size} color={color}><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></Ico>;
 const SvgLuggage  = ({size=14,color="currentColor"}) => <Ico size={size} color={color}><rect x="4" y="7" width="16" height="14" rx="2"/><path d="M16 7V5a2 2 0 00-2-2h-4a2 2 0 00-2 2v2"/><line x1="12" y1="12" x2="12" y2="16"/><line x1="10" y1="14" x2="14" y2="14"/></Ico>;
@@ -86,6 +87,7 @@ const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 const CATEGORIES = ["All", "Accessories", "Activewear", "Bags", "Denim", "Dresses", "Intimates", "Jewelry", "Knits", "Loungewear", "Outerwear", "Shoes", "Shorts + Skirts", "Sleepwear", "Socks + Tights", "Sweaters", "Swim", "Tops", "Trousers"];
 const COLORS = ["Black", "Blue", "Brown", "Clear", "Cream", "Gold", "Green", "Grey", "Orange", "Pink", "Purple", "Red", "Silver", "Tan", "White", "Yellow"];
+const COLOR_HEX = { Black:"#1a1a1a", Blue:"#4a7fc1", Brown:"#8b6250", Clear:"#e8e8e8", Cream:"#f5f0e8", Gold:"#d4a843", Green:"#5a8f5a", Grey:"#9a9a9a", Orange:"#e8823a", Pink:"#f0a0b8", Purple:"#9b72cf", Red:"#d45050", Silver:"#c0c0c0", Tan:"#c8a882", White:"#f8f8f8", Yellow:"#e8d050" };
 
 function getColorSwatch(name) {
   const n = (name || "").toLowerCase();
@@ -1656,7 +1658,7 @@ function AddItemModal({ onSave, onSaveWish, onCancel, initial, editMode, initial
           cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
           flexShrink: 0, position: "relative"
         }}>
-          <SvgBox size={15} color="#888" />
+          <SvgFolder size={15} color="#888" />
           {drafts.length > 0 && <span style={{ position: "absolute", top: 4, right: 4, width: 13, height: 13, borderRadius: "50%", background: "#e05588", color: "#fff", fontSize: 8, fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center" }}>{drafts.length}</span>}
         </button>
         <button onClick={onCancel} title="Close" style={{
@@ -3563,7 +3565,7 @@ function BoardSizer({ boardRef: _ignored, children }) {
 }
 
 // ── Outfit Builder ───────────────────────────────────────────────────────────
-function OutfitBuilder({ itemsDb, wishlistDb, onSave, onClose, initial, seedItem, capsules }) {
+function OutfitBuilder({ itemsDb, wishlistDb, onSave, onClose, initial, seedItem, capsules, lookbooks, onSaveToLookbook }) {
   const [name, setName] = useState(initial?.name || "");
   const [notes, setNotes] = useState(initial?.notes || "");
   const [tags, setTags] = useState(initial?.tags || []);
@@ -3600,12 +3602,21 @@ function OutfitBuilder({ itemsDb, wishlistDb, onSave, onClose, initial, seedItem
   const [lockedIds, setLockedIds] = useState(new Set());
   const [canUndo, setCanUndo] = useState(false);
   const [canRedo, setCanRedo] = useState(false);
+  const [selectedIds, setSelectedIds] = useState(new Set());
+  const [flipped, setFlipped] = useState({});
+  const [showShortcuts, setShowShortcuts] = useState(false);
+  const [saveLbModal, setSaveLbModal] = useState(false);
+  const [savedOutfitData, setSavedOutfitData] = useState(null);
+  const [ghostDrag, setGhostDrag] = useState(null);
   const history = useRef([]);
   const historyIdx = useRef(-1);
   const dragging = useRef(null);
   const resizing = useRef(null);
   const canvasRef = useRef(null);
   const boardRef = useRef(null);
+  const panelDragRef = useRef(null);
+  const stateRef = useRef({});
+  stateRef.current = { activeId, layers, positions, lockedIds, selectedIds };
 
   const pushHistory = (newLayers, newPositions) => {
     const snap = { layers: newLayers, positions: newPositions };
@@ -3651,12 +3662,23 @@ function OutfitBuilder({ itemsDb, wishlistDb, onSave, onClose, initial, seedItem
     } catch(e) {}
   }, []);
 
-  // Escape key to close
+  // Keyboard shortcuts
   useEffect(() => {
-    const handler = (e) => { if (e.key === "Escape") onClose(); };
+    const handler = (e) => {
+      if (e.key === "Escape") { if (showShortcuts) { setShowShortcuts(false); return; } onClose(); return; }
+      if ((e.key === "Delete" || e.key === "Backspace") && !e.target.matches("input,textarea,select")) {
+        const { activeId: aid, layers: ls, positions: pos, lockedIds: locked } = stateRef.current;
+        if (!aid || locked.has(aid)) return;
+        const newLayers = ls.filter(x => x !== aid);
+        const newPos = { ...pos }; delete newPos[aid];
+        setLayers(newLayers); setPositions(newPos); pushHistory(newLayers, newPos); setActiveId(null); setSelectedIds(new Set());
+      }
+      if ((e.metaKey || e.ctrlKey) && !e.shiftKey && e.key === "z") { e.preventDefault(); undo(); }
+      if ((e.metaKey || e.ctrlKey) && (e.key === "y" || (e.shiftKey && e.key === "z"))) { e.preventDefault(); redo(); }
+    };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-  }, [onClose]);
+  }, [onClose, showShortcuts]);
 
   const activeDb = panelTab === "wishlist" ? wishlistDb : itemsDb;
   const allItems = [...itemsDb.rows, ...wishlistDb.rows];
@@ -3704,6 +3726,7 @@ function OutfitBuilder({ itemsDb, wishlistDb, onSave, onClose, initial, seedItem
   };
 
   const toggleLock = (id) => setLockedIds(prev => { const next = new Set(prev); next.has(id) ? next.delete(id) : next.add(id); return next; });
+  const flipItem = (id) => setFlipped(f => ({ ...f, [id]: !f[id] }));
 
   const autoArrange = () => {
     const board = boardRef.current;
@@ -3739,21 +3762,41 @@ function OutfitBuilder({ itemsDb, wishlistDb, onSave, onClose, initial, seedItem
 
   const onMouseDown = (e, id) => {
     e.preventDefault(); e.stopPropagation();
+    if (e.shiftKey) {
+      setSelectedIds(prev => { const next = new Set(prev); next.has(id) ? next.delete(id) : next.add(id); return next; });
+      setActiveId(id); return;
+    }
+    const isInSelection = stateRef.current.selectedIds ? stateRef.current.selectedIds.has(id) : false;
+    if (!isInSelection) setSelectedIds(new Set());
     setActiveId(id);
-    if (lockedIds.has(id)) return; // locked — select only, no drag
+    if (lockedIds.has(id)) return;
     bringToFront(id);
     const board = boardRef.current;
     const rect = board.getBoundingClientRect();
-    const startX = e.clientX - rect.left - positions[id].x;
-    const startY = e.clientY - rect.top - positions[id].y;
-    dragging.current = { id, startX, startY };
+    const curPos = stateRef.current.positions;
+    const startMouseX = e.clientX - rect.left;
+    const startMouseY = e.clientY - rect.top;
+    // Capture start positions for all items in selection (or just this one)
+    const { selectedIds: sel } = stateRef.current;
+    const idsToMove = (sel && sel.size > 1 && sel.has(id)) ? Array.from(sel) : [id];
+    const startPositions = {};
+    idsToMove.forEach(mid => { if (curPos[mid]) startPositions[mid] = { ...curPos[mid] }; });
+    dragging.current = { id, startMouseX, startMouseY, idsToMove, startPositions };
     const onMove = (ev) => {
       if (!dragging.current) return;
       const r = board.getBoundingClientRect();
-      setPositions(p => ({ ...p, [dragging.current.id]: { ...p[dragging.current.id], x: ev.clientX - r.left - dragging.current.startX, y: ev.clientY - r.top - dragging.current.startY } }));
+      const dx = ev.clientX - r.left - dragging.current.startMouseX;
+      const dy = ev.clientY - r.top - dragging.current.startMouseY;
+      setPositions(p => {
+        const np = { ...p };
+        dragging.current.idsToMove.forEach(mid => {
+          if (dragging.current.startPositions[mid]) np[mid] = { ...np[mid], x: dragging.current.startPositions[mid].x + dx, y: dragging.current.startPositions[mid].y + dy };
+        });
+        return np;
+      });
     };
     const onUp = () => {
-      if (dragging.current) pushHistory(layers, positions);
+      if (dragging.current) pushHistory(stateRef.current.layers, stateRef.current.positions);
       dragging.current = null; window.removeEventListener("mousemove", onMove); window.removeEventListener("mouseup", onUp);
     };
     window.addEventListener("mousemove", onMove);
@@ -3857,23 +3900,78 @@ function OutfitBuilder({ itemsDb, wishlistDb, onSave, onClose, initial, seedItem
         if (!item.image) { loaded++; if (loaded === itemsToDraw.length) finish(); return; }
         const img = new Image();
         img.crossOrigin = "anonymous";
-        img.onload = () => { imgs[idx] = { img, pos }; loaded++; if (loaded === itemsToDraw.length) finish(); };
+        img.onload = () => { imgs[idx] = { img, pos, id: item.id }; loaded++; if (loaded === itemsToDraw.length) finish(); };
         img.onerror = () => { loaded++; if (loaded === itemsToDraw.length) finish(); };
         img.src = item.image;
       });
 
       function finish() {
-        imgs.forEach(entry => { if (entry) ctx.drawImage(entry.img, entry.pos.x, entry.pos.y, entry.pos.w, entry.pos.h); });
+        imgs.forEach((entry, idx) => {
+          if (!entry) return;
+          const { img, pos, id } = entry;
+          if (flipped[id]) {
+            ctx.save(); ctx.translate(pos.x + pos.w, pos.y); ctx.scale(-1, 1);
+            ctx.drawImage(img, 0, 0, pos.w, pos.h); ctx.restore();
+          } else {
+            ctx.drawImage(img, pos.x, pos.y, pos.w, pos.h);
+          }
+        });
         resolve(canvas.toDataURL("image/jpeg", 0.85));
       }
     });
   };
 
-  const handleSave = async () => {
+  const handleSave = async (saveLookbook = false) => {
     if (!name || layers.length === 0) return;
     const previewImage = await capturePreview();
     try { localStorage.removeItem("wardrobe_builder_draft"); } catch(e) {}
-    onSave({ name, notes, tags, seasons, itemIds: layers, layers, positions, previewImage });
+    const data = { name, notes, tags, seasons, itemIds: layers, layers, positions, previewImage };
+    if (saveLookbook && lookbooks && lookbooks.length > 0) {
+      setSavedOutfitData(data); setSaveLbModal(true);
+    } else {
+      onSave(data);
+    }
+  };
+  const handleSaveAndAddToLookbook = async (lookbookId) => {
+    if (!savedOutfitData) return;
+    await onSave(savedOutfitData);
+    if (onSaveToLookbook && lookbookId) onSaveToLookbook(savedOutfitData, lookbookId);
+    setSaveLbModal(false); setSavedOutfitData(null);
+  };
+
+  const onPanelItemMouseDown = (e, item) => {
+    if (e.button !== 0) return;
+    e.preventDefault();
+    panelDragRef.current = { id: item.id, item, startX: e.clientX, startY: e.clientY, moved: false };
+    const onMove = (ev) => {
+      if (!panelDragRef.current) return;
+      if (!panelDragRef.current.moved && (Math.abs(ev.clientX - panelDragRef.current.startX) > 5 || Math.abs(ev.clientY - panelDragRef.current.startY) > 5)) {
+        panelDragRef.current.moved = true;
+      }
+      if (panelDragRef.current.moved) setGhostDrag({ id: item.id, item, x: ev.clientX, y: ev.clientY });
+    };
+    const onUp = (ev) => {
+      window.removeEventListener("mousemove", onMove); window.removeEventListener("mouseup", onUp);
+      if (panelDragRef.current?.moved) {
+        const board = boardRef.current;
+        if (board) {
+          const rect = board.getBoundingClientRect();
+          if (ev.clientX >= rect.left && ev.clientX <= rect.right && ev.clientY >= rect.top && ev.clientY <= rect.bottom) {
+            const id = panelDragRef.current.id;
+            const { layers: ls, positions: pos } = stateRef.current;
+            if (!ls.includes(id)) {
+              const newPos = { ...pos, [id]: { x: Math.max(0, ev.clientX - rect.left - 70), y: Math.max(0, ev.clientY - rect.top - 80), w: 140, h: 160 } };
+              const newLayers = [...ls, id];
+              setLayers(newLayers); setPositions(newPos); pushHistory(newLayers, newPos); setActiveId(id);
+            }
+          }
+        }
+      } else if (panelDragRef.current) {
+        toggleItem(panelDragRef.current.id);
+      }
+      panelDragRef.current = null; setGhostDrag(null);
+    };
+    window.addEventListener("mousemove", onMove); window.addEventListener("mouseup", onUp);
   };
 
   const btnBase = { border: "none", cursor: "pointer", fontFamily: "'DM Sans', sans-serif", fontWeight: 700, borderRadius: 10, transition: "all 0.15s" };
@@ -3885,7 +3983,7 @@ function OutfitBuilder({ itemsDb, wishlistDb, onSave, onClose, initial, seedItem
       <style>{globalStyles}</style>
       <div className="builder-topbar">
         <button onClick={onClose} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 22, color: "#888", lineHeight: 1, padding: 0 }}><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
-        <span style={{ fontWeight: 700, fontSize: 15, color: "#1a1a1a" }}>Build a Look</span>
+        <span style={{ fontWeight: 700, fontSize: 15, color: "#1a1a1a" }}>{name || "Build a Look"}</span>
         <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
           <button onClick={() => setShowDraftPanel(p => !p)} style={{ ...btnBase, padding: "7px 14px", fontSize: 12, background: showDraftPanel ? "#f0f0f0" : "#f5f3ef", color: "#555", position: "relative" }}>
             Drafts {outfitDrafts.length > 0 && <span style={{ marginLeft: 4, background: "#1a1a1a", color: "#fff", borderRadius: 10, padding: "1px 6px", fontSize: 10, fontWeight: 800 }}>{outfitDrafts.length}</span>}
@@ -3893,7 +3991,14 @@ function OutfitBuilder({ itemsDb, wishlistDb, onSave, onClose, initial, seedItem
           <button onClick={saveOutfitDraft} style={{ ...btnBase, padding: "7px 14px", fontSize: 12, background: draftSaved ? "#f0faf4" : "#f5f3ef", color: draftSaved ? "#2d6a3f" : "#555" }}>
             {draftSaved ? "✓ Saved" : "Save Draft"}
           </button>
-          <button onClick={handleSave} disabled={!name || layers.length === 0} style={{
+          {lookbooks && lookbooks.length > 0 && (
+            <button onClick={() => handleSave(true)} disabled={!name || layers.length === 0} style={{
+              ...btnBase, padding: "8px 16px", fontSize: 13,
+              background: (!name || layers.length === 0) ? "#ccc" : "#f5f2ed",
+              color: (!name || layers.length === 0) ? "#fff" : "#555", cursor: (!name || layers.length === 0) ? "not-allowed" : "pointer"
+            }}>+ Lookbook</button>
+          )}
+          <button onClick={() => handleSave(false)} disabled={!name || layers.length === 0} style={{
             ...btnBase, padding: "8px 20px", fontSize: 13,
             background: (!name || layers.length === 0) ? "#ccc" : "#2d6a3f",
             color: "#fff", cursor: (!name || layers.length === 0) ? "not-allowed" : "pointer"
@@ -3918,14 +4023,14 @@ function OutfitBuilder({ itemsDb, wishlistDb, onSave, onClose, initial, seedItem
           </div>
           <div style={{ marginBottom: 18 }}>
             <label style={labelStyle}>Season</label>
-            <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-              {["Spring", "Summer", "Fall", "Winter"].map(s => (
-                <button key={s} onClick={() => setSeasons(ss => ss.includes(s) ? ss.filter(x => x !== s) : [...ss, s])} style={{
-                  ...btnBase, padding: "5px 12px", borderRadius: 16, fontSize: 12,
-                  border: seasons.includes(s) ? "1.5px solid #2bafd4" : "1.5px solid #e8e4dc",
-                  background: seasons.includes(s) ? "#f0fbff" : "#fafaf8",
-                  color: seasons.includes(s) ? "#2bafd4" : "#aaa"
-                }}>{s}</button>
+            <div style={{ display: "flex", flexWrap: "nowrap", gap: 6 }}>
+              {[{value:"Spring",label:"SP"},{value:"Summer",label:"SU"},{value:"Fall",label:"FA"},{value:"Winter",label:"WI"}].map(({value, label}) => (
+                <button key={value} onClick={() => setSeasons(ss => ss.includes(value) ? ss.filter(x => x !== value) : [...ss, value])} style={{
+                  ...btnBase, padding: "5px 10px", borderRadius: 16, fontSize: 12,
+                  border: seasons.includes(value) ? "1.5px solid #2bafd4" : "1.5px solid #e8e4dc",
+                  background: seasons.includes(value) ? "#f0fbff" : "#fafaf8",
+                  color: seasons.includes(value) ? "#2bafd4" : "#aaa"
+                }}>{label}</button>
               ))}
             </div>
           </div>
@@ -3946,35 +4051,29 @@ function OutfitBuilder({ itemsDb, wishlistDb, onSave, onClose, initial, seedItem
             </div>
           </div>
 
-          {/* Live preview thumbnail */}
-          {layers.length > 0 && (() => {
-            // Compute a scaled-down snapshot of board positions for preview
-            const boardEl = boardRef.current;
-            const bw = boardEl?.offsetWidth || 320;
-            const bh = boardEl?.offsetHeight || 400;
-            const PREV_W = 180, PREV_H = Math.round(PREV_W * (bh / bw));
-            const scale = PREV_W / bw;
-            return (
-              <div style={{ marginBottom: 18 }}>
-                <label style={labelStyle}>Preview</label>
-                <div style={{ width: PREV_W, height: PREV_H, background: "#fff", border: "1.5px solid #e8e4dc", borderRadius: 12, position: "relative", overflow: "hidden", boxShadow: "0 2px 12px rgba(0,0,0,0.06)" }}>
-                  {layers.map((id, zi) => {
-                    const item = allItems.find(i => i.id === id);
-                    const pos = positions[id];
-                    if (!item || !pos) return null;
-                    return (
-                      <div key={id} style={{ position: "absolute", left: pos.x * scale, top: pos.y * scale, width: pos.w * scale, height: pos.h * scale, zIndex: zi + 1 }}>
-                        {item.image
-                          ? <img src={item.image} alt="" style={{ width: "100%", height: "100%", objectFit: "contain", pointerEvents: "none" }} />
-                          : <div style={{ width: "100%", height: "100%", background: "#f0ece4", display: "flex", alignItems: "center", justifyContent: "center" }}><HangerIcon size={12} color="#ccc" /></div>
-                        }
-                      </div>
-                    );
-                  })}
-                </div>
+          {/* Selected pieces preview */}
+          {layers.length > 0 && (
+            <div style={{ marginBottom: 18 }}>
+              <label style={labelStyle}>Pieces ({layers.length})</label>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                {layers.map(id => {
+                  const item = allItems.find(i => i.id === id);
+                  if (!item) return null;
+                  return (
+                    <div key={id} onClick={() => { setActiveId(id); }} title={item.name} style={{
+                      width: 52, height: 52, borderRadius: 10, overflow: "hidden", border: activeId === id ? "2px solid #2d6a3f" : "1.5px solid #e8e4dc",
+                      background: "#fafaf8", flexShrink: 0, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center"
+                    }}>
+                      {item.image
+                        ? <img src={item.image} alt={item.name} style={{ width: "100%", height: "100%", objectFit: "contain", transform: flipped[id] ? "scaleX(-1)" : "none" }} />
+                        : <HangerIcon size={16} color="#ccc" />
+                      }
+                    </div>
+                  );
+                })}
               </div>
-            );
-          })()}
+            </div>
+          )}
         </div>
 
         {/* CANVAS — centered white 4:5 board */}
@@ -3998,15 +4097,18 @@ function OutfitBuilder({ itemsDb, wishlistDb, onSave, onClose, initial, seedItem
                   if (!item || !positions[id]) return null;
                   const { x, y, w, h } = positions[id];
                   const isActive = activeId === id;
+                  const isSelected = selectedIds.has(id);
                   const isTop = zIndex === layers.length - 1;
                   const isBottom = zIndex === 0;
+                  const outlineColor = lockedIds.has(id) ? "#f0c040" : isSelected ? "#2bafd4" : "#2d6a3f";
+                  const showOutline = isActive || isSelected;
                   return (
                     <div key={id} className="canvas-item" style={{ left: x, top: y, width: w, zIndex: zIndex + 1 }}
                       onMouseDown={e => onMouseDown(e, id)} onClick={e => e.stopPropagation()}>
                       <div style={{ position: "relative", display: "inline-block" }}>
                         {item.image
-                          ? <img src={item.image} alt={item.name} style={{ width: w, height: h, objectFit: "contain", borderRadius: 4, display: "block", pointerEvents: "none", outline: isActive ? (lockedIds.has(id) ? "2px solid #f0c040" : "2px solid #2d6a3f") : "none", outlineOffset: 2 }} />
-                          : <div style={{ width: w, height: h, background: "#f0ece4", borderRadius: 4, display: "flex", alignItems: "center", justifyContent: "center", outline: isActive ? "2px solid #2d6a3f" : "none" }}><HangerIcon size={32} color="#ccc" /></div>
+                          ? <img src={item.image} alt={item.name} style={{ width: w, height: h, objectFit: "contain", borderRadius: 4, display: "block", pointerEvents: "none", outline: showOutline ? `2px solid ${outlineColor}` : "none", outlineOffset: 2, transform: flipped[id] ? "scaleX(-1)" : "none" }} />
+                          : <div style={{ width: w, height: h, background: "#f0ece4", borderRadius: 4, display: "flex", alignItems: "center", justifyContent: "center", outline: showOutline ? `2px solid ${outlineColor}` : "none" }}><HangerIcon size={32} color="#ccc" /></div>
                         }
                         {lockedIds.has(id) && <div style={{ position: "absolute", top: 4, left: 4, background: "rgba(0,0,0,0.5)", borderRadius: 6, padding: "2px 4px", pointerEvents: "none", display: "flex" }}><SvgLock size={12} color="#fff" /></div>}
                         {isActive && (
@@ -4033,6 +4135,10 @@ function OutfitBuilder({ itemsDb, wishlistDb, onSave, onClose, initial, seedItem
                             </button>
                             <div style={{ width: 1, background: "#444", margin: "3px 2px", height: 16 }} />
                           </>)}
+                          <button onClick={() => flipItem(id)} title="Flip horizontal" style={{ background: flipped[id] ? "rgba(43,175,212,0.15)" : "rgba(255,255,255,0.08)", border: "none", color: flipped[id] ? "#2bafd4" : "#ccc", cursor: "pointer", padding: "4px 9px", fontSize: 11, fontFamily: "'DM Sans', sans-serif", fontWeight: 700, borderRadius: 14, display: "flex", alignItems: "center", gap: 4 }}>
+                            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M8 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h3"/><path d="M16 3h3a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-3"/><line x1="12" y1="20" x2="12" y2="4"/></svg>
+                            Flip
+                          </button>
                           <button onClick={() => toggleLock(id)} title={lockedIds.has(id) ? "Unlock" : "Lock"} style={{ background: lockedIds.has(id) ? "rgba(240,192,64,0.15)" : "rgba(255,255,255,0.08)", border: "none", color: lockedIds.has(id) ? "#f0c040" : "#aaa", cursor: "pointer", padding: "4px 9px", fontSize: 11, fontFamily: "'DM Sans', sans-serif", fontWeight: 700, borderRadius: 14, display: "flex", alignItems: "center", gap: 4 }}>
                             {lockedIds.has(id) ? <SvgLock size={11} color="#f0c040" /> : <SvgUnlock size={11} color="#aaa" />}
                             {lockedIds.has(id) ? "Locked" : "Lock"}
@@ -4053,11 +4159,24 @@ function OutfitBuilder({ itemsDb, wishlistDb, onSave, onClose, initial, seedItem
           </BoardSizer>
           {/* Canvas bottom toolbar */}
           <div style={{ position: "absolute", bottom: 14, left: "50%", transform: "translateX(-50%)", display: "flex", gap: 4, background: "rgba(26,26,26,0.88)", borderRadius: 20, padding: "5px 8px", boxShadow: "0 4px 16px rgba(0,0,0,0.25)", zIndex: 200, backdropFilter: "blur(8px)", whiteSpace: "nowrap" }}>
-            <button onClick={undo} disabled={!canUndo} title="Undo" style={{ background: "none", border: "none", color: canUndo ? "#fff" : "#555", cursor: canUndo ? "pointer" : "default", padding: "4px 10px", fontSize: 12, fontFamily: "'DM Sans', sans-serif", fontWeight: 700, borderRadius: 12, display: "flex", alignItems: "center", gap: 5 }}>↩ Undo</button>
-            <button onClick={redo} disabled={!canRedo} title="Redo" style={{ background: "none", border: "none", color: canRedo ? "#fff" : "#555", cursor: canRedo ? "pointer" : "default", padding: "4px 10px", fontSize: 12, fontFamily: "'DM Sans', sans-serif", fontWeight: 700, borderRadius: 12, display: "flex", alignItems: "center", gap: 5 }}>↪ Redo</button>
+            <button onClick={undo} disabled={!canUndo} title="Undo (⌘Z)" style={{ background: "none", border: "none", color: canUndo ? "#fff" : "#555", cursor: canUndo ? "pointer" : "default", padding: "4px 10px", fontSize: 12, fontFamily: "'DM Sans', sans-serif", fontWeight: 700, borderRadius: 12, display: "flex", alignItems: "center", gap: 5 }}>↩ Undo</button>
+            <button onClick={redo} disabled={!canRedo} title="Redo (⌘Y)" style={{ background: "none", border: "none", color: canRedo ? "#fff" : "#555", cursor: canRedo ? "pointer" : "default", padding: "4px 10px", fontSize: 12, fontFamily: "'DM Sans', sans-serif", fontWeight: 700, borderRadius: 12, display: "flex", alignItems: "center", gap: 5 }}>↪ Redo</button>
             <div style={{ width: 1, background: "#444", margin: "4px 2px" }} />
             <button onClick={autoArrange} disabled={layers.length === 0} title="Auto-arrange" style={{ background: "none", border: "none", color: layers.length > 0 ? "#fff" : "#555", cursor: layers.length > 0 ? "pointer" : "default", padding: "4px 10px", fontSize: 12, fontFamily: "'DM Sans', sans-serif", fontWeight: 700, borderRadius: 12, display: "flex", alignItems: "center", gap: 5 }}>⊹ Arrange</button>
+            <div style={{ width: 1, background: "#444", margin: "4px 2px" }} />
+            <button onClick={() => setShowShortcuts(s => !s)} title="Keyboard shortcuts" style={{ background: showShortcuts ? "rgba(255,255,255,0.15)" : "none", border: "none", color: "#aaa", cursor: "pointer", padding: "4px 10px", fontSize: 12, fontFamily: "'DM Sans', sans-serif", fontWeight: 700, borderRadius: 12 }}>?</button>
           </div>
+          {showShortcuts && (
+            <div style={{ position: "absolute", bottom: 60, left: "50%", transform: "translateX(-50%)", background: "rgba(20,20,20,0.96)", borderRadius: 14, padding: "14px 18px", zIndex: 300, backdropFilter: "blur(8px)", boxShadow: "0 8px 32px rgba(0,0,0,0.4)", minWidth: 240 }}>
+              <div style={{ fontSize: 11, fontWeight: 800, color: "#fff", textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 10 }}>Keyboard Shortcuts</div>
+              {[["Delete / Backspace","Remove selected item"],["⌘Z / Ctrl+Z","Undo"],["⌘Y / Ctrl+Y","Redo"],["Shift+Click","Multi-select items"],["Escape","Close builder"]].map(([key, desc]) => (
+                <div key={key} style={{ display: "flex", justifyContent: "space-between", gap: 16, marginBottom: 6, alignItems: "center" }}>
+                  <span style={{ background: "rgba(255,255,255,0.1)", color: "#fff", borderRadius: 6, padding: "2px 8px", fontSize: 11, fontFamily: "monospace", whiteSpace: "nowrap" }}>{key}</span>
+                  <span style={{ fontSize: 11, color: "#aaa" }}>{desc}</span>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
 
         {/* RIGHT PANEL */}
@@ -4121,14 +4240,23 @@ function OutfitBuilder({ itemsDb, wishlistDb, onSave, onClose, initial, seedItem
               </button>
 
               {showFilters && (
-                <div style={{ display: "flex", flexDirection: "column", gap: 6, marginBottom: 8 }}>
+                <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 8 }}>
                   <select value={filterCat} onChange={e => setFilterCat(e.target.value)} style={{ ...fieldStyle }}>
                     {CATEGORIES.map(c => <option key={c} value={c}>{c === "All" ? "All Categories" : c}</option>)}
                   </select>
-                  <select value={filterColor} onChange={e => setFilterColor(e.target.value)} style={{ ...fieldStyle }}>
-                    <option value="">All Colors</option>
-                    {COLORS.map(c => <option key={c} value={c}>{c}</option>)}
-                  </select>
+                  <div>
+                    <div style={{ fontSize: 10, fontWeight: 700, color: "#aaa", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 5 }}>Color</div>
+                    <div style={{ display: "flex", flexWrap: "wrap", gap: 5 }}>
+                      <button onClick={() => setFilterColor("")} title="All" style={{ width: 20, height: 20, borderRadius: "50%", border: !filterColor ? "2px solid #2d6a3f" : "1.5px solid #ddd", background: "linear-gradient(135deg,#f66,#66f,#6f6)", cursor: "pointer", padding: 0, outline: "none" }} />
+                      {COLORS.map(c => (
+                        <button key={c} onClick={() => setFilterColor(filterColor === c ? "" : c)} title={c} style={{
+                          width: 20, height: 20, borderRadius: "50%", border: filterColor === c ? "2px solid #2d6a3f" : "1.5px solid #ddd",
+                          background: COLOR_HEX[c] || "#ccc", cursor: "pointer", padding: 0, outline: "none",
+                          boxShadow: filterColor === c ? "0 0 0 2px #fff, 0 0 0 4px #2d6a3f" : "none"
+                        }} />
+                      ))}
+                    </div>
+                  </div>
                   <select value={filterSeason} onChange={e => setFilterSeason(e.target.value)} style={{ ...fieldStyle }}>
                     <option value="">All Seasons</option>
                     {SEASONS.map(s => <option key={s} value={s}>{s}</option>)}
@@ -4158,12 +4286,12 @@ function OutfitBuilder({ itemsDb, wishlistDb, onSave, onClose, initial, seedItem
               const sel = layers.includes(item.id);
               return (
                 <div key={item.id} style={{ position: "relative" }}>
-                  <div className={`product-thumb${sel ? " selected" : ""}`} onClick={() => toggleItem(item.id)}>
-                    {item.image && <img src={item.image} alt={item.name} />}
+                  <div className={`product-thumb${sel ? " selected" : ""}`} onMouseDown={e => onPanelItemMouseDown(e, item)} style={{ cursor: "grab" }}>
+                    {item.image && <img src={item.image} alt={item.name} draggable={false} />}
                     {!item.image && <HangerIcon size={28} color="#ccc" />}
                     {sel && <div className="check"><SvgCheck size={10} color="#fff" /></div>}
                   </div>
-                  <button onClick={e => { e.stopPropagation(); setItemPopup({ mode: "edit", item }); }} title="Edit" style={{
+                  <button onMouseDown={e => e.stopPropagation()} onClick={e => { e.stopPropagation(); setItemPopup({ mode: "edit", item }); }} title="Edit" style={{
                     position: "absolute", top: 5, right: 5, width: 22, height: 22, borderRadius: "50%",
                     background: "rgba(255,255,255,0.92)", border: "none", cursor: "pointer",
                     fontSize: 13, display: "flex", alignItems: "center", justifyContent: "center",
@@ -4223,6 +4351,41 @@ function OutfitBuilder({ itemsDb, wishlistDb, onSave, onClose, initial, seedItem
               onCancel={() => setItemPopup(null)}
             />
           </div>
+        </div>
+      )}
+
+      {/* Save to Lookbook modal */}
+      {saveLbModal && (
+        <div onClick={() => { setSaveLbModal(false); if (savedOutfitData) { onSave(savedOutfitData); setSavedOutfitData(null); } }} style={{
+          position: "absolute", inset: 0, background: "rgba(0,0,0,0.35)", zIndex: 500,
+          display: "flex", alignItems: "center", justifyContent: "center", backdropFilter: "blur(3px)"
+        }}>
+          <div onClick={e => e.stopPropagation()} style={{ background: "#fff", borderRadius: 20, padding: "28px 28px 24px", width: 360, boxShadow: "0 20px 60px rgba(0,0,0,0.2)" }}>
+            <div style={{ fontSize: 16, fontWeight: 800, color: "#1a1a1a", marginBottom: 6 }}>Add to Lookbook</div>
+            <div style={{ fontSize: 13, color: "#888", marginBottom: 18 }}>Choose a lookbook to add this look to:</div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 8, maxHeight: 280, overflowY: "auto" }}>
+              {(lookbooks || []).map(lb => (
+                <button key={lb.id} onClick={() => handleSaveAndAddToLookbook(lb.id)} style={{
+                  padding: "12px 16px", background: "#fafaf8", border: "1.5px solid #e8e4dc", borderRadius: 12,
+                  cursor: "pointer", textAlign: "left", fontFamily: "'DM Sans', sans-serif", fontSize: 13, fontWeight: 600, color: "#1a1a1a"
+                }}>{lb.name}</button>
+              ))}
+            </div>
+            <button onClick={() => { setSaveLbModal(false); if (savedOutfitData) { onSave(savedOutfitData); setSavedOutfitData(null); } }} style={{
+              marginTop: 14, width: "100%", padding: "10px", background: "#f5f2ed", border: "none", borderRadius: 10,
+              cursor: "pointer", fontFamily: "'DM Sans', sans-serif", fontSize: 13, fontWeight: 600, color: "#555"
+            }}>Save Without Lookbook</button>
+          </div>
+        </div>
+      )}
+
+      {/* Ghost drag overlay */}
+      {ghostDrag && (
+        <div style={{ position: "fixed", left: ghostDrag.x - 50, top: ghostDrag.y - 60, width: 100, height: 110, borderRadius: 12, background: "#fff", border: "2px solid #2d6a3f", boxShadow: "0 8px 24px rgba(0,0,0,0.25)", overflow: "hidden", pointerEvents: "none", zIndex: 9999, opacity: 0.9 }}>
+          {ghostDrag.item.image
+            ? <img src={ghostDrag.item.image} alt="" style={{ width: "100%", height: "100%", objectFit: "contain" }} />
+            : <div style={{ width: "100%", height: "100%", background: "#f0ece4", display: "flex", alignItems: "center", justifyContent: "center" }}><HangerIcon size={24} color="#ccc" /></div>
+          }
         </div>
       )}
     </div>
@@ -10973,6 +11136,15 @@ export default function App() {
           seedItem={outfitSeedItem}
           onSave={saveOutfit}
           onClose={() => { setOutfitBuilder(false); setEditingOutfit(null); setOutfitSeedItem(null); setOutfitPrefillName(""); }}
+          lookbooks={lookbooksDb.rows}
+          onSaveToLookbook={async (outfitData, lookbookId) => {
+            const lb = lookbooksDb.rows.find(l => l.id === lookbookId);
+            if (!lb) return;
+            const savedOutfit = outfitsDb.rows.find(o => o.name === outfitData.name) || { id: null };
+            const outfitId = savedOutfit.id || ("o_" + Date.now());
+            const updated = { ...lb, outfitIds: [...(lb.outfitIds || []), outfitId] };
+            try { await lookbooksDb.update(updated); } catch(e) { console.error("Add to lookbook error:", e); }
+          }}
         />
       )}
 

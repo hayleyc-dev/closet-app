@@ -11508,7 +11508,7 @@ export default function App() {
                 const fmtDate = (d) => { if (!d) return null; const dt = new Date(d + "T00:00:00"); return dt.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }); };
                 const dateStr = (previewLb.dateStart || previewLb.dateEnd) ? [fmtDate(previewLb.dateStart), fmtDate(previewLb.dateEnd)].filter(Boolean).join(" – ") : null;
                 return (
-                  <div onClick={() => setLbPreview(null)} style={{ position: "fixed", inset: 0, zIndex: 1000, background: "rgba(0,0,0,0.45)", display: "flex", alignItems: "center", justifyContent: "center", padding: 24 }}>
+                  <div onClick={() => setLbPreview(null)} style={{ position: "fixed", inset: 0, zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center", padding: 24 }}>
                     <div onClick={e => e.stopPropagation()} style={{ background: "#fff", borderRadius: 24, width: "100%", maxWidth: 720, maxHeight: "88vh", display: "flex", flexDirection: "column", overflow: "hidden", boxShadow: "0 24px 80px rgba(0,0,0,0.18)" }}>
                       {/* Header */}
                       <div style={{ padding: "20px 24px 16px", borderBottom: "1px solid #f0ece6", display: "flex", alignItems: "flex-start", justifyContent: "space-between", flexShrink: 0 }}>

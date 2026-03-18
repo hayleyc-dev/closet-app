@@ -9076,7 +9076,7 @@ function OutfitCalendar({ outfits, calendar, onSaveCalendar, month, onMonthChang
                   <div style={{ fontSize: 8, fontWeight: 800, color: "#bbb", letterSpacing: "0.1em", fontFamily: "'DM Sans', sans-serif", marginBottom: 2 }}>{dayName}</div>
                   <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
                     <div style={{ fontSize: 20, fontWeight: isToday ? 900 : 700, color: isToday ? "#1a1a1a" : "#555", fontFamily: "'DM Sans', sans-serif", lineHeight: 1 }}>{dayNum}</div>
-                    {wx && <div style={{ fontSize: 10, color: "#aaa", fontWeight: 700, fontFamily: "'DM Sans', sans-serif" }}>{wx.high}°</div>}
+                    {wx && <div style={{ fontSize: 10, color: "#888", fontWeight: 700, fontFamily: "'DM Sans', sans-serif", display: "flex", alignItems: "center", gap: 3 }}><span>{weatherIcon(wx.code)}</span><span>{wx.high}°<span style={{ color: "#bbb", fontWeight: 500 }}>/{wx.low}°</span></span></div>}
                   </div>
                   {isToday && <div style={{ width: 18, height: 2, background: "#1a1a1a", borderRadius: 1, marginTop: 3 }} />}
                 </div>
@@ -9205,11 +9205,16 @@ function OutfitCalendar({ outfits, calendar, onSaveCalendar, month, onMonthChang
               {/* Content overlay */}
               <div style={{ position: "relative", zIndex: 10, padding: "4px 5px 3px", display: "flex", flexDirection: "column", height: "100%", boxSizing: "border-box", minHeight: 88, pointerEvents: "none" }}>
                 {/* Day number + weather */}
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
                   <div style={{ fontSize: 10, fontWeight: isToday ? 900 : 700, color: isToday ? "#fff" : ids.length > 0 ? "rgba(255,255,255,0.9)" : "#999", fontFamily: "'DM Sans', sans-serif", background: isToday ? "#1a1a1a" : ids.length > 0 ? "rgba(0,0,0,0.28)" : "transparent", borderRadius: 10, padding: "1px 5px", lineHeight: 1.4 }}>{day}</div>
-                  <div style={{ display: "flex", alignItems: "center", gap: 2 }}>
+                  <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 2 }}>
                     {ids.length > 0 && getWeatherWarning(outfits.find(o=>o.id===ids[0]), wx) && <span style={{ fontSize: 7, background: "#f59e0b", color: "#fff", borderRadius: 3, padding: "1px 3px", fontWeight: 800 }}>⚠</span>}
-                    {wx && <div style={{ fontSize: 8, color: ids.length > 0 ? "rgba(255,255,255,0.85)" : "#ccc", fontWeight: 700, fontFamily: "'DM Sans', sans-serif" }}>{wx.high}°</div>}
+                    {wx && hoveredDay === dateStr && (
+                      <div style={{ background: "rgba(255,255,255,0.92)", borderRadius: 6, padding: "2px 5px", display: "flex", alignItems: "center", gap: 3, fontSize: 9, fontWeight: 700, color: "#1a1a1a", whiteSpace: "nowrap", backdropFilter: "blur(4px)" }}>
+                        <span style={{ fontSize: 11 }}>{weatherIcon(wx.code)}</span>
+                        <span>{wx.high}°<span style={{ color: "#aaa", fontWeight: 500 }}>/{wx.low}°</span></span>
+                      </div>
+                    )}
                   </div>
                 </div>
 
@@ -11293,8 +11298,16 @@ export default function App() {
             const sidebarWxIcon = (code) => { if (code === 0) return "☀️"; if (code <= 2) return "⛅"; if (code <= 45) return "☁️"; if (code <= 67) return "🌧️"; if (code <= 77) return "❄️"; return "⛈️"; };
             return (
               <div className="right-card">
-                <div className="right-card-title">Today</div>
-                <div style={{ fontSize: 13, color: "#1a1a1a", fontWeight: 800, marginBottom: 10, marginTop: -6 }}>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 2 }}>
+                  <div className="right-card-title" style={{ marginBottom: 0 }}>Today</div>
+                  {sidebarWx && (
+                    <div style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 12, fontWeight: 700, color: "#1a1a1a" }}>
+                      <span>{sidebarWxIcon(sidebarWx.code)}</span>
+                      <span>{sidebarWx.high}°<span style={{ color: "#aaa", fontWeight: 500 }}> / {sidebarWx.low}°</span></span>
+                    </div>
+                  )}
+                </div>
+                <div style={{ fontSize: 13, color: "#1a1a1a", fontWeight: 800, marginBottom: 10 }}>
                   {new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })}
                 </div>
                 {todayOutfit ? (
@@ -11304,12 +11317,6 @@ export default function App() {
                       style={{ cursor: "pointer", borderRadius: 12, overflow: "hidden", aspectRatio: "3/4", position: "relative", background: "#f5f3ef" }}>
                       {todayOutfit.previewImage && (
                         <img src={todayOutfit.previewImage} alt={todayOutfit.name} style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
-                      )}
-                      {sidebarWx && (
-                        <div style={{ position: "absolute", top: 8, right: 8, zIndex: 10, background: "rgba(255,255,255,0.92)", borderRadius: 10, padding: "4px 8px", display: "flex", alignItems: "center", gap: 4, fontSize: 11, fontWeight: 700, color: "#1a1a1a" }}>
-                          <span>{sidebarWxIcon(sidebarWx.code)}</span>
-                          <span>{sidebarWx.high}°</span>
-                        </div>
                       )}
                       {hoveredSidebarToday && (
                         <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, zIndex: 10, background: "#fff", padding: "8px 12px" }}>

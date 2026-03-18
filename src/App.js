@@ -9890,8 +9890,8 @@ export default function App() {
                     <input className="closet-search" value={outfitSearch} onChange={e => setOutfitSearch(e.target.value)} placeholder="Search outfits…" />
                   </div>
                 </div>
-                <div className="sidebar-section">
-                  <div className="sidebar-label">Occasion</div>
+                <div style={{ background: "#fff", borderRadius: 16, border: "1px solid #ece8e0", padding: "18px 16px", marginBottom: 12 }}>
+                  <div style={{ fontSize: 10, fontWeight: 700, color: "#c0b8b0", textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 10 }}>Occasion</div>
                   {["All", "WFH", "Disney", "Universal", "Date Night", "Travel", "Sport", "Weekend", "Occasion"].map(tag => (
                     <button key={tag} className={"sidebar-btn" + (outfitTagFilter === tag ? " active" : "")} onClick={() => setOutfitTagFilter(tag)}>{tag}</button>
                   ))}

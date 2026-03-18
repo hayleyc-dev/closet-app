@@ -267,6 +267,12 @@ const globalStyles = `
   .item-card-brand { font-size: 11px; color: #b0a898; font-weight: 400; }
   .item-card-img { width: 100%; aspect-ratio: 3/4; object-fit: contain; display: block; background: #f7f5f2; padding: 8px; }
 
+  /* Outfit cards: collapse label until hover */
+  .outfit-card .outfit-card-label { max-height: 0; overflow: hidden; padding: 0; border-top: none; transition: max-height 0.2s ease, padding 0.2s ease; }
+  .outfit-card:hover .outfit-card-label { max-height: 100px; padding: 8px 12px 12px; border-top: 1px solid #f5f2ee; }
+  .outfit-card-btns { opacity: 0; transition: opacity 0.15s; }
+  .outfit-card:hover .outfit-card-btns { opacity: 1; }
+
   /* Right rail cards */
   .right-card { background: #fff; border-radius: 16px; border: 1px solid #ece8e0; padding: 18px 16px; }
   .right-card-title { font-size: 10px; font-weight: 700; color: #c0b8b0; text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 14px; }
@@ -10154,7 +10160,7 @@ export default function App() {
                       const tags = outfit.tags || [];
                       const outfitSeasons = outfit.seasons || [];
                       return (
-                        <div key={outfit.id} className="card fade-up" onClick={() => setOutfitPopup(outfit)} style={{
+                        <div key={outfit.id} className="card fade-up outfit-card" onClick={() => setOutfitPopup(outfit)} style={{
                           background: "#fff", borderRadius: 20, border: "1.5px solid #e8e4dc", overflow: "hidden",
                           boxShadow: "0 2px 12px rgba(0,0,0,0.04)", animationDelay: `${i * 0.05}s`, opacity: 0, cursor: "pointer", position: "relative"
                         }}>
@@ -10162,8 +10168,7 @@ export default function App() {
                           {(() => { const lbCount = lookbooksDb.rows.filter(lb => (lb.outfitIds || []).includes(outfit.id)).length; return lbCount > 0 ? <div style={{ position: "absolute", top: 8, left: 8, zIndex: 2, background: "rgba(124,111,224,0.92)", color: "#fff", borderRadius: 20, padding: "2px 8px", fontSize: 10, fontWeight: 700, backdropFilter: "blur(4px)" }}>▤ {lbCount}</div> : null; })()}
                           {/* Preview: use saved previewImage if available, else item collage */}
                           {outfit.previewImage ? (
-                            <div style={{ aspectRatio: "4/5", background: `url(${outfit.previewImage}) center/contain no-repeat #f5f3ef`, position: "relative" }}>
-            </div>
+                            <div style={{ aspectRatio: "4/5", background: `url(${outfit.previewImage}) center/contain no-repeat #f5f3ef`, position: "relative" }} />
                           ) : (
                             <div style={{
                               display: "grid",
@@ -10186,13 +10191,14 @@ export default function App() {
                               )}
                             </div>
                           )}
-                          <div style={{ position: "absolute", top: 8, right: 8, display: "flex", gap: 6, zIndex: 3 }}>
-                            <button onClick={e => { e.stopPropagation(); duplicateOutfit(outfit); }} title="Duplicate" style={{ width: 28, height: 28, borderRadius: "50%", background: "rgba(255,255,255,0.9)", border: "none", cursor: "pointer", fontSize: 13, display: "flex", alignItems: "center", justifyContent: "center", backdropFilter: "blur(4px)", boxShadow: "0 1px 4px rgba(0,0,0,0.1)" }}>⧉</button>
-                            <button onClick={e => { e.stopPropagation(); if (window.confirm(`Archive "${outfit.name}"? Restore from Settings → Data.`)) archiveOutfit(outfit); }} title="Archive outfit" style={{ width: 28, height: 28, borderRadius: "50%", background: "rgba(255,255,255,0.92)", border: "none", cursor: "pointer", color: "#888", display: "flex", alignItems: "center", justifyContent: "center", backdropFilter: "blur(4px)", boxShadow: "0 1px 4px rgba(0,0,0,0.1)" }}><SvgArrowDn size={12} color="#888" /></button>
-                          </div>
-                          {/* Name overlay at bottom */}
-                          <div style={{ padding: "10px 12px 12px" }}>
-                            <div style={{ fontSize: 13, fontWeight: 700, color: "#1a1a1a", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{outfit.name}</div>
+                          {/* Hover-expand label */}
+                          <div className="outfit-card-label">
+                            <div style={{ fontSize: 12, fontWeight: 700, color: "#1a1a1a", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", marginBottom: tags[0] ? 4 : 0 }}>{outfit.name}</div>
+                            {tags[0] && (() => { const oc = OCCASION_COLORS[tags[0]] || { bg: "#f5f3ef", color: "#888" }; return <div style={{ display: "inline-block", background: oc.bg, color: oc.color, borderRadius: 20, padding: "2px 8px", fontSize: 10, fontWeight: 700 }}>{tags[0]}</div>; })()}
+                            <div className="outfit-card-btns" style={{ display: "flex", gap: 6, marginTop: 6 }}>
+                              <button onClick={e => { e.stopPropagation(); setOutfitPopup(outfit); }} style={{ flex: 1, padding: "5px 0", background: "#f5f3ef", border: "none", borderRadius: 8, cursor: "pointer", fontFamily: "'DM Sans', sans-serif", fontSize: 11, fontWeight: 700, color: "#555" }}>Edit</button>
+                              <button onClick={e => { e.stopPropagation(); if (window.confirm(`Delete "${outfit.name}"?`)) archiveOutfit(outfit); }} style={{ flex: 1, padding: "5px 0", background: "#fff0f0", border: "none", borderRadius: 8, cursor: "pointer", fontFamily: "'DM Sans', sans-serif", fontSize: 11, fontWeight: 700, color: "#e05555" }}>Delete</button>
+                            </div>
                           </div>
                         </div>
                       );

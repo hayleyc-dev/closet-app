@@ -8078,7 +8078,7 @@ function SectionHeader({ title, action }) {
   );
 }
 
-function HomeTab({ outfitCalendar, outfitsDb, itemsDb, lookbooksDb, wishlistDb, setTab, setActiveLookbook, setActiveLookbookView, setOutfitPopup, homeCity: homeCityProp, setHomeCity: setHomeCityProp }) {
+function HomeTab({ outfitCalendar, outfitsDb, itemsDb, lookbooksDb, wishlistDb, setTab, setActiveLookbook, setActiveLookbookView, setOutfitPopup, homeCity: homeCityProp, setHomeCity: setHomeCityProp, homeWeather: homeWeatherProp }) {
   const now = new Date();
   const hour = now.getHours();
   const greeting = hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening";
@@ -8132,28 +8132,29 @@ function HomeTab({ outfitCalendar, outfitsDb, itemsDb, lookbooksDb, wishlistDb, 
   const homeCity = homeCityProp || "";
   const setHomeCity = (c) => { if (setHomeCityProp) setHomeCityProp(c); };
   const [homeCityInput, setHomeCityInput] = useState(homeCity);
-  const [homeWeather, setHomeWeather] = useState(null);
+  const [localHomeWeather, setLocalHomeWeather] = useState(null);
+  const homeWeather = homeWeatherProp || localHomeWeather;
   const [wxLoading, setWxLoading] = useState(false);
 
   const fetchHomeWeather = useCallback(async (city) => {
-    if (!city) return;
+    if (!city || homeWeatherProp) return; // skip if parent is handling it
     setWxLoading(true);
     const q = city.split(",")[0].trim();
     try {
       const geoRes = await fetch("https://geocoding-api.open-meteo.com/v1/search?name=" + encodeURIComponent(q) + "&count=1&language=en&format=json");
       const geo = await geoRes.json();
       const loc = geo.results?.[0];
-      if (!loc) { setHomeWeather({ error: "City not found" }); setWxLoading(false); return; }
+      if (!loc) { setLocalHomeWeather({ error: "City not found" }); setWxLoading(false); return; }
       const wRes = await fetch("https://api.open-meteo.com/v1/forecast?latitude=" + loc.latitude + "&longitude=" + loc.longitude + "&daily=temperature_2m_max,temperature_2m_min,weathercode&temperature_unit=fahrenheit&timezone=auto&forecast_days=7");
       const w = await wRes.json();
       const days = (w.daily?.time || []).map((d, i) => ({
         date: d, high: Math.round(w.daily.temperature_2m_max[i]),
         low: Math.round(w.daily.temperature_2m_min[i]), code: w.daily.weathercode[i],
       }));
-      setHomeWeather({ city: loc.name, days });
-    } catch(e) { setHomeWeather({ error: "Weather unavailable" }); }
+      setLocalHomeWeather({ city: loc.name, days });
+    } catch(e) { setLocalHomeWeather({ error: "Weather unavailable" }); }
     setWxLoading(false);
-  }, []);
+  }, [homeWeatherProp]);
 
   useEffect(() => { if (homeCity) { setHomeCityInput(homeCity); fetchHomeWeather(homeCity); } }, [homeCity]); // eslint-disable-line
 
@@ -10061,6 +10062,22 @@ export default function App() {
   };
   const [calendarMonth, setCalendarMonth] = useState(() => { const n = new Date(); return { year: n.getFullYear(), month: n.getMonth() }; });
   const [calendarWeather, setCalendarWeather] = useState(null);
+  const [homeWeather, setHomeWeather] = useState(null);
+  const fetchHomeWeather = useCallback(async (city) => {
+    if (!city) return;
+    const q = city.split(",")[0].trim();
+    try {
+      const geoRes = await fetch("https://geocoding-api.open-meteo.com/v1/search?name=" + encodeURIComponent(q) + "&count=1&language=en&format=json");
+      const geo = await geoRes.json();
+      const loc = geo.results?.[0];
+      if (!loc) return;
+      const wRes = await fetch("https://api.open-meteo.com/v1/forecast?latitude=" + loc.latitude + "&longitude=" + loc.longitude + "&daily=temperature_2m_max,temperature_2m_min,weathercode&temperature_unit=fahrenheit&timezone=auto&forecast_days=7");
+      const w = await wRes.json();
+      const days = (w.daily?.time || []).map((d, i) => ({ date: d, high: Math.round(w.daily.temperature_2m_max[i]), low: Math.round(w.daily.temperature_2m_min[i]), code: w.daily.weathercode[i] }));
+      setHomeWeather({ city: loc.name, days });
+    } catch(e) {}
+  }, []);
+  useEffect(() => { if (homeCity) fetchHomeWeather(homeCity); }, [homeCity]); // eslint-disable-line
   const [calendarEvents, setCalendarEvents] = useState(() => { try { return JSON.parse(localStorage.getItem("wardrobe_cal_events_v1") || "[]"); } catch { return []; } });
   const saveCalendarEvents = (evts) => { setCalendarEvents(evts); try { localStorage.setItem("wardrobe_cal_events_v1", JSON.stringify(evts)); } catch {} };
   const [itemDetail, setItemDetail] = useState(null); // closet item detail popup
@@ -10621,6 +10638,7 @@ export default function App() {
               setOutfitPopup={setOutfitPopup}
               homeCity={homeCity}
               setHomeCity={setHomeCity}
+              homeWeather={homeWeather}
             />
           )}
 
@@ -11274,7 +11292,7 @@ export default function App() {
             const todayRaw = outfitCalendar[todayKey];
             const todayIds = Array.isArray(todayRaw) ? todayRaw : (todayRaw ? [todayRaw] : []);
             const todayOutfit = todayIds.length > 0 ? outfitsDb.rows.find(o => o.id === todayIds[0]) : null;
-            const sidebarWx = calendarWeather?.days?.find(d => d.date === todayKey);
+            const sidebarWx = (homeWeather || calendarWeather)?.days?.find(d => d.date === todayKey);
             const sidebarWxIcon = (code) => { if (code === 0) return "☀️"; if (code <= 2) return "⛅"; if (code <= 45) return "☁️"; if (code <= 67) return "🌧️"; if (code <= 77) return "❄️"; return "⛈️"; };
             return (
               <div className="right-card">

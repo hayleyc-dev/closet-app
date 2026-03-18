@@ -4642,7 +4642,6 @@ function StatsTab({ itemsDb, outfitsDb, lookbooksDb, wishlistDb, outfitCalendar,
     const wName = (wi.name||"").toLowerCase().split(" ")[0];
     return items.some(ci => ci.category === wCat && (ci.name||"").toLowerCase().includes(wName));
   });
-  const wishlistTotalValue = wishItems.reduce((s,i) => s+parsePrice(i.price), 0);
 
   // ── Closet health score ──
   const healthScore = (() => {
@@ -4749,8 +4748,6 @@ function StatsTab({ itemsDb, outfitsDb, lookbooksDb, wishlistDb, outfitCalendar,
   ];
 
   // ── UI helpers ──
-  const SI = ({ d }) => <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight:6, verticalAlign:"middle", display:"inline-block", flexShrink:0 }}>{d}</svg>;
-
   const Card = ({ children, style={} }) => (
     <div style={{ background:"#fff", borderRadius:20, border:"1.5px solid #e8e4dc", padding:"20px 22px", ...style }}>{children}</div>
   );
@@ -4771,7 +4768,7 @@ function StatsTab({ itemsDb, outfitsDb, lookbooksDb, wishlistDb, outfitCalendar,
     </div>
   );
 
-  const tabs = [["profile","✦ Profile"],["intelligence","◈ Intelligence"],["habits","◷ Habits"],["budget","$ Budget"]];
+  const tabs = [["identity","✦ Identity"],["gaps","◈ Closet Gaps"],["wear","◷ Wear Patterns"],["spending","$ Spending"]];
 
   return (
     <div className="fade-up">
@@ -4796,18 +4793,21 @@ function StatsTab({ itemsDb, outfitsDb, lookbooksDb, wishlistDb, outfitCalendar,
         </div>
       ) : (<>
 
-      {/* ══════════════════ PROFILE ══════════════════ */}
-      {statsView === "profile" && (
+      {statsView === "identity" && (
         <div style={{ display:"flex", flexDirection:"column", gap:16 }}>
-
-          {/* Archetype hero */}
           {displayArchetype ? (
             <div style={{ background:"linear-gradient(135deg,#1a1a1a 0%,#2a2a2a 100%)", borderRadius:24, padding:"30px 28px", color:"#fff", position:"relative", overflow:"hidden" }}>
               <div style={{ position:"absolute", top:-20, right:-10, fontFamily:"'Cormorant Garamond',serif", fontSize:160, fontStyle:"italic", opacity:0.04, lineHeight:1, pointerEvents:"none", userSelect:"none" }}>✦</div>
-              <div style={{ fontSize:10, fontWeight:700, color:"rgba(255,255,255,0.4)", textTransform:"uppercase", letterSpacing:"0.12em", marginBottom:10 }}>Your Style Archetype</div>
+              <div style={{ fontSize:10, fontWeight:700, color:"rgba(255,255,255,0.4)", textTransform:"uppercase", letterSpacing:"0.12em", marginBottom:10 }}>Style Identity</div>
               <div style={{ fontFamily:"'Cormorant Garamond',serif", fontSize:40, fontWeight:300, fontStyle:"italic", letterSpacing:"-0.01em", lineHeight:1.1, marginBottom:10 }}>{displayArchetype.label}</div>
-              <div style={{ fontSize:13, color:"rgba(255,255,255,0.65)", lineHeight:1.7, maxWidth:380, marginBottom:16 }}>{displayArchetype.desc}</div>
-              {/* Evidence pills */}
+              <div style={{ fontSize:13, color:"rgba(255,255,255,0.72)", lineHeight:1.7, maxWidth:520, marginBottom:16 }}>{styleThesis}</div>
+              {inferredStyleWords.length > 0 && (
+                <div style={{ display:"flex", flexWrap:"wrap", gap:6, marginBottom:16 }}>
+                  {inferredStyleWords.map(word => (
+                    <div key={word} style={{ fontSize:11, color:"rgba(255,255,255,0.7)", background:"rgba(255,255,255,0.08)", borderRadius:20, padding:"4px 10px", backdropFilter:"blur(4px)" }}>{word}</div>
+                  ))}
+                </div>
+              )}
               {archetypeEvidence.length > 0 && !quizResult && (
                 <div style={{ display:"flex", flexWrap:"wrap", gap:6, marginBottom:20 }}>
                   {archetypeEvidence.map((e,i) => (
@@ -4815,25 +4815,19 @@ function StatsTab({ itemsDb, outfitsDb, lookbooksDb, wishlistDb, outfitCalendar,
                   ))}
                 </div>
               )}
-              {/* Archetype palette */}
               <div style={{ display:"flex", gap:8, marginBottom:24 }}>
                 {(displayArchetype.palette||[]).map((hex,i) => (
                   <div key={i} style={{ width:28, height:28, borderRadius:"50%", background:hex, border:"2px solid rgba(255,255,255,0.15)", boxShadow:"0 2px 8px rgba(0,0,0,0.3)" }} />
                 ))}
               </div>
               <div style={{ display:"flex", gap:24, flexWrap:"wrap", alignItems:"center" }}>
-                {[{label:"Pieces",value:items.length},{label:"Total Value",value:`$${totalValue.toFixed(0)}`},{label:"Total Wears",value:totalWears},{label:"Avg CPW",value:cpwItems.length>0?`$${(cpwItems.reduce((s,i)=>s+i.cpw,0)/cpwItems.length).toFixed(1)}`:"—"}].map(s=>(
+                {[{label:"Pieces",value:items.length},{label:"Total Wears",value:totalWears},{label:"Lead Color",value:topColors[0]?.[0] || "—"},{label:"Top Occasion",value:topOccasions[0]?.[0] || "—"}].map(s=>(
                   <div key={s.label}>
                     <div style={{ fontSize:22, fontWeight:800 }}>{s.value}</div>
                     <div style={{ fontSize:10, fontWeight:700, color:"rgba(255,255,255,0.4)", textTransform:"uppercase", letterSpacing:"0.07em" }}>{s.label}</div>
                   </div>
                 ))}
                 {quizResult && <button onClick={()=>{setQuizResult(null);setQuizAnswers({});}} style={{ marginLeft:"auto", fontSize:11, color:"rgba(255,255,255,0.4)", background:"transparent", border:"1px solid rgba(255,255,255,0.15)", borderRadius:20, padding:"4px 12px", cursor:"pointer", fontFamily:"'DM Sans',sans-serif", fontWeight:600 }}>Retake quiz</button>}
-              </div>
-              {/* Health score badge */}
-              <div style={{ position:"absolute", top:22, right:22, background:"rgba(255,255,255,0.08)", borderRadius:16, padding:"10px 16px", textAlign:"center", backdropFilter:"blur(8px)" }}>
-                <div style={{ fontSize:28, fontWeight:900, color:healthLabel[1] }}>{healthScore}</div>
-                <div style={{ fontSize:9, fontWeight:700, color:"rgba(255,255,255,0.45)", textTransform:"uppercase", letterSpacing:"0.08em" }}>{healthLabel[0]}</div>
               </div>
             </div>
           ) : archetypeQuiz ? (
@@ -4863,7 +4857,7 @@ function StatsTab({ itemsDb, outfitsDb, lookbooksDb, wishlistDb, outfitCalendar,
               <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", flexWrap:"wrap", gap:16 }}>
                 <div style={{ flex:1, minWidth:200 }}>
                   <div style={{ fontFamily:"'Cormorant Garamond',serif", fontSize:26, fontWeight:300, fontStyle:"italic", color:"#b0a898", marginBottom:8 }}>What's your style archetype?</div>
-                  <div style={{ fontSize:13, color:"#bbb", lineHeight:1.7, maxWidth:340, marginBottom:14 }}>Answer 3 quick questions to discover your style personality — or tag items with occasions and we'll figure it out automatically.</div>
+                  <div style={{ fontSize:13, color:"#bbb", lineHeight:1.7, maxWidth:420, marginBottom:14 }}>Answer 3 quick questions to discover your style personality, then we’ll use your colors, occasions, and outfit formulas to sharpen the rest of the tab.</div>
                   <div style={{ display:"flex", flexWrap:"wrap", gap:6 }}>
                     {Object.entries(ARCHETYPES).slice(0,4).map(([occ,a]) => (
                       <div key={occ} style={{ padding:"4px 12px", borderRadius:20, background:"#fff", border:"1px solid #e8e4dc", fontSize:11, fontWeight:700, color:"#888" }}>{a.label}</div>
@@ -4876,28 +4870,61 @@ function StatsTab({ itemsDb, outfitsDb, lookbooksDb, wishlistDb, outfitCalendar,
             </div>
           )}
 
-          {/* Color DNA */}
-          <Card>
-            <CardTitle icon={<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="8" cy="9" r="1.5" fill="currentColor" stroke="none"/><circle cx="15" cy="9" r="1.5" fill="currentColor" stroke="none"/><circle cx="12" cy="15" r="1.5" fill="currentColor" stroke="none"/></svg>}>Color DNA</CardTitle>
-            <div style={{ display:"flex", gap:10, flexWrap:"wrap", alignItems:"flex-end" }}>
-              {topColors.map(([color,count],i) => {
-                const hex = COLOR_HEX[color]||"#ccc";
-                const size = i===0?64:i===1?54:i===2?48:40;
-                const pct = Math.round((count/items.length)*100);
-                return (
-                  <div key={color} style={{ display:"flex", flexDirection:"column", alignItems:"center", gap:5 }}>
-                    <div style={{ width:size, height:size, borderRadius:"50%", background:hex, border:(color==="White"||color==="Cream")?"1.5px solid #e0dbd0":"none", boxShadow:"0 4px 14px rgba(0,0,0,0.12)", transition:"transform 0.15s" }}
-                      onMouseEnter={e=>e.currentTarget.style.transform="scale(1.08)"}
-                      onMouseLeave={e=>e.currentTarget.style.transform="scale(1)"} />
-                    <div style={{ fontSize:10, fontWeight:700, color:"#555" }}>{color}</div>
-                    <div style={{ fontSize:10, color:"#bbb" }}>{pct}%</div>
+          <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:14 }}>
+            <Card>
+              <CardTitle icon={<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="8" cy="9" r="1.5" fill="currentColor" stroke="none"/><circle cx="15" cy="9" r="1.5" fill="currentColor" stroke="none"/><circle cx="12" cy="15" r="1.5" fill="currentColor" stroke="none"/></svg>}>Color DNA</CardTitle>
+              <div style={{ display:"flex", gap:10, flexWrap:"wrap", alignItems:"flex-end" }}>
+                {topColors.map(([color,count],i) => {
+                  const hex = COLOR_HEX[color]||"#ccc";
+                  const size = i===0?64:i===1?54:i===2?48:40;
+                  const pct = Math.round((count/items.length)*100);
+                  return (
+                    <div key={color} style={{ display:"flex", flexDirection:"column", alignItems:"center", gap:5 }}>
+                      <div style={{ width:size, height:size, borderRadius:"50%", background:hex, border:(color==="White"||color==="Cream")?"1.5px solid #e0dbd0":"none", boxShadow:"0 4px 14px rgba(0,0,0,0.12)" }} />
+                      <div style={{ fontSize:10, fontWeight:700, color:"#555" }}>{color}</div>
+                      <div style={{ fontSize:10, color:"#bbb" }}>{pct}%</div>
+                    </div>
+                  );
+                })}
+              </div>
+              <div style={{ marginTop:14, fontSize:12, color:"#888", lineHeight:1.6 }}>
+                {topColors[0] ? `Your wardrobe is led by ${topColors[0][0].toLowerCase()} and supported by a tight, repeatable palette.` : "Add more color tags to reveal the palette story."}
+              </div>
+            </Card>
+            <Card>
+              <CardTitle icon={<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 19h16"/><path d="M4 15h10"/><path d="M4 11h16"/><path d="M4 7h8"/></svg>}>Style Spectrum</CardTitle>
+              <div style={{ display:"flex", flexDirection:"column", gap:12 }}>
+                {styleSpectrum.map(scale => (
+                  <div key={scale.left}>
+                    <div style={{ display:"flex", justifyContent:"space-between", marginBottom:5, fontSize:11, fontWeight:700 }}>
+                      <span style={{ color:"#777" }}>{scale.left}</span>
+                      <span style={{ color:"#aaa" }}>{scale.right}</span>
+                    </div>
+                    <div style={{ height:7, background:"#f0ece4", borderRadius:99, position:"relative" }}>
+                      <div style={{ position:"absolute", left:`calc(${scale.value}% - 7px)`, top:-4, width:14, height:14, borderRadius:"50%", background:"#1a1a1a", boxShadow:"0 2px 6px rgba(0,0,0,0.18)" }} />
+                    </div>
                   </div>
-                );
-              })}
-            </div>
+                ))}
+              </div>
+            </Card>
+          </div>
+
+          <Card>
+            <CardTitle icon={<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 3H5a2 2 0 00-2 2v4m6-6h10a2 2 0 012 2v4M9 3v18m0 0h10a2 2 0 002-2V9M9 21H5a2 2 0 01-2-2V9m0 0h18"/></svg>}>Signature Outfit Formulas</CardTitle>
+            <div style={{ fontSize:12, color:"#bbb", marginBottom:12 }}>The combinations you return to most often when you get dressed.</div>
+            {outfitFormula.length===0 ? <div style={{ fontSize:12, color:"#ccc" }}>Build more outfits to discover your formula</div> : (
+              <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fit,minmax(220px,1fr))", gap:10 }}>
+                {outfitFormula.map(([pair,count],i) => (
+                  <div key={pair} style={{ border:"1.5px solid #ece8e0", borderRadius:16, padding:"14px 16px", background:i===0?"#faf7f2":"#fff" }}>
+                    <div style={{ fontSize:10, fontWeight:700, color:"#aaa", textTransform:"uppercase", letterSpacing:"0.07em", marginBottom:6 }}>Formula {i+1}</div>
+                    <div style={{ fontSize:15, fontWeight:800, color:"#1a1a1a", marginBottom:4 }}>{pair}</div>
+                    <div style={{ fontSize:12, color:"#888" }}>{count} outfit{count!==1?"s":""}</div>
+                  </div>
+                ))}
+              </div>
+            )}
           </Card>
 
-          {/* Two col: Occasions + Seasons */}
           <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:14 }}>
             <Card>
               <CardTitle icon={<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>}>Occasions</CardTitle>
@@ -4941,11 +4968,55 @@ function StatsTab({ itemsDb, outfitsDb, lookbooksDb, wishlistDb, outfitCalendar,
               </div>
             </Card>
           </div>
+        </div>
+      )}
 
-          {/* Top categories + brands */}
+      {statsView === "gaps" && (
+        <div style={{ display:"flex", flexDirection:"column", gap:16 }}>
+          <Card style={{ background:"#fcfaf6" }}>
+            <CardTitle icon={<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>}>What Your Closet Needs Next</CardTitle>
+            {topGapInsights.length === 0 && gaps.length === 0 ? (
+              <div style={{ display:"flex", alignItems:"center", gap:10, padding:"12px 0", color:"#3aaa6e", fontSize:13, fontWeight:700 }}>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                Your wardrobe looks well-rounded right now.
+              </div>
+            ) : (
+              <>
+                {topGapInsights.length > 0 && (
+                  <div style={{ display:"flex", flexDirection:"column", gap:10, marginBottom:16 }}>
+                    {topGapInsights.map((ins,i) => (
+                      <div key={i} style={{ display:"flex", alignItems:"flex-start", gap:12, padding:"14px 16px", borderRadius:16, background:ins.priority==="high"?"#fff8f0":ins.priority==="medium"?"#f8f8ff":"#f9fdf9", border:`1.5px solid ${ins.priority==="high"?"#f5c89a":ins.priority==="medium"?"#d8d2f8":"#c8ecd8"}` }}>
+                        <span style={{ fontSize:22, lineHeight:1, flexShrink:0, marginTop:1 }}>{ins.emoji}</span>
+                        <div style={{ flex:1 }}>
+                          <div style={{ fontSize:12, color:"#444", lineHeight:1.6, fontWeight:500 }}>{ins.msg}</div>
+                          <div style={{ fontSize:10, fontWeight:700, color:ins.priority==="high"?"#e07000":ins.priority==="medium"?"#6d63c8":"#2f8a58", marginTop:4, textTransform:"uppercase", letterSpacing:"0.06em" }}>{ins.priority} impact</div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                {gaps.length > 0 && (
+                  <>
+                    <div style={{ fontSize:11, fontWeight:700, color:"#aaa", textTransform:"uppercase", letterSpacing:"0.07em", marginBottom:10 }}>Thin categories</div>
+                    <div style={{ display:"flex", flexWrap:"wrap", gap:8 }}>
+                      {gaps.map(({cat,count}) => (
+                        <div key={cat} style={{ padding:"8px 14px", borderRadius:20, background:count===0?"#fff0f0":"#fff8ee", border:`1px solid ${count===0?"#ffc5c5":"#f5c842"}`, fontSize:12, fontWeight:700, color:count===0?"#e05555":"#a07000", display:"flex", alignItems:"center", gap:8 }}>
+                          <span>{count===0?"✕":"!"}</span>
+                          <span>{cat}</span>
+                          <span style={{ fontWeight:500, opacity:0.7 }}>{count===0?"none":`only ${count}`}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </>
+                )}
+              </>
+            )}
+          </Card>
+
           <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:14 }}>
             <Card>
-              <CardTitle icon={<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>}>Categories</CardTitle>
+              <CardTitle icon={<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>}>Category Balance</CardTitle>
+              <div style={{ fontSize:12, color:"#bbb", marginBottom:12 }}>Where the closet feels full versus thin.</div>
               <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
                 {topCategories.slice(0,6).map(([cat,count]) => {
                   const pct = Math.round((count/(topCategories[0]?.[1]||1))*100);
@@ -4964,38 +5035,73 @@ function StatsTab({ itemsDb, outfitsDb, lookbooksDb, wishlistDb, outfitCalendar,
               </div>
             </Card>
             <Card>
-              <CardTitle icon={<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20.59 13.41l-7.17 7.17a2 2 0 01-2.83 0L2 12V2h10l8.59 8.59a2 2 0 010 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg>}>Brands</CardTitle>
-              {topBrands.length===0 ? <div style={{ fontSize:12,color:"#ccc",paddingTop:8 }}>No brands tagged yet</div> : (
-                <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
-                  {topBrands.slice(0,6).map(([brand,count]) => {
-                    const pct = Math.round((count/(topBrands[0]?.[1]||1))*100);
-                    return (
-                      <div key={brand}>
-                        <div style={{ display:"flex", justifyContent:"space-between", marginBottom:3 }}>
-                          <span style={{ fontSize:12, fontWeight:700, color:"#444", overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap", maxWidth:110 }}>{brand}</span>
-                          <span style={{ fontSize:11, color:"#aaa", fontWeight:600 }}>{count}</span>
-                        </div>
-                        <div style={{ height:4, background:"#f0ece4", borderRadius:99 }}>
-                          <div style={{ height:"100%", width:`${pct}%`, background:"#7c6fe0", borderRadius:99 }} />
-                        </div>
-                      </div>
-                    );
-                  })}
+              <CardTitle icon={<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18"/><path d="M6 12h12"/><path d="M9 18h6"/></svg>}>Duplicates & Concentration</CardTitle>
+              {duplicateSignals.length === 0 ? (
+                <div style={{ fontSize:12, color:"#888", lineHeight:1.6 }}>Nothing looks overly repetitive yet. Your closet is fairly spread out.</div>
+              ) : (
+                <div style={{ display:"flex", flexDirection:"column", gap:10 }}>
+                  {duplicateSignals.map(signal => (
+                    <div key={signal.label} style={{ padding:"12px 14px", borderRadius:14, background:"#faf9f6", border:"1px solid #ece8e0" }}>
+                      <div style={{ fontSize:12, fontWeight:800, color:"#1a1a1a", marginBottom:4 }}>{signal.label}</div>
+                      <div style={{ fontSize:12, color:"#888", lineHeight:1.5 }}>{signal.detail}</div>
+                    </div>
+                  ))}
                 </div>
               )}
             </Card>
           </div>
 
-          {/* This week — wear tracker strip */}
+          <Card>
+            <CardTitle icon={<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20V10"/><path d="M18 20V4"/><path d="M6 20v-4"/></svg>}>Best Next Additions</CardTitle>
+            <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fit,minmax(220px,1fr))", gap:10 }}>
+              {nextAdditions.map(rec => (
+                <div key={rec.label} style={{ border:"1.5px solid #ece8e0", borderRadius:16, padding:"14px 16px", background:"#fff" }}>
+                  <div style={{ fontSize:10, fontWeight:700, color:"#aaa", textTransform:"uppercase", letterSpacing:"0.07em", marginBottom:6 }}>{rec.label}</div>
+                  <div style={{ fontSize:15, fontWeight:800, color:"#1a1a1a", marginBottom:4 }}>{rec.value}</div>
+                  <div style={{ fontSize:12, color:"#888", lineHeight:1.5 }}>{rec.note}</div>
+                </div>
+              ))}
+            </div>
+          </Card>
+
+          <Card>
+            <CardTitle icon={<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20.84 4.61a5.5 5.5 0 00-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 00-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 000-7.78z"/></svg>}>Wishlist Overlap</CardTitle>
+            <div style={{ fontSize:12, color:"#bbb", marginBottom:12 }}>Catch wishlist items that may repeat what you already own.</div>
+            {wishlistOverlap.length === 0 ? (
+              <div style={{ fontSize:12, color:"#3aaa6e", fontWeight:700 }}>Your wishlist looks distinct from your current closet.</div>
+            ) : (
+              <div>
+                <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:10 }}>
+                  <div style={{ fontSize:22, fontWeight:900, color:"#e05555" }}>{wishlistOverlap.length}</div>
+                  <div style={{ fontSize:12, color:"#888" }}>wishlist item{wishlistOverlap.length!==1?"s":""} may already have a close closet match</div>
+                </div>
+                {wishlistOverlap.slice(0,4).map(wi=>(
+                  <div key={wi.id} style={{ display:"flex", alignItems:"center", gap:8, padding:"6px 0", borderBottom:"1px solid #f5f3ef" }}>
+                    <div style={{ width:32, height:32, borderRadius:8, overflow:"hidden", background:"#f5f3ef", flexShrink:0 }}>
+                      {wi.image?<img src={wi.image} alt="" style={{ width:"100%", height:"100%", objectFit:"contain" }}/>:<HangerIcon size={12} color="#ddd"/>}
+                    </div>
+                    <div style={{ flex:1, minWidth:0 }}>
+                      <div style={{ fontSize:12, fontWeight:700, color:"#1a1a1a", overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{wi.name}</div>
+                      <div style={{ fontSize:11, color:"#e05555" }}>{wi.category} · likely overlap</div>
+                    </div>
+                    {wi.price && <div style={{ fontSize:12, fontWeight:700, color:"#9a6fe0" }}>{wi.price}</div>}
+                  </div>
+                ))}
+              </div>
+            )}
+          </Card>
+        </div>
+      )}
+
+      {statsView === "wear" && (
+        <div style={{ display:"flex", flexDirection:"column", gap:16 }}>
           <Card>
             <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:16 }}>
               <CardTitle icon={<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>}>This Week</CardTitle>
               <div style={{ display:"flex", gap:6, alignItems:"center" }}>
-                {weekStrip.filter(d=>d.outfitIds.length>0).length === 7 && (
-                  <div style={{ fontSize:11, fontWeight:700, color:"#3aaa6e", display:"flex", alignItems:"center", gap:4 }}>🔥 Perfect week!</div>
-                )}
+                {weekLogged === 7 && <div style={{ fontSize:11, fontWeight:700, color:"#3aaa6e", display:"flex", alignItems:"center", gap:4 }}>Perfect week!</div>}
                 <div style={{ fontSize:12, color:"#aaa", fontWeight:600 }}>
-                  <span style={{ color:"#1a1a1a", fontWeight:800 }}>{weekStrip.filter(d=>d.outfitIds.length>0).length}</span>/7 days
+                  <span style={{ color:"#1a1a1a", fontWeight:800 }}>{weekLogged}</span>/7 days
                 </div>
               </div>
             </div>
@@ -5009,13 +5115,7 @@ function StatsTab({ itemsDb, outfitsDb, lookbooksDb, wishlistDb, outfitCalendar,
                 return (
                   <div key={day.key} style={{ flex:1, display:"flex", flexDirection:"column", alignItems:"center", gap:5 }}>
                     <div style={{ fontSize:10, fontWeight:700, color:day.isToday?"#1a1a1a":"#bbb", textTransform:"uppercase", letterSpacing:"0.06em" }}>{dayLabel}</div>
-                    <div style={{
-                      width:"100%", aspectRatio:"3/4", borderRadius:14,
-                      background: preview?.previewImage ? `url(${preview.previewImage}) center/cover` : wore ? "#1a1a1a" : day.isToday ? "#faf9f6" : "#f5f3ef",
-                      border: day.isToday && !wore ? "2px dashed #1a1a1a" : wore ? "none" : "1.5px solid #e8e4dc",
-                      display:"flex", alignItems:"center", justifyContent:"center",
-                      overflow:"hidden", position:"relative", transition:"transform 0.12s",
-                    }}
+                    <div style={{ width:"100%", aspectRatio:"3/4", borderRadius:14, background: preview?.previewImage ? `url(${preview.previewImage}) center/cover` : wore ? "#1a1a1a" : day.isToday ? "#faf9f6" : "#f5f3ef", border: day.isToday && !wore ? "2px dashed #1a1a1a" : wore ? "none" : "1.5px solid #e8e4dc", display:"flex", alignItems:"center", justifyContent:"center", overflow:"hidden", position:"relative", transition:"transform 0.12s" }}
                       onMouseEnter={e=>e.currentTarget.style.transform="scale(1.04)"}
                       onMouseLeave={e=>e.currentTarget.style.transform="scale(1)"}>
                       {!preview?.previewImage && (wore ? (
@@ -5040,191 +5140,36 @@ function StatsTab({ itemsDb, outfitsDb, lookbooksDb, wishlistDb, outfitCalendar,
             )}
           </Card>
 
-          {/* Signature pieces */}
-          {mostWorn.filter(i=>i.wornCount>0).length > 0 && (
-            <Card>
-              <CardTitle icon={<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>}>Signature Pieces</CardTitle>
-              <div style={{ fontSize:12, color:"#bbb", marginBottom:12 }}>Your most-reached-for items</div>
-              <div style={{ display:"flex", gap:10, overflowX:"auto", paddingBottom:4 }}>
-                {mostWorn.filter(i=>i.wornCount>0).slice(0,6).map((item,idx) => (
-                  <div key={item.id} onClick={()=>onViewItem(item)} style={{ flexShrink:0, width:90, cursor:"pointer", textAlign:"center" }}>
-                    <div style={{ position:"relative" }}>
-                      <div style={{ width:90, height:90, borderRadius:16, overflow:"hidden", background:"#f5f3ef", border:"1.5px solid #e8e4dc", marginBottom:6 }}>
-                        {item.image ? <img src={item.image} alt="" style={{ width:"100%", height:"100%", objectFit:"contain" }} /> : <div style={{ display:"flex", alignItems:"center", justifyContent:"center", height:"100%" }}><HangerIcon size={20} color="#ddd" /></div>}
+          <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:14 }}>
+            {mostWorn.filter(i=>i.wornCount>0).length > 0 && (
+              <Card>
+                <CardTitle icon={<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>}>Signature Pieces</CardTitle>
+                <div style={{ fontSize:12, color:"#bbb", marginBottom:12 }}>Your most-reached-for items.</div>
+                <div style={{ display:"flex", gap:10, overflowX:"auto", paddingBottom:4 }}>
+                  {mostWorn.filter(i=>i.wornCount>0).slice(0,6).map((item,idx) => (
+                    <div key={item.id} onClick={()=>onViewItem(item)} style={{ flexShrink:0, width:90, cursor:"pointer", textAlign:"center" }}>
+                      <div style={{ position:"relative" }}>
+                        <div style={{ width:90, height:90, borderRadius:16, overflow:"hidden", background:"#f5f3ef", border:"1.5px solid #e8e4dc", marginBottom:6 }}>
+                          {item.image ? <img src={item.image} alt="" style={{ width:"100%", height:"100%", objectFit:"contain" }} /> : <div style={{ display:"flex", alignItems:"center", justifyContent:"center", height:"100%" }}><HangerIcon size={20} color="#ddd" /></div>}
+                        </div>
+                        {idx===0 && <div style={{ position:"absolute", top:-6, right:-6, background:"#f0c840", borderRadius:"50%", width:20, height:20, display:"flex", alignItems:"center", justifyContent:"center", fontSize:10 }}>★</div>}
                       </div>
-                      {idx===0 && <div style={{ position:"absolute", top:-6, right:-6, background:"#f0c840", borderRadius:"50%", width:20, height:20, display:"flex", alignItems:"center", justifyContent:"center", fontSize:10 }}>★</div>}
-                    </div>
-                    <div style={{ fontSize:10, fontWeight:700, color:"#1a1a1a", overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{item.name}</div>
-                    <div style={{ fontSize:10, color:"#aaa" }}>{item.wornCount}× worn</div>
-                  </div>
-                ))}
-              </div>
-            </Card>
-          )}
-        </div>
-      )}
-
-      {/* ══════════════════ INTELLIGENCE ══════════════════ */}
-      {statsView === "intelligence" && (
-        <div style={{ display:"flex", flexDirection:"column", gap:16 }}>
-
-          {/* Cost per wear — best */}
-          <Card>
-            <CardTitle icon={<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg>}>Best Cost Per Wear</CardTitle>
-            <div style={{ fontSize:12, color:"#bbb", marginBottom:12 }}>Your best investments — price ÷ wears</div>
-            {cpwItems.length===0 ? <div style={{ fontSize:12, color:"#ccc" }}>Add prices and start marking outfits worn to see this</div> : (
-              cpwItems.slice(0,5).map(item => (
-                <ItemRow key={item.id} item={item} sub={`$${item.cpw.toFixed(2)}/wear · ${item.wornCount}× worn · $${parsePrice(item.price).toFixed(0)}`} onClick={()=>onViewItem(item)} />
-              ))
-            )}
-          </Card>
-
-          {/* Cost per wear — worst */}
-          <Card>
-            <CardTitle icon={<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>}>Worst Cost Per Wear</CardTitle>
-            <div style={{ fontSize:12, color:"#bbb", marginBottom:12 }}>Items that need more love to justify their price</div>
-            {worstCpw.length===0 ? <div style={{ fontSize:12, color:"#ccc" }}>Add prices to items to see this</div> : (
-              worstCpw.map(item => (
-                <ItemRow key={item.id} item={item} sub={`$${item.cpw.toFixed(2)}/wear · ${item.wornCount||0}× worn · $${parsePrice(item.price).toFixed(0)}`} onClick={()=>onViewItem(item)} />
-              ))
-            )}
-          </Card>
-
-          {/* Outfit formula */}
-          <Card>
-            <CardTitle icon={<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 3H5a2 2 0 00-2 2v4m6-6h10a2 2 0 012 2v4M9 3v18m0 0h10a2 2 0 002-2V9M9 21H5a2 2 0 01-2-2V9m0 0h18"/></svg>}>Your Outfit Formula</CardTitle>
-            <div style={{ fontSize:12, color:"#bbb", marginBottom:12 }}>Category combinations that appear together most in your outfits</div>
-            {outfitFormula.length===0 ? <div style={{ fontSize:12, color:"#ccc" }}>Build more outfits to discover your formula</div> : (
-              <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
-                {outfitFormula.map(([pair,count],i) => (
-                  <div key={pair} style={{ display:"flex", alignItems:"center", gap:10 }}>
-                    <div style={{ width:22, height:22, borderRadius:6, background:"#f5f3ef", display:"flex", alignItems:"center", justifyContent:"center", fontSize:10, fontWeight:800, color:"#aaa", flexShrink:0 }}>{i+1}</div>
-                    <div style={{ flex:1, fontSize:12, fontWeight:700, color:"#1a1a1a" }}>{pair}</div>
-                    <div style={{ fontSize:11, color:"#aaa", fontWeight:600 }}>{count}×</div>
-                    <div style={{ width:60, height:4, background:"#f0ece4", borderRadius:99 }}>
-                      <div style={{ height:"100%", width:`${(count/(outfitFormula[0]?.[1]||1))*100}%`, background:"#1a1a1a", borderRadius:99 }} />
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </Card>
-
-          {/* Wardrobe gaps + smart insights */}
-          <Card>
-            <CardTitle icon={<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>}>Wardrobe Gaps & Insights</CardTitle>
-            {gapInsights.length === 0 && gaps.length === 0 ? (
-              <div style={{ display:"flex", alignItems:"center", gap:10, padding:"12px 0", color:"#3aaa6e", fontSize:13, fontWeight:700 }}>
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
-                Your wardrobe looks well-rounded — no major gaps!
-              </div>
-            ) : (<>
-              {gapInsights.length > 0 && (
-                <div style={{ display:"flex", flexDirection:"column", gap:10, marginBottom:16 }}>
-                  {gapInsights.map((ins,i) => (
-                    <div key={i} style={{ display:"flex", alignItems:"flex-start", gap:12, padding:"14px 16px", borderRadius:16, background:ins.priority==="high"?"#fff8f0":ins.priority==="medium"?"#f8f8ff":"#f9fdf9", border:`1.5px solid ${ins.priority==="high"?"#f5c89a":ins.priority==="medium"?"#d8d2f8":"#c8ecd8"}` }}>
-                      <span style={{ fontSize:22, lineHeight:1, flexShrink:0, marginTop:1 }}>{ins.emoji}</span>
-                      <div style={{ flex:1 }}>
-                        <div style={{ fontSize:12, color:"#444", lineHeight:1.6, fontWeight:500 }}>{ins.msg}</div>
-                        {ins.priority==="high" && <div style={{ fontSize:10, fontWeight:700, color:"#e07000", marginTop:4, textTransform:"uppercase", letterSpacing:"0.06em" }}>High priority</div>}
-                      </div>
+                      <div style={{ fontSize:10, fontWeight:700, color:"#1a1a1a", overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{item.name}</div>
+                      <div style={{ fontSize:10, color:"#aaa" }}>{item.wornCount}× worn</div>
                     </div>
                   ))}
                 </div>
-              )}
-              {gaps.length > 0 && (<>
-                <div style={{ fontSize:11, fontWeight:700, color:"#aaa", textTransform:"uppercase", letterSpacing:"0.07em", marginBottom:10 }}>Missing or thin categories</div>
-                <div style={{ display:"flex", flexWrap:"wrap", gap:8 }}>
-                  {gaps.map(({cat,count}) => (
-                    <div key={cat} style={{ padding:"8px 14px", borderRadius:20, background:count===0?"#fff0f0":"#fff8ee", border:`1px solid ${count===0?"#ffc5c5":"#f5c842"}`, fontSize:12, fontWeight:700, color:count===0?"#e05555":"#a07000", display:"flex", alignItems:"center", gap:8 }}>
-                      <span>{count===0?"✕":"!"}</span>
-                      <span>{cat}</span>
-                      <span style={{ fontWeight:500, opacity:0.7 }}>{count===0?"none":`only ${count}`}</span>
-                    </div>
-                  ))}
-                </div>
-                <div style={{ marginTop:12, fontSize:12, color:"#aaa", lineHeight:1.6 }}>
-                  💡 Add these to your <strong style={{ color:"#888" }}>Wishlist</strong> to track what you're looking for next
-                </div>
-              </>)}
-            </>)}
-          </Card>
-
-          {/* Never worn */}
-          {unworn.length > 0 && (
+              </Card>
+            )}
             <Card>
-              <CardTitle icon={<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0112 20c-7 0-11-8-11-8a18.45 18.45 0 015.06-5.94"/><path d="M9.9 4.24A9.12 9.12 0 0112 4c7 0 11 8 11 8a18.5 18.5 0 01-2.16 3.19"/><line x1="1" y1="1" x2="23" y2="23"/></svg>}>Never Worn <span style={{ fontSize:11, fontWeight:600, color:"#e05555", marginLeft:6 }}>{unworn.length} items</span></CardTitle>
-              <div style={{ fontSize:12, color:"#bbb", marginBottom:12 }}>Wear them or list them for sale</div>
-              <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill,minmax(80px,1fr))", gap:10 }}>
-                {unworn.slice(0,12).map(item => (
-                  <div key={item.id} onClick={()=>onViewItem(item)} style={{ cursor:"pointer", borderRadius:12, overflow:"hidden", background:"#faf9f6", border:"1.5px solid #e8e4dc" }}
-                    onMouseEnter={e=>e.currentTarget.style.borderColor="#e05555"}
-                    onMouseLeave={e=>e.currentTarget.style.borderColor="#e8e4dc"}>
-                    <div style={{ aspectRatio:"1/1", display:"flex", alignItems:"center", justifyContent:"center", padding:4 }}>
-                      {item.image ? <img src={item.image} alt="" style={{ width:"100%", height:"100%", objectFit:"contain" }} /> : <HangerIcon size={16} color="#ddd" />}
-                    </div>
-                    <div style={{ padding:"3px 6px 5px", fontSize:9, fontWeight:700, color:"#888", overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{item.name}</div>
-                  </div>
-                ))}
-              </div>
+              <CardTitle icon={<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0112 20c-7 0-11-8-11-8a18.45 18.45 0 015.06-5.94"/><path d="M9.9 4.24A9.12 9.12 0 0112 4c7 0 11 8 11 8a18.5 18.5 0 01-2.16 3.19"/><line x1="1" y1="1" x2="23" y2="23"/></svg>}>Needs Styling</CardTitle>
+              <div style={{ fontSize:12, color:"#bbb", marginBottom:12 }}>High-value or unworn pieces worth revisiting before buying more.</div>
+              {neglectedValue.length === 0 ? <div style={{ fontSize:12, color:"#888" }}>Everything with a price tag has been worn at least once.</div> : neglectedValue.map(item => (
+                <ItemRow key={item.id} item={item} sub={`$${parsePrice(item.price).toFixed(0)} · ${item.wornCount||0}× worn`} onClick={()=>onViewItem(item)} />
+              ))}
             </Card>
-          )}
-        </div>
-      )}
+          </div>
 
-      {/* ══════════════════ HABITS ══════════════════ */}
-      {statsView === "habits" && (
-        <div style={{ display:"flex", flexDirection:"column", gap:16 }}>
-
-          {/* This week strip */}
-          <Card>
-            <CardTitle icon={<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>}>This Week</CardTitle>
-            <div style={{ display:"flex", gap:6 }}>
-              {weekStrip.map(day => {
-                const dayLabel = day.date.toLocaleDateString("en-US", { weekday:"short" });
-                const dateLabel = day.date.toLocaleDateString("en-US", { month:"numeric", day:"numeric" });
-                const wore = day.outfitIds.length > 0;
-                const outfitPreviews = day.outfitIds.map(id => outfits.find(o => o.id === id)).filter(Boolean);
-                return (
-                  <div key={day.key} style={{ flex:1, display:"flex", flexDirection:"column", alignItems:"center", gap:4 }}>
-                    <div style={{ fontSize:9, fontWeight:700, color: day.isToday ? "#1a1a1a" : "#bbb", textTransform:"uppercase", letterSpacing:"0.06em" }}>{dayLabel}</div>
-                    <div style={{
-                      width:"100%", aspectRatio:"1/1", borderRadius:12,
-                      background: wore ? "#1a1a1a" : day.isToday ? "#f5f3ef" : "#f5f3ef",
-                      border: day.isToday ? "2px solid #1a1a1a" : "1.5px solid #e8e4dc",
-                      display:"flex", alignItems:"center", justifyContent:"center",
-                      overflow:"hidden", position:"relative",
-                    }}>
-                      {outfitPreviews[0]?.previewImage ? (
-                        <img src={outfitPreviews[0].previewImage} alt="" style={{ width:"100%", height:"100%", objectFit:"cover" }} />
-                      ) : wore ? (
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
-                      ) : (
-                        <div style={{ width:6, height:6, borderRadius:"50%", background: day.isToday ? "#1a1a1a" : "#ddd" }} />
-                      )}
-                      {day.outfitIds.length > 1 && (
-                        <div style={{ position:"absolute", bottom:3, right:3, background:"rgba(255,255,255,0.9)", borderRadius:6, padding:"1px 4px", fontSize:8, fontWeight:800, color:"#1a1a1a" }}>+{day.outfitIds.length}</div>
-                      )}
-                    </div>
-                    <div style={{ fontSize:9, color:"#bbb", fontWeight:500 }}>{dateLabel}</div>
-                  </div>
-                );
-              })}
-            </div>
-            <div style={{ marginTop:12, display:"flex", alignItems:"center", justifyContent:"space-between" }}>
-              <div style={{ fontSize:11, color:"#888" }}>
-                <span style={{ fontWeight:700, color:"#1a1a1a" }}>{weekStrip.filter(d=>d.outfitIds.length>0).length}</span> of 7 days tracked this week
-              </div>
-              {weekStrip.filter(d=>d.outfitIds.length>0).length === 7 && (
-                <div style={{ fontSize:11, fontWeight:700, color:"#3aaa6e", display:"flex", alignItems:"center", gap:4 }}>
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
-                  Perfect week!
-                </div>
-              )}
-            </div>
-          </Card>
-
-          {/* Wear frequency heatmap */}
           <Card>
             <CardTitle icon={<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>}>Outfit Frequency <span style={{ fontSize:11, fontWeight:500, color:"#bbb", marginLeft:6 }}>last 12 weeks</span></CardTitle>
             <div style={{ overflowX:"auto" }}>
@@ -5256,7 +5201,6 @@ function StatsTab({ itemsDb, outfitsDb, lookbooksDb, wishlistDb, outfitCalendar,
             </div>
           </Card>
 
-          {/* Monthly stats */}
           <Card>
             <CardTitle icon={<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>}>Monthly Activity</CardTitle>
             <div style={{ display:"flex", flexDirection:"column", gap:14 }}>
@@ -5275,24 +5219,6 @@ function StatsTab({ itemsDb, outfitsDb, lookbooksDb, wishlistDb, outfitCalendar,
             </div>
           </Card>
 
-          {/* Most active season */}
-          <Card>
-            <CardTitle icon={<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 8h1a4 4 0 010 8h-1"/><path d="M2 8h16v9a4 4 0 01-4 4H6a4 4 0 01-4-4V8z"/><line x1="6" y1="1" x2="6" y2="4"/><line x1="10" y1="1" x2="10" y2="4"/><line x1="14" y1="1" x2="14" y2="4"/></svg>}>Season Breakdown</CardTitle>
-            <div style={{ display:"flex", gap:8, flexWrap:"wrap" }}>
-              {topSeasons.map(([s,count]) => {
-                const pct = Math.round((count/items.length)*100);
-                return (
-                  <div key={s} style={{ background:SEASON_COLORS[s]||"#f5f3ef", borderRadius:14, padding:"12px 16px", textAlign:"center", minWidth:80 }}>
-                    <div style={{ fontSize:18, fontWeight:800, color:SEASON_TEXT[s]||"#888" }}>{pct}%</div>
-                    <div style={{ fontSize:10, fontWeight:700, color:SEASON_TEXT[s]||"#888", opacity:0.8, marginTop:2 }}>{s}</div>
-                    <div style={{ fontSize:10, color:SEASON_TEXT[s]||"#888", opacity:0.5 }}>{count} items</div>
-                  </div>
-                );
-              })}
-            </div>
-          </Card>
-
-          {/* Getting dressed score */}
           <Card>
             <CardTitle icon={<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>}>Wardrobe Health Score</CardTitle>
             <div style={{ display:"flex", alignItems:"center", gap:20, marginBottom:16 }}>
@@ -5311,7 +5237,7 @@ function StatsTab({ itemsDb, outfitsDb, lookbooksDb, wishlistDb, outfitCalendar,
               </div>
               <div>
                 <div style={{ fontSize:16, fontWeight:800, color:healthLabel[1], marginBottom:4 }}>{healthLabel[0]}</div>
-                <div style={{ fontSize:12, color:"#888", lineHeight:1.6 }}>Based on wear frequency,<br/>category balance, and cost per wear</div>
+                <div style={{ fontSize:12, color:"#888", lineHeight:1.6 }}>Higher scores come from wearing what you own, keeping category balance, and getting more value from each piece.</div>
               </div>
             </div>
             <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
@@ -5335,8 +5261,7 @@ function StatsTab({ itemsDb, outfitsDb, lookbooksDb, wishlistDb, outfitCalendar,
         </div>
       )}
 
-      {/* ══════════════════ BUDGET ══════════════════ */}
-      {statsView === "budget" && (() => {
+      {statsView === "spending" && (() => {
         const spentThisMonth = items.filter(i=>(i.purchaseDate||"").startsWith(thisMonth)).reduce((s,i)=>s+parsePrice(i.price),0);
         const spentThisYear  = items.filter(i=>(i.purchaseDate||"").startsWith(String(now.getFullYear()))).reduce((s,i)=>s+parsePrice(i.price),0);
         const moPct   = monthlyBudget > 0 ? Math.min((spentThisMonth / monthlyBudget) * 100, 100) : 0;
@@ -5385,12 +5310,7 @@ function StatsTab({ itemsDb, outfitsDb, lookbooksDb, wishlistDb, outfitCalendar,
 
           {/* Summary stats */}
           <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill,minmax(140px,1fr))", gap:12 }}>
-            {[
-              { label:"Closet Value", value:`$${totalValue.toFixed(0)}`, color:"#1a1a1a", bg:"#fafaf8" },
-              { label:"Avg Item Price", value: items.filter(i=>parsePrice(i.price)>0).length>0?`$${(totalValue/items.filter(i=>parsePrice(i.price)>0).length).toFixed(0)}`:"—", color:"#2090c0", bg:"#f0f8ff" },
-              { label:"Wishlist Value", value:wishlistTotalValue>0?`$${wishlistTotalValue.toFixed(0)}`:"—", color:"#9a6fe0", bg:"#f8f0ff" },
-              { label:"Added This Month", value:items.filter(i=>(i.purchaseDate||"").startsWith(thisMonth)).length, color:"#3aaa6e", bg:"#f0faf4" },
-            ].map(s=>(
+            {spendingStats.map(s=>(
               <div key={s.label} style={{ background:s.bg, borderRadius:16, padding:"16px 18px", textAlign:"center", border:"1.5px solid #e8e4dc" }}>
                 <div style={{ fontSize:24, fontWeight:900, color:s.color, lineHeight:1 }}>{s.value}</div>
                 <div style={{ fontSize:10, fontWeight:700, color:"#aaa", textTransform:"uppercase", letterSpacing:"0.07em", marginTop:6 }}>{s.label}</div>
@@ -5433,46 +5353,32 @@ function StatsTab({ itemsDb, outfitsDb, lookbooksDb, wishlistDb, outfitCalendar,
             )}
           </Card>
 
-          {/* Most valuable items */}
+          <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:14 }}>
+            <Card>
+              <CardTitle icon={<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg>}>Best Value</CardTitle>
+              <div style={{ fontSize:12, color:"#bbb", marginBottom:12 }}>Items delivering the strongest cost per wear.</div>
+              {cpwItems.length===0 ? <div style={{ fontSize:12, color:"#ccc" }}>Add prices and start marking outfits worn to see this</div> : (
+                cpwItems.slice(0,5).map(item => (
+                  <ItemRow key={item.id} item={item} sub={`$${item.cpw.toFixed(2)}/wear · ${item.wornCount}× worn · $${parsePrice(item.price).toFixed(0)}`} onClick={()=>onViewItem(item)} />
+                ))
+              )}
+            </Card>
+            <Card>
+              <CardTitle icon={<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>}>Needs More Wear</CardTitle>
+              <div style={{ fontSize:12, color:"#bbb", marginBottom:12 }}>Pieces that are expensive relative to how often they get worn.</div>
+              {worstCpw.length===0 ? <div style={{ fontSize:12, color:"#ccc" }}>Add prices to items to see this</div> : (
+                worstCpw.map(item => (
+                  <ItemRow key={item.id} item={item} sub={`$${item.cpw.toFixed(2)}/wear · ${item.wornCount||0}× worn · $${parsePrice(item.price).toFixed(0)}`} onClick={()=>onViewItem(item)} />
+                ))
+              )}
+            </Card>
+          </div>
+
           <Card>
             <CardTitle icon={<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M6 3h12l4 6-10 13L2 9z"/><path d="M11 3L8 9l4 13 4-13-3-6"/><path d="M2 9h20"/></svg>}>Most Valuable Items</CardTitle>
             {[...items].sort((a,b)=>parsePrice(b.price)-parsePrice(a.price)).filter(i=>parsePrice(i.price)>0).slice(0,6).map(item=>(
               <ItemRow key={item.id} item={item} sub={`$${parsePrice(item.price).toFixed(0)} · $${(parsePrice(item.price)/Math.max(item.wornCount||0,1)).toFixed(2)}/wear`} onClick={()=>onViewItem(item)} />
             ))}
-          </Card>
-
-          {/* Wishlist intelligence */}
-          <Card>
-            <CardTitle icon={<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20.84 4.61a5.5 5.5 0 00-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 00-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 000-7.78z"/></svg>}>Wishlist Intelligence</CardTitle>
-            <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap:10, marginBottom:14 }}>
-              {[
-                { label:"Wishlist Items", value:wishItems.length, color:"#9a6fe0" },
-                { label:"Total Value", value:wishlistTotalValue>0?`$${wishlistTotalValue.toFixed(0)}`:"—", color:"#9a6fe0" },
-                { label:"Closet Overlap", value:wishlistOverlap.length, color:wishlistOverlap.length>0?"#e05555":"#3aaa6e" },
-              ].map(s=>(
-                <div key={s.label} style={{ background:"#faf9f6", borderRadius:12, padding:"10px 12px", textAlign:"center" }}>
-                  <div style={{ fontSize:20, fontWeight:800, color:s.color }}>{s.value}</div>
-                  <div style={{ fontSize:9, fontWeight:700, color:"#bbb", textTransform:"uppercase", letterSpacing:"0.06em", marginTop:3 }}>{s.label}</div>
-                </div>
-              ))}
-            </div>
-            {wishlistOverlap.length > 0 && (
-              <div>
-                <div style={{ fontSize:11, fontWeight:700, color:"#e05555", marginBottom:8 }}>⚠ You may already own versions of these:</div>
-                {wishlistOverlap.slice(0,4).map(wi=>(
-                  <div key={wi.id} style={{ display:"flex", alignItems:"center", gap:8, padding:"6px 0", borderBottom:"1px solid #f5f3ef" }}>
-                    <div style={{ width:32, height:32, borderRadius:8, overflow:"hidden", background:"#f5f3ef", flexShrink:0 }}>
-                      {wi.image?<img src={wi.image} alt="" style={{ width:"100%", height:"100%", objectFit:"contain" }}/>:<HangerIcon size={12} color="#ddd"/>}
-                    </div>
-                    <div style={{ flex:1, minWidth:0 }}>
-                      <div style={{ fontSize:12, fontWeight:700, color:"#1a1a1a", overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{wi.name}</div>
-                      <div style={{ fontSize:11, color:"#e05555" }}>{wi.category} · already in closet</div>
-                    </div>
-                    {wi.price && <div style={{ fontSize:12, fontWeight:700, color:"#9a6fe0" }}>{wi.price}</div>}
-                  </div>
-                ))}
-              </div>
-            )}
           </Card>
         </div>
         );
@@ -9019,9 +8925,22 @@ function OutfitCalendar({ outfits, calendar, onSaveCalendar, month, onMonthChang
   const nextWeek = () => { const d = new Date(weekAnchor + "T00:00:00"); d.setDate(d.getDate() + 7); setWeekAnchor(d.toISOString().slice(0, 10)); };
   const weekLabel = (() => { const s = new Date(weekDays[0] + "T00:00:00"); const e = new Date(weekDays[6] + "T00:00:00"); return s.toLocaleDateString("en-US", { month: "short", day: "numeric" }) + " – " + e.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }); })();
 
+  const prevMonthDays = new Date(year, mo, 0).getDate();
   const cells = [];
-  for (let i = 0; i < firstDay; i++) cells.push(null);
-  for (let d = 1; d <= daysInMonth; d++) cells.push(d);
+  for (let i = 0; i < firstDay; i++) {
+    const d = prevMonthDays - firstDay + 1 + i;
+    const prevMo = mo === 0 ? 11 : mo - 1;
+    const prevYr = mo === 0 ? year - 1 : year;
+    cells.push({ day: d, month: prevMo, year: prevYr, overflow: true });
+  }
+  for (let d = 1; d <= daysInMonth; d++) cells.push({ day: d, month: mo, year, overflow: false });
+  // Fill trailing days to complete the last row
+  const remainder = cells.length % 7;
+  if (remainder !== 0) {
+    const nextMo = mo === 11 ? 0 : mo + 1;
+    const nextYr = mo === 11 ? year + 1 : year;
+    for (let d = 1; d <= 7 - remainder; d++) cells.push({ day: d, month: nextMo, year: nextYr, overflow: true });
+  }
 
   // Season helpers
   const getSeason = (dateStr) => {
@@ -9218,9 +9137,9 @@ function OutfitCalendar({ outfits, calendar, onSaveCalendar, month, onMonthChang
 
       {/* Month Calendar grid */}
       {calView === "month" && <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 4 }}>
-        {cells.map((day, idx) => {
-          if (!day) return <div key={"blank-" + idx} />;
-          const dateStr = year + "-" + String(mo + 1).padStart(2, "0") + "-" + String(day).padStart(2, "0");
+        {cells.map((cell, idx) => {
+          const { day, month: cellMo, year: cellYr, overflow } = cell;
+          const dateStr = cellYr + "-" + String(cellMo + 1).padStart(2, "0") + "-" + String(day).padStart(2, "0");
           const ids = getIds(dateStr);
           const isToday = dateStr === todayStr;
           const isPast = dateStr < todayStr;
@@ -9233,24 +9152,24 @@ function OutfitCalendar({ outfits, calendar, onSaveCalendar, month, onMonthChang
 
           return (
             <div key={dateStr}
-              draggable={!!cellOutfit}
-              onDragStart={cellOutfit ? () => { setDraggingInfo({ outfitId: ids[0], fromDate: dateStr }); } : undefined}
-              onDragEnd={cellOutfit ? () => setDraggingInfo(null) : undefined}
-              onClick={() => { setDayPopup(dateStr); setDayPopupTab(0); setShowDayAdd(false); setDayAddSearch(""); }}
-              onDragOver={e => { e.preventDefault(); setDragOver(dateStr); }}
-              onDragLeave={() => setDragOver(null)}
-              onDrop={e => { e.preventDefault(); setDragOver(null); if (draggingInfo) { moveOutfitToDay(draggingInfo.outfitId, draggingInfo.fromDate, dateStr); setDraggingInfo(null); } }}
+              draggable={!overflow && !!cellOutfit}
+              onDragStart={!overflow && cellOutfit ? () => { setDraggingInfo({ outfitId: ids[0], fromDate: dateStr }); } : undefined}
+              onDragEnd={!overflow && cellOutfit ? () => setDraggingInfo(null) : undefined}
+              onClick={overflow ? undefined : () => { setDayPopup(dateStr); setDayPopupTab(0); setShowDayAdd(false); setDayAddSearch(""); }}
+              onDragOver={overflow ? undefined : e => { e.preventDefault(); setDragOver(dateStr); }}
+              onDragLeave={overflow ? undefined : () => setDragOver(null)}
+              onDrop={overflow ? undefined : e => { e.preventDefault(); setDragOver(null); if (draggingInfo) { moveOutfitToDay(draggingInfo.outfitId, draggingInfo.fromDate, dateStr); setDraggingInfo(null); } }}
               style={{
                 borderRadius: 8,
-                border: isToday ? "2px solid #1a1a1a" : isDragOver ? "1.5px dashed #2d6a3f" : "1px solid #ede9e2",
-                background: isDragOver ? "#f0faf4" : isEmptyFuture ? "#fff" : cellOutfit ? "#f5f3ef" : "#fff",
-                cursor: "pointer", aspectRatio: "3/4", overflow: "hidden", position: "relative",
+                border: overflow ? "1px solid #f5f3ef" : isToday ? "2px solid #1a1a1a" : isDragOver ? "1.5px dashed #2d6a3f" : "1px solid #ede9e2",
+                background: overflow ? "#faf9f7" : isDragOver ? "#f0faf4" : isEmptyFuture ? "#fff" : cellOutfit ? "#f5f3ef" : "#fff",
+                cursor: overflow ? "default" : "pointer", aspectRatio: "3/4", overflow: "hidden", position: "relative",
                 transition: "box-shadow 0.12s",
-                opacity: isPast ? 0.55 : 1,
-                filter: isPast ? "saturate(0.45)" : "none",
+                opacity: overflow ? 0.32 : isPast ? 0.55 : 1,
+                filter: overflow ? "none" : isPast ? "saturate(0.45)" : "none",
               }}
-              onMouseEnter={e => { setHoveredDay(dateStr); e.currentTarget.style.boxShadow = "0 2px 10px rgba(0,0,0,0.08)"; if(isPast) e.currentTarget.style.opacity="0.8"; }}
-              onMouseLeave={e => { setHoveredDay(null); e.currentTarget.style.boxShadow = "none"; if(isPast) e.currentTarget.style.opacity="0.55"; }}
+              onMouseEnter={overflow ? undefined : e => { setHoveredDay(dateStr); e.currentTarget.style.boxShadow = "0 2px 10px rgba(0,0,0,0.08)"; if(isPast) e.currentTarget.style.opacity="0.8"; }}
+              onMouseLeave={overflow ? undefined : e => { setHoveredDay(null); e.currentTarget.style.boxShadow = "none"; if(isPast) e.currentTarget.style.opacity="0.55"; }}
             >
               {/* Outfit image — absolutely fills cell (works because cell has aspectRatio) */}
               {cellOutfit?.previewImage && (
@@ -9258,16 +9177,16 @@ function OutfitCalendar({ outfits, calendar, onSaveCalendar, month, onMonthChang
               )}
 
               {/* Linen texture for unplanned future days */}
-              {isEmptyFuture && !isDragOver && (
+              {isEmptyFuture && !isDragOver && !overflow && (
                 <div style={{ position: "absolute", inset: 0, backgroundImage: "repeating-linear-gradient(45deg, transparent, transparent 3px, rgba(0,0,0,0.018) 3px, rgba(0,0,0,0.018) 6px)", zIndex: 1 }} />
               )}
 
               {/* Season start marker */}
-              {seasonMark && <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 2, background: SEASON_COLORS[seasonMark], zIndex: 4 }} />}
-              {seasonMark && <div style={{ position: "absolute", top: 2, left: "50%", transform: "translateX(-50%)", background: SEASON_COLORS[seasonMark], color: "#fff", fontSize: 6, fontWeight: 800, padding: "1px 4px", borderRadius: "0 0 4px 4px", zIndex: 4, whiteSpace: "nowrap", fontFamily: "'DM Sans', sans-serif", textTransform: "uppercase", letterSpacing: "0.05em" }}>{seasonMark}</div>}
+              {!overflow && seasonMark && <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 2, background: SEASON_COLORS[seasonMark], zIndex: 4 }} />}
+              {!overflow && seasonMark && <div style={{ position: "absolute", top: 2, left: "50%", transform: "translateX(-50%)", background: SEASON_COLORS[seasonMark], color: "#fff", fontSize: 6, fontWeight: 800, padding: "1px 4px", borderRadius: "0 0 4px 4px", zIndex: 4, whiteSpace: "nowrap", fontFamily: "'DM Sans', sans-serif", textTransform: "uppercase", letterSpacing: "0.05em" }}>{seasonMark}</div>}
 
               {/* Custom marker bars */}
-              {markersOnDate(dateStr).map((mk, mki) => {
+              {!overflow && markersOnDate(dateStr).map((mk, mki) => {
                 const topOff = (seasonMark ? 12 : 0) + mki * 10;
                 return (<>
                   <div key={mk.id + "_bar"} onClick={e => { e.stopPropagation(); openEditMarker(mk); }} style={{ position: "absolute", top: topOff, left: 0, right: 0, height: 2, background: mk.color, zIndex: 4, cursor: "pointer" }} />
@@ -9279,7 +9198,7 @@ function OutfitCalendar({ outfits, calendar, onSaveCalendar, month, onMonthChang
               {ids.length > 1 && <div style={{ position: "absolute", top: 4, right: 4, background: "rgba(26,26,26,0.7)", color: "#fff", borderRadius: 8, padding: "1px 5px", fontSize: 7, fontWeight: 800, fontFamily: "'DM Sans', sans-serif", zIndex: 5 }}>+{ids.length - 1}</div>}
 
               {/* Event pills — visible even on empty days */}
-              {dayEvts.length > 0 && (
+              {!overflow && dayEvts.length > 0 && (
                 <div style={{ position: "absolute", bottom: ids.length > 0 ? 0 : 18, left: 0, right: 0, zIndex: 5 }}>
                   {dayEvts.slice(0, 2).map(ev => (
                     <div key={ev.id} onClick={e => { e.stopPropagation(); openEditEvent(ev); }}
@@ -9312,7 +9231,7 @@ function OutfitCalendar({ outfits, calendar, onSaveCalendar, month, onMonthChang
                 <div style={{ flex: 1 }} />
 
                 {/* Outfit name — hover only, as gradient fade */}
-                {ids.length > 0 && hoveredDay === dateStr && (
+                {!overflow && ids.length > 0 && hoveredDay === dateStr && (
                   <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, padding: "5px 6px", background: "#fff", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 4, pointerEvents: "auto" }} onClick={e => e.stopPropagation()}>
                     <div style={{ flex: 1, fontSize: 7, color: "#1a1a1a", fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontFamily: "'DM Sans', sans-serif" }}>
                       {outfits.find(o=>o.id===ids[0])?.name || ""}
@@ -9321,7 +9240,7 @@ function OutfitCalendar({ outfits, calendar, onSaveCalendar, month, onMonthChang
                   </div>
                 )}
                 {/* Empty hint */}
-                {ids.length === 0 && !isPast && (
+                {ids.length === 0 && !isPast && !overflow && (
                   <div style={{ fontSize: 14, color: "#d8d2ca", textAlign: "center", lineHeight: 1 }}>+</div>
                 )}
               </div>

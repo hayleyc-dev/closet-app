@@ -109,7 +109,7 @@ function getColorSwatch(name) {
 }
 const SIZES = ["XS", "S", "M", "L", "XL", "00/24", "0/25", "2/26", "4/27", "6/28", "OS", "34B", "S Tall", "XS Long", "S/M", "7", "9"];
 const SEASONS = ["Spring", "Summer", "Fall", "Winter", "All Season", "Holiday", "Disney"];
-const OCCASIONS = ["WFH", "Disney", "Universal", "Date Night", "Travel", "Sport", "Weekend", "Occasion"];
+const OCCASIONS = ["WFH", "Disney", "Universal", "Date Night", "Travel", "Sport", "Weekend", "Event"];
 
 const OCCASION_COLORS = {
   "WFH":        { bg: "#f0faf4", color: "#3aaa6e" },
@@ -119,7 +119,7 @@ const OCCASION_COLORS = {
   "Travel":     { bg: "#f0fbff", color: "#2bafd4" },
   "Sport":      { bg: "#f0f4ff", color: "#5b7fe6" },
   "Weekend":    { bg: "#fafaf0", color: "#9aaa30" },
-  "Occasion":   { bg: "#f5f0ff", color: "#7c6fe0" },
+  "Event":      { bg: "#f5f0ff", color: "#7c6fe0" },
 };
 
 const uid = () => Math.random().toString(36).slice(2);
@@ -4271,7 +4271,7 @@ function StatsTab({ itemsDb, outfitsDb, lookbooksDb, wishlistDb, outfitCalendar,
     "Sport": { label: "The Athlete", desc: "Performance meets style. You keep it active and functional.", palette: ["#4aaa6e","#1a1a1a","#4a7fd4","#f5f5f5"] },
     "Disney": { label: "The Dreamer", desc: "Bold, fun, and full of personality — you dress for the magic.", palette: ["#d040b0","#f0c840","#4a7fd4","#e05555"] },
     "Travel": { label: "The Adventurer", desc: "Versatile and ready for anything. Your wardrobe goes where you go.", palette: ["#2090c0","#c4a882","#4aaa6e","#1a1a1a"] },
-    "Occasion": { label: "The Elegante", desc: "You always dress for the occasion — polished and event-ready.", palette: ["#9a6fe0","#d4a820","#1a1a1a","#f5f5f5"] },
+    "Event": { label: "The Elegante", desc: "You always dress for the occasion — polished and event-ready.", palette: ["#9a6fe0","#d4a820","#1a1a1a","#f5f5f5"] },
     "Universal": { label: "The Trendsetter", desc: "Pop culture meets personal style. You always stand out.", palette: ["#e07e30","#4a7fd4","#e05555","#1a1a1a"] },
   };
   const archetype = topOccasions[0] ? (ARCHETYPES[topOccasions[0][0]] || { label: "The Individualist", desc: "Your style defies categories — uniquely and completely you.", palette: ["#1a1a1a","#9a9a9a","#c4a882","#f5f5f5"] }) : null;
@@ -9360,7 +9360,7 @@ export default function App() {
   const CUSTOM_OCC_KEY = "wardrobe_custom_occ_v1";
   const CUSTOM_SEAS_KEY = "wardrobe_custom_seas_v1";
   const [customCategories, setCustomCategories] = useState(() => { try { return JSON.parse(localStorage.getItem("wardrobe_custom_cats_v1") || "null") || ["Tops","Bottoms","Dresses","Outerwear","Shoes","Bags","Accessories","Activewear","Swimwear","Jewelry","Other"]; } catch { return ["Tops","Bottoms","Dresses","Outerwear","Shoes","Bags","Accessories","Activewear","Swimwear","Jewelry","Other"]; } });
-  const [customOccasions, setCustomOccasions] = useState(() => { try { return JSON.parse(localStorage.getItem("wardrobe_custom_occ_v1") || "null") || ["WFH","Disney","Universal","Date Night","Travel","Sport","Weekend","Occasion"]; } catch { return ["WFH","Disney","Universal","Date Night","Travel","Sport","Weekend","Occasion"]; } });
+  const [customOccasions, setCustomOccasions] = useState(() => { try { return JSON.parse(localStorage.getItem("wardrobe_custom_occ_v1") || "null") || ["WFH","Disney","Universal","Date Night","Travel","Sport","Weekend","Event"]; } catch { return ["WFH","Disney","Universal","Date Night","Travel","Sport","Weekend","Event"]; } });
   const [customSeasons, setCustomSeasons] = useState(() => { try { return JSON.parse(localStorage.getItem("wardrobe_custom_seas_v1") || "null") || ["Spring","Summer","Fall","Winter","All Season","Holiday","Disney"]; } catch { return ["Spring","Summer","Fall","Winter","All Season","Holiday","Disney"]; } });
   const [lastSynced, setLastSynced] = useState(() => { try { return localStorage.getItem("wardrobe_last_synced_v1") || null; } catch { return null; } });
   const [monthlyBudget, setMonthlyBudgetState] = useState(() => { try { return parseFloat(localStorage.getItem("wardrobe_monthly_budget_v1")) || 0; } catch { return 0; } });
@@ -9401,10 +9401,10 @@ export default function App() {
   const [activeLookbookView, setActiveLookbookView] = useState("editorial");
   const [moodboardActiveIdx, setMoodboardActiveIdx] = useState(0);
   const LOOKBOOK_TYPES = ["trip", "event", "season", "capsule", "inspiration"];
-  const LOOKBOOK_OCCASIONS = ["All", "WFH", "Disney", "Universal", "Date Night", "Travel", "Sport", "Weekend", "Occasion"];
+  const LOOKBOOK_OCCASIONS = ["All", "WFH", "Disney", "Universal", "Date Night", "Travel", "Sport", "Weekend", "Event"];
   const LOOKBOOK_OCCASION_ALIASES = {
     "WFH": ["WFH", "Work Week", "Work"],
-    "Occasion": ["Occasion", "Event", "Vacation"],
+    "Event": ["Event", "Occasion", "Vacation"],
   };
   const [lbSearch, setLbSearch] = useState("");
   const [lbSort, setLbSort] = useState("newest");
@@ -9899,7 +9899,7 @@ export default function App() {
                 </div>
                 <div style={{ background: "#fff", borderRadius: 16, border: "1px solid #ece8e0", padding: "18px 16px", marginBottom: 12 }}>
                   <div style={{ fontSize: 10, fontWeight: 700, color: "#c0b8b0", textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 10 }}>Occasion</div>
-                  {["All", "WFH", "Disney", "Universal", "Date Night", "Travel", "Sport", "Weekend", "Occasion"].map(tag => (
+                  {["All", "WFH", "Disney", "Universal", "Date Night", "Travel", "Sport", "Weekend", "Event"].map(tag => (
                     <button key={tag} className={"sidebar-btn" + (outfitTagFilter === tag ? " active" : "")} onClick={() => setOutfitTagFilter(tag)}>{tag}</button>
                   ))}
                 </div>

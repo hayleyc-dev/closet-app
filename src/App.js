@@ -9063,22 +9063,48 @@ function SectionHeader({ title, action }) {
   );
 }
 
-function HomeTab({ outfitCalendar, outfitsDb, itemsDb, lookbooksDb, wishlistDb, setTab, setActiveLookbook, setActiveLookbookView, setOutfitPopup, homeCity: homeCityProp, setHomeCity: setHomeCityProp, homeWeather: homeWeatherProp }) {
+function HomeTab({
+  outfitCalendar,
+  outfitsDb,
+  itemsDb,
+  lookbooksDb,
+  wishlistDb,
+  moodboardsDb = [],
+  calendarEvents = [],
+  setTab,
+  setActiveLookbook,
+  setActiveLookbookView,
+  setOutfitPopup,
+  setItemDetail,
+  setMoodboardActiveIdx,
+  setMoodboardView,
+  homeCity: homeCityProp,
+  setHomeCity: setHomeCityProp,
+  homeWeather: homeWeatherProp
+}) {
   const now = new Date();
+  const todayKey = now.toISOString().slice(0, 10);
   const hour = now.getHours();
   const greeting = hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening";
   const dayName = now.toLocaleDateString("en-US", { weekday: "long" });
-  const dateLabel = now.toLocaleDateString("en-US", { month: "long", day: "numeric" });
+  const fullDateLabel = now.toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" });
+  const dayMs = 86400000;
+  const todayMidnight = new Date(todayKey + "T00:00:00");
 
-  const todayKey = now.toISOString().slice(0, 10);
+  const parsePrice = (p) => parseFloat((p || "").replace(/[^0-9.]/g, "")) || 0;
+  const fmtDate = (d) => d ? new Date(d + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" }) : null;
+  const cardStyle = { background: "#fff", borderRadius: 22, border: "1px solid #e7dfd4", overflow: "hidden", boxShadow: "0 12px 30px rgba(48,33,19,0.06)" };
+
+  const allItems = itemsDb.rows;
+  const closetItems = allItems.filter(i => !i.forSale);
+  const allLookbooks = lookbooksDb.rows;
   const rawIds = outfitCalendar[todayKey] || [];
   const todayIds = Array.isArray(rawIds) ? rawIds : rawIds ? [rawIds] : [];
   const todayOutfits = todayIds.map(id => outfitsDb.rows.find(o => o.id === id)).filter(Boolean);
+  const todayPlans = (calendarEvents || [])
+    .filter(ev => ev.startDate <= todayKey && ev.endDate >= todayKey)
+    .sort((a, b) => a.startDate.localeCompare(b.startDate));
 
-  const pinnedLookbooks = lookbooksDb.rows.filter(lb => lb.pinned);
-  const allItems = itemsDb.rows;
-  const closetItems = allItems.filter(i => !i.forSale);
-  const parsePrice = (p) => parseFloat((p || "").replace(/[^0-9.]/g, "")) || 0;
   const totalValue = closetItems.reduce((s, i) => s + parsePrice(i.price), 0);
   const unwornCount = closetItems.filter(i => !(i.wornCount > 0)).length;
   const wornItems = closetItems.filter(i => (i.wornCount || 0) > 0);
@@ -9096,7 +9122,6 @@ function HomeTab({ outfitCalendar, outfitsDb, itemsDb, lookbooksDb, wishlistDb, 
   const healthColor = healthScore >= 80 ? "#3aaa6e" : healthScore >= 60 ? "#2090c0" : healthScore >= 40 ? "#a07000" : "#e05555";
   const healthLabel = healthScore >= 80 ? "Thriving" : healthScore >= 60 ? "Healthy" : healthScore >= 40 ? "Growing" : "Needs Love";
 
-  // Monthly budget
   const monthlyBudget = (() => { try { return parseFloat(localStorage.getItem("wardrobe_monthly_budget") || "") || 0; } catch { return 0; } })();
   const thisMonthStart = new Date(now.getFullYear(), now.getMonth(), 1).getTime();
   const monthlySpend = closetItems.reduce((s, i) => {
@@ -9104,9 +9129,8 @@ function HomeTab({ outfitCalendar, outfitsDb, itemsDb, lookbooksDb, wishlistDb, 
     return d >= thisMonthStart ? s + parsePrice(i.price) : s;
   }, 0);
 
-  // Wear again suggestion
   const wearAgainItem = useMemo(() => {
-    const sixtyDaysAgo = Date.now() - 60 * 24 * 60 * 60 * 1000;
+    const sixtyDaysAgo = Date.now() - 60 * dayMs;
     const candidates = closetItems.filter(i => {
       if (!i.image) return false;
       if (!(i.wornCount > 0)) return true;
@@ -9115,16 +9139,17 @@ function HomeTab({ outfitCalendar, outfitsDb, itemsDb, lookbooksDb, wishlistDb, 
     });
     if (candidates.length === 0) return null;
     return candidates[Math.floor(Math.random() * candidates.length)];
-  }, []); // eslint-disable-line
+  }, [closetItems]);
 
-  // New In
-  const thirtyDaysAgo = Date.now() - 30 * 24 * 60 * 60 * 1000;
+  const newInStart = Date.now() - 90 * dayMs;
   const newInItems = closetItems
-    .filter(i => { const d = new Date(i.created_at || i.purchaseDate || 0).getTime(); return d >= thirtyDaysAgo; })
-    .sort((a, b) => new Date(b.created_at || b.purchaseDate || 0) - new Date(a.created_at || a.purchaseDate || 0))
+    .filter(i => {
+      const d = new Date(i.purchaseDate || i.created_at || 0).getTime();
+      return d >= newInStart;
+    })
+    .sort((a, b) => new Date(b.purchaseDate || b.created_at || 0) - new Date(a.purchaseDate || a.created_at || 0))
     .slice(0, 8);
 
-  // Seller stats
   const sellerItems = allItems.filter(i => i.forSale || i.status === "listed" || i.status === "sold" || i.status === "pending");
   const sellerListed = sellerItems.filter(i => (i.status === "listed" || i.forSale) && i.status !== "sold").length;
   const sellerSold = sellerItems.filter(i => i.status === "sold").length;
@@ -9134,11 +9159,21 @@ function HomeTab({ outfitCalendar, outfitsDb, itemsDb, lookbooksDb, wishlistDb, 
   const hasSeller = sellerItems.length > 0;
 
   const highPriorityWish = wishlistDb.rows.filter(i => i.priority === "high").slice(0, 4);
+  const pinnedLookbooks = allLookbooks.filter(lb => lb.pinned);
+  const pinnedMoodboards = (moodboardsDb || []).filter(board => board.pinned);
+  const [featuredMoodboardId, setFeaturedMoodboardId] = useState(() => {
+    try { return localStorage.getItem("wardrobe_home_featured_moodboard_v1") || ""; } catch { return ""; }
+  });
+  useEffect(() => {
+    if (!moodboardsDb?.length) return;
+    if (!featuredMoodboardId || !moodboardsDb.some(board => board.id === featuredMoodboardId)) {
+      const nextId = pinnedMoodboards[0]?.id || moodboardsDb[0]?.id || "";
+      setFeaturedMoodboardId(nextId);
+      try { localStorage.setItem("wardrobe_home_featured_moodboard_v1", nextId); } catch {}
+    }
+  }, [featuredMoodboardId, moodboardsDb, pinnedMoodboards]);
+  const featuredMoodboard = (moodboardsDb || []).find(board => board.id === featuredMoodboardId) || null;
 
-  const fmtDate = (d) => d ? new Date(d + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" }) : null;
-  const cardStyle = { background: "#fff", borderRadius: 16, border: "1.5px solid #e8e4dc", overflow: "hidden", boxShadow: "0 2px 12px rgba(0,0,0,0.04)" };
-
-  // Weather
   const homeCity = homeCityProp || "";
   const setHomeCity = (c) => { if (setHomeCityProp) setHomeCityProp(c); };
   const [homeCityInput, setHomeCityInput] = useState(homeCity);
@@ -9157,380 +9192,556 @@ function HomeTab({ outfitCalendar, outfitsDb, itemsDb, lookbooksDb, wishlistDb, 
       if (!loc) { setLocalHomeWeather({ error: "City not found" }); setWxLoading(false); return; }
       const wRes = await fetch("https://api.open-meteo.com/v1/forecast?latitude=" + loc.latitude + "&longitude=" + loc.longitude + "&daily=temperature_2m_max,temperature_2m_min,weathercode&temperature_unit=fahrenheit&timezone=auto&forecast_days=7");
       const w = await wRes.json();
-      const days = (w.daily?.time || []).map((d, i) => ({
-        date: d, high: Math.round(w.daily.temperature_2m_max[i]),
-        low: Math.round(w.daily.temperature_2m_min[i]), code: w.daily.weathercode[i],
-      }));
+      const days = (w.daily?.time || []).map((d, i) => ({ date: d, high: Math.round(w.daily.temperature_2m_max[i]), low: Math.round(w.daily.temperature_2m_min[i]), code: w.daily.weathercode[i] }));
       setLocalHomeWeather({ city: loc.name, days });
-    } catch(e) { setLocalHomeWeather({ error: "Weather unavailable" }); }
+    } catch (e) {
+      setLocalHomeWeather({ error: "Weather unavailable" });
+    }
     setWxLoading(false);
   }, [homeWeatherProp]);
 
-  useEffect(() => { if (homeCity) { setHomeCityInput(homeCity); fetchHomeWeather(homeCity); } }, [homeCity]); // eslint-disable-line
+  useEffect(() => { if (homeCity) { setHomeCityInput(homeCity); fetchHomeWeather(homeCity); } }, [homeCity, fetchHomeWeather]);
 
   const wxIcon = (code) => {
-    if (code === 0) return "☀️";
+    if (code === 0) return "☀";
     if (code <= 2) return "⛅";
-    if (code <= 45) return "☁️";
-    if (code <= 67) return "🌧️";
-    if (code <= 77) return "❄️";
-    if (code <= 82) return "🌦️";
-    return "⛈️";
+    if (code <= 45) return "☁";
+    if (code <= 67) return "🌧";
+    if (code <= 77) return "❄";
+    if (code <= 82) return "🌦";
+    return "⛈";
   };
-
   const todayWx = homeWeather?.days?.find(d => d.date === todayKey);
-  const [hoveredTodayId, setHoveredTodayId] = useState(null);
 
-  // Week strip
-  const weekDays = (() => {
-    const days = [];
-    for (let i = 0; i < 7; i++) {
-      const d = new Date(now); d.setDate(d.getDate() + i);
-      const key = d.toISOString().slice(0, 10);
-      const ids = (() => { const v = outfitCalendar[key] || []; return Array.isArray(v) ? v : v ? [v] : []; })();
-      days.push({ key, date: d, ids, isToday: i === 0 });
-    }
-    return days;
-  })();
+  const weekDays = Array.from({ length: 7 }, (_, i) => {
+    const d = new Date(now);
+    d.setDate(d.getDate() + i);
+    const key = d.toISOString().slice(0, 10);
+    const ids = (() => {
+      const v = outfitCalendar[key] || [];
+      return Array.isArray(v) ? v : v ? [v] : [];
+    })();
+    return { key, date: d, ids, isToday: i === 0 };
+  });
   const weekLogged = weekDays.filter(d => d.ids.length > 0).length;
 
-  // Upcoming trips
-  const todayMidnight = new Date(todayKey + "T00:00:00");
-  const upcomingTrips = lookbooksDb.rows
+  const seasonStarts = [
+    [3, 20, "Spring", "#d9efcf"],
+    [6, 21, "Summer", "#f9e49a"],
+    [9, 22, "Fall", "#efc498"],
+    [12, 21, "Winter", "#d6e4f3"],
+  ].map(([month, day, name, color]) => {
+    const target = new Date(now.getFullYear(), month - 1, day);
+    if (target < todayMidnight) target.setFullYear(target.getFullYear() + 1);
+    return {
+      id: `season-${name}-${target.getFullYear()}`,
+      label: `${name} starts`,
+      type: "season",
+      startDate: target.toISOString().slice(0, 10),
+      endDate: target.toISOString().slice(0, 10),
+      accent: color
+    };
+  });
+
+  const dateLinkedLookbooks = allLookbooks
     .filter(lb => lb.dateStart || lb.dateEnd)
     .map(lb => {
       const start = lb.dateStart ? new Date(lb.dateStart + "T00:00:00") : null;
       const end = lb.dateEnd ? new Date(lb.dateEnd + "T00:00:00") : null;
-      const daysUntil = start ? Math.round((start - todayMidnight) / 86400000) : null;
-      const isActive = (start && start <= todayMidnight && end && end >= todayMidnight) || (!start && end && end >= todayMidnight);
+      const anchor = start || end;
+      const daysUntil = anchor ? Math.round((anchor - todayMidnight) / dayMs) : null;
+      const isActive = (!!start && start <= todayMidnight && (!end || end >= todayMidnight)) || (!start && !!end && end >= todayMidnight);
       return { ...lb, daysUntil, isActive };
     })
     .filter(lb => lb.isActive || (lb.daysUntil !== null && lb.daysUntil >= 0))
-    .sort((a, b) => (a.isActive ? -1 : b.isActive ? 1 : (a.daysUntil || 0) - (b.daysUntil || 0)))
-    .slice(0, 3);
+    .sort((a, b) => (a.isActive ? -1 : b.isActive ? 1 : (a.daysUntil ?? 9999) - (b.daysUntil ?? 9999)));
+
+  const keepWorkingLookbooks = dateLinkedLookbooks.slice(0, 3);
+  const upcomingTrip = dateLinkedLookbooks.find(lb => lb.isActive || (lb.daysUntil !== null && lb.daysUntil <= 90));
+
+  const planningRows = [
+    ...calendarEvents
+      .filter(ev => {
+        const start = new Date(ev.startDate + "T00:00:00");
+        const diff = Math.round((start - todayMidnight) / dayMs);
+        return diff >= 0 && diff <= 30;
+      })
+      .map(ev => ({ ...ev, kind: "event" })),
+    ...seasonStarts
+      .filter(ev => {
+        const diff = Math.round((new Date(ev.startDate + "T00:00:00") - todayMidnight) / dayMs);
+        return diff >= 0 && diff <= 30;
+      })
+      .map(ev => ({ ...ev, kind: "season" })),
+    ...dateLinkedLookbooks
+      .filter(lb => lb.daysUntil !== null && lb.daysUntil >= 0 && lb.daysUntil <= 90)
+      .map(lb => ({ id: `lb-${lb.id}`, label: lb.name, startDate: lb.dateStart || lb.dateEnd, endDate: lb.dateEnd || lb.dateStart, type: "lookbook", lookbook: lb, kind: "lookbook" }))
+  ]
+    .sort((a, b) => (a.startDate || "").localeCompare(b.startDate || ""))
+    .slice(0, 7);
 
   const packCheckedAll = useMemo(() => { try { return JSON.parse(localStorage.getItem("wardrobe_pack_checked_v1") || "{}"); } catch { return {}; } }, []);
   const getPackProgress = (lb) => {
     const lbOutfits = (lb.outfitIds || []).map(id => outfitsDb.rows.find(o => o.id === id)).filter(Boolean);
     const seen = {};
-    lbOutfits.forEach(o => (o.layers || o.itemIds || []).forEach(id => { const item = allItems.find(i => i.id === id); if (item) seen[id] = item; }));
+    lbOutfits.forEach(o => (o.layers || o.itemIds || []).forEach(id => {
+      const item = allItems.find(i => i.id === id);
+      if (item) seen[id] = item;
+    }));
     const items = Object.values(seen);
     const checked = packCheckedAll[lb.id] || {};
     return { total: items.length, packed: Object.keys(checked).filter(k => checked[k]).length };
   };
 
+  const openLookbook = (lb, view = "editorial") => {
+    setActiveLookbookView(view);
+    setActiveLookbook(lb);
+    setTab("lookbooks");
+  };
+  const openMoodboard = (board) => {
+    const idx = (moodboardsDb || []).findIndex(b => b.id === board.id);
+    if (idx >= 0 && setMoodboardActiveIdx) setMoodboardActiveIdx(idx);
+    if (setMoodboardView) setMoodboardView("canvas");
+    setTab("moodboard");
+  };
+
   const EH = ({ eyebrow, title, action }) => (
-    <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 16, marginBottom: 16 }}>
+    <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 16, marginBottom: 18, flexWrap: "wrap" }}>
       <div>
-        {eyebrow && <div style={{ fontSize: 10, fontWeight: 700, color: "#b8aea1", textTransform: "uppercase", letterSpacing: "0.14em", marginBottom: 4 }}>{eyebrow}</div>}
-        <div style={{ fontFamily: "’Cormorant Garamond’, serif", fontStyle: "italic", fontWeight: 300, fontSize: 26, color: "#1a1a1a", lineHeight: 1 }}>{title}</div>
+        {eyebrow && <div style={{ fontSize: 10, fontWeight: 700, color: "#ab9b88", textTransform: "uppercase", letterSpacing: "0.16em", marginBottom: 6 }}>{eyebrow}</div>}
+        <div style={{ fontFamily: "'Cormorant Garamond', serif", fontStyle: "italic", fontWeight: 300, fontSize: 32, color: "#241b15", lineHeight: 0.95 }}>{title}</div>
       </div>
-      {action && <button onClick={action.onClick} style={{ fontSize: 11, color: "#9f978b", background: "none", border: "none", cursor: "pointer", fontFamily: "’DM Sans’, sans-serif", padding: 0, flexShrink: 0 }}>{action.label}</button>}
+      {action && <button onClick={action.onClick} style={{ fontSize: 11, color: "#8e7d6a", background: "none", border: "none", cursor: "pointer", fontFamily: "'DM Sans', sans-serif", padding: 0 }}>{action.label}</button>}
     </div>
   );
 
-  return (
-    <div className="fade-up" style={{ maxWidth: 900, margin: "0 auto", padding: "0 40px 80px" }}>
+  const planBadge = (entry) => {
+    if (entry.kind === "season") return { label: "Season", bg: "#f5ecdf", color: "#9a6f43" };
+    if (entry.kind === "lookbook") return { label: "Lookbook", bg: "#edf3f8", color: "#4f7392" };
+    if (entry.type === "trip") return { label: "Trip", bg: "#edf3f8", color: "#4f7392" };
+    if (entry.type === "work") return { label: "Work", bg: "#edf7ef", color: "#3f7d55" };
+    return { label: "Plan", bg: "#f4effa", color: "#8663a7" };
+  };
 
-      {/* ── Hero: greeting + weather ── */}
-      <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 24, marginBottom: 6, paddingTop: 4 }}>
-        <div>
-          <div style={{ fontFamily: "’Cormorant Garamond’, serif", fontStyle: "italic", fontWeight: 300, fontSize: 56, color: "#1a1a1a", lineHeight: 0.9, marginBottom: 12 }}>{greeting}</div>
-          <div style={{ fontSize: 13, color: "#9f978b", fontWeight: 500 }}>{dayName}, {dateLabel}</div>
-        </div>
-        <div style={{ flexShrink: 0, paddingTop: 10 }}>
-          {homeWeather?.days && todayWx ? (
-            <div style={{ textAlign: "right" }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 8, justifyContent: "flex-end", marginBottom: 6 }}>
-                <span style={{ fontSize: 22 }}>{wxIcon(todayWx.code)}</span>
-                <span style={{ fontSize: 30, fontWeight: 800, color: "#1a1a1a", lineHeight: 1 }}>{todayWx.high}°</span>
-                <span style={{ fontSize: 13, color: "#bbb", fontWeight: 600 }}>{todayWx.low}°</span>
+  return (
+    <div className="fade-up" style={{ maxWidth: 1120, margin: "0 auto", padding: "0 36px 96px" }}>
+      <div style={{ ...cardStyle, marginBottom: 28, background: "linear-gradient(135deg, #f6efe7 0%, #fbf8f3 52%, #efe5d8 100%)", border: "1px solid #e6ddd2", padding: 28 }}>
+        <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1.35fr) minmax(280px, 0.9fr)", gap: 24, alignItems: "stretch" }}>
+          <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
+            <div>
+              <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.18em", textTransform: "uppercase", color: "#8b7762", marginBottom: 10 }}>{dayName}</div>
+              <div style={{ fontFamily: "'Cormorant Garamond', serif", fontStyle: "italic", fontWeight: 300, fontSize: 68, color: "#201814", lineHeight: 0.88, marginBottom: 12 }}>{greeting}</div>
+              <div style={{ fontSize: 15, color: "#6f6154", maxWidth: 520, lineHeight: 1.7 }}>
+                {fullDateLabel}. Home is now a rollup of what to wear, what is coming up, and what deserves your attention next.
               </div>
-              <div style={{ fontSize: 11, color: "#b8aea1", fontWeight: 600, marginBottom: 8 }}>{homeWeather.city}</div>
-              <div style={{ display: "flex", gap: 14, justifyContent: "flex-end" }}>
-                {homeWeather.days.slice(1, 4).map(d => (
-                  <div key={d.date} style={{ textAlign: "center" }}>
-                    <div style={{ fontSize: 9, color: "#ccc", fontWeight: 700 }}>{new Date(d.date + "T00:00:00").toLocaleDateString("en-US", { weekday: "short" })}</div>
-                    <div style={{ fontSize: 13 }}>{wxIcon(d.code)}</div>
-                    <div style={{ fontSize: 10, fontWeight: 700, color: "#aaa" }}>{d.high}°</div>
+            </div>
+
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 12 }}>
+              {[
+                { label: "Closet", value: `${closetItems.length} pieces`, sub: `${wornPct}% worn` },
+                { label: "This Week", value: `${weekLogged}/7 logged`, sub: weekLogged > 0 ? "Calendar in motion" : "Start planning" },
+                { label: "New In", value: `${newInItems.length} recent`, sub: "Last 3 months" },
+              ].map(stat => (
+                <div key={stat.label} style={{ background: "rgba(255,255,255,0.66)", border: "1px solid rgba(107,81,54,0.08)", borderRadius: 16, padding: "14px 16px" }}>
+                  <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", color: "#a08e7a", marginBottom: 8 }}>{stat.label}</div>
+                  <div style={{ fontSize: 22, fontWeight: 800, color: "#1f1915", lineHeight: 1, marginBottom: 4 }}>{stat.value}</div>
+                  <div style={{ fontSize: 11, color: "#7e6f61" }}>{stat.sub}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div style={{ ...cardStyle, background: "rgba(255,255,255,0.82)", border: "1px solid rgba(107,81,54,0.08)", borderRadius: 20, padding: 20, boxShadow: "none" }}>
+            <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12, marginBottom: 18 }}>
+              <div>
+                <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase", color: "#ab9b88", marginBottom: 6 }}>Today</div>
+                <div style={{ fontFamily: "'Cormorant Garamond', serif", fontStyle: "italic", fontWeight: 300, fontSize: 30, color: "#241b15" }}>Daily Brief</div>
+              </div>
+              {todayWx ? (
+                <div style={{ textAlign: "right" }}>
+                  <div style={{ fontSize: 28, fontWeight: 800, color: "#1f1915", lineHeight: 1, display: "flex", alignItems: "center", gap: 6, justifyContent: "flex-end" }}>
+                    <span style={{ fontSize: 20 }}>{wxIcon(todayWx.code)}</span>
+                    <span>{todayWx.high}°</span>
+                  </div>
+                  <div style={{ fontSize: 11, color: "#7e6f61", marginTop: 4 }}>{homeWeather?.city || homeCity}</div>
+                </div>
+              ) : (
+                <form onSubmit={e => { e.preventDefault(); const c = homeCityInput.trim(); if (!c) return; setHomeCity(c); try { localStorage.setItem("wardrobe_home_city", c); } catch {} fetchHomeWeather(c); }} style={{ display: "flex", gap: 8 }}>
+                  <input value={homeCityInput} onChange={e => setHomeCityInput(e.target.value)} placeholder="City for weather" style={{ width: 148, padding: "8px 10px", borderRadius: 10, border: "1px solid #e6ddd2", fontSize: 12, fontFamily: "'DM Sans', sans-serif", outline: "none" }} />
+                  <button type="submit" disabled={wxLoading} style={{ padding: "8px 12px", borderRadius: 10, background: "#1f1915", border: "none", color: "#fff", fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: "'DM Sans', sans-serif" }}>{wxLoading ? "..." : "Save"}</button>
+                </form>
+              )}
+            </div>
+
+            <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 16 }}>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, paddingBottom: 10, borderBottom: "1px solid #efe6dc" }}>
+                <div>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: "#a08e7a", textTransform: "uppercase", letterSpacing: "0.12em", marginBottom: 4 }}>Weather</div>
+                  <div style={{ fontSize: 13, color: "#362d26" }}>{todayWx ? `${wxIcon(todayWx.code)} ${todayWx.high}° / ${todayWx.low}°` : "Add a city to load forecast"}</div>
+                </div>
+                <button onClick={() => setTab("settings")} style={{ background: "none", border: "none", padding: 0, cursor: "pointer", fontSize: 11, color: "#8e7d6a", fontFamily: "'DM Sans', sans-serif" }}>Forecast settings</button>
+              </div>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, paddingBottom: 10, borderBottom: "1px solid #efe6dc" }}>
+                <div>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: "#a08e7a", textTransform: "uppercase", letterSpacing: "0.12em", marginBottom: 4 }}>Plans</div>
+                  <div style={{ fontSize: 13, color: "#362d26" }}>{todayPlans.length > 0 ? todayPlans.map(ev => ev.name).join(" · ") : "No events scheduled today"}</div>
+                </div>
+                <button onClick={() => setTab("outfits")} style={{ background: "none", border: "none", padding: 0, cursor: "pointer", fontSize: 11, color: "#8e7d6a", fontFamily: "'DM Sans', sans-serif" }}>Calendar</button>
+              </div>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
+                <div>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: "#a08e7a", textTransform: "uppercase", letterSpacing: "0.12em", marginBottom: 4 }}>Outfit</div>
+                  <div style={{ fontSize: 13, color: "#362d26" }}>{todayOutfits.length > 0 ? `${todayOutfits.length} look${todayOutfits.length > 1 ? "s" : ""} planned` : "Nothing slotted yet"}</div>
+                </div>
+                <button onClick={() => setTab("outfits")} style={{ background: "#f4ede5", border: "none", borderRadius: 999, padding: "7px 12px", cursor: "pointer", fontSize: 11, fontWeight: 700, color: "#4c4034", fontFamily: "'DM Sans', sans-serif" }}>{todayOutfits.length > 0 ? "Open looks" : "Plan today"}</button>
+              </div>
+            </div>
+
+            {homeWeather?.days?.length > 1 && (
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 10 }}>
+                {homeWeather.days.slice(1, 4).map(day => (
+                  <div key={day.date} style={{ background: "#faf6f1", borderRadius: 14, padding: "10px 12px", border: "1px solid #f0e6da", textAlign: "center" }}>
+                    <div style={{ fontSize: 10, fontWeight: 700, color: "#9a8977", letterSpacing: "0.08em", textTransform: "uppercase" }}>{new Date(day.date + "T00:00:00").toLocaleDateString("en-US", { weekday: "short" })}</div>
+                    <div style={{ fontSize: 18, margin: "6px 0" }}>{wxIcon(day.code)}</div>
+                    <div style={{ fontSize: 12, fontWeight: 700, color: "#362d26" }}>{day.high}°</div>
                   </div>
                 ))}
               </div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1.45fr) minmax(280px, 0.85fr)", gap: 24, marginBottom: 34 }}>
+        <div>
+          <EH eyebrow="Daily Dressing" title="Outfits This Week" action={{ label: "Open calendar →", onClick: () => setTab("outfits") }} />
+          {todayOutfits.length > 0 && (
+            <div style={{ display: "grid", gridTemplateColumns: todayOutfits.length > 1 ? "1.45fr 0.85fr" : "1fr", gap: 14, marginBottom: 16 }}>
+              {todayOutfits.slice(0, 2).map((outfit, idx) => {
+                const layerIds = outfit.layers || outfit.itemIds || [];
+                const thumbItems = layerIds.slice(0, 4).map(id => allItems.find(x => x.id === id)).filter(Boolean);
+                return (
+                  <div key={outfit.id} onClick={() => setOutfitPopup(outfit)} style={{ cursor: "pointer", borderRadius: 22, overflow: "hidden", border: "1px solid #e7dfd4", aspectRatio: idx === 0 ? "16/10" : "4/5", position: "relative", background: "#f5f0e8", boxShadow: "0 10px 26px rgba(48,33,19,0.08)" }}>
+                    {outfit.previewImage ? (
+                      <img src={outfit.previewImage} alt={outfit.name} style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
+                    ) : (
+                      <div style={{ position: "absolute", inset: 0, display: "grid", gridTemplateColumns: "1fr 1fr" }}>
+                        {[0, 1, 2, 3].map(qi => {
+                          const it = thumbItems[qi];
+                          return (
+                            <div key={qi} style={{ background: it?.image ? `url(${it.image}) center/contain no-repeat #f5f3ef` : "#f5f3ef", display: "flex", alignItems: "center", justifyContent: "center", borderRight: qi % 2 === 0 ? "1px solid #fff" : "none", borderBottom: qi < 2 ? "1px solid #fff" : "none" }}>
+                              {!it?.image && <HangerIcon size={16} color="#d7ccbf" />}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                    <div style={{ position: "absolute", inset: 0, background: "linear-gradient(to top, rgba(20,14,11,0.62), rgba(20,14,11,0.12) 55%, transparent)" }} />
+                    <div style={{ position: "absolute", left: 16, right: 16, bottom: 16 }}>
+                      <div style={{ fontSize: 9, fontWeight: 700, color: "rgba(255,255,255,0.66)", textTransform: "uppercase", letterSpacing: "0.14em", marginBottom: 6 }}>{idx === 0 ? "Today's look" : "Also planned"}</div>
+                      <div style={{ fontSize: 16, fontWeight: 700, color: "#fff", lineHeight: 1.2 }}>{outfit.name || "Untitled Outfit"}</div>
+                    </div>
+                    {todayWx && idx === 0 && (
+                      <div style={{ position: "absolute", top: 14, right: 14, zIndex: 2, background: "rgba(255,255,255,0.92)", borderRadius: 12, padding: "5px 10px", display: "flex", alignItems: "center", gap: 5, fontSize: 11, fontWeight: 700, color: "#1a1a1a" }}>
+                        <span>{wxIcon(todayWx.code)}</span>
+                        <span>{todayWx.high}°</span>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          <div style={{ ...cardStyle, padding: 18 }}>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 10 }}>
+              {weekDays.map(day => {
+                const outfit = day.ids.length > 0 ? outfitsDb.rows.find(o => o.id === day.ids[0]) : null;
+                return (
+                  <div key={day.key} onClick={() => setTab("outfits")} style={{ cursor: "pointer", display: "flex", flexDirection: "column", alignItems: "center", gap: 6 }}>
+                    <div style={{ fontSize: 9, fontWeight: 700, color: day.isToday ? "#1f1915" : "#b6a795", letterSpacing: "0.08em", textTransform: "uppercase" }}>
+                      {day.date.toLocaleDateString("en-US", { weekday: "short" })}
+                    </div>
+                    <div style={{ width: "100%", aspectRatio: "3/4", borderRadius: 12, border: day.isToday ? "2px solid #1f1915" : "1px solid #ece2d6", background: outfit?.previewImage ? `url(${outfit.previewImage}) center/cover no-repeat` : "#faf6f1", display: "flex", alignItems: "center", justifyContent: "center", position: "relative", overflow: "hidden" }}>
+                      {!outfit?.previewImage && <div style={{ width: 7, height: 7, borderRadius: "50%", background: day.ids.length > 0 ? "#b39f89" : "#e8ded2" }} />}
+                      {day.ids.length > 1 && <div style={{ position: "absolute", right: 4, bottom: 4, background: "rgba(255,255,255,0.95)", borderRadius: 5, padding: "1px 4px", fontSize: 8, fontWeight: 800, color: "#1f1915" }}>+{day.ids.length}</div>}
+                    </div>
+                    <div style={{ fontSize: 10, fontWeight: day.isToday ? 800 : 600, color: day.isToday ? "#1f1915" : "#a89582" }}>{day.isToday ? "Today" : day.date.getDate()}</div>
+                  </div>
+                );
+              })}
+            </div>
+            {weekLogged === 0 && <div style={{ textAlign: "center", paddingTop: 12, fontSize: 11, color: "#b6a795" }}>Nothing planned yet this week.</div>}
+          </div>
+        </div>
+
+        <div>
+          <EH eyebrow="Forward Look" title="Planning" action={{ label: "Outfits tab →", onClick: () => setTab("outfits") }} />
+          <div style={{ ...cardStyle, padding: 20, marginBottom: 16 }}>
+            {planningRows.length === 0 ? (
+              <div style={{ fontSize: 13, color: "#a89582" }}>No upcoming plans yet. Add events in the outfit calendar to start building around them.</div>
+            ) : (
+              <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                {planningRows.map(entry => {
+                  const badge = planBadge(entry);
+                  const dateText = [fmtDate(entry.startDate), entry.endDate && entry.endDate !== entry.startDate ? fmtDate(entry.endDate) : null].filter(Boolean).join(" – ");
+                  const content = (
+                    <div key={entry.id} onClick={() => {
+                      if (entry.lookbook) openLookbook(entry.lookbook);
+                      else setTab("outfits");
+                    }} style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 14px", borderRadius: 16, background: "#faf6f1", border: "1px solid #f0e6da", cursor: entry.lookbook ? "pointer" : "default" }}>
+                      <div style={{ minWidth: 58 }}>
+                        <div style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", padding: "4px 8px", borderRadius: 999, background: badge.bg, color: badge.color, fontSize: 10, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase" }}>{badge.label}</div>
+                      </div>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontSize: 13, fontWeight: 700, color: "#2a211b", lineHeight: 1.25 }}>{entry.label || entry.name}</div>
+                        <div style={{ fontSize: 11, color: "#9b8a78", marginTop: 3 }}>{dateText}</div>
+                      </div>
+                      {entry.lookbook && <div style={{ fontSize: 11, color: "#8e7d6a", fontWeight: 700 }}>Open</div>}
+                    </div>
+                  );
+                  return content;
+                })}
+              </div>
+            )}
+          </div>
+
+          <div style={{ ...cardStyle, padding: 20 }}>
+            <div style={{ fontSize: 10, fontWeight: 700, color: "#ab9b88", textTransform: "uppercase", letterSpacing: "0.16em", marginBottom: 8 }}>Keep Working</div>
+            <div style={{ fontFamily: "'Cormorant Garamond', serif", fontStyle: "italic", fontWeight: 300, fontSize: 28, color: "#241b15", lineHeight: 0.95, marginBottom: 14 }}>Upcoming Lookbooks</div>
+            {keepWorkingLookbooks.length === 0 ? (
+              <div style={{ fontSize: 13, color: "#a89582" }}>Date-linked lookbooks will appear here automatically for the next month, or next 3 months for trips.</div>
+            ) : (
+              <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                {keepWorkingLookbooks.map(lb => {
+                  const pack = getPackProgress(lb);
+                  const packPct = pack.total > 0 ? Math.round(pack.packed / pack.total * 100) : 0;
+                  const countdown = lb.isActive ? "Active now" : lb.daysUntil === 0 ? "Today" : lb.daysUntil === 1 ? "Tomorrow" : `In ${lb.daysUntil} days`;
+                  return (
+                    <div key={lb.id} onClick={() => openLookbook(lb)} style={{ cursor: "pointer", borderRadius: 16, overflow: "hidden", border: "1px solid #efe4d8", background: "#faf6f1" }}>
+                      <div style={{ display: "grid", gridTemplateColumns: "92px minmax(0, 1fr)", gap: 12, padding: 12, alignItems: "center" }}>
+                        <div style={{ height: 108, borderRadius: 14, background: lb.coverImage ? `url(${lb.coverImage}) center/cover no-repeat` : "linear-gradient(135deg, #eadfce, #f7f1e9)" }} />
+                        <div style={{ minWidth: 0 }}>
+                          <div style={{ fontSize: 10, fontWeight: 700, color: "#ab9b88", textTransform: "uppercase", letterSpacing: "0.12em", marginBottom: 6 }}>{countdown}</div>
+                          <div style={{ fontSize: 15, fontWeight: 700, color: "#241b15", lineHeight: 1.2 }}>{lb.name}</div>
+                          <div style={{ fontSize: 11, color: "#9b8a78", marginTop: 4 }}>{[fmtDate(lb.dateStart), fmtDate(lb.dateEnd)].filter(Boolean).join(" – ")}</div>
+                          {pack.total > 0 && (
+                            <div style={{ marginTop: 10 }}>
+                              <div style={{ display: "flex", justifyContent: "space-between", fontSize: 10, color: "#9b8a78", marginBottom: 4 }}>
+                                <span>Packing progress</span>
+                                <span>{pack.packed}/{pack.total}</span>
+                              </div>
+                              <div style={{ height: 5, borderRadius: 999, background: "#e8ddd0", overflow: "hidden" }}>
+                                <div style={{ width: `${packPct}%`, height: "100%", borderRadius: 999, background: packPct === 100 ? "#3aaa6e" : "#1f1915" }} />
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {newInItems.length > 0 && (
+        <div style={{ marginBottom: 34 }}>
+          <EH eyebrow="Recent Arrivals" title="New In" action={{ label: "View closet →", onClick: () => setTab("closet") }} />
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 14 }}>
+            {newInItems.map(item => (
+              <ItemCard
+                key={item.id}
+                item={item}
+                onClick={() => setItemDetail && setItemDetail(item)}
+                onCreateLook={() => setTab("outfits")}
+              />
+            ))}
+          </div>
+        </div>
+      )}
+
+      <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr) minmax(0, 1fr)", gap: 24, marginBottom: 34 }}>
+        <div>
+          <EH eyebrow="Collections" title="Pinned Lookbooks" action={{ label: "All lookbooks →", onClick: () => setTab("lookbooks") }} />
+          {pinnedLookbooks.length === 0 ? (
+            <div style={{ ...cardStyle, padding: "22px 20px", textAlign: "center", color: "#b4a491" }}>Pin lookbooks from the Lookbooks tab to keep them here.</div>
+          ) : (
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 14 }}>
+              {pinnedLookbooks.slice(0, 4).map(lb => {
+                const lbOutfits = (lb.outfitIds || []).map(id => outfitsDb.rows.find(o => o.id === id)).filter(Boolean);
+                return (
+                  <div key={lb.id} onClick={() => openLookbook(lb)} style={{ ...cardStyle, cursor: "pointer" }}>
+                    <div style={{ aspectRatio: "4/3", background: lb.coverImage ? `url(${lb.coverImage}) center/cover no-repeat` : "linear-gradient(135deg, #eadfce, #f7f1e9)" }} />
+                    <div style={{ padding: "14px 16px 16px" }}>
+                      <div style={{ fontSize: 15, fontWeight: 700, color: "#241b15", lineHeight: 1.25 }}>{lb.name}</div>
+                      <div style={{ fontSize: 11, color: "#9b8a78", marginTop: 5 }}>{lbOutfits.length} look{lbOutfits.length !== 1 ? "s" : ""}{lb.dateStart || lb.dateEnd ? ` · ${[fmtDate(lb.dateStart), fmtDate(lb.dateEnd)].filter(Boolean).join(" – ")}` : ""}</div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
+        <div>
+          <EH eyebrow="Moodboard" title="Featured Board" action={{ label: "All boards →", onClick: () => setTab("moodboard") }} />
+          <div style={{ ...cardStyle, padding: 20 }}>
+            {moodboardsDb?.length > 0 ? (
+              <>
+                <div style={{ display: "flex", gap: 10, alignItems: "center", marginBottom: 16, flexWrap: "wrap" }}>
+                  <select
+                    value={featuredMoodboardId}
+                    onChange={e => {
+                      setFeaturedMoodboardId(e.target.value);
+                      try { localStorage.setItem("wardrobe_home_featured_moodboard_v1", e.target.value); } catch {}
+                    }}
+                    className="pill-select"
+                    style={{ minWidth: 220 }}
+                  >
+                    {moodboardsDb.map(board => <option key={board.id} value={board.id}>{board.name || "Untitled Board"}</option>)}
+                  </select>
+                  {pinnedMoodboards.length > 0 && <div style={{ fontSize: 11, color: "#9b8a78" }}>{pinnedMoodboards.length} pinned board{pinnedMoodboards.length > 1 ? "s" : ""}</div>}
+                </div>
+
+                {featuredMoodboard ? (
+                  <div onClick={() => openMoodboard(featuredMoodboard)} style={{ cursor: "pointer" }}>
+                    <div style={{ aspectRatio: "16/10", borderRadius: 18, overflow: "hidden", background: featuredMoodboard.bg || "#f5f2ed", display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 8, padding: 12 }}>
+                      {(featuredMoodboard.items || []).slice(0, 6).map((item, idx) => (
+                        <div key={item.id || idx} style={{ borderRadius: 12, background: item.src ? `url(${item.src}) center/cover no-repeat` : "#efe5d8" }} />
+                      ))}
+                      {(featuredMoodboard.items || []).length === 0 && <div style={{ gridColumn: "1 / -1", display: "flex", alignItems: "center", justifyContent: "center", color: "#b4a491", fontSize: 13 }}>No images on this board yet</div>}
+                    </div>
+                    <div style={{ paddingTop: 14 }}>
+                      <div style={{ fontSize: 15, fontWeight: 700, color: "#241b15" }}>{featuredMoodboard.name || "Untitled Board"}</div>
+                      <div style={{ fontSize: 11, color: "#9b8a78", marginTop: 4 }}>{(featuredMoodboard.items || []).length} assets · Open board to keep refining</div>
+                    </div>
+                  </div>
+                ) : null}
+              </>
+            ) : (
+              <div style={{ fontSize: 13, color: "#a89582" }}>Create a moodboard to feature it here on Home.</div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr) minmax(0, 1fr)", gap: 24, marginBottom: 34 }}>
+        <div>
+          <EH eyebrow="Overview" title="Closet Health" action={{ label: "Full profile →", onClick: () => setTab("stats") }} />
+          <div onClick={() => setTab("stats")} style={{ ...cardStyle, padding: "22px 22px 20px", cursor: "pointer" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 16, marginBottom: 18 }}>
+              <div style={{ width: 58, height: 58, borderRadius: "50%", border: `3px solid ${healthColor}`, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                <span style={{ fontSize: 16, fontWeight: 800, color: healthColor }}>{healthScore}</span>
+              </div>
+              <div>
+                <div style={{ fontSize: 18, fontWeight: 700, color: "#241b15" }}>{healthLabel}</div>
+                <div style={{ fontSize: 12, color: "#9b8a78", marginTop: 4 }}>Based on wear, variety, and value across your closet.</div>
+              </div>
+            </div>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12 }}>
+              {[{ label: "Value", value: `$${totalValue.toFixed(0)}` }, { label: "Items", value: closetItems.length }, { label: "Unworn", value: unwornCount }].map(stat => (
+                <div key={stat.label} style={{ background: "#faf6f1", borderRadius: 16, padding: "14px 12px", textAlign: "center" }}>
+                  <div style={{ fontSize: 18, fontWeight: 800, color: "#241b15" }}>{stat.value}</div>
+                  <div style={{ fontSize: 10, fontWeight: 700, color: "#ab9b88", textTransform: "uppercase", letterSpacing: "0.08em", marginTop: 4 }}>{stat.label}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        <div>
+          <EH eyebrow="Sales" title="Seller Snapshot" action={{ label: "Go to Seller →", onClick: () => setTab("seller") }} />
+          {hasSeller ? (
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 12 }}>
+              {[
+                { label: "Listed", value: sellerListed, color: "#2090c0" },
+                { label: "Pending", value: sellerPending, color: "#a07000" },
+                { label: "Sold", value: sellerSold, color: "#3aaa6e" },
+                { label: "Earned", value: `$${sellerEarned.toFixed(0)}`, color: "#3aaa6e" },
+                { label: "Potential", value: `$${sellerPotential.toFixed(0)}`, color: "#7d7468" },
+                { label: "To Review", value: sellerItems.length, color: "#1f1915" },
+              ].map(stat => (
+                <div key={stat.label} onClick={() => setTab("seller")} style={{ ...cardStyle, padding: "18px 16px", cursor: "pointer" }}>
+                  <div style={{ fontSize: 24, fontWeight: 800, color: stat.color, lineHeight: 1, marginBottom: 8 }}>{stat.value}</div>
+                  <div style={{ fontSize: 10, fontWeight: 700, color: "#ab9b88", textTransform: "uppercase", letterSpacing: "0.1em" }}>{stat.label}</div>
+                </div>
+              ))}
             </div>
           ) : (
-            <form onSubmit={e => { e.preventDefault(); const c = homeCityInput.trim(); if (!c) return; setHomeCity(c); try { localStorage.setItem("wardrobe_home_city", c); } catch {} fetchHomeWeather(c); }} style={{ display: "flex", gap: 8 }}>
-              <input value={homeCityInput} onChange={e => setHomeCityInput(e.target.value)} placeholder="Add your city for weather…" style={{ width: 200, padding: "8px 12px", borderRadius: 10, border: "1.5px solid #e8e4dc", fontSize: 12, fontFamily: "’DM Sans’, sans-serif", outline: "none" }} />
-              <button type="submit" disabled={wxLoading} style={{ padding: "8px 14px", borderRadius: 10, background: "#1a1a1a", border: "none", color: "#fff", fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: "’DM Sans’, sans-serif", opacity: wxLoading ? 0.6 : 1 }}>{wxLoading ? "…" : "Go"}</button>
-            </form>
+            <div style={{ ...cardStyle, padding: "22px 20px", color: "#a89582" }}>No selling activity yet. Mark pieces for sale to see your seller rollup here.</div>
           )}
         </div>
       </div>
 
-      {/* ── Snapshot bar ── */}
-      <div style={{ display: "flex", alignItems: "center", gap: 0, paddingBottom: 28, borderBottom: "1px solid #f0ece4", marginBottom: 44 }}>
-        {[`${closetItems.length} items`, `$${totalValue.toFixed(0)} value`, `${wornPct}% worn`].map((s, i) => (
-          <span key={s} style={{ fontSize: 12, color: "#c0b8af", fontWeight: 500 }}>
-            {i > 0 && <span style={{ margin: "0 8px", color: "#e0dbd4" }}>·</span>}
-            {s}
-          </span>
-        ))}
-        <button onClick={() => setTab("stats")} style={{ marginLeft: "auto", fontSize: 11, color: "#9f978b", background: "none", border: "none", cursor: "pointer", fontFamily: "’DM Sans’, sans-serif", padding: 0 }}>View profile →</button>
-      </div>
-
-      {/* ── Trip countdown ── */}
-      {upcomingTrips[0] && (() => {
-        const trip = upcomingTrips[0];
-        const countdown = trip.isActive ? "Active now" : trip.daysUntil === 0 ? "Today" : trip.daysUntil === 1 ? "Tomorrow" : `in ${trip.daysUntil} days`;
-        const pack = getPackProgress(trip);
-        const packPct = pack.total > 0 ? Math.round(pack.packed / pack.total * 100) : 0;
-        return (
-          <div onClick={() => { setActiveLookbookView("editorial"); setActiveLookbook(trip); setTab("lookbooks"); }}
-            style={{ display: "flex", alignItems: "center", gap: 14, padding: "13px 18px", background: "#f8f5f0", borderRadius: 14, border: "1.5px solid #ece7de", cursor: "pointer", marginBottom: 44 }}>
-            <span style={{ fontSize: 16 }}>✈</span>
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <span style={{ fontFamily: "’Cormorant Garamond’, serif", fontStyle: "italic", fontSize: 16, color: "#1a1a1a", fontWeight: 300 }}>{trip.name}</span>
-              <span style={{ fontSize: 12, color: "#9f978b", marginLeft: 10 }}>{countdown}</span>
-              {pack.total > 0 && <span style={{ fontSize: 11, color: "#c0b8af", marginLeft: 8 }}>· {pack.packed}/{pack.total} packed</span>}
-            </div>
-            {pack.total > 0 && (
-              <div style={{ width: 80, height: 3, borderRadius: 2, background: "#e0d9cf", flexShrink: 0, overflow: "hidden" }}>
-                <div style={{ height: "100%", borderRadius: 2, background: packPct === 100 ? "#3aaa6e" : "#1a1a1a", width: `${packPct}%` }} />
+      <div style={{ display: "grid", gridTemplateColumns: monthlyBudget > 0 ? "minmax(0, 0.9fr) minmax(0, 1.1fr) minmax(0, 1fr)" : "minmax(0, 1.1fr) minmax(0, 1fr)", gap: 24 }}>
+        {monthlyBudget > 0 && (
+          <div>
+            <EH eyebrow="Spending" title="Monthly Budget" action={{ label: "Settings →", onClick: () => setTab("settings") }} />
+            <div style={{ ...cardStyle, padding: 20 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 12 }}>
+                <span style={{ fontSize: 12, color: "#9b8a78" }}>Spent this month</span>
+                <span style={{ fontSize: 13, fontWeight: 700, color: "#241b15" }}>${monthlySpend.toFixed(0)} <span style={{ color: "#bcae9d", fontWeight: 400 }}>of ${monthlyBudget.toFixed(0)}</span></span>
               </div>
-            )}
-          </div>
-        );
-      })()}
-
-      {/* ── Today’s Outfit ── */}
-      <div style={{ marginBottom: 44 }}>
-        <EH eyebrow="Daily Dressing" title="Today’s Outfit" action={{ label: "Outfits →", onClick: () => setTab("outfits") }} />
-        {todayOutfits.length === 0 ? (
-          <div style={{ ...cardStyle, padding: "22px 20px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16, flexWrap: "wrap" }}>
-            <div>
-              <div style={{ fontSize: 14, fontWeight: 700, color: "#1a1a1a", marginBottom: 4 }}>No outfit planned today</div>
-              <div style={{ fontSize: 12, color: "#aaa" }}>What are you wearing?</div>
+              <div style={{ height: 6, borderRadius: 999, background: "#efe4d8", overflow: "hidden", marginBottom: 10 }}>
+                <div style={{ width: `${Math.min(100, monthlySpend / monthlyBudget * 100)}%`, height: "100%", borderRadius: 999, background: monthlySpend > monthlyBudget ? "#e05555" : "#1f1915" }} />
+              </div>
+              <div style={{ fontSize: 11, color: "#9b8a78" }}>{monthlySpend > monthlyBudget ? "You are over budget this month." : "You are within budget."}</div>
             </div>
-            <button onClick={() => setTab("outfits")} style={{ fontSize: 13, fontWeight: 600, color: "#888", background: "#f5f3ef", border: "none", borderRadius: 10, padding: "8px 14px", cursor: "pointer", fontFamily: "’DM Sans’, sans-serif" }}>Plan one →</button>
-          </div>
-        ) : (
-          <div style={{ display: "grid", gridTemplateColumns: todayOutfits.length > 1 ? "1.4fr 0.8fr" : "1fr", gap: 14 }}>
-            {todayOutfits.slice(0, 2).map((outfit, idx) => {
-              const layerIds = outfit.layers || outfit.itemIds || [];
-              const thumbItems = layerIds.slice(0, 4).map(id => allItems.find(x => x.id === id)).filter(Boolean);
-              const isHov = hoveredTodayId === outfit.id;
-              return (
-                <div key={outfit.id} onClick={() => setOutfitPopup(outfit)}
-                  onMouseEnter={() => setHoveredTodayId(outfit.id)} onMouseLeave={() => setHoveredTodayId(null)}
-                  className="card" style={{ cursor: "pointer", borderRadius: 18, overflow: "hidden", border: "1.5px solid #e8e4dc", aspectRatio: idx === 0 ? "16/10" : "4/5", position: "relative", background: "#f5f3ef", boxShadow: "0 2px 12px rgba(0,0,0,0.04)" }}>
-                  {outfit.previewImage ? (
-                    <img src={outfit.previewImage} alt={outfit.name} style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
-                  ) : (
-                    <div style={{ position: "absolute", inset: 0, display: "grid", gridTemplateColumns: "1fr 1fr" }}>
-                      {[0,1,2,3].map(qi => {
-                        const it = thumbItems[qi];
-                        return (
-                          <div key={qi} style={{ background: it?.image ? `url(${it.image}) center/contain no-repeat #f5f3ef` : "#f5f3ef", display: "flex", alignItems: "center", justifyContent: "center", borderRight: qi%2===0 ? "1px solid #fff" : "none", borderBottom: qi<2 ? "1px solid #fff" : "none" }}>
-                            {!it?.image && <HangerIcon size={14} color="#ddd" />}
-                          </div>
-                        );
-                      })}
-                    </div>
-                  )}
-                  {todayWx && (
-                    <div style={{ position: "absolute", top: 10, right: 10, zIndex: 10, background: "rgba(255,255,255,0.92)", borderRadius: 10, padding: "4px 8px", display: "flex", alignItems: "center", gap: 4, fontSize: 11, fontWeight: 700, color: "#1a1a1a", backdropFilter: "blur(4px)" }}>
-                      <span>{wxIcon(todayWx.code)}</span><span>{todayWx.high}°</span>
-                    </div>
-                  )}
-                  {(isHov || idx === 0) && (
-                    <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, zIndex: 10, background: "linear-gradient(to top, rgba(0,0,0,0.62) 0%, transparent 100%)", padding: idx === 0 ? "40px 16px 16px" : "24px 12px 12px" }}>
-                      <div style={{ fontSize: 9, fontWeight: 700, color: "rgba(255,255,255,0.65)", textTransform: "uppercase", letterSpacing: "0.12em", marginBottom: 4 }}>{idx === 0 ? "Today’s look" : "Also planned"}</div>
-                      <div style={{ fontSize: 13, fontWeight: 700, color: "#fff", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{outfit.name || "Untitled Outfit"}</div>
-                    </div>
-                  )}
-                </div>
-              );
-            })}
           </div>
         )}
-      </div>
 
-      {/* ── This Week (compact) ── */}
-      <div style={{ marginBottom: 44 }}>
-        <EH eyebrow="Wardrobe Rhythm" title="This Week" action={{ label: "Calendar →", onClick: () => setTab("outfits") }} />
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 10 }}>
-          {weekDays.map(day => {
-            const outfit = day.ids.length > 0 ? outfitsDb.rows.find(o => o.id === day.ids[0]) : null;
-            const dayShort = day.date.toLocaleDateString("en-US", { weekday: "short" }).toUpperCase();
-            const dateNum = day.date.getDate();
-            return (
-              <div key={day.key} onClick={() => setTab("outfits")} style={{ cursor: "pointer", display: "flex", flexDirection: "column", alignItems: "center", gap: 5 }}>
-                <div style={{ fontSize: 9, fontWeight: 700, color: day.isToday ? "#1a1a1a" : "#ccc", letterSpacing: "0.06em" }}>{dayShort}</div>
-                <div style={{ width: "100%", aspectRatio: "3/4", borderRadius: 10, border: day.isToday ? "2px dashed #1a1a1a" : "1.5px solid #ece8e2", background: outfit?.previewImage ? `url(${outfit.previewImage}) center/cover no-repeat` : day.isToday ? "#fafaf8" : "#f8f6f2", display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden", position: "relative", transition: "transform 0.12s" }}
-                  onMouseEnter={e => e.currentTarget.style.transform = "scale(1.04)"} onMouseLeave={e => e.currentTarget.style.transform = "scale(1)"}>
-                  {!outfit?.previewImage && (outfit
-                    ? <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#bbb" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
-                    : <div style={{ width: 5, height: 5, borderRadius: "50%", background: "#e0dbd4" }} />)}
-                  {day.ids.length > 1 && <div style={{ position: "absolute", bottom: 2, right: 2, background: "rgba(255,255,255,0.92)", borderRadius: 4, padding: "1px 3px", fontSize: 7, fontWeight: 800, color: "#1a1a1a" }}>+{day.ids.length}</div>}
+        {wearAgainItem && (
+          <div>
+            <EH eyebrow="Wardrobe Refresh" title="Wear Again" />
+            <div style={{ ...cardStyle, padding: 18, display: "flex", gap: 14, alignItems: "center" }}>
+              <div style={{ width: 88, height: 112, borderRadius: 16, background: wearAgainItem.image ? `url(${wearAgainItem.image}) center/cover no-repeat` : "#f5f0e8", flexShrink: 0 }} />
+              <div style={{ minWidth: 0 }}>
+                <div style={{ fontSize: 15, fontWeight: 700, color: "#241b15" }}>{wearAgainItem.name}</div>
+                <div style={{ fontSize: 11, color: "#9b8a78", marginTop: 4 }}>{[wearAgainItem.brand, wearAgainItem.category].filter(Boolean).join(" · ")}</div>
+                <div style={{ display: "flex", gap: 8, marginTop: 14 }}>
+                  <button onClick={() => setTab("outfits")} style={{ padding: "7px 12px", borderRadius: 999, border: "1px solid #d9ccbe", background: "#fff", fontSize: 11, fontWeight: 700, color: "#241b15", cursor: "pointer", fontFamily: "'DM Sans', sans-serif" }}>Style it</button>
+                  <button onClick={() => setTab("seller")} style={{ padding: "7px 12px", borderRadius: 999, border: "none", background: "#f4ede5", fontSize: 11, fontWeight: 700, color: "#7e6f61", cursor: "pointer", fontFamily: "'DM Sans', sans-serif" }}>Sell instead</button>
                 </div>
-                <div style={{ fontSize: 9, color: day.isToday ? "#1a1a1a" : "#ccc", fontWeight: day.isToday ? 800 : 500 }}>{day.isToday ? "Today" : dateNum}</div>
               </div>
-            );
-          })}
-        </div>
-        {weekLogged === 0 && (
-          <div style={{ textAlign: "center", paddingTop: 10 }}>
-            <span style={{ fontSize: 11, color: "#ccc" }}>Log your first outfit this week from <strong style={{ color: "#aaa", cursor: "pointer" }} onClick={() => setTab("outfits")}>Outfits → Calendar</strong></span>
+            </div>
           </div>
         )}
-      </div>
 
-      {/* ── New In (horizontal scroll) ── */}
-      {newInItems.length > 0 && (
-        <div style={{ marginBottom: 44 }}>
-          <EH eyebrow="Recent Arrivals" title="New In" action={{ label: "View closet →", onClick: () => setTab("closet") }} />
-          <div style={{ display: "flex", gap: 14, overflowX: "auto", paddingBottom: 4, scrollbarWidth: "none", msOverflowStyle: "none" }}>
-            {newInItems.map((item, idx) => (
-              <div key={item.id} onClick={() => setTab("closet")} className="card" style={{ cursor: "pointer", borderRadius: 16, overflow: "hidden", border: "1.5px solid #e8e4dc", background: "#fff", flexShrink: 0, width: idx === 0 ? 200 : 150, boxShadow: "0 2px 12px rgba(0,0,0,0.04)" }}>
-                <div style={{ aspectRatio: "3/4", background: item.image ? `url(${item.image}) center/cover no-repeat` : "#f0ece4", display: "flex", alignItems: "center", justifyContent: "center", position: "relative" }}>
-                  {!item.image && <HangerIcon size={20} color="#ccc" />}
-                  {idx === 0 && <div style={{ position: "absolute", left: 8, top: 8, background: "rgba(255,255,255,0.9)", color: "#6f6558", borderRadius: 100, padding: "3px 8px", fontSize: 9, fontWeight: 800, letterSpacing: "0.08em", textTransform: "uppercase" }}>New</div>}
-                </div>
-                <div style={{ padding: "10px 12px 12px" }}>
-                  <div style={{ fontSize: 12, fontWeight: 700, color: "#1a1a1a", lineHeight: 1.2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{item.name || "Untitled"}</div>
-                  {item.price && <div style={{ fontSize: 11, color: "#aaa", marginTop: 3 }}>{item.price}</div>}
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* ── Pinned Lookbooks ── */}
-      <div style={{ marginBottom: 44 }}>
-        <EH eyebrow="Collections" title="Pinned Lookbooks" action={{ label: "All lookbooks →", onClick: () => setTab("lookbooks") }} />
-        {pinnedLookbooks.length === 0 ? (
-          <div style={{ padding: "22px 20px", borderRadius: 14, border: "1.5px dashed #e0dbd2", textAlign: "center" }}>
-            <div style={{ fontSize: 12, color: "#ccc" }}>Pin lookbooks from the Lookbooks tab</div>
-          </div>
-        ) : (
-          <div style={{ display: "flex", gap: 14, overflowX: "auto", paddingBottom: 4, scrollbarWidth: "none", msOverflowStyle: "none" }}>
-            {pinnedLookbooks.map(lb => {
-              const lbOutfits = (lb.outfitIds || []).map(id => outfitsDb.rows.find(o => o.id === id)).filter(Boolean);
-              const dateStr = [fmtDate(lb.dateStart), fmtDate(lb.dateEnd)].filter(Boolean).join(" – ");
-              return (
-                <div key={lb.id} onClick={() => { setActiveLookbookView("editorial"); setActiveLookbook(lb); setTab("lookbooks"); }} className="card"
-                  style={{ cursor: "pointer", borderRadius: 16, overflow: "hidden", border: "1.5px solid #e8e4dc", background: "#fff", flexShrink: 0, width: 200, boxShadow: "0 2px 12px rgba(0,0,0,0.04)" }}>
-                  <div style={{ aspectRatio: "4/3", background: lb.coverImage ? `url(${lb.coverImage}) center/cover no-repeat` : "linear-gradient(135deg, #f4ede4, #ece2d4)", position: "relative" }}>
-                    <div style={{ position: "absolute", inset: 0, background: "linear-gradient(to top, rgba(26,26,26,0.3), transparent)" }} />
+        {highPriorityWish.length > 0 && (
+          <div>
+            <EH eyebrow="Wishlist" title="On My Radar" action={{ label: "All →", onClick: () => setTab("wishlist") }} />
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(110px, 1fr))", gap: 12 }}>
+              {highPriorityWish.map(item => (
+                <div key={item.id} onClick={() => setTab("wishlist")} style={{ ...cardStyle, cursor: "pointer" }}>
+                  <div style={{ aspectRatio: "3/4", background: item.image ? `url(${item.image}) center/cover no-repeat` : "#f5f0e8", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                    {!item.image && <SvgHeart size={18} color="#d6c8b8" />}
                   </div>
                   <div style={{ padding: "10px 12px 12px" }}>
-                    <div style={{ fontSize: 13, fontWeight: 700, color: "#1a1a1a", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{lb.name}</div>
-                    <div style={{ fontSize: 11, color: "#9f978b", marginTop: 3 }}>{lbOutfits.length} look{lbOutfits.length !== 1 ? "s" : ""}{dateStr && ` · ${dateStr}`}</div>
+                    <div style={{ fontSize: 11, fontWeight: 700, color: "#241b15", lineHeight: 1.25 }}>{item.name}</div>
+                    {item.price && <div style={{ fontSize: 10, color: "#9b8a78", marginTop: 4 }}>{item.price}</div>}
                   </div>
                 </div>
-              );
-            })}
+              ))}
+            </div>
           </div>
         )}
       </div>
 
-      {/* ── Wear Again ── */}
-      {wearAgainItem && (
-        <div style={{ marginBottom: 44 }}>
-          <EH eyebrow="Wardrobe Refresh" title="Wear Again" />
-          <div style={{ display: "flex", gap: 16, alignItems: "center", padding: "16px 18px", ...cardStyle, borderRadius: 16 }}>
-            <div style={{ width: 72, height: 88, borderRadius: 12, background: wearAgainItem.image ? `url(${wearAgainItem.image}) center/cover no-repeat` : "#f5f3ef", flexShrink: 0 }} />
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontSize: 14, fontWeight: 700, color: "#1a1a1a", marginBottom: 2 }}>{wearAgainItem.name}</div>
-              <div style={{ fontSize: 11, color: "#9f978b", marginBottom: 10 }}>{wearAgainItem.category}{wearAgainItem.brand ? ` · ${wearAgainItem.brand}` : ""}</div>
-              <div style={{ display: "flex", gap: 8 }}>
-                <button onClick={() => setTab("outfits")} style={{ padding: "6px 12px", borderRadius: 8, border: "1.5px solid #e0dbd2", background: "#fff", fontSize: 11, fontWeight: 700, color: "#1a1a1a", cursor: "pointer", fontFamily: "’DM Sans’, sans-serif" }}>Wear it →</button>
-                <button onClick={() => setTab("seller")} style={{ padding: "6px 12px", borderRadius: 8, border: "none", background: "#f5f3ef", fontSize: 11, fontWeight: 700, color: "#888", cursor: "pointer", fontFamily: "’DM Sans’, sans-serif" }}>Sell it</button>
-              </div>
+      {upcomingTrip && (
+        <div style={{ marginTop: 28, padding: "14px 18px", borderRadius: 16, background: "#f8f4ee", border: "1px solid #ebe1d5", display: "flex", alignItems: "center", gap: 12, cursor: "pointer" }} onClick={() => openLookbook(upcomingTrip)}>
+          <div style={{ width: 34, height: 34, borderRadius: "50%", background: "#fff", display: "flex", alignItems: "center", justifyContent: "center", color: "#6c5d4f", fontSize: 14 }}>✦</div>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontSize: 13, fontWeight: 700, color: "#241b15" }}>{upcomingTrip.name}</div>
+            <div style={{ fontSize: 11, color: "#9b8a78", marginTop: 2 }}>
+              {upcomingTrip.isActive ? "Open your active lookbook." : `Coming up ${upcomingTrip.daysUntil === 0 ? "today" : upcomingTrip.daysUntil === 1 ? "tomorrow" : `in ${upcomingTrip.daysUntil} days`}.`} Keep working from Home.
             </div>
           </div>
+          <div style={{ fontSize: 11, fontWeight: 700, color: "#8e7d6a" }}>Open →</div>
         </div>
       )}
-
-      {/* ── Seller ── */}
-      {hasSeller && (
-        <div style={{ marginBottom: 44 }}>
-          <EH eyebrow="Sales" title="Seller" action={{ label: "Go to Seller →", onClick: () => setTab("seller") }} />
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 10 }}>
-            {[
-              { label: "Listed", value: sellerListed, color: "#2090c0" },
-              { label: "Pending", value: sellerPending, color: "#a07000" },
-              { label: "Sold", value: sellerSold, color: "#3aaa6e" },
-              { label: "Earned", value: `$${sellerEarned.toFixed(0)}`, color: "#3aaa6e" },
-              { label: "Potential", value: `$${sellerPotential.toFixed(0)}`, color: "#888" },
-            ].map(s => (
-              <div key={s.label} onClick={() => setTab("seller")} className="card" style={{ ...cardStyle, borderRadius: 14, padding: "14px 12px", cursor: "pointer", textAlign: "center" }}>
-                <div style={{ fontSize: 20, fontWeight: 800, color: s.color, lineHeight: 1, marginBottom: 5 }}>{s.value}</div>
-                <div style={{ fontSize: 10, fontWeight: 700, color: "#b8aea1", textTransform: "uppercase", letterSpacing: "0.08em" }}>{s.label}</div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* ── Budget bar ── */}
-      {monthlyBudget > 0 && (
-        <div style={{ marginBottom: 44 }}>
-          <EH eyebrow="Spending" title="Monthly Budget" action={{ label: "Settings →", onClick: () => setTab("settings") }} />
-          <div style={{ ...cardStyle, borderRadius: 16, padding: "16px 20px" }}>
-            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 10 }}>
-              <span style={{ fontSize: 12, color: "#9f978b" }}>Spent this month</span>
-              <span style={{ fontSize: 13, fontWeight: 700, color: "#1a1a1a" }}>${monthlySpend.toFixed(0)} <span style={{ color: "#c0b8af", fontWeight: 400 }}>of ${monthlyBudget.toFixed(0)}</span></span>
-            </div>
-            <div style={{ height: 4, borderRadius: 3, background: "#f0ece4", overflow: "hidden" }}>
-              <div style={{ height: "100%", borderRadius: 3, background: monthlySpend > monthlyBudget ? "#e05555" : "#1a1a1a", width: `${Math.min(100, monthlySpend / monthlyBudget * 100)}%` }} />
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ── Closet Health ── */}
-      <div style={{ marginBottom: 44 }}>
-        <EH eyebrow="Overview" title="Closet Health" action={{ label: "Full profile →", onClick: () => setTab("stats") }} />
-        <div onClick={() => setTab("stats")} className="card" style={{ ...cardStyle, borderRadius: 16, padding: "18px 20px", cursor: "pointer", display: "flex", alignItems: "center", gap: 20, flexWrap: "wrap" }}>
-          <div style={{ width: 50, height: 50, borderRadius: "50%", border: `3px solid ${healthColor}`, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-            <span style={{ fontSize: 13, fontWeight: 800, color: healthColor }}>{healthScore}</span>
-          </div>
-          <div style={{ flex: 1, minWidth: 100 }}>
-            <div style={{ fontSize: 15, fontWeight: 700, color: "#1a1a1a", marginBottom: 2 }}>{healthLabel}</div>
-            <div style={{ fontSize: 11, color: "#9f978b" }}>Based on wear, variety & value</div>
-          </div>
-          <div style={{ display: "flex", gap: 28 }}>
-            {[{ label: "Value", value: `$${totalValue.toFixed(0)}` }, { label: "Items", value: closetItems.length }, { label: "Unworn", value: unwornCount }].map(s => (
-              <div key={s.label} style={{ textAlign: "center" }}>
-                <div style={{ fontSize: 18, fontWeight: 800, color: "#1a1a1a" }}>{s.value}</div>
-                <div style={{ fontSize: 9, fontWeight: 700, color: "#c0b8af", textTransform: "uppercase", letterSpacing: "0.06em", marginTop: 2 }}>{s.label}</div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
-
-      {/* ── Wishlist ── */}
-      {highPriorityWish.length > 0 && (
-        <div style={{ marginBottom: 44 }}>
-          <EH eyebrow="Wish List" title="On My Radar" action={{ label: "All →", onClick: () => setTab("wishlist") }} />
-          <div style={{ display: "flex", gap: 14, overflowX: "auto", paddingBottom: 4, scrollbarWidth: "none", msOverflowStyle: "none" }}>
-            {highPriorityWish.map(item => (
-              <div key={item.id} onClick={() => setTab("wishlist")} className="card" style={{ cursor: "pointer", borderRadius: 14, overflow: "hidden", border: "1.5px solid #e8e4dc", background: "#fff", flexShrink: 0, width: 140 }}>
-                <div style={{ aspectRatio: "3/4", background: item.image ? `url(${item.image}) center/cover no-repeat` : "#f5f3ef", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                  {!item.image && <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#ddd" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20.84 4.61a5.5 5.5 0 00-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 00-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 000-7.78z"/></svg>}
-                </div>
-                <div style={{ padding: "8px 10px 10px" }}>
-                  <div style={{ fontSize: 11, fontWeight: 700, color: "#1a1a1a", lineHeight: 1.2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{item.name}</div>
-                  {item.price && <div style={{ fontSize: 10, color: "#aaa", marginTop: 2 }}>{item.price}</div>}
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
     </div>
   );
 }
@@ -11550,10 +11761,15 @@ export default function App() {
               itemsDb={itemsDb}
               lookbooksDb={lookbooksDb}
               wishlistDb={wishlistDb}
+              moodboardsDb={moodboardsDb.boards}
+              calendarEvents={calendarEvents}
               setTab={setTab}
               setActiveLookbook={setActiveLookbook}
               setActiveLookbookView={setActiveLookbookView}
               setOutfitPopup={setOutfitPopup}
+              setItemDetail={setItemDetail}
+              setMoodboardActiveIdx={setMoodboardActiveIdx}
+              setMoodboardView={setMoodboardView}
               homeCity={homeCity}
               setHomeCity={setHomeCity}
               homeWeather={homeWeather}

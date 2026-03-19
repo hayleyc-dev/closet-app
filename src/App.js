@@ -6480,32 +6480,6 @@ function MoodboardInfoPanel({ activeIdx, setActiveIdx, boards: boardsProp, updat
 
   return (
     <>
-    {/* ── Board selector (dropdown) ── */}
-    <div className="right-card">
-      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:10}}>
-        <div className="right-card-title" style={{marginBottom:0}}>Board</div>
-        <div style={{display:"flex",gap:6,alignItems:"center"}}>
-          <button onClick={() => save(data.map((b,i) => i===activeIdx ? {...b, pinned:!b.pinned} : b))} title={board?.pinned ? "Unpin board" : "Pin board"}
-            style={{padding:"4px 8px",background:"none",border:"1px solid #e0dbd2",borderRadius:8,cursor:"pointer",fontSize:14,lineHeight:1,color:board?.pinned?"#f0c840":"#ccc",fontFamily:"'DM Sans',sans-serif"}}>
-            {board?.pinned?"★":"☆"}
-          </button>
-          <button onClick={() => {
-            const updated = [...data, {id:uid(), name:`Board ${data.length+1}`, items:[], bg:"#ffffff", pinned:false, tags:[]}];
-            save(updated); setActiveIdx(updated.length-1);
-          }} style={{padding:"4px 10px",background:"#1a1a1a",color:"#fff",border:"none",borderRadius:8,cursor:"pointer",fontSize:11,fontWeight:700,fontFamily:"'DM Sans',sans-serif"}}>+ New</button>
-        </div>
-      </div>
-      <select
-        value={activeIdx}
-        onChange={e => setActiveIdx(Number(e.target.value))}
-        style={{width:"100%",padding:"8px 32px 8px 12px",border:"1.5px solid #e0dbd2",borderRadius:10,fontFamily:"'DM Sans',sans-serif",fontSize:13,fontWeight:700,background:"#fafaf8",color:"#1a1a1a",outline:"none",cursor:"pointer",appearance:"auto",boxSizing:"border-box"}}
-      >
-        {[...data.map((b,i)=>({b,i}))].sort((a,z)=>(z.b.pinned?1:0)-(a.b.pinned?1:0)).map(({b,i}) => (
-          <option key={b.id} value={i}>{b.pinned?"★ ":""}{b.name}</option>
-        ))}
-      </select>
-    </div>
-
     {board && (<>
 
     {/* ── Board Info ── */}
@@ -6550,7 +6524,6 @@ function MoodboardInfoPanel({ activeIdx, setActiveIdx, boards: boardsProp, updat
         <div className="right-card-title" style={{marginBottom:0}}>Color Palette</div>
         <button onClick={generatePalette} title="Generate palette from board images"
           style={{padding:"3px 8px",background:"#f5f3ef",border:"1px solid #e0dbd2",borderRadius:8,cursor:"pointer",fontSize:10,fontWeight:700,color:"#666",fontFamily:"'DM Sans',sans-serif",display:"flex",alignItems:"center",gap:4}}>
-          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><path d="M12 2l1.5 4h4l-3 3 1.5 4L12 11l-4 2 1.5-4-3-3h4z"/></svg>
           Generate
         </button>
       </div>
@@ -6606,7 +6579,7 @@ function MoodboardInfoPanel({ activeIdx, setActiveIdx, boards: boardsProp, updat
       ) : (
         <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
           {closetSuggestions.map(item=>(
-            <div key={item.id} title={item.name} style={{width:48,height:60,borderRadius:10,overflow:"hidden",background:"#f5f2ed",border:"1.5px solid #e8e4dc",flexShrink:0}}>
+            <div key={item.id} title={item.name} style={{width:48,height:60,borderRadius:10,overflow:"hidden",background:"#fff",border:"1.5px solid #e8e4dc",flexShrink:0}}>
               <img src={item.image} alt={item.name} style={{width:"100%",height:"100%",objectFit:"contain"}} />
             </div>
           ))}
@@ -6693,32 +6666,6 @@ function MoodboardInfoPanel({ activeIdx, setActiveIdx, boards: boardsProp, updat
             </div>
           )}
         </>
-      )}
-    </div>
-
-    {/* ── Archive ── */}
-    <div style={{marginTop:16,paddingTop:4}}>
-      {confirmArchive ? (
-        <div style={{padding:"14px 16px",background:"#fff8f8",borderRadius:14,border:"1.5px solid #ffd0d0"}}>
-          <div style={{fontSize:13,fontWeight:700,color:"#1a1a1a",marginBottom:4}}>Archive this board?</div>
-          <div style={{fontSize:11,color:"#aaa",marginBottom:12,lineHeight:1.5}}>It'll be removed from here but you can restore it from Settings → Data.</div>
-          <div style={{display:"flex",gap:8}}>
-            <button onClick={() => setConfirmArchive(false)} style={{flex:1,padding:"8px 0",background:"#f5f3ef",border:"none",borderRadius:10,cursor:"pointer",fontFamily:"'DM Sans',sans-serif",fontSize:12,fontWeight:600,color:"#888"}}>Cancel</button>
-            <button onClick={archiveBoard} style={{flex:1,padding:"8px 0",background:"#e05555",border:"none",borderRadius:10,cursor:"pointer",fontFamily:"'DM Sans',sans-serif",fontSize:12,fontWeight:700,color:"#fff"}}>Archive</button>
-          </div>
-        </div>
-      ) : (
-        <button onClick={() => setConfirmArchive(true)} style={{
-          width:"100%",padding:"9px 12px",background:"transparent",border:"1.5px solid #ece8e0",
-          borderRadius:12,cursor:"pointer",fontFamily:"'DM Sans',sans-serif",fontSize:12,fontWeight:600,color:"#bbb",
-          display:"flex",alignItems:"center",gap:8,
-        }}
-          onMouseEnter={e=>{e.currentTarget.style.borderColor="#ffd0d0";e.currentTarget.style.color="#e05555";}}
-          onMouseLeave={e=>{e.currentTarget.style.borderColor="#ece8e0";e.currentTarget.style.color="#bbb";}}
-        >
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><polyline points="21 8 21 21 3 21 3 8"/><rect x="1" y="3" width="22" height="5"/><line x1="10" y1="12" x2="14" y2="12"/></svg>
-          Archive Board
-        </button>
       )}
     </div>
 
@@ -7126,25 +7073,27 @@ function Moodboard({ closetItems = [], activeIdx, setActiveIdx, boards: boardsPr
       <div style={{display:"flex",gap:8,marginBottom:10,flexWrap:"wrap",alignItems:"center"}}>
         <input ref={fileRef} type="file" accept="image/*" multiple style={{display:"none"}} onChange={e=>{importImages(e.target.files);e.target.value="";}} />
         <button onClick={()=>fileRef.current.click()} style={{padding:"8px 16px",background:"#1a1a1a",color:"#fff",border:"none",borderRadius:10,cursor:"pointer",fontFamily:"'DM Sans',sans-serif",fontSize:12,fontWeight:700,display:"flex",alignItems:"center",gap:8}}><SvgCamera size={13} color="#fff" />Import Images</button>
-        <button onClick={addTextNote} style={{padding:"8px 16px",background:"#fff9e6",border:"1.5px solid #f0e0a0",borderRadius:10,cursor:"pointer",fontFamily:"'DM Sans',sans-serif",fontSize:12,fontWeight:700,color:"#7a6000",display:"flex",alignItems:"center",gap:8}}><SvgEdit size={13} color="#7a6000" />Add Text</button>
-        <button onClick={()=>setShowUrlImport(u=>!u)} style={{padding:"8px 14px",background:showUrlImport?"#f0f4ff":"#f5f3ef",border:showUrlImport?"1.5px solid #a0b4f0":"none",borderRadius:10,cursor:"pointer",fontFamily:"'DM Sans',sans-serif",fontSize:12,fontWeight:700,color:showUrlImport?"#3a5fe0":"#666",display:"flex",alignItems:"center",gap:8}}><SvgLink size={13} color="currentColor" />URL</button>
-        <button onClick={()=>setShowClosetPicker(p=>!p)} style={{padding:"8px 14px",background:showClosetPicker?"#f0faf4":"#f5f3ef",border:showClosetPicker?"1.5px solid #b6e8c8":"none",borderRadius:10,cursor:"pointer",fontFamily:"'DM Sans',sans-serif",fontSize:12,fontWeight:700,color:showClosetPicker?"#2d6a3f":"#666",display:"flex",alignItems:"center",gap:8}}><SvgHanger size={13} color="currentColor" />From Closet</button>
+        <button onClick={addTextNote} style={{padding:"8px 16px",background:"#f5f3ef",border:"1px solid #e0dbd2",borderRadius:10,cursor:"pointer",fontFamily:"'DM Sans',sans-serif",fontSize:12,fontWeight:700,color:"#666",display:"flex",alignItems:"center",gap:8}}><SvgEdit size={13} color="#666" />Add Text</button>
+        <button onClick={()=>setShowUrlImport(u=>!u)} style={{padding:"8px 14px",background:showUrlImport?"#f0f4ff":"#f5f3ef",border:showUrlImport?"1.5px solid #a0b4f0":"1px solid #e0dbd2",borderRadius:10,cursor:"pointer",fontFamily:"'DM Sans',sans-serif",fontSize:12,fontWeight:700,color:showUrlImport?"#3a5fe0":"#666",display:"flex",alignItems:"center",gap:8}}><SvgLink size={13} color="currentColor" />URL</button>
+        <button onClick={()=>setShowClosetPicker(p=>!p)} style={{padding:"8px 14px",background:showClosetPicker?"#f0faf4":"#f5f3ef",border:showClosetPicker?"1.5px solid #b6e8c8":"1px solid #e0dbd2",borderRadius:10,cursor:"pointer",fontFamily:"'DM Sans',sans-serif",fontSize:12,fontWeight:700,color:showClosetPicker?"#2d6a3f":"#666",display:"flex",alignItems:"center",gap:8}}><SvgHanger size={13} color="currentColor" />From Closet</button>
         <div style={{display:"flex",gap:6,marginLeft:"auto",alignItems:"center"}}>
-          <button onClick={()=>setMbView("grid")} title="Board grid" style={{padding:"7px 10px",background:"#f5f3ef",border:"none",borderRadius:8,cursor:"pointer",fontSize:11,fontWeight:700,color:"#666",fontFamily:"'DM Sans',sans-serif",display:"flex",alignItems:"center",gap:5}}>
+          <button onClick={()=>setMbView("grid")} title="Board grid" style={{padding:"7px 10px",background:"#f5f3ef",border:"1px solid #e0dbd2",borderRadius:8,cursor:"pointer",fontSize:11,fontWeight:700,color:"#666",fontFamily:"'DM Sans',sans-serif",display:"flex",alignItems:"center",gap:5}}>
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
           </button>
-          <div style={{display:"flex",alignItems:"center",gap:2,background:"#f5f3ef",borderRadius:8,padding:"2px 4px"}}>
+          <div style={{display:"flex",alignItems:"center",gap:2,background:"#f5f3ef",border:"1px solid #e0dbd2",borderRadius:8,padding:"2px 4px"}}>
             <button onClick={()=>setZoom(z=>Math.max(0.25,z-0.25))} style={{width:22,height:22,border:"none",background:"none",cursor:"pointer",fontSize:14,color:"#666",display:"flex",alignItems:"center",justifyContent:"center",fontFamily:"'DM Sans',sans-serif"}}>−</button>
             <span style={{fontSize:10,fontWeight:700,color:"#888",minWidth:30,textAlign:"center"}}>{Math.round(zoom*100)}%</span>
             <button onClick={()=>setZoom(z=>Math.min(2.0,z+0.25))} style={{width:22,height:22,border:"none",background:"none",cursor:"pointer",fontSize:14,color:"#666",display:"flex",alignItems:"center",justifyContent:"center",fontFamily:"'DM Sans',sans-serif"}}>+</button>
           </div>
-          <button onClick={undo} title="Undo (⌘Z)" style={{padding:"7px 10px",background:"#f5f3ef",border:"none",borderRadius:8,cursor:"pointer",fontSize:11,fontWeight:700,color:"#666",fontFamily:"'DM Sans',sans-serif",display:"flex",alignItems:"center",gap:5}}>
+          <button onClick={undo} title="Undo (⌘Z)" style={{padding:"7px 10px",background:"#f5f3ef",border:"1px solid #e0dbd2",borderRadius:8,cursor:"pointer",fontSize:11,fontWeight:700,color:"#666",fontFamily:"'DM Sans',sans-serif",display:"flex",alignItems:"center",gap:5}}>
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><path d="M3 7v6h6"/><path d="M21 17a9 9 0 00-9-9 9 9 0 00-6 2.3L3 13"/></svg>
           </button>
-          <button onClick={redo} title="Redo (⌘⇧Z)" style={{padding:"7px 10px",background:"#f5f3ef",border:"none",borderRadius:8,cursor:"pointer",fontSize:11,fontWeight:700,color:"#666",fontFamily:"'DM Sans',sans-serif",display:"flex",alignItems:"center",gap:5}}>
+          <button onClick={redo} title="Redo (⌘⇧Z)" style={{padding:"7px 10px",background:"#f5f3ef",border:"1px solid #e0dbd2",borderRadius:8,cursor:"pointer",fontSize:11,fontWeight:700,color:"#666",fontFamily:"'DM Sans',sans-serif",display:"flex",alignItems:"center",gap:5}}>
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><path d="M21 7v6h-6"/><path d="M3 17a9 9 0 019-9 9 9 0 016 2.3l3 2.7"/></svg>
           </button>
-          <button onClick={exportCanvas} style={{padding:"8px 14px",background:"#f5f2ed",border:"none",borderRadius:10,cursor:"pointer",fontFamily:"'DM Sans',sans-serif",fontSize:12,fontWeight:700,color:"#666",display:"flex",alignItems:"center",gap:8}}><SvgDownload size={13} color="#666" />Export JPG</button>
+          <button onClick={exportCanvas} title="Export as JPG" style={{padding:"7px 10px",background:"#f5f3ef",border:"1px solid #e0dbd2",borderRadius:8,cursor:"pointer",fontSize:11,color:"#777",fontFamily:"'DM Sans',sans-serif",display:"flex",alignItems:"center",gap:5}}>
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+          </button>
           <button onClick={() => {
             if (!board) return;
             if (window.confirm(`Archive "${board.name || "this board"}"? Restore from Settings → Data.`)) {
@@ -7160,8 +7109,8 @@ function Moodboard({ closetItems = [], activeIdx, setActiveIdx, boards: boardsPr
               }
               if (setActiveIdx) setActiveIdx(Math.max(0, activeIdx - 1));
             }
-          }} title="Archive this board" style={{padding:"7px 10px",background:"#f5f3ef",border:"none",borderRadius:8,cursor:"pointer",fontSize:11,color:"#777",fontFamily:"'DM Sans',sans-serif",display:"flex",alignItems:"center",gap:5}}>
-            <SvgArrowDn size={13} color="#777" />
+          }} title="Archive this board" style={{padding:"7px 10px",background:"#f5f3ef",border:"1px solid #e0dbd2",borderRadius:8,cursor:"pointer",fontSize:11,color:"#777",fontFamily:"'DM Sans',sans-serif",display:"flex",alignItems:"center",gap:5}}>
+            <SvgDownload size={13} color="#777" />
           </button>
           <button onClick={() => {
             if (!board) return;

@@ -10611,12 +10611,6 @@ function UpcomingEventsCard({ events, onAdd, onRemove, onSelect, onEdit }) {
   return (
     <div className="right-card">
       <div className="right-card-title">Upcoming Events</div>
-      {/* Type pills */}
-      <div style={{ display: "flex", gap: 5, marginBottom: 10, flexWrap: "wrap" }}>
-        {EVENT_TYPE_OPTIONS.map(([val, lbl, clr]) => (
-          <button key={val} onClick={() => setType(val)} style={{ padding: "4px 10px", borderRadius: 20, border: type === val ? `1.5px solid ${clr}` : "1.5px solid #e8e4dc", background: type === val ? clr : "#fff", color: type === val ? "#fff" : "#888", fontSize: 11, fontWeight: 700, cursor: "pointer", fontFamily: "'DM Sans', sans-serif" }}>{lbl}</button>
-        ))}
-      </div>
       {/* Name */}
       <input value={name} onChange={e => setName(e.target.value)} onKeyDown={e => { if (e.key === "Enter") handleAdd(); }} placeholder="Event name..." style={{ width: "100%", boxSizing: "border-box", padding: "8px 12px", border: "1.5px solid #e8e4dc", borderRadius: 10, fontFamily: "'DM Sans', sans-serif", fontSize: 12, outline: "none", marginBottom: 8 }} />
       {/* Date row */}
@@ -10627,7 +10621,7 @@ function UpcomingEventsCard({ events, onAdd, onRemove, onSelect, onEdit }) {
       {multiDay && (
         <input type="date" value={endDate} min={startDate} onChange={e => setEndDate(e.target.value)} placeholder="End date" style={{ width: "100%", boxSizing: "border-box", padding: "7px 8px", border: "1.5px solid #e8e4dc", borderRadius: 10, fontFamily: "'DM Sans', sans-serif", fontSize: 11, outline: "none", marginBottom: 8 }} />
       )}
-      <button onClick={handleAdd} disabled={!canAdd} style={{ width: "100%", padding: "8px", borderRadius: 10, border: "none", background: canAdd ? typeColor : "#e8e4dc", color: canAdd ? "#fff" : "#aaa", fontFamily: "'DM Sans', sans-serif", fontSize: 12, fontWeight: 700, cursor: canAdd ? "pointer" : "default", marginBottom: upcoming.length > 0 ? 12 : 0 }}>Add to Calendar</button>
+      <button onClick={handleAdd} disabled={!canAdd} style={{ width: "100%", padding: "8px", borderRadius: 10, border: "none", background: canAdd ? "#1a1a1a" : "#e8e4dc", color: canAdd ? "#fff" : "#aaa", fontFamily: "'DM Sans', sans-serif", fontSize: 12, fontWeight: 700, cursor: canAdd ? "pointer" : "default", marginBottom: upcoming.length > 0 ? 12 : 0 }}>Add to Calendar</button>
       {upcoming.length > 0 && (
         <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
           {upcoming.slice(0, 5).map(ev => {

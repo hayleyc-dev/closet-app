@@ -278,6 +278,10 @@ const globalStyles = `
   /* Lookbook card hover actions */
   .lb-card-actions { max-height: 0; overflow: hidden; padding: 0; border-top: none; transition: max-height 0.2s ease, padding 0.2s ease; }
   .lb-card:hover .lb-card-actions { max-height: 60px; padding: 8px 14px 12px; border-top: 1px solid #f5f2ee; }
+  .mb-card { background: #fff; border-radius: 18px; border: 1.5px solid #e8e4dc; overflow: hidden; cursor: pointer; box-shadow: 0 2px 10px rgba(0,0,0,0.05); transition: transform 0.15s, box-shadow 0.15s; }
+  .mb-card:hover { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(0,0,0,0.10); }
+  .mb-card-actions { max-height: 0; overflow: hidden; padding: 0; border-top: none; transition: max-height 0.2s ease, padding 0.2s ease; }
+  .mb-card:hover .mb-card-actions { max-height: 60px; padding: 8px 12px 10px; border-top: 1px solid #f5f2ee; }
 
   /* Right rail cards */
   .right-card { background: #fff; border-radius: 16px; border: 1px solid #ece8e0; padding: 18px 16px; }
@@ -7150,35 +7154,121 @@ function MoodboardInfoPanel({ activeIdx, setActiveIdx, boards: boardsProp, updat
 }
 
 
-function MoodboardGridCard({ board, onClick }) {
-  const [hovered, setHovered] = useState(false);
+function MoodboardGridCard({ board, onPreview, onEdit, onArchive, onDelete }) {
   const imgItems = (board?.items||[]).filter(it=>it.src);
   return (
-    <button onClick={onClick} style={{width:"100%",border:"1.5px solid #e8e4dc",borderRadius:18,background:board?.bg||"#f5f3ef",cursor:"pointer",overflow:"hidden",padding:0,position:"relative",aspectRatio:"4/3",boxShadow:"0 2px 10px rgba(0,0,0,0.05)",transition:"transform 0.15s,box-shadow 0.15s"}}
-      onMouseEnter={e=>{setHovered(true);e.currentTarget.style.transform="translateY(-2px)";e.currentTarget.style.boxShadow="0 10px 28px rgba(0,0,0,0.12)";}}
-      onMouseLeave={e=>{setHovered(false);e.currentTarget.style.transform="translateY(0)";e.currentTarget.style.boxShadow="0 2px 10px rgba(0,0,0,0.05)";}}>
-      {/* Thumbnail collage */}
-      {imgItems.slice(0,4).map((it,idx)=>(
-        <img key={it.id} src={it.src} alt="" style={{position:"absolute",objectFit:"cover",borderRadius:6,
-          ...(idx===0?{top:"8%",left:"6%",width:"56%",height:"82%"}:
-             idx===1?{top:"8%",right:"6%",width:"36%",height:"39%"}:
-             idx===2?{bottom:"8%",right:"6%",width:"36%",height:"39%"}:
-             {bottom:"8%",left:"6%",width:"36%",height:"39%"})}} />
-      ))}
-      {imgItems.length===0&&<div style={{position:"absolute",inset:0,display:"flex",alignItems:"center",justifyContent:"center"}}><SvgSparkle size={28} color="rgba(0,0,0,0.12)" /></div>}
-      {/* Hover overlay */}
-      <div style={{position:"absolute",inset:0,background:"rgba(0,0,0,0.52)",opacity:hovered?1:0,transition:"opacity 0.18s",display:"flex",flexDirection:"column",justifyContent:"space-between",padding:"12px 14px",pointerEvents:"none"}}>
-        <div style={{display:"flex",alignItems:"flex-start",justifyContent:"space-between",gap:6}}>
-          <div style={{fontSize:13,fontWeight:800,color:"#fff",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",flex:1}}>{board?.name||"Untitled"}</div>
-          {board?.linkedLb&&<div style={{flexShrink:0,background:"rgba(58,170,110,0.9)",color:"#fff",borderRadius:20,padding:"2px 8px",fontSize:10,fontWeight:700}}>Lookbook</div>}
-          {board?.pinned&&<span style={{flexShrink:0,color:"#f0c840",fontSize:13}}>★</span>}
-        </div>
-        <div style={{display:"flex",alignItems:"center",justifyContent:"space-between"}}>
-          <div style={{fontSize:11,color:"rgba(255,255,255,0.7)"}}>{(board?.items||[]).length} item{(board?.items||[]).length!==1?"s":""}</div>
-          <div style={{fontSize:11,fontWeight:700,color:"#fff"}}>Open Board →</div>
+    <div className="mb-card">
+      {/* Clickable preview area */}
+      <div onClick={onPreview} style={{position:"relative",aspectRatio:"4/3",background:board?.bg||"#f5f3ef",overflow:"hidden"}}>
+        {imgItems.slice(0,4).map((it,idx)=>(
+          <img key={it.id} src={it.src} alt="" style={{position:"absolute",objectFit:"cover",borderRadius:6,
+            ...(idx===0?{top:"8%",left:"6%",width:"56%",height:"82%"}:
+               idx===1?{top:"8%",right:"6%",width:"36%",height:"39%"}:
+               idx===2?{bottom:"8%",right:"6%",width:"36%",height:"39%"}:
+               {bottom:"8%",left:"6%",width:"36%",height:"39%"})}} />
+        ))}
+        {imgItems.length===0&&<div style={{position:"absolute",inset:0,display:"flex",alignItems:"center",justifyContent:"center"}}><SvgSparkle size={28} color="rgba(0,0,0,0.12)" /></div>}
+      </div>
+      {/* Always-visible name row */}
+      <div style={{padding:"10px 12px 0",display:"flex",alignItems:"center",gap:6}}>
+        <div style={{fontSize:13,fontWeight:700,color:"#1a1a1a",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",flex:1}}>{board?.name||"Untitled"}</div>
+        {board?.pinned&&<span style={{color:"#f0c840",fontSize:11,flexShrink:0}}>★</span>}
+        {board?.linkedLb&&<span style={{fontSize:9,fontWeight:700,color:"#2d6a3f",background:"#f0faf4",border:"1px solid #b6e8c8",borderRadius:20,padding:"2px 6px",flexShrink:0}}>Lookbook</span>}
+      </div>
+      {/* Hover-reveal action buttons */}
+      <div className="mb-card-actions">
+        <div style={{display:"flex",gap:6,alignItems:"center"}}>
+          <button onClick={e=>{e.stopPropagation();onEdit&&onEdit();}} title="Edit board"
+            style={{width:30,height:30,borderRadius:8,background:"#f5f3ef",border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>
+            <SvgEdit size={12} color="#555" />
+          </button>
+          <div style={{flex:1}} />
+          <button onClick={e=>{e.stopPropagation();onArchive&&onArchive();}} title="Archive board"
+            style={{width:30,height:30,borderRadius:8,background:"#f5f3ef",border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>
+            <SvgDownload size={12} color="#555" />
+          </button>
+          <button onClick={e=>{e.stopPropagation();onDelete&&onDelete();}} title="Delete board"
+            style={{width:30,height:30,borderRadius:8,background:"#fef2f2",border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>
+            <SvgTrash size={12} color="#e05555" />
+          </button>
         </div>
       </div>
-    </button>
+    </div>
+  );
+}
+
+function MoodboardPreviewPopup({ board, onClose, onEdit }) {
+  const items = board?.items || [];
+  // Compute bounding box of all items to scale them to fit
+  const allX = items.map(it=>it.x||0);
+  const allY = items.map(it=>it.y||0);
+  const allR = items.map(it=>(it.x||0)+(it.w||160));
+  const allB = items.map(it=>(it.y||0)+(it.h||200));
+  const minX = items.length ? Math.min(...allX) : 0;
+  const minY = items.length ? Math.min(...allY) : 0;
+  const maxR = items.length ? Math.max(...allR) : 800;
+  const maxB = items.length ? Math.max(...allB) : 600;
+  const contentW = Math.max(maxR - minX, 400);
+  const contentH = Math.max(maxB - minY, 300);
+  const PREVIEW_W = Math.min(window.innerWidth * 0.8, 900);
+  const PREVIEW_H = Math.min(window.innerHeight * 0.75, 650);
+  const scale = Math.min(PREVIEW_W / contentW, PREVIEW_H / contentH, 1);
+  return (
+    <div onClick={onClose} style={{position:"fixed",inset:0,zIndex:1000,background:"rgba(0,0,0,0.6)",display:"flex",alignItems:"center",justifyContent:"center",padding:24}}>
+      <div onClick={e=>e.stopPropagation()} style={{background:board?.bg||"#f5f3ef",borderRadius:20,overflow:"hidden",boxShadow:"0 24px 80px rgba(0,0,0,0.28)",display:"flex",flexDirection:"column",maxWidth:"90vw",maxHeight:"90vh"}}>
+        {/* Header */}
+        <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"14px 18px",background:"rgba(255,255,255,0.85)",borderBottom:"1px solid rgba(0,0,0,0.08)",backdropFilter:"blur(8px)"}}>
+          <div style={{fontSize:15,fontWeight:700,color:"#1a1a1a"}}>{board?.name||"Untitled Board"}</div>
+          <div style={{display:"flex",gap:8,alignItems:"center"}}>
+            <button onClick={onEdit} style={{padding:"6px 14px",background:"#1a1a1a",color:"#fff",border:"none",borderRadius:8,cursor:"pointer",fontSize:12,fontWeight:700,fontFamily:"'DM Sans',sans-serif",display:"flex",alignItems:"center",gap:6}}>
+              <SvgEdit size={11} color="#fff" />Edit Board
+            </button>
+            <button onClick={onClose} style={{width:30,height:30,borderRadius:8,background:"rgba(0,0,0,0.08)",border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#666" strokeWidth="2.5" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+            </button>
+          </div>
+        </div>
+        {/* Canvas preview */}
+        <div style={{overflow:"auto",flex:1}}>
+          <div style={{position:"relative",width:contentW*scale,height:contentH*scale,flexShrink:0}}>
+            {items.map(item=>(
+              <div key={item.id} style={{
+                position:"absolute",
+                left:(item.x||0-minX)*scale, top:(item.y||0-minY)*scale,
+                width:(item.w||160)*scale, height:(item.h||200)*scale,
+                transform:`rotate(${item.rotation||0}deg)`,
+                transformOrigin:"center center",
+                opacity:item.opacity??1,
+                pointerEvents:"none",
+              }}>
+                {item.type==="text" ? (
+                  <div style={{
+                    width:"100%",height:"100%",
+                    fontFamily:item.fontFamily||"'DM Sans',sans-serif",
+                    fontSize:(item.fontSize||14)*scale,
+                    fontWeight:item.bold?"700":"400",
+                    color:item.color||"#1a1a1a",
+                    background:item.transparentBg?"transparent":(item.bg||"#fff9e6"),
+                    display:"flex",alignItems:"center",justifyContent:"center",
+                    padding:8*scale,boxSizing:"border-box",
+                    borderRadius:8*scale,overflow:"hidden",
+                    whiteSpace:"pre-wrap",textAlign:"center",lineHeight:1.4,
+                  }}>{item.text||""}</div>
+                ) : (
+                  <img src={item.src} alt="" style={{
+                    width:"100%",height:"100%",
+                    objectFit:"contain",display:"block",
+                    background:item.transparent?"transparent":"transparent",
+                    transform:item.flipH?"scaleX(-1)":"none",
+                  }} />
+                )}
+              </div>
+            ))}
+            {items.length===0&&<div style={{position:"absolute",inset:0,display:"flex",alignItems:"center",justifyContent:"center"}}><SvgSparkle size={48} color="rgba(0,0,0,0.1)" /></div>}
+          </div>
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -7212,6 +7302,7 @@ function Moodboard({ closetItems = [], activeIdx, setActiveIdx, boards: boardsPr
   const [showClosetPicker, setShowClosetPicker] = useState(false);
   const [editingTextId, setEditingTextId] = useState(null);
   const [editingTextVal, setEditingTextVal] = useState("");
+  const [mbPreviewBoard, setMbPreviewBoard] = useState(null);
 
   // ── Undo/redo history ──
   const history = useRef([]);   // array of board item snapshots
@@ -7429,8 +7520,30 @@ function Moodboard({ closetItems = [], activeIdx, setActiveIdx, boards: boardsPr
       if (mbTagFilter !== "All" && !(b.tags||[]).includes(mbTagFilter)) return false;
       return true;
     }).sort((a,z)=>(z.b.pinned?1:0)-(a.b.pinned?1:0));
+    const archiveBoardFromGrid = (b) => {
+      if (!window.confirm(`Archive "${b.name||"this board"}"? Restore from Settings → Data.`)) return;
+      try {
+        const archived = JSON.parse(localStorage.getItem("wardrobe_moodboards_archived_v1") || "[]");
+        archived.push({ ...b, archivedAt: new Date().toISOString() });
+        localStorage.setItem("wardrobe_moodboards_archived_v1", JSON.stringify(archived));
+      } catch {}
+      if (removeBoardById) removeBoardById(b.id);
+      else setBoards(bs => bs.filter(x => x.id !== b.id));
+    };
+    const deleteBoardFromGrid = (b) => {
+      if (!window.confirm(`Delete "${b.name||"this board"}"? This cannot be undone.`)) return;
+      if (removeBoardById) removeBoardById(b.id);
+      else setBoards(bs => bs.filter(x => x.id !== b.id));
+    };
     return (
       <div style={{display:"flex",flexDirection:"column",padding:"0 4px"}}>
+        {mbPreviewBoard && (
+          <MoodboardPreviewPopup
+            board={mbPreviewBoard}
+            onClose={()=>setMbPreviewBoard(null)}
+            onEdit={()=>{ const idx=boards.findIndex(x=>x.id===mbPreviewBoard.id); if(idx>=0){setActiveIdx(idx);setMbView&&setMbView("canvas");} setMbPreviewBoard(null); }}
+          />
+        )}
         {boards.length === 0 ? (
           <div style={{display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",height:"60vh",gap:16}}>
             <div><SvgSparkle size={40} color="#ddd" /></div>
@@ -7444,11 +7557,14 @@ function Moodboard({ closetItems = [], activeIdx, setActiveIdx, boards: boardsPr
               <button onClick={()=>{addBoard();setMbView&&setMbView("canvas");}} style={{padding:"7px 14px",background:"#1a1a1a",color:"#fff",border:"none",borderRadius:10,cursor:"pointer",fontSize:11,fontWeight:700,fontFamily:"'DM Sans',sans-serif"}}>+ New Board</button>
             </div>
             <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(220px,1fr))",gap:14}}>
-              {filteredBoards.map(({b,i})=>{
-                return (
-                  <MoodboardGridCard key={b.id} board={b} onClick={()=>{setActiveIdx(i);setMbView&&setMbView("canvas");}} />
-                );
-              })}
+              {filteredBoards.map(({b,i})=>(
+                <MoodboardGridCard key={b.id} board={b}
+                  onPreview={()=>setMbPreviewBoard(b)}
+                  onEdit={()=>{setActiveIdx(i);setMbView&&setMbView("canvas");}}
+                  onArchive={()=>archiveBoardFromGrid(b)}
+                  onDelete={()=>deleteBoardFromGrid(b)}
+                />
+              ))}
             </div>
           </>
         )}

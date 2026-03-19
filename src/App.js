@@ -3187,8 +3187,8 @@ function LookbookViewer({ lookbook, outfits, allItems, closetItems, onClose, onU
         </div>
       </div>
 
-      {/* ── HERO HEADER (per type) ── */}
-      {(() => {
+      {/* ── HERO HEADER (per type) — hidden in moodboard view ── */}
+      {view !== "moodboard" && (() => {
         const heroPill = (content, bg = "#f5f3ef", color = "#555") => (
           <div style={{ display: "flex", alignItems: "center", gap: 5, padding: "4px 12px", background: bg, borderRadius: 20 }}>
             <span style={{ fontSize: 12, fontWeight: 700, color }}>{content}</span>
@@ -3315,7 +3315,7 @@ function LookbookViewer({ lookbook, outfits, allItems, closetItems, onClose, onU
                 closetItems={closetItems || []}
                 activeIdx={linkedMoodboardIdx}
                 setActiveIdx={setLinkedMoodboardIdx}
-                boards={moodboardsProp}
+                boards={moodboards}
                 updateBoards={moodboardsUpdateBoards}
               />
             ) : (
@@ -3558,8 +3558,8 @@ function LookbookViewer({ lookbook, outfits, allItems, closetItems, onClose, onU
           )}
         </div>
 
-        {/* ── RIGHT SIDEBAR (accordion) ── */}
-        <div style={{ width: 272, background: "#fff", borderLeft: "1.5px solid #e8e4dc", display: "flex", flexDirection: "column", overflowY: "auto", flexShrink: 0 }}>
+        {/* ── RIGHT SIDEBAR (accordion) — hidden in moodboard view ── */}
+        {view !== "moodboard" && <div style={{ width: 272, background: "#fff", borderLeft: "1.5px solid #e8e4dc", display: "flex", flexDirection: "column", overflowY: "auto", flexShrink: 0 }}>
 
           {/* ── OVERVIEW ── */}
           <button onClick={() => toggleAccordion("overview")} style={{ ...acHdrStyle }}>
@@ -4027,7 +4027,7 @@ function LookbookViewer({ lookbook, outfits, allItems, closetItems, onClose, onU
             </div>
           )}
 
-        </div>
+        </div>}
       </div>
 
       {/* ── ADD LOOKS MODAL ── */}

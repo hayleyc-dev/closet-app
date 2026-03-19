@@ -6174,75 +6174,70 @@ const SALE_STATUS_META = {
   archived: { label: "Archived", bg: "#f5f3ef", color: "#aaa",    border: "#e0dbd0" },
 };
 
+const PLATFORM_FEE_CALC = {
+  "Poshmark":  (p) => p >= 15 ? p * 0.20 : 2.95,
+  "Depop":     (p) => p * 0.10,
+  "Mercari":   (p) => p * 0.10,
+  "eBay":      (p) => p * 0.1295,
+  "ThredUp":   () => 0,
+  "Facebook":  (p) => p * 0.05,
+  "Vinted":    () => 0,
+  "Instagram": (p) => p * 0.05,
+  "Other":     () => 0,
+};
+const PLATFORM_FEE_LABELS = {
+  "Poshmark": "20% (or $2.95 flat under $15)",
+  "Depop": "10%", "Mercari": "10%", "eBay": "12.95%",
+  "ThredUp": "Variable (they set price)", "Facebook": "5% (shipping orders)",
+  "Vinted": "Buyer pays fee", "Instagram": "5%", "Other": "—",
+};
+
+const CONDITION_BADGE = {
+  "New with tags": { bg: "#f0faf4", color: "#2d6a3f", border: "#b6e8c8" },
+  "Like new":      { bg: "#f5f0ff", color: "#7c6fe0", border: "#c4b0f0" },
+  "Good":          { bg: "#fff8ee", color: "#a07000", border: "#f5c842" },
+  "Fair":          { bg: "#fef2f2", color: "#e05555", border: "#fca5a5" },
+  "Poor":          { bg: "#f5f3ef", color: "#aaa",    border: "#e0dbd0" },
+};
+
+const getDaysListed = (item) => {
+  if (!item.listedDate) return null;
+  return Math.floor((Date.now() - new Date(item.listedDate + "T00:00:00")) / 86400000);
+};
+const getDaysBadgeStyle = (days) => {
+  if (days < 14) return { color: "#2d6a3f", bg: "#f0faf4" };
+  if (days < 30) return { color: "#a07000", bg: "#fff8ee" };
+  return { color: "#e05555", bg: "#fef2f2" };
+};
+
 function SellerDashboard({ itemsDb, allClosetItems, onViewItem }) {
   const forSaleItems = itemsDb.rows.filter(i => i.forSale);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
+  const [sortBy, setSortBy] = useState("dateAdded");
+  const [viewMode, setViewMode] = useState("list");
   const [editingId, setEditingId] = useState(null);
   const [editVals, setEditVals] = useState({});
-  // Bulk list
+  const [genLoading, setGenLoading] = useState(null);
   const [showBulkModal, setShowBulkModal] = useState(false);
   const [bulkSearch, setBulkSearch] = useState("");
   const [bulkSelected, setBulkSelectedLocal] = useState(new Set());
   const [bulkPlatform, setBulkPlatform] = useState("");
   const [bulkCondition, setBulkCondition] = useState("");
   const [bulkPrice, setBulkPrice] = useState("");
-  // Sold confirmation modal
+  const [showBulkPriceModal, setShowBulkPriceModal] = useState(false);
+  const [bulkPriceSelected, setBulkPriceSelected] = useState(new Set());
+  const [bulkDiscountPct, setBulkDiscountPct] = useState(10);
   const [soldConfirmItem, setSoldConfirmItem] = useState(null);
   const [soldPrice, setSoldPrice] = useState("");
   const [soldPlatform, setSoldPlatform] = useState("");
   const [soldShipping, setSoldShipping] = useState("");
   const [soldDate, setSoldDate] = useState(new Date().toISOString().slice(0, 10));
+  const [soldRemoveFromCloset, setSoldRemoveFromCloset] = useState(true);
+  const [showBulkMenu, setShowBulkMenu] = useState(false);
+  const [gridEditItem, setGridEditItem] = useState(null);
 
-  const updateItem = (item, patch) => itemsDb.update({ ...item, ...patch });
-
-  const moveBackToCloset = (item) => {
-    itemsDb.update({ ...item, forSale: false, saleStatus: undefined, salePrice: undefined, salePlatform: undefined, saleNotes: undefined });
-  };
-
-  const openSoldConfirm = (item) => {
-    setSoldConfirmItem(item);
-    setSoldPrice(item.salePrice || "");
-    setSoldPlatform(item.salePlatform || "");
-    setSoldShipping("");
-    setSoldDate(new Date().toISOString().slice(0, 10));
-  };
-
-  const confirmSold = () => {
-    if (!soldConfirmItem) return;
-    updateItem(soldConfirmItem, {
-      saleStatus: "sold",
-      soldDate: soldDate,
-      salePrice: soldPrice,
-      salePlatform: soldPlatform,
-      shippingCost: soldShipping,
-      netRevenue: soldPrice && soldShipping
-        ? String((parseFloat(soldPrice)||0) - (parseFloat(soldShipping)||0))
-        : soldPrice,
-    });
-    setSoldConfirmItem(null);
-  };
-
-  const startEdit = (item) => {
-    setEditingId(item.id);
-    setEditVals({ salePrice: item.salePrice || "", salePlatform: item.salePlatform || "", saleNotes: item.saleNotes || "", saleStatus: item.saleStatus || "listed" });
-  };
-
-  const saveEdit = (item) => {
-    updateItem(item, editVals);
-    setEditingId(null);
-  };
-
-  const filtered = forSaleItems.filter(i => {
-    const matchStatus = statusFilter === "all" || (i.saleStatus || "listed") === statusFilter;
-    const q = search.trim().toLowerCase();
-    const matchSearch = !q || i.name.toLowerCase().includes(q) || (i.brand || "").toLowerCase().includes(q);
-    return matchStatus && matchSearch;
-  });
-
-  const PLATFORMS = ["Depop", "Poshmark", "eBay", "Mercari", "ThredUp", "Facebook", "Instagram", "Vinted", "Other"];
-
-  // Stats
+  // Stats (moved here from right-rail)
   const listed = forSaleItems.filter(i => i.saleStatus === "listed" || !i.saleStatus).length;
   const pending = forSaleItems.filter(i => i.saleStatus === "pending").length;
   const drafts = forSaleItems.filter(i => i.saleStatus === "draft").length;
@@ -6251,279 +6246,449 @@ function SellerDashboard({ itemsDb, allClosetItems, onViewItem }) {
     .reduce((s, i) => s + (parseFloat((i.netRevenue || i.salePrice || "").replace(/[^0-9.]/g, "")) || 0), 0);
   const potentialEarnings = forSaleItems.filter(i => i.saleStatus !== "sold")
     .reduce((s, i) => s + (parseFloat((i.salePrice || "").replace(/[^0-9.]/g, "")) || 0), 0);
-  // Earned vs spent
   const totalSpent = itemsDb.rows.reduce((s, i) => s + (parseFloat((i.price||"").replace(/[^0-9.]/g,""))||0), 0);
   const earnedPct = totalSpent > 0 ? Math.min(100, (totalEarned / totalSpent) * 100) : 0;
-  // Time to sell
   const soldWithDates = forSaleItems.filter(i => i.saleStatus === "sold" && i.soldDate && i.listedDate);
   const avgDaysToSell = soldWithDates.length > 0
     ? Math.round(soldWithDates.reduce((s, i) => s + Math.max(0, (new Date(i.soldDate) - new Date(i.listedDate)) / 86400000), 0) / soldWithDates.length)
     : null;
+  const sellThrough = forSaleItems.length > 0 ? Math.round((sold / forSaleItems.length) * 100) : 0;
 
-  // Bulk list closet items
+  const updateItem = (item, patch) => itemsDb.update({ ...item, ...patch });
+  const moveBackToCloset = (item) => {
+    itemsDb.update({ ...item, forSale: false, saleStatus: undefined, salePrice: undefined, salePlatform: undefined, saleNotes: undefined, saleUrl: undefined, saleDescription: undefined });
+  };
+  const openSoldConfirm = (item) => {
+    setSoldConfirmItem(item); setSoldPrice(item.salePrice || ""); setSoldPlatform(item.salePlatform || "");
+    setSoldShipping(""); setSoldDate(new Date().toISOString().slice(0, 10)); setSoldRemoveFromCloset(true);
+  };
+  const confirmSold = () => {
+    if (!soldConfirmItem) return;
+    const spNum = parseFloat(soldPrice || 0) || 0;
+    const shipNum = parseFloat(soldShipping || 0) || 0;
+    const feeCalc = PLATFORM_FEE_CALC[soldPlatform];
+    const platformFee = feeCalc ? feeCalc(spNum) : 0;
+    updateItem(soldConfirmItem, { saleStatus: "sold", soldDate, salePrice: soldPrice, salePlatform: soldPlatform, shippingCost: soldShipping, netRevenue: String(spNum - shipNum - platformFee), ...(soldRemoveFromCloset ? { forSale: false } : {}) });
+    setSoldConfirmItem(null);
+  };
+  const startEdit = (item) => {
+    setEditingId(item.id);
+    setEditVals({ salePrice: item.salePrice || "", salePlatform: item.salePlatform || "", saleCondition: item.saleCondition || "", saleNotes: item.saleNotes || "", saleStatus: item.saleStatus || "listed", saleUrl: item.saleUrl || "", saleDescription: item.saleDescription || "" });
+  };
+  const saveEdit = (item) => { updateItem(item, editVals); setEditingId(null); };
+  const generateDescription = async (item) => {
+    const apiKey = process.env.REACT_APP_ANTHROPIC_KEY || "";
+    if (!apiKey) { alert("No API key configured (REACT_APP_ANTHROPIC_KEY)"); return; }
+    setGenLoading(item.id);
+    try {
+      const prompt = `Write a short, engaging resale listing description for this clothing item. Be specific, appealing, and honest. Keep it under 80 words.\n- Name: ${item.name}\n- Brand: ${item.brand || "N/A"}\n- Category: ${item.category || ""}\n- Color: ${item.color || ""}\n- Size: ${item.size || ""}\n- Condition: ${item.saleCondition || "Good"}\n- Original price: ${item.price || ""}\n- Notes: ${item.notes || ""}\nOutput only the description text, no labels or headers.`;
+      const res = await fetch("https://api.anthropic.com/v1/messages", { method: "POST", headers: { "Content-Type": "application/json", "x-api-key": apiKey, "anthropic-version": "2023-06-01", "anthropic-dangerous-direct-browser-access": "true" }, body: JSON.stringify({ model: "claude-sonnet-4-6", max_tokens: 200, messages: [{ role: "user", content: prompt }] }) });
+      const data = await res.json();
+      const desc = data?.content?.[0]?.text?.trim() || "";
+      if (desc) setEditVals(v => ({ ...v, saleDescription: desc }));
+    } catch (e) { console.error("Generate description error:", e); }
+    setGenLoading(null);
+  };
+
+  const sortedFiltered = (() => {
+    const base = forSaleItems.filter(i => {
+      const matchStatus = statusFilter === "all" || (i.saleStatus || "listed") === statusFilter;
+      const q = search.trim().toLowerCase();
+      return matchStatus && (!q || i.name.toLowerCase().includes(q) || (i.brand || "").toLowerCase().includes(q));
+    });
+    return [...base].sort((a, b) => {
+      if (sortBy === "price") return (parseFloat((b.salePrice||"").replace(/[^0-9.]/g,""))||0) - (parseFloat((a.salePrice||"").replace(/[^0-9.]/g,""))||0);
+      if (sortBy === "days") return (getDaysListed(b) ?? -1) - (getDaysListed(a) ?? -1);
+      if (sortBy === "status") return SALE_STATUSES.indexOf(a.saleStatus||"listed") - SALE_STATUSES.indexOf(b.saleStatus||"listed");
+      return (b.listedDate || b.id || "").localeCompare(a.listedDate || a.id || "");
+    });
+  })();
+
+  const PLATFORMS = ["Depop", "Poshmark", "eBay", "Mercari", "ThredUp", "Facebook", "Instagram", "Vinted", "Other"];
   const closetOnlyItems = (allClosetItems || itemsDb.rows).filter(i => !i.forSale);
   const bulkFiltered = closetOnlyItems.filter(i => !bulkSearch || i.name.toLowerCase().includes(bulkSearch.toLowerCase()));
-
   const applyBulkList = () => {
     if (bulkSelected.size === 0) return;
     const today = new Date().toISOString().slice(0, 10);
-    bulkSelected.forEach(id => {
-      const item = closetOnlyItems.find(i => i.id === id);
-      if (item) itemsDb.update({ ...item, forSale: true, saleStatus: "listed", listedDate: today, salePlatform: bulkPlatform || undefined, saleCondition: bulkCondition || undefined, salePrice: bulkPrice || undefined });
-    });
+    bulkSelected.forEach(id => { const item = closetOnlyItems.find(i => i.id === id); if (item) itemsDb.update({ ...item, forSale: true, saleStatus: "listed", listedDate: today, salePlatform: bulkPlatform || undefined, saleCondition: bulkCondition || undefined, salePrice: bulkPrice || undefined }); });
     setShowBulkModal(false); setBulkSelectedLocal(new Set()); setBulkSearch(""); setBulkPlatform(""); setBulkCondition(""); setBulkPrice("");
   };
+  const applyBulkPrice = () => {
+    if (bulkPriceSelected.size === 0) return;
+    const factor = 1 - (bulkDiscountPct / 100);
+    bulkPriceSelected.forEach(id => { const item = forSaleItems.find(i => i.id === id); if (!item) return; const current = parseFloat((item.salePrice || "").replace(/[^0-9.]/g, "")) || 0; if (current > 0) itemsDb.update({ ...item, salePrice: String(Math.round(current * factor)) }); });
+    setShowBulkPriceModal(false); setBulkPriceSelected(new Set()); setBulkDiscountPct(10);
+  };
+  const activePriceItems = forSaleItems.filter(i => (i.saleStatus === "listed" || i.saleStatus === "pending") && parseFloat((i.salePrice || "").replace(/[^0-9.]/g, "")) > 0);
 
-  if (forSaleItems.length === 0) return (
-    <div className="fade-up">
-      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "60px 0 40px", gap: 14 }}>
-        <div><SvgTag size={40} color="#ddd" /></div>
-        <div style={{ fontSize: 18, fontWeight: 800, color: "#1a1a1a" }}>No items listed for sale</div>
-        <div style={{ fontSize: 13, color: "#aaa", textAlign: "center", maxWidth: 280 }}>Open any item in your closet and tap "List for Sale" to move it here</div>
+  // Shared edit form fields (used in both list inline + grid modal)
+  const editFormFields = (genItem) => (
+    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+      <div style={{ display: "flex", gap: 8 }}>
+        <input value={editVals.salePrice} onChange={e => setEditVals(v => ({ ...v, salePrice: e.target.value }))} placeholder="Sale price"
+          style={{ flex: 1, padding: "7px 10px", border: "1.5px solid #e8e4dc", borderRadius: 10, fontFamily: "'DM Sans', sans-serif", fontSize: 12, outline: "none" }} />
+        <select value={editVals.salePlatform} onChange={e => setEditVals(v => ({ ...v, salePlatform: e.target.value }))}
+          style={{ flex: 1, padding: "7px 32px 7px 10px", border: "1.5px solid #e8e4dc", borderRadius: 10, fontFamily: "'DM Sans', sans-serif", fontSize: 12, appearance: "none", WebkitAppearance: "none", backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='11' height='11' viewBox='0 0 24 24' fill='none' stroke='%23999' stroke-width='2.5' stroke-linecap='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E")`, backgroundRepeat: "no-repeat", backgroundPosition: "right 10px center", backgroundColor: "#fff" }}>
+          <option value="">Platform…</option>
+          {PLATFORMS.map(p => <option key={p} value={p}>{p}</option>)}
+        </select>
       </div>
-      <div style={{ display: "flex", justifyContent: "center" }}>
-        <button onClick={() => setShowBulkModal(true)} style={{ padding: "10px 22px", background: "#1a1a1a", color: "#fff", border: "none", borderRadius: 12, cursor: "pointer", fontFamily: "'DM Sans', sans-serif", fontSize: 13, fontWeight: 700 }}>
-          + Bulk List from Closet
+      <select value={editVals.saleCondition} onChange={e => setEditVals(v => ({ ...v, saleCondition: e.target.value }))}
+        style={{ padding: "7px 32px 7px 10px", border: "1.5px solid #e8e4dc", borderRadius: 10, fontFamily: "'DM Sans', sans-serif", fontSize: 12, appearance: "none", WebkitAppearance: "none", backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='11' height='11' viewBox='0 0 24 24' fill='none' stroke='%23999' stroke-width='2.5' stroke-linecap='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E")`, backgroundRepeat: "no-repeat", backgroundPosition: "right 10px center", backgroundColor: "#fff" }}>
+        <option value="">Condition…</option>
+        {["New with tags", "Like new", "Good", "Fair", "Poor"].map(c => <option key={c} value={c}>{c}</option>)}
+      </select>
+      <input value={editVals.saleUrl} onChange={e => setEditVals(v => ({ ...v, saleUrl: e.target.value }))} placeholder="Listing URL (e.g. depop.com/…)"
+        style={{ padding: "7px 10px", border: "1.5px solid #e8e4dc", borderRadius: 10, fontFamily: "'DM Sans', sans-serif", fontSize: 12, outline: "none" }} />
+      <div style={{ position: "relative" }}>
+        <textarea value={editVals.saleDescription} onChange={e => setEditVals(v => ({ ...v, saleDescription: e.target.value }))} placeholder="Listing description…" rows={3}
+          style={{ width: "100%", padding: "7px 10px 28px", border: "1.5px solid #e8e4dc", borderRadius: 10, fontFamily: "'DM Sans', sans-serif", fontSize: 12, outline: "none", resize: "vertical", boxSizing: "border-box" }} />
+        <button onClick={() => generateDescription(genItem)} disabled={genLoading === genItem.id}
+          style={{ position: "absolute", bottom: 7, right: 7, padding: "3px 10px", background: genLoading === genItem.id ? "#f0ece4" : "#1a1a1a", color: genLoading === genItem.id ? "#aaa" : "#fff", border: "none", borderRadius: 7, cursor: genLoading === genItem.id ? "not-allowed" : "pointer", fontSize: 10, fontWeight: 700, fontFamily: "'DM Sans', sans-serif" }}>
+          {genLoading === genItem.id ? "Generating…" : "✦ Generate"}
         </button>
       </div>
-      {showBulkModal && <BulkListModal items={bulkFiltered} search={bulkSearch} setSearch={setBulkSearch} selected={bulkSelected} setSelected={setBulkSelectedLocal} platform={bulkPlatform} setPlatform={setBulkPlatform} condition={bulkCondition} setCondition={setBulkCondition} price={bulkPrice} setPrice={setBulkPrice} platforms={PLATFORMS} onApply={applyBulkList} onClose={() => setShowBulkModal(false)} />}
+      <input value={editVals.saleNotes} onChange={e => setEditVals(v => ({ ...v, saleNotes: e.target.value }))} placeholder="Notes"
+        style={{ padding: "7px 10px", border: "1.5px solid #e8e4dc", borderRadius: 10, fontFamily: "'DM Sans', sans-serif", fontSize: 12, outline: "none" }} />
+    </div>
+  );
+
+  // ── Left panel ──
+  const leftPanel = (
+    <div style={{ width: 210, flexShrink: 0, position: "sticky", top: 24, maxHeight: "calc(100vh - 48px)", overflowY: "auto", display: "flex", flexDirection: "column", gap: 14 }}>
+      {/* Search */}
+      <div style={{ position: "relative" }}>
+        <span style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)", pointerEvents: "none", display: "flex" }}>
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#bbb" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        </span>
+        <input className="closet-search" value={search} onChange={e => setSearch(e.target.value)} placeholder="Search listings…" />
+      </div>
+      {/* Stats cards */}
+      {forSaleItems.length > 0 && (<>
+        <div className="right-card">
+          <div className="right-card-title">Listings</div>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6, marginBottom: 6 }}>
+            {[{ label: "Drafts", value: drafts, bg: "#f5f3ef", color: "#888" }, { label: "Listed", value: listed, bg: "#f0faf4", color: "#2d6a3f" }, { label: "Pending", value: pending, bg: "#fff8ee", color: "#a07000" }, { label: "Sold", value: sold, bg: "#f5f0ff", color: "#7c6fe0" }].map(s => (
+              <div key={s.label} style={{ background: s.bg, borderRadius: 8, padding: "8px 10px", textAlign: "center" }}>
+                <div style={{ fontSize: 16, fontWeight: 800, color: s.color }}>{s.value}</div>
+                <div style={{ fontSize: 9, fontWeight: 700, color: "#aaa", textTransform: "uppercase", letterSpacing: "0.07em" }}>{s.label}</div>
+              </div>
+            ))}
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6 }}>
+            <div style={{ background: "#fafaf8", borderRadius: 8, padding: "8px 10px", textAlign: "center" }}>
+              <div style={{ fontSize: 14, fontWeight: 800, color: "#2d6a3f" }}>{totalEarned > 0 ? `$${totalEarned.toFixed(0)}` : "—"}</div>
+              <div style={{ fontSize: 9, fontWeight: 700, color: "#aaa", textTransform: "uppercase", letterSpacing: "0.07em" }}>Earned</div>
+            </div>
+            <div style={{ background: "#fafaf8", borderRadius: 8, padding: "8px 10px", textAlign: "center" }}>
+              <div style={{ fontSize: 14, fontWeight: 800, color: "#888" }}>{potentialEarnings > 0 ? `$${potentialEarnings.toFixed(0)}` : "—"}</div>
+              <div style={{ fontSize: 9, fontWeight: 700, color: "#aaa", textTransform: "uppercase", letterSpacing: "0.07em" }}>Potential</div>
+            </div>
+          </div>
+        </div>
+        <div className="right-card">
+          <div className="right-card-title">Performance</div>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
+            <span style={{ fontSize: 12, color: "#888" }}>Sell-through</span>
+            <span style={{ fontSize: 13, fontWeight: 800, color: "#7c6fe0" }}>{sellThrough}%</span>
+          </div>
+          <div style={{ height: 5, borderRadius: 6, background: "#e8e4dc", overflow: "hidden", marginBottom: 8 }}>
+            <div style={{ height: "100%", borderRadius: 6, background: "#7c6fe0", width: sellThrough + "%", transition: "width 0.5s" }} />
+          </div>
+          <div style={{ fontSize: 11, color: "#aaa" }}>{sold} of {forSaleItems.length} sold</div>
+          {avgDaysToSell !== null && (
+            <div style={{ marginTop: 8, paddingTop: 8, borderTop: "1px solid #f0ece4", fontSize: 11, color: "#888" }}>
+              Avg time to sell: <strong style={{ color: "#1a1a1a" }}>{avgDaysToSell}d</strong>
+            </div>
+          )}
+        </div>
+        {totalSpent > 0 && (
+          <div className="right-card">
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 8 }}>
+              <div className="right-card-title" style={{ marginBottom: 0 }}>Wardrobe Payback</div>
+              <span style={{ fontSize: 12, fontWeight: 800, color: "#7c6fe0" }}>{earnedPct.toFixed(1)}%</span>
+            </div>
+            <div style={{ height: 6, borderRadius: 8, background: "#e8e4dc", overflow: "hidden", marginBottom: 6 }}>
+              <div style={{ height: "100%", borderRadius: 8, background: "linear-gradient(90deg, #7c6fe0, #3aaa6e)", width: earnedPct + "%", transition: "width 0.5s" }} />
+            </div>
+            <div style={{ display: "flex", justifyContent: "space-between" }}>
+              <span style={{ fontSize: 10, color: "#aaa" }}>Sold: <strong style={{ color: "#2d6a3f" }}>${totalEarned.toFixed(0)}</strong></span>
+              <span style={{ fontSize: 10, color: "#aaa" }}>Spent: <strong style={{ color: "#1a1a1a" }}>${totalSpent.toFixed(0)}</strong></span>
+            </div>
+          </div>
+        )}
+      </>)}
+    </div>
+  );
+
+  // ── Top toolbar ──
+  const topBar = (
+    <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 16, flexWrap: "wrap" }}>
+      {/* Status filter pills */}
+      <div style={{ display: "flex", gap: 5, flexWrap: "wrap", flex: 1 }}>
+        {[["all", "All"], ...SALE_STATUSES.map(s => [s, SALE_STATUS_META[s].label])].map(([val, lbl]) => (
+          <button key={val} onClick={() => setStatusFilter(val)}
+            style={{ padding: "5px 13px", border: "1.5px solid", borderRadius: 20, cursor: "pointer", fontSize: 12, fontWeight: 700, fontFamily: "'DM Sans', sans-serif", transition: "all 0.12s",
+              background: statusFilter === val ? "#1a1a1a" : "#f5f3ef",
+              borderColor: statusFilter === val ? "#1a1a1a" : "#e8e4dc",
+              color: statusFilter === val ? "#fff" : "#777" }}>
+            {lbl}
+          </button>
+        ))}
+      </div>
+      {/* Sort */}
+      <select value={sortBy} onChange={e => setSortBy(e.target.value)}
+        style={{ padding: "6px 32px 6px 10px", border: "1.5px solid #e8e4dc", borderRadius: 10, fontFamily: "'DM Sans', sans-serif", fontSize: 12, outline: "none", cursor: "pointer", color: "#555", appearance: "none", WebkitAppearance: "none", backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23999' stroke-width='2.5' stroke-linecap='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E")`, backgroundRepeat: "no-repeat", backgroundPosition: "right 10px center", backgroundColor: "#faf9f6" }}>
+        <option value="dateAdded">Date Added</option>
+        <option value="days">Days Listed</option>
+        <option value="price">Price ↓</option>
+        <option value="status">Status</option>
+      </select>
+      {/* View toggle */}
+      <div style={{ display: "flex", background: "#f5f2ed", borderRadius: 10, padding: 3, gap: 2 }}>
+        {[
+          ["list", <svg key="l" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>],
+          ["grid", <svg key="g" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>],
+        ].map(([mode, icon]) => (
+          <button key={mode} onClick={() => setViewMode(mode)} style={{ padding: "5px 8px", border: "none", borderRadius: 8, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", background: viewMode === mode ? "#fff" : "transparent", color: viewMode === mode ? "#1a1a1a" : "#bbb", boxShadow: viewMode === mode ? "0 1px 4px rgba(0,0,0,0.08)" : "none" }}>{icon}</button>
+        ))}
+      </div>
+      {/* Bulk Actions */}
+      <div style={{ position: "relative" }}>
+        {showBulkMenu && <div style={{ position: "fixed", inset: 0, zIndex: 99 }} onClick={() => setShowBulkMenu(false)} />}
+        <button onClick={() => setShowBulkMenu(v => !v)}
+          style={{ padding: "6px 13px", background: "#f5f3ef", border: "1.5px solid #e8e4dc", borderRadius: 10, cursor: "pointer", fontFamily: "'DM Sans', sans-serif", fontSize: 12, fontWeight: 700, color: "#555", display: "flex", alignItems: "center", gap: 6 }}>
+          <span>Bulk Actions</span>
+          <span style={{ fontSize: 10, opacity: 0.5 }}>▾</span>
+        </button>
+        {showBulkMenu && (
+          <div style={{ position: "absolute", top: "100%", right: 0, marginTop: 4, background: "#fff", border: "1.5px solid #e8e4dc", borderRadius: 10, overflow: "hidden", boxShadow: "0 4px 16px rgba(0,0,0,0.08)", zIndex: 100, minWidth: 150 }}>
+            <button onClick={() => { setShowBulkModal(true); setShowBulkMenu(false); }}
+              style={{ display: "block", width: "100%", padding: "10px 14px", background: "none", border: "none", cursor: "pointer", fontFamily: "'DM Sans', sans-serif", fontSize: 12, fontWeight: 600, color: "#1a1a1a", textAlign: "left" }}>
+              List from Closet
+            </button>
+            {activePriceItems.length > 0 && (
+              <button onClick={() => { setShowBulkPriceModal(true); setShowBulkMenu(false); }}
+                style={{ display: "block", width: "100%", padding: "10px 14px", background: "none", border: "none", borderTop: "1px solid #f0ece4", cursor: "pointer", fontFamily: "'DM Sans', sans-serif", fontSize: 12, fontWeight: 600, color: "#1a1a1a", textAlign: "left" }}>
+                Adjust Prices
+              </button>
+            )}
+          </div>
+        )}
+      </div>
     </div>
   );
 
   return (
-    <div className="fade-up">
-      {/* Stats row */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(120px, 1fr))", gap: 10, marginBottom: 20 }}>
-        {[
-          { label: "Drafts", value: drafts, bg: "#f5f3ef", color: "#888" },
-          { label: "Listed", value: listed, bg: "#f0faf4", color: "#2d6a3f" },
-          { label: "Pending", value: pending, bg: "#fff8ee", color: "#a07000" },
-          { label: "Sold", value: sold, bg: "#f5f0ff", color: "#7c6fe0" },
-          { label: "Earned", value: totalEarned > 0 ? `$${totalEarned.toFixed(0)}` : "—", bg: "#f0faf4", color: "#2d6a3f" },
-          { label: "Potential", value: potentialEarnings > 0 ? `$${potentialEarnings.toFixed(0)}` : "—", bg: "#fafaf8", color: "#888" },
-        ].map(s => (
-          <div key={s.label} style={{ background: s.bg, borderRadius: 14, padding: "12px 14px", textAlign: "center" }}>
-            <div style={{ fontSize: 20, fontWeight: 800, color: s.color }}>{s.value}</div>
-            <div style={{ fontSize: 10, fontWeight: 700, color: "#aaa", textTransform: "uppercase", letterSpacing: "0.07em", marginTop: 2 }}>{s.label}</div>
+    <div className="fade-up" style={{ display: "flex", gap: 24, alignItems: "flex-start" }}>
+      {leftPanel}
+      <div style={{ flex: 1, minWidth: 0 }}>
+        {topBar}
+        {/* Item list / grid */}
+        {forSaleItems.length === 0 ? (
+          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "80px 0 40px", gap: 14 }}>
+            <HangerIcon size={40} color="#ddd" />
+            <div style={{ fontSize: 18, fontWeight: 800, color: "#1a1a1a" }}>No items listed for sale</div>
+            <div style={{ fontSize: 13, color: "#aaa", textAlign: "center", maxWidth: 260 }}>Open any item in your closet and tap "List for Sale" to move it here, or use Bulk Actions to list multiple items.</div>
           </div>
-        ))}
+        ) : sortedFiltered.length === 0 ? (
+          <div style={{ textAlign: "center", padding: "40px 0", color: "#ccc", fontSize: 13, fontWeight: 600 }}>No items match this filter</div>
+        ) : viewMode === "grid" ? (
+          /* ── GRID VIEW ── */
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(140px, 1fr))", gap: 12 }}>
+            {sortedFiltered.map(item => {
+              const status = item.saleStatus || "listed";
+              const meta = SALE_STATUS_META[status] || SALE_STATUS_META.listed;
+              const days = getDaysListed(item);
+              const showDays = days !== null && (status === "listed" || status === "pending");
+              const dayStyle = showDays ? getDaysBadgeStyle(days) : null;
+              const salePrice = parseFloat((item.salePrice || "").replace(/[^0-9.]/g, "")) || 0;
+              return (
+                <div key={item.id} style={{ borderRadius: 16, overflow: "hidden", background: "#fff", border: "1.5px solid #e8e4dc", position: "relative", boxShadow: "0 2px 8px rgba(0,0,0,0.04)" }}>
+                  <div style={{ position: "absolute", top: 8, right: 8, zIndex: 2, background: meta.bg, border: `1px solid ${meta.border}`, borderRadius: 12, padding: "2px 7px", fontSize: 9, fontWeight: 700, color: meta.color }}>{meta.label}</div>
+                  {showDays && <div style={{ position: "absolute", top: 8, left: 8, zIndex: 2, background: dayStyle.bg, borderRadius: 12, padding: "2px 7px", fontSize: 9, fontWeight: 700, color: dayStyle.color }}>{days}d</div>}
+                  <div onClick={() => onViewItem(item)} style={{ aspectRatio: "1/1", background: "#f8f6f2", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                    {item.image ? <img src={item.image} alt={item.name} style={{ width: "100%", height: "100%", objectFit: "contain", padding: 8 }} /> : <HangerIcon size={28} color="#ddd" />}
+                  </div>
+                  <div style={{ padding: "8px 10px 10px" }}>
+                    <div style={{ fontSize: 11, fontWeight: 800, color: "#1a1a1a", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{item.name}</div>
+                    {item.brand && <div style={{ fontSize: 10, color: "#bbb", marginTop: 1 }}>{item.brand}</div>}
+                    <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 6 }}>
+                      {salePrice > 0 ? <span style={{ fontSize: 13, fontWeight: 800, color: "#2d6a3f" }}>${salePrice.toFixed(0)}</span> : <span style={{ fontSize: 11, color: "#ccc" }}>No price</span>}
+                      {item.salePlatform && <span style={{ fontSize: 9, background: "#f5f2ed", borderRadius: 6, padding: "1px 6px", color: "#777", fontWeight: 600 }}>{item.salePlatform}</span>}
+                    </div>
+                    {item.saleCondition && CONDITION_BADGE[item.saleCondition] && (() => { const cb = CONDITION_BADGE[item.saleCondition]; return <div style={{ marginTop: 5, display: "inline-block", background: cb.bg, border: `1px solid ${cb.border}`, borderRadius: 8, padding: "2px 7px", fontSize: 9, fontWeight: 700, color: cb.color }}>{item.saleCondition}</div>; })()}
+                    <div style={{ display: "flex", gap: 4, marginTop: 8 }}>
+                      <button onClick={() => { startEdit(item); setGridEditItem(item); }} style={{ flex: 1, padding: "5px 0", background: "#f5f2ed", border: "none", borderRadius: 6, cursor: "pointer", fontSize: 10, fontWeight: 700, color: "#555", fontFamily: "'DM Sans', sans-serif", display: "flex", alignItems: "center", justifyContent: "center", gap: 4 }}>
+                        <SvgEdit size={10} color="#555" /> Edit
+                      </button>
+                      {status !== "sold" && (
+                        <button onClick={() => openSoldConfirm(item)} style={{ flex: 1, padding: "5px 0", background: "#eff6ff", border: "1px solid #93c5fd", borderRadius: 6, cursor: "pointer", fontSize: 10, fontWeight: 700, color: "#2563eb", fontFamily: "'DM Sans', sans-serif", display: "flex", alignItems: "center", justifyContent: "center", gap: 4 }}>
+                          <SvgTag size={10} color="#2563eb" /> Sold
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        ) : (
+          /* ── LIST VIEW ── */
+          <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+            {sortedFiltered.map(item => {
+              const status = item.saleStatus || "listed";
+              const meta = SALE_STATUS_META[status] || SALE_STATUS_META.listed;
+              const origPrice = parseFloat((item.price || "").replace(/[^0-9.]/g, "")) || 0;
+              const salePrice = parseFloat((item.salePrice || "").replace(/[^0-9.]/g, "")) || 0;
+              const isEditing = editingId === item.id;
+              const days = getDaysListed(item);
+              const showDays = days !== null && (status === "listed" || status === "pending");
+              const dayStyle = showDays ? getDaysBadgeStyle(days) : null;
+              return (
+                <div key={item.id} style={{ background: "#fff", borderRadius: 18, border: "1.5px solid #e8e4dc", overflow: "hidden", boxShadow: "0 2px 10px rgba(0,0,0,0.04)", display: "flex" }}>
+                  <div onClick={() => onViewItem(item)} style={{ width: 100, flexShrink: 0, background: item.image ? `url(${item.image}) center/contain no-repeat #f8f6f2` : "#f8f6f2", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                    {!item.image && <HangerIcon size={28} color="#ddd" />}
+                  </div>
+                  <div style={{ flex: 1, padding: "14px 16px", display: "flex", flexDirection: "column", gap: 8, minWidth: 0 }}>
+                    <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 8 }}>
+                      <div style={{ minWidth: 0 }}>
+                        <div style={{ fontSize: 14, fontWeight: 800, color: "#1a1a1a", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{item.name}</div>
+                        {item.brand && <div style={{ fontSize: 12, color: "#aaa", marginTop: 1 }}>{item.brand}</div>}
+                      </div>
+                      <select value={status} onChange={e => { if (e.target.value === "sold") { openSoldConfirm(item); } else updateItem(item, { saleStatus: e.target.value, ...(e.target.value === "listed" ? { listedDate: item.listedDate || new Date().toISOString().slice(0,10) } : {}) }); }}
+                        style={{ padding: "4px 32px 4px 10px", border: `1.5px solid ${meta.border}`, borderRadius: 20, color: meta.color, fontSize: 11, fontWeight: 700, fontFamily: "'DM Sans', sans-serif", cursor: "pointer", flexShrink: 0, appearance: "none", WebkitAppearance: "none", backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2.5' stroke-linecap='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E")`, backgroundRepeat: "no-repeat", backgroundPosition: "right 9px center", backgroundColor: meta.bg }}>
+                        {SALE_STATUSES.map(s => <option key={s} value={s}>{SALE_STATUS_META[s].label}</option>)}
+                      </select>
+                    </div>
+                    <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+                      {origPrice > 0 && <span style={{ fontSize: 12, color: "#bbb", textDecoration: "line-through" }}>${origPrice.toFixed(0)}</span>}
+                      {salePrice > 0 && <span style={{ fontSize: 14, fontWeight: 800, color: "#2d6a3f" }}>${salePrice.toFixed(0)}</span>}
+                      {item.salePlatform && <span style={{ fontSize: 11, background: "#f5f2ed", borderRadius: 8, padding: "2px 8px", color: "#666", fontWeight: 600 }}>{item.salePlatform}</span>}
+                      {origPrice > 0 && salePrice > 0 && origPrice > salePrice && <span style={{ fontSize: 11, color: "#e05555", fontWeight: 700 }}>-{Math.round((1 - salePrice/origPrice)*100)}%</span>}
+                      {item.shippingCost && <span style={{ fontSize: 11, color: "#aaa" }}>ship: ${item.shippingCost}</span>}
+                      {showDays && <span style={{ fontSize: 11, fontWeight: 700, color: dayStyle.color, background: dayStyle.bg, borderRadius: 8, padding: "2px 8px" }}>{days}d listed</span>}
+                      {item.saleCondition && CONDITION_BADGE[item.saleCondition] && (() => { const cb = CONDITION_BADGE[item.saleCondition]; return <span style={{ fontSize: 11, fontWeight: 700, color: cb.color, background: cb.bg, border: `1px solid ${cb.border}`, borderRadius: 8, padding: "2px 8px" }}>{item.saleCondition}</span>; })()}
+                    </div>
+                    {isEditing ? (
+                      <>
+                        {editFormFields(item)}
+                        <div style={{ display: "flex", gap: 8 }}>
+                          <button onClick={() => saveEdit(item)} style={{ flex: 1, padding: "7px", background: "#1a1a1a", color: "#fff", border: "none", borderRadius: 10, cursor: "pointer", fontSize: 12, fontWeight: 700, fontFamily: "'DM Sans', sans-serif" }}>Save</button>
+                          <button onClick={() => setEditingId(null)} style={{ flex: 1, padding: "7px", background: "#f5f2ed", border: "none", borderRadius: 10, cursor: "pointer", fontSize: 12, fontWeight: 700, color: "#888", fontFamily: "'DM Sans', sans-serif" }}>Cancel</button>
+                        </div>
+                      </>
+                    ) : (
+                      <>
+                        {item.saleDescription && <div style={{ fontSize: 11, color: "#555", lineHeight: 1.5, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{item.saleDescription}</div>}
+                        {item.saleUrl && <a href={item.saleUrl} target="_blank" rel="noopener noreferrer" style={{ fontSize: 11, color: "#7c6fe0", textDecoration: "none", fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", display: "block" }}>↗ View Listing</a>}
+                        {item.saleNotes && <div style={{ fontSize: 11, color: "#888", fontStyle: "italic" }}>{item.saleNotes}</div>}
+                        {item.soldDate && <div style={{ fontSize: 11, color: "#7c6fe0", fontWeight: 600 }}>Sold {new Date(item.soldDate + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}{item.netRevenue ? ` · Net $${parseFloat(item.netRevenue).toFixed(0)}` : ""}</div>}
+                        <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginTop: 2 }}>
+                          <button onClick={() => startEdit(item)} style={{ padding: "5px 11px", background: "#f5f2ed", border: "none", borderRadius: 8, cursor: "pointer", fontSize: 11, fontWeight: 700, color: "#555", fontFamily: "'DM Sans', sans-serif", display: "flex", alignItems: "center", gap: 5 }}>
+                            <SvgEdit size={11} color="#555" /> Edit
+                          </button>
+                          {status !== "sold" && (
+                            <button onClick={() => openSoldConfirm(item)} style={{ padding: "5px 11px", background: "#eff6ff", border: "1.5px solid #93c5fd", borderRadius: 8, cursor: "pointer", fontSize: 11, fontWeight: 700, color: "#2563eb", fontFamily: "'DM Sans', sans-serif", display: "flex", alignItems: "center", gap: 5 }}>
+                              <SvgTag size={11} color="#2563eb" /> Mark Sold
+                            </button>
+                          )}
+                          {status === "draft" && (
+                            <button onClick={() => updateItem(item, { saleStatus: "listed", listedDate: new Date().toISOString().slice(0,10) })} style={{ padding: "5px 11px", background: "#f0faf4", border: "1.5px solid #b6e8c8", borderRadius: 8, cursor: "pointer", fontSize: 11, fontWeight: 700, color: "#2d6a3f", fontFamily: "'DM Sans', sans-serif", display: "flex", alignItems: "center", gap: 5 }}>
+                              → List Now
+                            </button>
+                          )}
+                          <button onClick={() => moveBackToCloset(item)} style={{ padding: "5px 11px", background: "#f5f3ef", border: "none", borderRadius: 8, cursor: "pointer", fontSize: 11, fontWeight: 700, color: "#777", fontFamily: "'DM Sans', sans-serif", display: "flex", alignItems: "center", gap: 5 }}>
+                            <HangerIcon size={12} color="#999" /> Back to Closet
+                          </button>
+                        </div>
+                      </>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
       </div>
 
-      {/* Earned vs spent bar */}
-      {totalSpent > 0 && (
-        <div style={{ background: "#fff", borderRadius: 16, border: "1.5px solid #e8e4dc", padding: "16px 18px", marginBottom: 14 }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 10 }}>
-            <span style={{ fontSize: 13, fontWeight: 800, color: "#1a1a1a" }}>Wardrobe Payback</span>
-            <span style={{ fontSize: 13, fontWeight: 800, color: "#7c6fe0" }}>{earnedPct.toFixed(1)}% recouped</span>
-          </div>
-          <div style={{ height: 8, borderRadius: 8, background: "#e8e4dc", overflow: "hidden", marginBottom: 8 }}>
-            <div style={{ height: "100%", borderRadius: 8, background: "linear-gradient(90deg, #7c6fe0, #3aaa6e)", width: earnedPct + "%", transition: "width 0.5s" }} />
-          </div>
-          <div style={{ display: "flex", justifyContent: "space-between" }}>
-            <span style={{ fontSize: 11, color: "#aaa" }}>Sold: <strong style={{ color: "#2d6a3f" }}>${totalEarned.toFixed(0)}</strong></span>
-            <span style={{ fontSize: 11, color: "#aaa" }}>Total spent: <strong style={{ color: "#1a1a1a" }}>${totalSpent.toFixed(0)}</strong></span>
-          </div>
-          {avgDaysToSell !== null && (
-            <div style={{ marginTop: 10, paddingTop: 10, borderTop: "1px solid #f0ece4", fontSize: 12, color: "#888" }}>
-              ⏱ Avg time to sell: <strong style={{ color: "#1a1a1a" }}>{avgDaysToSell} days</strong>
+      {/* Bulk List Modal */}
+      {showBulkModal && <BulkListModal items={bulkFiltered} search={bulkSearch} setSearch={setBulkSearch} selected={bulkSelected} setSelected={setBulkSelectedLocal} platform={bulkPlatform} setPlatform={setBulkPlatform} condition={bulkCondition} setCondition={setBulkCondition} price={bulkPrice} setPrice={setBulkPrice} platforms={PLATFORMS} onApply={applyBulkList} onClose={() => setShowBulkModal(false)} />}
+      {/* Bulk Price Modal */}
+      {showBulkPriceModal && <BulkPriceModal items={activePriceItems} selected={bulkPriceSelected} setSelected={setBulkPriceSelected} discountPct={bulkDiscountPct} setDiscountPct={setBulkDiscountPct} onApply={applyBulkPrice} onClose={() => { setShowBulkPriceModal(false); setBulkPriceSelected(new Set()); setBulkDiscountPct(10); }} />}
+
+      {/* Grid Edit Modal */}
+      {gridEditItem && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.2)", zIndex: 99999, display: "flex", alignItems: "center", justifyContent: "center" }}
+          onClick={() => setGridEditItem(null)}>
+          <div onClick={e => e.stopPropagation()} style={{ background: "#fff", borderRadius: 22, padding: "24px", width: 420, maxHeight: "88vh", overflowY: "auto", boxShadow: "0 20px 60px rgba(0,0,0,0.18)", fontFamily: "'DM Sans', sans-serif" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 20 }}>
+              {gridEditItem.image && <img src={gridEditItem.image} alt={gridEditItem.name} style={{ width: 44, height: 44, borderRadius: 10, objectFit: "contain", background: "#f8f6f2", border: "1px solid #e8e4dc" }} />}
+              <div>
+                <div style={{ fontSize: 15, fontWeight: 800, color: "#1a1a1a" }}>{gridEditItem.name}</div>
+                {gridEditItem.brand && <div style={{ fontSize: 12, color: "#aaa" }}>{gridEditItem.brand}</div>}
+              </div>
             </div>
-          )}
+            {editFormFields(gridEditItem)}
+            <div style={{ display: "flex", gap: 8, marginTop: 16 }}>
+              <button onClick={() => { saveEdit(gridEditItem); setGridEditItem(null); }} style={{ flex: 1, padding: "10px", background: "#1a1a1a", color: "#fff", border: "none", borderRadius: 12, cursor: "pointer", fontSize: 13, fontWeight: 700 }}>Save</button>
+              <button onClick={() => setGridEditItem(null)} style={{ padding: "10px 18px", background: "#f5f3ef", color: "#888", border: "none", borderRadius: 12, cursor: "pointer", fontSize: 13, fontWeight: 700 }}>Cancel</button>
+            </div>
+          </div>
         </div>
       )}
 
-      {/* Sold history chart */}
-      {sold > 0 && (() => {
-        const soldItems = forSaleItems.filter(i => i.saleStatus === "sold" && i.soldDate);
-        const byMonth = {};
-        soldItems.forEach(i => {
-          const m = i.soldDate.slice(0, 7);
-          if (!byMonth[m]) byMonth[m] = { count: 0, revenue: 0 };
-          byMonth[m].count++;
-          byMonth[m].revenue += parseFloat((i.netRevenue || i.salePrice||"").replace(/[^0-9.]/g,""))||0;
-        });
-        const months = Object.keys(byMonth).sort().slice(-6);
-        const maxRev = Math.max(...months.map(m => byMonth[m].revenue), 1);
+      {/* Sold Confirmation Modal */}
+      {soldConfirmItem && (() => {
+        const spNum = parseFloat(soldPrice || 0) || 0;
+        const shipNum = parseFloat(soldShipping || 0) || 0;
+        const feeCalc = PLATFORM_FEE_CALC[soldPlatform];
+        const platformFee = feeCalc ? feeCalc(spNum) : 0;
+        const netAfterAll = spNum - shipNum - platformFee;
         return (
-          <div style={{ background: "#fff", borderRadius: 16, border: "1.5px solid #e8e4dc", padding: "16px 18px", marginBottom: 18 }}>
-            <div style={{ fontSize: 13, fontWeight: 800, color: "#1a1a1a", marginBottom: 14 }}><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{marginRight:6,verticalAlign:"middle"}}><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>Sales History</div>
-            <div style={{ display: "flex", alignItems: "flex-end", gap: 10, height: 70 }}>
-              {months.map(m => {
-                const d = new Date(m + "-01T00:00:00");
-                const label = d.toLocaleDateString("en-US", { month: "short" });
-                return (
-                  <div key={m} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 3 }}>
-                    <div style={{ fontSize: 9, color: "#7c6fe0", fontWeight: 700 }}>${byMonth[m].revenue.toFixed(0)}</div>
-                    <div style={{ width: "100%", background: "#7c6fe0", borderRadius: "4px 4px 0 0", height: `${Math.max(4, (byMonth[m].revenue / maxRev) * 44)}px` }} />
-                    <div style={{ fontSize: 9, color: "#aaa", fontWeight: 600 }}>{label}</div>
+          <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", zIndex: 99999, display: "flex", alignItems: "center", justifyContent: "center" }}
+            onClick={() => setSoldConfirmItem(null)}>
+            <div onClick={e => e.stopPropagation()} style={{ background: "#fff", borderRadius: 22, padding: "28px", width: 380, boxShadow: "0 20px 60px rgba(0,0,0,0.2)", fontFamily: "'DM Sans', sans-serif" }}>
+              <div style={{ fontSize: 17, fontWeight: 800, color: "#1a1a1a", marginBottom: 4 }}>🎉 Mark as Sold</div>
+              <div style={{ fontSize: 13, color: "#888", marginBottom: 20 }}>{soldConfirmItem.name}</div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 20 }}>
+                <div><label style={{ fontSize: 11, fontWeight: 700, color: "#aaa", textTransform: "uppercase", letterSpacing: "0.07em", display: "block", marginBottom: 4 }}>Final Sale Price</label>
+                  <input value={soldPrice} onChange={e => setSoldPrice(e.target.value)} placeholder="e.g. 35" style={{ width: "100%", padding: "9px 12px", border: "1.5px solid #e8e4dc", borderRadius: 10, fontFamily: "'DM Sans', sans-serif", fontSize: 13, outline: "none", boxSizing: "border-box" }} /></div>
+                <div><label style={{ fontSize: 11, fontWeight: 700, color: "#aaa", textTransform: "uppercase", letterSpacing: "0.07em", display: "block", marginBottom: 4 }}>Platform</label>
+                  <select value={soldPlatform} onChange={e => setSoldPlatform(e.target.value)} style={{ width: "100%", padding: "9px 28px 9px 12px", border: "1.5px solid #e8e4dc", borderRadius: 10, fontFamily: "'DM Sans', sans-serif", fontSize: 13, outline: "none" }}>
+                    <option value="">Select platform…</option>
+                    {PLATFORMS.map(p => <option key={p} value={p}>{p}</option>)}
+                  </select>
+                  {soldPlatform && PLATFORM_FEE_LABELS[soldPlatform] && <div style={{ fontSize: 10, color: "#aaa", marginTop: 4 }}>Fee: {PLATFORM_FEE_LABELS[soldPlatform]}</div>}
+                </div>
+                <div><label style={{ fontSize: 11, fontWeight: 700, color: "#aaa", textTransform: "uppercase", letterSpacing: "0.07em", display: "block", marginBottom: 4 }}>Shipping Cost</label>
+                  <input value={soldShipping} onChange={e => setSoldShipping(e.target.value)} placeholder="e.g. 4.50" style={{ width: "100%", padding: "9px 12px", border: "1.5px solid #e8e4dc", borderRadius: 10, fontFamily: "'DM Sans', sans-serif", fontSize: 13, outline: "none", boxSizing: "border-box" }} /></div>
+                <div><label style={{ fontSize: 11, fontWeight: 700, color: "#aaa", textTransform: "uppercase", letterSpacing: "0.07em", display: "block", marginBottom: 4 }}>Date Sold</label>
+                  <input type="date" value={soldDate} onChange={e => setSoldDate(e.target.value)} style={{ width: "100%", padding: "9px 12px", border: "1.5px solid #e8e4dc", borderRadius: 10, fontFamily: "'DM Sans', sans-serif", fontSize: 13, outline: "none", boxSizing: "border-box" }} /></div>
+                {spNum > 0 && (
+                  <div style={{ background: "#f0faf4", borderRadius: 10, padding: "12px 14px" }}>
+                    <div style={{ fontSize: 12, color: "#555", marginBottom: 6, fontWeight: 700 }}>Earnings Breakdown</div>
+                    <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, color: "#555" }}><span>Sale price</span><span style={{ fontWeight: 700 }}>${spNum.toFixed(2)}</span></div>
+                      {shipNum > 0 && <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, color: "#888" }}><span>Shipping</span><span>-${shipNum.toFixed(2)}</span></div>}
+                      {platformFee > 0 && <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, color: "#888" }}><span>{soldPlatform} fee</span><span>-${platformFee.toFixed(2)}</span></div>}
+                      <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13, color: "#2d6a3f", fontWeight: 800, borderTop: "1px solid #d8f0e4", paddingTop: 6, marginTop: 2 }}><span>Net earnings</span><span>${netAfterAll.toFixed(2)}</span></div>
+                    </div>
                   </div>
-                );
-              })}
+                )}
+              </div>
+              <label style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 14, cursor: "pointer" }}>
+                <input type="checkbox" checked={soldRemoveFromCloset} onChange={e => setSoldRemoveFromCloset(e.target.checked)} style={{ width: 15, height: 15, accentColor: "#7c6fe0", cursor: "pointer" }} />
+                <span style={{ fontSize: 12, color: "#555", fontWeight: 600 }}>Remove from my active closet</span>
+              </label>
+              <div style={{ display: "flex", gap: 8 }}>
+                <button onClick={confirmSold} style={{ flex: 1, padding: "11px", background: "#7c6fe0", color: "#fff", border: "none", borderRadius: 12, cursor: "pointer", fontSize: 13, fontWeight: 700 }}>Confirm Sale</button>
+                <button onClick={() => setSoldConfirmItem(null)} style={{ padding: "11px 18px", background: "#f5f3ef", color: "#888", border: "none", borderRadius: 12, cursor: "pointer", fontSize: 13, fontWeight: 700 }}>Cancel</button>
+              </div>
             </div>
           </div>
         );
       })()}
-
-      {/* Toolbar */}
-      <div style={{ display: "flex", gap: 8, marginBottom: 16, flexWrap: "wrap", alignItems: "center" }}>
-        <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search listings…"
-          style={{ flex: "1 1 160px", padding: "8px 14px", border: "1.5px solid #e8e4dc", borderRadius: 12, fontFamily: "'DM Sans', sans-serif", fontSize: 13, outline: "none", background: "#faf9f6" }} />
-        <div style={{ display: "flex", background: "#f5f2ed", borderRadius: 10, padding: 3, gap: 2 }}>
-          {[["all", "All"], ...SALE_STATUSES.map(s => [s, SALE_STATUS_META[s].label])].map(([val, lbl]) => (
-            <button key={val} onClick={() => setStatusFilter(val)} style={{
-              padding: "5px 10px", border: "none", borderRadius: 8, cursor: "pointer",
-              background: statusFilter === val ? "#fff" : "transparent",
-              color: statusFilter === val ? "#1a1a1a" : "#aaa",
-              fontFamily: "'DM Sans', sans-serif", fontSize: 11, fontWeight: 700,
-              boxShadow: statusFilter === val ? "0 1px 4px rgba(0,0,0,0.08)" : "none"
-            }}>{lbl}</button>
-          ))}
-        </div>
-        <button onClick={() => setShowBulkModal(true)} style={{ padding: "8px 14px", background: "#fff8ee", border: "1.5px solid #f5c842", borderRadius: 10, cursor: "pointer", fontFamily: "'DM Sans', sans-serif", fontSize: 12, fontWeight: 700, color: "#a07000", whiteSpace: "nowrap" }}>
-          + Bulk List
-        </button>
-      </div>
-
-      {/* Listings */}
-      {filtered.length === 0 ? (
-        <div style={{ textAlign: "center", padding: "40px 0", color: "#ccc", fontSize: 13, fontWeight: 600 }}>No items match this filter</div>
-      ) : (
-        <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-          {filtered.map(item => {
-            const status = item.saleStatus || "listed";
-            const meta = SALE_STATUS_META[status] || SALE_STATUS_META.listed;
-            const origPrice = parseFloat((item.price || "").replace(/[^0-9.]/g, "")) || 0;
-            const salePrice = parseFloat((item.salePrice || "").replace(/[^0-9.]/g, "")) || 0;
-            const isEditing = editingId === item.id;
-            return (
-              <div key={item.id} style={{ background: "#fff", borderRadius: 18, border: "1.5px solid #e8e4dc", overflow: "hidden", boxShadow: "0 2px 10px rgba(0,0,0,0.04)", display: "flex" }}>
-                {/* Image */}
-                <div onClick={() => onViewItem(item)} style={{ width: 100, flexShrink: 0, background: item.image ? `url(${item.image}) center/contain no-repeat #f8f6f2` : "#f8f6f2", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                  {!item.image && <HangerIcon size={28} color="#ddd" />}
-                </div>
-
-                {/* Info */}
-                <div style={{ flex: 1, padding: "14px 16px", display: "flex", flexDirection: "column", gap: 8, minWidth: 0 }}>
-                  <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 8 }}>
-                    <div style={{ minWidth: 0 }}>
-                      <div style={{ fontSize: 14, fontWeight: 800, color: "#1a1a1a", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{item.name}</div>
-                      {item.brand && <div style={{ fontSize: 12, color: "#aaa", marginTop: 1 }}>{item.brand}</div>}
-                    </div>
-                    <select value={status} onChange={e => {
-                      if (e.target.value === "sold") { openSoldConfirm(item); }
-                      else updateItem(item, { saleStatus: e.target.value, ...(e.target.value === "listed" ? { listedDate: item.listedDate || new Date().toISOString().slice(0,10) } : {}) });
-                    }}
-                      style={{ padding: "4px 10px", background: meta.bg, border: `1.5px solid ${meta.border}`, borderRadius: 20, color: meta.color, fontSize: 11, fontWeight: 700, fontFamily: "'DM Sans', sans-serif", cursor: "pointer", flexShrink: 0 }}>
-                      {SALE_STATUSES.map(s => <option key={s} value={s}>{SALE_STATUS_META[s].label}</option>)}
-                    </select>
-                  </div>
-
-                  {/* Prices row */}
-                  <div style={{ display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
-                    {origPrice > 0 && <span style={{ fontSize: 12, color: "#bbb", textDecoration: "line-through" }}>${origPrice.toFixed(0)} orig</span>}
-                    {salePrice > 0 && <span style={{ fontSize: 14, fontWeight: 800, color: "#2d6a3f" }}>${salePrice.toFixed(0)}</span>}
-                    {item.salePlatform && <span style={{ fontSize: 11, background: "#f5f2ed", borderRadius: 8, padding: "2px 8px", color: "#666", fontWeight: 600 }}>{item.salePlatform}</span>}
-                    {origPrice > 0 && salePrice > 0 && origPrice > salePrice && (
-                      <span style={{ fontSize: 11, color: "#e05555", fontWeight: 700 }}>-{Math.round((1 - salePrice/origPrice)*100)}%</span>
-                    )}
-                    {item.shippingCost && <span style={{ fontSize: 11, color: "#aaa" }}>ship: ${item.shippingCost}</span>}
-                  </div>
-
-                  {/* Edit form */}
-                  {isEditing ? (
-                    <div style={{ display: "flex", flexDirection: "column", gap: 8, marginTop: 4 }}>
-                      <div style={{ display: "flex", gap: 8 }}>
-                        <input value={editVals.salePrice} onChange={e => setEditVals(v => ({ ...v, salePrice: e.target.value }))}
-                          placeholder="Sale price (e.g. 25)"
-                          style={{ flex: 1, padding: "7px 10px", border: "1.5px solid #e8e4dc", borderRadius: 10, fontFamily: "'DM Sans', sans-serif", fontSize: 12 }} />
-                        <select value={editVals.salePlatform} onChange={e => setEditVals(v => ({ ...v, salePlatform: e.target.value }))}
-                          style={{ flex: 1, padding: "7px 10px", border: "1.5px solid #e8e4dc", borderRadius: 10, fontFamily: "'DM Sans', sans-serif", fontSize: 12 }}>
-                          <option value="">Platform…</option>
-                          {PLATFORMS.map(p => <option key={p} value={p}>{p}</option>)}
-                        </select>
-                      </div>
-                      <input value={editVals.saleNotes} onChange={e => setEditVals(v => ({ ...v, saleNotes: e.target.value }))}
-                        placeholder="Notes (e.g. listing URL, condition)"
-                        style={{ padding: "7px 10px", border: "1.5px solid #e8e4dc", borderRadius: 10, fontFamily: "'DM Sans', sans-serif", fontSize: 12 }} />
-                      <div style={{ display: "flex", gap: 8 }}>
-                        <button onClick={() => saveEdit(item)} style={{ flex: 1, padding: "7px", background: "#1a1a1a", color: "#fff", border: "none", borderRadius: 10, cursor: "pointer", fontSize: 12, fontWeight: 700, fontFamily: "'DM Sans', sans-serif" }}>Save</button>
-                        <button onClick={() => setEditingId(null)} style={{ flex: 1, padding: "7px", background: "#f5f2ed", border: "none", borderRadius: 10, cursor: "pointer", fontSize: 12, fontWeight: 700, color: "#888", fontFamily: "'DM Sans', sans-serif" }}>Cancel</button>
-                      </div>
-                    </div>
-                  ) : (
-                    <>
-                      {item.saleNotes && <div style={{ fontSize: 11, color: "#888", fontStyle: "italic" }}>{item.saleNotes}</div>}
-                      {item.soldDate && <div style={{ fontSize: 11, color: "#7c6fe0", fontWeight: 600 }}>Sold {new Date(item.soldDate + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}{item.netRevenue ? ` · Net $${parseFloat(item.netRevenue).toFixed(0)}` : ""}</div>}
-                      {/* Actions */}
-                      <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginTop: 2 }}>
-                        <button onClick={() => startEdit(item)} style={{ padding: "5px 12px", background: "#f5f2ed", border: "none", borderRadius: 8, cursor: "pointer", fontSize: 11, fontWeight: 700, color: "#555", fontFamily: "'DM Sans', sans-serif" }}>✏ Edit</button>
-                        {status !== "sold" && (
-                          <button onClick={() => openSoldConfirm(item)} style={{ padding: "5px 12px", background: "#f5f0ff", border: "1.5px solid #c4b0f0", borderRadius: 8, cursor: "pointer", fontSize: 11, fontWeight: 700, color: "#7c6fe0", fontFamily: "'DM Sans', sans-serif" }}>
-                            <SvgCheck size={11} color="#7c6fe0" style={{marginRight:4}} />Mark Sold
-                          </button>
-                        )}
-                        {status === "draft" && (
-                          <button onClick={() => updateItem(item, { saleStatus: "listed", listedDate: new Date().toISOString().slice(0,10) })} style={{ padding: "5px 12px", background: "#f0faf4", border: "1.5px solid #b6e8c8", borderRadius: 8, cursor: "pointer", fontSize: 11, fontWeight: 700, color: "#2d6a3f", fontFamily: "'DM Sans', sans-serif" }}>
-                            → List Now
-                          </button>
-                        )}
-                        <button onClick={() => moveBackToCloset(item)} style={{ padding: "5px 12px", background: "#fef2f2", border: "none", borderRadius: 8, cursor: "pointer", fontSize: 11, fontWeight: 700, color: "#e05555", fontFamily: "'DM Sans', sans-serif" }}>↩ Back to Closet</button>
-                      </div>
-                    </>
-                  )}
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      )}
-
-      {/* Bulk List Modal */}
-      {showBulkModal && <BulkListModal items={bulkFiltered} search={bulkSearch} setSearch={setBulkSearch} selected={bulkSelected} setSelected={setBulkSelectedLocal} platform={bulkPlatform} setPlatform={setBulkPlatform} condition={bulkCondition} setCondition={setBulkCondition} price={bulkPrice} setPrice={setBulkPrice} platforms={PLATFORMS} onApply={applyBulkList} onClose={() => setShowBulkModal(false)} />}
-
-      {/* Sold Confirmation Modal */}
-      {soldConfirmItem && (
-        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", zIndex: 99999, display: "flex", alignItems: "center", justifyContent: "center" }}
-          onClick={() => setSoldConfirmItem(null)}>
-          <div onClick={e => e.stopPropagation()} style={{ background: "#fff", borderRadius: 22, padding: "28px", width: 360, boxShadow: "0 20px 60px rgba(0,0,0,0.2)", fontFamily: "'DM Sans', sans-serif" }}>
-            <div style={{ fontSize: 17, fontWeight: 800, color: "#1a1a1a", marginBottom: 4 }}>🎉 Mark as Sold</div>
-            <div style={{ fontSize: 13, color: "#888", marginBottom: 20 }}>{soldConfirmItem.name}</div>
-            <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 20 }}>
-              <div>
-                <label style={{ fontSize: 11, fontWeight: 700, color: "#aaa", textTransform: "uppercase", letterSpacing: "0.07em", display: "block", marginBottom: 4 }}>Final Sale Price</label>
-                <input value={soldPrice} onChange={e => setSoldPrice(e.target.value)} placeholder="e.g. 35"
-                  style={{ width: "100%", padding: "9px 12px", border: "1.5px solid #e8e4dc", borderRadius: 10, fontFamily: "'DM Sans', sans-serif", fontSize: 13, outline: "none", boxSizing: "border-box" }} />
-              </div>
-              <div>
-                <label style={{ fontSize: 11, fontWeight: 700, color: "#aaa", textTransform: "uppercase", letterSpacing: "0.07em", display: "block", marginBottom: 4 }}>Platform</label>
-                <select value={soldPlatform} onChange={e => setSoldPlatform(e.target.value)}
-                  style={{ width: "100%", padding: "9px 12px", border: "1.5px solid #e8e4dc", borderRadius: 10, fontFamily: "'DM Sans', sans-serif", fontSize: 13, outline: "none" }}>
-                  <option value="">Select platform…</option>
-                  {["Depop", "Poshmark", "eBay", "Mercari", "ThredUp", "Facebook", "Instagram", "Vinted", "Other"].map(p => <option key={p} value={p}>{p}</option>)}
-                </select>
-              </div>
-              <div>
-                <label style={{ fontSize: 11, fontWeight: 700, color: "#aaa", textTransform: "uppercase", letterSpacing: "0.07em", display: "block", marginBottom: 4 }}>Shipping Cost (optional)</label>
-                <input value={soldShipping} onChange={e => setSoldShipping(e.target.value)} placeholder="e.g. 4.50"
-                  style={{ width: "100%", padding: "9px 12px", border: "1.5px solid #e8e4dc", borderRadius: 10, fontFamily: "'DM Sans', sans-serif", fontSize: 13, outline: "none", boxSizing: "border-box" }} />
-              </div>
-              <div>
-                <label style={{ fontSize: 11, fontWeight: 700, color: "#aaa", textTransform: "uppercase", letterSpacing: "0.07em", display: "block", marginBottom: 4 }}>Date Sold</label>
-                <input type="date" value={soldDate} onChange={e => setSoldDate(e.target.value)}
-                  style={{ width: "100%", padding: "9px 12px", border: "1.5px solid #e8e4dc", borderRadius: 10, fontFamily: "'DM Sans', sans-serif", fontSize: 13, outline: "none", boxSizing: "border-box" }} />
-              </div>
-              {soldPrice && soldShipping && (
-                <div style={{ background: "#f0faf4", borderRadius: 10, padding: "10px 14px", fontSize: 13, color: "#2d6a3f", fontWeight: 700 }}>
-                  Net: ${(parseFloat(soldPrice||0) - parseFloat(soldShipping||0)).toFixed(2)} after shipping
-                </div>
-              )}
-            </div>
-            <div style={{ display: "flex", gap: 8 }}>
-              <button onClick={confirmSold} style={{ flex: 1, padding: "11px", background: "#7c6fe0", color: "#fff", border: "none", borderRadius: 12, cursor: "pointer", fontSize: 13, fontWeight: 700 }}>Confirm Sale</button>
-              <button onClick={() => setSoldConfirmItem(null)} style={{ padding: "11px 18px", background: "#f5f3ef", color: "#888", border: "none", borderRadius: 12, cursor: "pointer", fontSize: 13, fontWeight: 700 }}>Cancel</button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
@@ -6535,7 +6700,7 @@ function BulkListModal({ items, search, setSearch, selected, setSelected, platfo
     setSelected(next);
   };
   return (
-    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", zIndex: 99999, display: "flex", alignItems: "center", justifyContent: "center" }}
+    <div style={{ position: "fixed", inset: 0, zIndex: 99999, display: "flex", alignItems: "center", justifyContent: "center" }}
       onClick={onClose}>
       <div onClick={e => e.stopPropagation()} style={{ background: "#fff", borderRadius: 22, width: "min(720px, 95vw)", maxHeight: "86vh", display: "flex", flexDirection: "column", boxShadow: "0 20px 60px rgba(0,0,0,0.2)", fontFamily: "'DM Sans', sans-serif" }}>
         {/* Header */}
@@ -6591,6 +6756,71 @@ function BulkListModal({ items, search, setSearch, selected, setSelected, platfo
               List {selected.size > 0 ? selected.size : ""} Item{selected.size !== 1 ? "s" : ""}
             </button>
           </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function BulkPriceModal({ items, selected, setSelected, discountPct, setDiscountPct, onApply, onClose }) {
+  const toggle = (id) => {
+    const next = new Set(selected);
+    if (next.has(id)) next.delete(id); else next.add(id);
+    setSelected(next);
+  };
+  const toggleAll = () => {
+    if (selected.size === items.length) setSelected(new Set());
+    else setSelected(new Set(items.map(i => i.id)));
+  };
+  return (
+    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", zIndex: 99999, display: "flex", alignItems: "center", justifyContent: "center" }}
+      onClick={onClose}>
+      <div onClick={e => e.stopPropagation()} style={{ background: "#fff", borderRadius: 22, width: "min(560px, 95vw)", maxHeight: "82vh", display: "flex", flexDirection: "column", boxShadow: "0 20px 60px rgba(0,0,0,0.2)", fontFamily: "'DM Sans', sans-serif" }}>
+        {/* Header */}
+        <div style={{ padding: "22px 24px 16px", borderBottom: "1px solid #e8e4dc" }}>
+          <div style={{ fontSize: 17, fontWeight: 800, marginBottom: 2 }}>Bulk Price Editor</div>
+          <div style={{ fontSize: 13, color: "#aaa", marginBottom: 14 }}>Drop prices on selected listings by a percentage.</div>
+          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+            <label style={{ fontSize: 12, fontWeight: 700, color: "#555" }}>Discount %</label>
+            <input type="number" min={1} max={90} value={discountPct} onChange={e => setDiscountPct(Math.min(90, Math.max(1, parseInt(e.target.value) || 1)))}
+              style={{ width: 70, padding: "7px 10px", border: "1.5px solid #e8e4dc", borderRadius: 10, fontFamily: "'DM Sans', sans-serif", fontSize: 14, fontWeight: 700, outline: "none", textAlign: "center" }} />
+            <span style={{ fontSize: 13, color: "#888" }}>off current price</span>
+            <button onClick={toggleAll} style={{ marginLeft: "auto", padding: "5px 12px", background: "#f5f2ed", border: "none", borderRadius: 8, cursor: "pointer", fontSize: 11, fontWeight: 700, color: "#555", fontFamily: "'DM Sans', sans-serif" }}>
+              {selected.size === items.length ? "Deselect All" : "Select All"}
+            </button>
+          </div>
+        </div>
+        {/* Items list */}
+        <div style={{ flex: 1, overflowY: "auto", padding: "14px 24px", display: "flex", flexDirection: "column", gap: 8 }}>
+          {items.map(item => {
+            const isSelected = selected.has(item.id);
+            const currentPrice = parseFloat((item.salePrice || "").replace(/[^0-9.]/g, "")) || 0;
+            const newPrice = Math.round(currentPrice * (1 - discountPct / 100));
+            return (
+              <div key={item.id} onClick={() => toggle(item.id)} style={{ display: "flex", alignItems: "center", gap: 10, padding: "9px 12px", border: `1.5px solid ${isSelected ? "#7c6fe0" : "#e8e4dc"}`, borderRadius: 12, cursor: "pointer", background: isSelected ? "#f5f0ff" : "#fff", transition: "all 0.1s" }}>
+                <div style={{ width: 36, height: 36, borderRadius: 8, background: item.image ? `url(${item.image}) center/contain no-repeat #f8f6f2` : "#f8f6f2", flexShrink: 0, border: "1px solid #e8e4dc" }} />
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 12, fontWeight: 700, color: "#1a1a1a", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{item.name}</div>
+                  {item.salePlatform && <div style={{ fontSize: 10, color: "#aaa" }}>{item.salePlatform}</div>}
+                </div>
+                <div style={{ textAlign: "right", flexShrink: 0 }}>
+                  <div style={{ fontSize: 13, color: "#bbb", textDecoration: "line-through", fontWeight: 600 }}>${currentPrice.toFixed(0)}</div>
+                  {isSelected && <div style={{ fontSize: 14, fontWeight: 800, color: "#2d6a3f" }}>${newPrice.toFixed(0)}</div>}
+                </div>
+                <div style={{ width: 20, height: 20, borderRadius: "50%", border: `2px solid ${isSelected ? "#7c6fe0" : "#ddd"}`, background: isSelected ? "#7c6fe0" : "#fff", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                  {isSelected && <SvgCheck size={10} color="#fff" />}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+        {/* Footer */}
+        <div style={{ padding: "14px 24px", borderTop: "1px solid #e8e4dc", display: "flex", gap: 8, alignItems: "center" }}>
+          <span style={{ fontSize: 13, color: "#888", flex: 1 }}>{selected.size} item{selected.size !== 1 ? "s" : ""} selected</span>
+          <button onClick={onClose} style={{ padding: "9px 18px", background: "#f5f3ef", border: "none", borderRadius: 10, cursor: "pointer", fontSize: 13, fontWeight: 700, color: "#888" }}>Cancel</button>
+          <button onClick={onApply} disabled={selected.size === 0} style={{ padding: "9px 22px", background: selected.size > 0 ? "#7c6fe0" : "#e0dbd2", color: "#fff", border: "none", borderRadius: 10, cursor: selected.size > 0 ? "pointer" : "not-allowed", fontSize: 13, fontWeight: 700 }}>
+            Apply -{discountPct}%
+          </button>
         </div>
       </div>
     </div>
@@ -11783,6 +12013,159 @@ export default function App() {
 
 
         </div>}
+
+
+        {tab === "seller" && (() => {
+          const forSaleItems = itemsDb.rows.filter(i => i.forSale);
+          const listed = forSaleItems.filter(i => i.saleStatus === "listed" || !i.saleStatus).length;
+          const pending = forSaleItems.filter(i => i.saleStatus === "pending").length;
+          const drafts = forSaleItems.filter(i => i.saleStatus === "draft").length;
+          const sold = forSaleItems.filter(i => i.saleStatus === "sold").length;
+          const totalEarned = forSaleItems.filter(i => i.saleStatus === "sold")
+            .reduce((s, i) => s + (parseFloat((i.netRevenue || i.salePrice || "").replace(/[^0-9.]/g, "")) || 0), 0);
+          const potentialEarnings = forSaleItems.filter(i => i.saleStatus !== "sold")
+            .reduce((s, i) => s + (parseFloat((i.salePrice || "").replace(/[^0-9.]/g, "")) || 0), 0);
+          const totalSpent = itemsDb.rows.reduce((s, i) => s + (parseFloat((i.price||"").replace(/[^0-9.]/g,""))||0), 0);
+          const earnedPct = totalSpent > 0 ? Math.min(100, (totalEarned / totalSpent) * 100) : 0;
+          const soldWithDates = forSaleItems.filter(i => i.saleStatus === "sold" && i.soldDate && i.listedDate);
+          const avgDaysToSell = soldWithDates.length > 0
+            ? Math.round(soldWithDates.reduce((s, i) => s + Math.max(0, (new Date(i.soldDate) - new Date(i.listedDate)) / 86400000), 0) / soldWithDates.length)
+            : null;
+          const sellThrough = forSaleItems.length > 0 ? Math.round((sold / forSaleItems.length) * 100) : 0;
+          // Platform breakdown (sold items only)
+          const platformMap = {};
+          forSaleItems.filter(i => i.saleStatus === "sold" && i.salePlatform).forEach(i => {
+            if (!platformMap[i.salePlatform]) platformMap[i.salePlatform] = { count: 0, revenue: 0 };
+            platformMap[i.salePlatform].count++;
+            platformMap[i.salePlatform].revenue += parseFloat((i.netRevenue || i.salePrice||"").replace(/[^0-9.]/g,""))||0;
+          });
+          const platforms = Object.entries(platformMap).sort((a,b) => b[1].revenue - a[1].revenue);
+          // Sales history chart
+          const soldItems = forSaleItems.filter(i => i.saleStatus === "sold" && i.soldDate);
+          const byMonth = {};
+          soldItems.forEach(i => {
+            const m = i.soldDate.slice(0, 7);
+            if (!byMonth[m]) byMonth[m] = { count: 0, revenue: 0 };
+            byMonth[m].count++;
+            byMonth[m].revenue += parseFloat((i.netRevenue || i.salePrice||"").replace(/[^0-9.]/g,""))||0;
+          });
+          const months = Object.keys(byMonth).sort().slice(-6);
+          const maxRev = Math.max(...months.map(m => byMonth[m].revenue), 1);
+          // Sell candidates: non-listed closet items unworn or not worn in 12+ months
+          const twelveMonthsAgo = new Date();
+          twelveMonthsAgo.setFullYear(twelveMonthsAgo.getFullYear() - 1);
+          const sellCandidates = itemsDb.rows.filter(i => {
+            if (i.forSale) return false;
+            if ((i.wornCount || 0) === 0) return true;
+            if (i.lastWorn && new Date(i.lastWorn) < twelveMonthsAgo) return true;
+            if (!i.lastWorn && i.purchaseDate && new Date(i.purchaseDate) < twelveMonthsAgo) return true;
+            return false;
+          }).sort((a, b) => (a.wornCount || 0) - (b.wornCount || 0)).slice(0, 6);
+          // Best category analytics
+          const soldCats = {};
+          forSaleItems.filter(i => i.saleStatus === "sold" && i.category).forEach(i => {
+            const cat = i.category;
+            if (!soldCats[cat]) soldCats[cat] = { totalDays: 0, count: 0, pctSum: 0, pctCount: 0 };
+            if (i.listedDate && i.soldDate) {
+              soldCats[cat].totalDays += Math.max(0, (new Date(i.soldDate) - new Date(i.listedDate)) / 86400000);
+              soldCats[cat].count++;
+            }
+            const orig = parseFloat((i.price || "").replace(/[^0-9.]/g, "")) || 0;
+            const sale = parseFloat((i.salePrice || "").replace(/[^0-9.]/g, "")) || 0;
+            if (orig > 0 && sale > 0) { soldCats[cat].pctSum += (sale / orig) * 100; soldCats[cat].pctCount++; }
+          });
+          const topCats = Object.entries(soldCats).filter(([, d]) => d.count > 0)
+            .map(([cat, d]) => ({ cat, avgDays: Math.round(d.totalDays / d.count), avgPct: d.pctCount > 0 ? Math.round(d.pctSum / d.pctCount) : null }))
+            .sort((a, b) => a.avgDays - b.avgDays).slice(0, 3);
+          if (sellCandidates.length === 0 && months.length === 0 && platforms.length === 0 && topCats.length === 0) return null;
+          return (
+            <div className="app-right-panel" style={{ top: 24 }}>
+              {/* Sell Candidates */}
+              {sellCandidates.length > 0 && (
+                <div className="right-card">
+                  <div className="right-card-title">Sell Candidates</div>
+                  <div style={{ fontSize: 11, color: "#aaa", marginBottom: 10 }}>Unworn or not worn in 12+ months</div>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                    {sellCandidates.map(item => {
+                      const origPrice = parseFloat((item.price || "").replace(/[^0-9.]/g, "")) || 0;
+                      const suggestedPrice = origPrice > 0 ? Math.round(origPrice * 0.4) : null;
+                      const today = new Date().toISOString().slice(0, 10);
+                      return (
+                        <div key={item.id} style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                          <div style={{ width: 40, height: 40, borderRadius: 8, background: item.image ? `url(${item.image}) center/contain no-repeat #f8f6f2` : "#f8f6f2", flexShrink: 0, border: "1px solid #e8e4dc" }} />
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{ fontSize: 11, fontWeight: 700, color: "#1a1a1a", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{item.name}</div>
+                            <div style={{ fontSize: 10, color: "#aaa" }}>{item.category}{suggestedPrice ? ` · suggest $${suggestedPrice}` : ""}</div>
+                          </div>
+                          <button onClick={() => itemsDb.update({ ...item, forSale: true, saleStatus: "listed", listedDate: today, ...(suggestedPrice ? { salePrice: String(suggestedPrice) } : {}) })}
+                            style={{ padding: "4px 9px", background: "#f0faf4", border: "1.5px solid #b6e8c8", borderRadius: 8, cursor: "pointer", fontSize: 10, fontWeight: 700, color: "#2d6a3f", fontFamily: "'DM Sans', sans-serif", whiteSpace: "nowrap", flexShrink: 0 }}>
+                            List →
+                          </button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+              {/* Best Category */}
+              {topCats.length > 0 && (
+                <div className="right-card">
+                  <div className="right-card-title">Best Category</div>
+                  <div style={{ fontSize: 11, color: "#aaa", marginBottom: 10 }}>Fastest-selling categories</div>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                    {topCats.map(({ cat, avgDays, avgPct }, idx) => (
+                      <div key={cat} style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                        <div style={{ width: 18, height: 18, borderRadius: "50%", background: idx === 0 ? "#fff8ee" : "#f5f3ef", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                          <span style={{ fontSize: 9, fontWeight: 800, color: idx === 0 ? "#a07000" : "#aaa" }}>#{idx + 1}</span>
+                        </div>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ fontSize: 12, fontWeight: 700, color: "#1a1a1a", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{cat}</div>
+                          <div style={{ fontSize: 10, color: "#aaa" }}>avg {avgDays}d to sell{avgPct !== null ? ` · ${avgPct}% of asking` : ""}</div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {/* Sales History chart */}
+              {months.length > 0 && (
+                <div className="right-card">
+                  <div className="right-card-title">Sales History</div>
+                  <div style={{ display: "flex", alignItems: "flex-end", gap: 6, height: 60 }}>
+                    {months.map(m => {
+                      const d = new Date(m + "-01T00:00:00");
+                      const label = d.toLocaleDateString("en-US", { month: "short" });
+                      return (
+                        <div key={m} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 2 }}>
+                          <div style={{ fontSize: 8, color: "#7c6fe0", fontWeight: 700 }}>${byMonth[m].revenue.toFixed(0)}</div>
+                          <div style={{ width: "100%", background: "#7c6fe0", borderRadius: "3px 3px 0 0", height: `${Math.max(4, (byMonth[m].revenue / maxRev) * 36)}px` }} />
+                          <div style={{ fontSize: 8, color: "#aaa", fontWeight: 600 }}>{label}</div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+              {/* Platform breakdown */}
+              {platforms.length > 0 && (
+                <div className="right-card">
+                  <div className="right-card-title">By Platform</div>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                    {platforms.map(([name, data]) => (
+                      <div key={name} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+                        <span style={{ fontSize: 12, fontWeight: 600, color: "#555" }}>{name}</span>
+                        <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                          <span style={{ fontSize: 11, color: "#aaa" }}>{data.count}×</span>
+                          <span style={{ fontSize: 13, fontWeight: 800, color: "#2d6a3f" }}>${data.revenue.toFixed(0)}</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          );
+        })()}
 
         {/* ── RIGHT PANEL (lookbooks tab) — packing lists ── */}
         {tab === "lookbooks" && (() => {

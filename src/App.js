@@ -87,7 +87,6 @@ const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 const CATEGORIES = ["All", "Accessories", "Activewear", "Bags", "Denim", "Dresses", "Intimates", "Jewelry", "Knits", "Loungewear", "Outerwear", "Shoes", "Shorts + Skirts", "Sleepwear", "Socks + Tights", "Sweaters", "Swim", "Tops", "Trousers"];
 const COLORS = ["Black", "Blue", "Brown", "Clear", "Cream", "Gold", "Green", "Grey", "Orange", "Pink", "Purple", "Red", "Silver", "Tan", "White", "Yellow"];
-const MOODBOARD_TAGS = ["Inspiration", "Planning", "Travel", "Seasonal", "Wishlist", "Archive"];
 const COLOR_HEX = { Black:"#1a1a1a", Blue:"#4a7fc1", Brown:"#8b6250", Clear:"#e8e8e8", Cream:"#f5f0e8", Gold:"#d4a843", Green:"#5a8f5a", Grey:"#9a9a9a", Orange:"#e8823a", Pink:"#f0a0b8", Purple:"#9b72cf", Red:"#d45050", Silver:"#c0c0c0", Tan:"#c8a882", White:"#f8f8f8", Yellow:"#e8d050" };
 
 function getColorSwatch(name) {
@@ -124,18 +123,6 @@ const OCCASION_COLORS = {
   "Weekend":    { bg: "#fafaf0", color: "#9aaa30" },
   "Event":      { bg: "#f5f0ff", color: "#7c6fe0" },
 };
-
-const LOOKBOOK_TYPE_META = {
-  trip: { label: "Trip", bg: "#eef8ff", color: "#2b7db8" },
-  event: { label: "Event", bg: "#fff3f0", color: "#c26745" },
-  season: { label: "Season", bg: "#f3f5ea", color: "#72823d" },
-  capsule: { label: "Capsule", bg: "#f4f0ff", color: "#7057b6" },
-  inspiration: { label: "Inspiration", bg: "#fff1f7", color: "#b64b78" },
-};
-
-function getLookbookTypeMeta(type) {
-  return LOOKBOOK_TYPE_META[(type || "").toLowerCase()] || { label: "Lookbook", bg: "#f5f3ef", color: "#666" };
-}
 
 const uid = () => Math.random().toString(36).slice(2);
 
@@ -2803,18 +2790,11 @@ function LookbookViewer({ lookbook, outfits, allItems, closetItems, onClose, onU
   });
   const [newActivity, setNewActivity] = useState("");
   const [plannedSlots, setPlannedSlots] = useState(() => lookbook.plannedSlots || []);
-  const [openAccordions, setOpenAccordions] = useState({ overview: true, planning: false, notes: false, looks: true, insights: true, inspiration: true });
+  const [openAccordions, setOpenAccordions] = useState({ overview: true, trip: false, notes: false, looks: true });
   const toggleAccordion = (key) => setOpenAccordions(a => ({ ...a, [key]: !a[key] }));
   const [editingSlotId, setEditingSlotId] = useState(null);
   const [slotDragIdx, setSlotDragIdx] = useState(null);
   const [slotDragOver, setSlotDragOver] = useState(null);
-  const lookbookType = (lookbook.type || "trip").toLowerCase();
-  const typeMeta = getLookbookTypeMeta(lookbookType);
-  const isTripType = lookbookType === "trip";
-  const isEventType = lookbookType === "event";
-  const isPlanningType = isTripType || isEventType;
-  const isInsightType = lookbookType === "season" || lookbookType === "capsule";
-  const isInspirationType = lookbookType === "inspiration";
 
   const looks = lookIds.map(id => outfits.find(o => o.id === id)).filter(Boolean);
   const availableToAdd = outfits.filter(o => !lookIds.includes(o.id));
@@ -3027,27 +3007,8 @@ function LookbookViewer({ lookbook, outfits, allItems, closetItems, onClose, onU
     });
   });
   const repeatCount = Object.values(itemUsageCount).filter(c => c > 1).length;
-  const repeatedItems = Object.entries(itemUsageCount)
-    .filter(([, count]) => count > 1)
-    .map(([id, count]) => ({ item: allItems.find(x => x.id === id), count }))
-    .filter(({ item }) => !!item)
-    .sort((a, b) => b.count - a.count);
-  const totalWearCount = packItems.reduce((sum, item) => sum + (item.wornCount || 0), 0);
-  const unwornPackCount = packItems.filter(item => !(item.wornCount || 0)).length;
-  const avgWearCount = packItems.length ? (totalWearCount / packItems.length) : 0;
-  const mostWornPackItems = [...packItems].filter(item => (item.wornCount || 0) > 0).sort((a, b) => (b.wornCount || 0) - (a.wornCount || 0)).slice(0, 3);
-  const canUseMoodboardView = isInspirationType || !!linkedMoodboardId;
-  const viewOptions = [
-    { id: "editorial", label: "Looks" },
-    { id: "grid", label: "Grid" },
-    ...(canUseMoodboardView ? [{ id: "moodboard", label: "Moodboard" }] : []),
-  ];
   const statTileStyle = { background: "#faf9f6", borderRadius: 10, padding: "10px 8px", textAlign: "center" };
   const acHdrStyle = { width: "100%", display: "flex", justifyContent: "space-between", alignItems: "center", background: "none", border: "none", borderBottom: "1.5px solid #f0ece4", cursor: "pointer", padding: "10px 16px", fontFamily: "'DM Sans', sans-serif" };
-
-  useEffect(() => {
-    if (view === "moodboard" && !canUseMoodboardView) setView("editorial");
-  }, [view, canUseMoodboardView]);
 
   return (
     <div className="lookbook-overlay">
@@ -3133,19 +3094,12 @@ function LookbookViewer({ lookbook, outfits, allItems, closetItems, onClose, onU
               {lbName} <SvgEdit size={12} color="#ccc" />
             </div>
           )}
-          <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap", marginTop: 1 }}>
-            <div style={{ fontSize: 11, color: "#aaa", fontWeight: 600 }}>
-              {dateStr ? `${dateStr}${isTripType && tripDays ? " \u00B7 " + tripDays + " day" + (tripDays !== 1 ? "s" : "") : ""}` : typeMeta.label}
-            </div>
-            <div style={{ padding: "2px 8px", borderRadius: 20, background: typeMeta.bg, color: typeMeta.color, fontSize: 10, fontWeight: 700 }}>
-              {typeMeta.label}
-            </div>
-          </div>
+          {dateStr && <div style={{ fontSize: 11, color: "#aaa", fontWeight: 600, marginTop: 1 }}>{dateStr}{tripDays ? " \u00B7 " + tripDays + " day" + (tripDays !== 1 ? "s" : "") : ""}</div>}
         </div>
         <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
           {/* View toggle */}
           <div style={{ display: "flex", background: "#f0ece4", borderRadius: 10, padding: 3, gap: 2 }}>
-            {viewOptions.map(v => (
+            {[{ id: "editorial", label: "Looks" }, { id: "grid", label: "Grid" }, { id: "moodboard", label: "Moodboard" }].map(v => (
               <button key={v.id} onClick={() => setView(v.id)} style={{
                 ...btnBase, padding: "6px 12px", fontSize: 12, borderRadius: 8,
                 background: view === v.id ? "#fff" : "transparent",
@@ -3163,14 +3117,12 @@ function LookbookViewer({ lookbook, outfits, allItems, closetItems, onClose, onU
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>
             {linkedMoodboardId && linkedMoodboardIdx >= 0 && moodboards[linkedMoodboardIdx]
               ? moodboards[linkedMoodboardIdx].name || "Linked Board"
-              : isInspirationType ? "Add Inspiration Board" : "Link Moodboard"}
+              : "Link Moodboard"}
           </button>
           <button onClick={handleShare} style={{ ...btnBase, padding: "7px 14px", background: "#f5f3ef", color: "#555", fontSize: 12 }}>Share</button>
-          {isTripType && (
-            <button onClick={() => setPackingListView(true)} style={{ ...btnBase, padding: "7px 14px", background: "#f0faf4", color: "#2d6a3f", fontSize: 12, border: "1.5px solid #b6e8c8" }}>
-              <SvgLuggage size={12} color="#2d6a3f" style={{ marginRight: 5 }} />Pack List
-            </button>
-          )}
+          <button onClick={() => setPackingListView(true)} style={{ ...btnBase, padding: "7px 14px", background: "#f0faf4", color: "#2d6a3f", fontSize: 12, border: "1.5px solid #b6e8c8" }}>
+            <SvgLuggage size={12} color="#2d6a3f" style={{ marginRight: 5 }} />Pack List
+          </button>
           <button onClick={handleExport} disabled={exportingPdf} style={{ ...btnBase, padding: "7px 14px", background: "#f5f3ef", color: "#555", fontSize: 12 }}>
             {exportingPdf ? "Exporting\u2026" : "Export PDF"}
           </button>
@@ -3192,9 +3144,9 @@ function LookbookViewer({ lookbook, outfits, allItems, closetItems, onClose, onU
       </div>
 
       {/* ── HERO HEADER ── */}
-      {(dateStr || lbTags.length > 0 || (isPlanningType && (lbCity || lbWeather?.days))) && (
+      {(lbCity || dateStr || lbTags.length > 0 || lbWeather?.days) && (
         <div style={{ background: "#fff", borderBottom: "1.5px solid #f0ece4", padding: "10px 20px", display: "flex", alignItems: "center", gap: 10, flexShrink: 0, flexWrap: "wrap" }}>
-          {isPlanningType && lbCity && (
+          {lbCity && (
             <div style={{ display: "flex", alignItems: "center", gap: 5, padding: "4px 12px", background: "#f5f3ef", borderRadius: 20 }}>
               <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#888" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/></svg>
               <span style={{ fontSize: 12, fontWeight: 700, color: "#555" }}>{lbCity}</span>
@@ -3212,7 +3164,7 @@ function LookbookViewer({ lookbook, outfits, allItems, closetItems, onClose, onU
           {lbTags.map(t => (
             <div key={t} style={{ padding: "4px 10px", background: "#1a1a1a", borderRadius: 20, fontSize: 11, fontWeight: 700, color: "#fff" }}>{t}</div>
           ))}
-          {isPlanningType && lbWeather?.days && (() => {
+          {lbWeather?.days && (() => {
             const wxDays = lbWeather.days.filter(d => {
               if (!lbDateStart && !lbDateEnd) return true;
               return d.date >= (lbDateStart || "0") && d.date <= (lbDateEnd || "9999");
@@ -3399,7 +3351,7 @@ function LookbookViewer({ lookbook, outfits, allItems, closetItems, onClose, onU
               })}
 
               {/* ── PLANNED SLOT CARDS (dotted placeholders) ── */}
-              {isPlanningType && plannedSlots.map((slot, si) => {
+              {plannedSlots.map((slot, si) => {
                 const slotWx = slot.date ? getWxForDate(slot.date) : null;
                 const slotDate = slot.date ? new Date(slot.date + "T00:00:00") : null;
                 const slotDateLabel = slotDate ? slotDate.toLocaleDateString("en-US", { month: "short", day: "numeric" }) : null;
@@ -3467,17 +3419,15 @@ function LookbookViewer({ lookbook, outfits, allItems, closetItems, onClose, onU
               })}
 
               {/* Add Slot tile */}
-              {isPlanningType && (
-                <div onClick={() => { const next = [...plannedSlots, { id: Date.now() + "_" + Math.random().toString(36).slice(2), name: "", date: "" }]; setPlannedSlots(next); save({ plannedSlots: next }); }}
-                  style={{ borderRadius: 16, border: "2px dashed #e0dbd2", background: "#fafaf8", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 6, cursor: "pointer", minHeight: 200, transition: "border-color 0.15s, background 0.15s" }}
-                  onMouseEnter={e => { e.currentTarget.style.borderColor = "#aaa"; e.currentTarget.style.background = "#f5f3ef"; }}
-                  onMouseLeave={e => { e.currentTarget.style.borderColor = "#e0dbd2"; e.currentTarget.style.background = "#fafaf8"; }}>
-                  <div style={{ width: 28, height: 28, borderRadius: "50%", background: "#e8e4dc", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                    <span style={{ fontSize: 17, color: "#999", lineHeight: 1 }}>+</span>
-                  </div>
-                  <div style={{ fontSize: 11, fontWeight: 700, color: "#bbb" }}>Plan a Look</div>
+              <div onClick={() => { const next = [...plannedSlots, { id: Date.now() + "_" + Math.random().toString(36).slice(2), name: "", date: "" }]; setPlannedSlots(next); save({ plannedSlots: next }); }}
+                style={{ borderRadius: 16, border: "2px dashed #e0dbd2", background: "#fafaf8", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 6, cursor: "pointer", minHeight: 200, transition: "border-color 0.15s, background 0.15s" }}
+                onMouseEnter={e => { e.currentTarget.style.borderColor = "#aaa"; e.currentTarget.style.background = "#f5f3ef"; }}
+                onMouseLeave={e => { e.currentTarget.style.borderColor = "#e0dbd2"; e.currentTarget.style.background = "#fafaf8"; }}>
+                <div style={{ width: 28, height: 28, borderRadius: "50%", background: "#e8e4dc", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                  <span style={{ fontSize: 17, color: "#999", lineHeight: 1 }}>+</span>
                 </div>
-              )}
+                <div style={{ fontSize: 11, fontWeight: 700, color: "#bbb" }}>Plan a Look</div>
+              </div>
             </div>
           )}
         </div>
@@ -3492,30 +3442,25 @@ function LookbookViewer({ lookbook, outfits, allItems, closetItems, onClose, onU
           </button>
           {openAccordions.overview && (
             <div style={{ padding: "12px 16px 14px", display: "flex", flexDirection: "column", gap: 12 }}>
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
-                <div style={{ fontSize: 12, fontWeight: 800, color: "#1a1a1a" }}>{lbName}</div>
-                <div style={{ padding: "3px 9px", borderRadius: 20, background: typeMeta.bg, color: typeMeta.color, fontSize: 10, fontWeight: 700 }}>
-                  {typeMeta.label}
-                </div>
-              </div>
+              {/* Stats grid */}
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 7 }}>
                 <div style={statTileStyle}>
-                  <div style={{ fontSize: 15, fontWeight: 800, color: "#1a1a1a", lineHeight: 1.2 }}>{looks.length}</div>
-                  <div style={{ fontSize: 9, color: "#aaa", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", marginTop: 3 }}>Looks</div>
+                  <div style={{ fontSize: 15, fontWeight: 800, color: "#1a1a1a", lineHeight: 1.2 }}>
+                    {looks.length}<span style={{ fontSize: 11, fontWeight: 600, color: "#bbb" }}> / {looks.length + plannedSlots.length}</span>
+                  </div>
+                  <div style={{ fontSize: 9, color: "#aaa", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", marginTop: 3 }}>Planned Looks</div>
                 </div>
                 <div style={statTileStyle}>
                   <div style={{ fontSize: 15, fontWeight: 800, color: "#1a1a1a", lineHeight: 1.2 }}>{packItems.length}</div>
-                  <div style={{ fontSize: 9, color: "#aaa", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", marginTop: 3 }}>Pieces</div>
+                  <div style={{ fontSize: 9, color: "#aaa", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", marginTop: 3 }}>Packed Pieces</div>
                 </div>
-                {isPlanningType && (
+                {repeatCount > 0 && (
                   <div style={statTileStyle}>
-                    <div style={{ fontSize: 15, fontWeight: 800, color: "#1a1a1a", lineHeight: 1.2 }}>
-                      {looks.length}<span style={{ fontSize: 11, fontWeight: 600, color: "#bbb" }}> / {looks.length + plannedSlots.length}</span>
-                    </div>
-                    <div style={{ fontSize: 9, color: "#aaa", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", marginTop: 3 }}>Planned</div>
+                    <div style={{ fontSize: 15, fontWeight: 800, color: "#1a1a1a", lineHeight: 1.2 }}>{repeatCount}</div>
+                    <div style={{ fontSize: 9, color: "#aaa", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", marginTop: 3 }}>Repeats</div>
                   </div>
                 )}
-                {isTripType && tripDays && (
+                {tripDays && (
                   <div style={statTileStyle}>
                     <div style={{ fontSize: 15, fontWeight: 800, color: "#1a1a1a", lineHeight: 1.2 }}>
                       {tripDays}<span style={{ fontSize: 10, color: "#bbb", fontWeight: 600 }}>d</span> {tripNights}<span style={{ fontSize: 10, color: "#bbb", fontWeight: 600 }}>n</span>
@@ -3523,207 +3468,102 @@ function LookbookViewer({ lookbook, outfits, allItems, closetItems, onClose, onU
                     <div style={{ fontSize: 9, color: "#aaa", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", marginTop: 3 }}>Duration</div>
                   </div>
                 )}
-                {isEventType && (
-                  <div style={statTileStyle}>
-                    <div style={{ fontSize: 15, fontWeight: 800, color: "#1a1a1a", lineHeight: 1.2 }}>{repeatCount}</div>
-                    <div style={{ fontSize: 9, color: "#aaa", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", marginTop: 3 }}>Repeat Pieces</div>
-                  </div>
-                )}
-                {isInsightType && (
-                  <>
-                    <div style={statTileStyle}>
-                      <div style={{ fontSize: 15, fontWeight: 800, color: "#1a1a1a", lineHeight: 1.2 }}>${totalVal.toFixed(0)}</div>
-                      <div style={{ fontSize: 9, color: "#aaa", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", marginTop: 3 }}>Value</div>
-                    </div>
-                    <div style={statTileStyle}>
-                      <div style={{ fontSize: 15, fontWeight: 800, color: "#1a1a1a", lineHeight: 1.2 }}>{totalWearCount}</div>
-                      <div style={{ fontSize: 9, color: "#aaa", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", marginTop: 3 }}>Total Wears</div>
-                    </div>
-                  </>
-                )}
-                {isInspirationType && (
-                  <>
-                    <div style={statTileStyle}>
-                      <div style={{ fontSize: 15, fontWeight: 800, color: linkedMoodboardId ? "#1a1a1a" : "#bbb", lineHeight: 1.2 }}>{linkedMoodboardId ? "Yes" : "No"}</div>
-                      <div style={{ fontSize: 9, color: "#aaa", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", marginTop: 3 }}>Moodboard</div>
-                    </div>
-                    <div style={statTileStyle}>
-                      <div style={{ fontSize: 15, fontWeight: 800, color: "#1a1a1a", lineHeight: 1.2 }}>{notes.trim() ? notes.trim().split(/\s+/).length : 0}</div>
-                      <div style={{ fontSize: 9, color: "#aaa", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", marginTop: 3 }}>Note Words</div>
-                    </div>
-                  </>
-                )}
               </div>
             </div>
           )}
 
-          {isPlanningType && (
-            <>
-              <button onClick={() => toggleAccordion("planning")} style={{ ...acHdrStyle }}>
-                <span style={{ fontSize: 10, fontWeight: 700, color: "#aaa", textTransform: "uppercase", letterSpacing: "0.1em" }}>{isTripType ? "Trip Planning" : "Event Details"}</span>
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#ccc" strokeWidth="2.5" strokeLinecap="round" style={{ transform: openAccordions.planning ? "rotate(180deg)" : "none", transition: "transform 0.2s" }}><polyline points="6 9 12 15 18 9"/></svg>
-              </button>
-              {openAccordions.planning && (
-                <div style={{ padding: "12px 16px 14px", display: "flex", flexDirection: "column", gap: 10 }}>
-                  <div>
-                    <div style={{ fontSize: 9, fontWeight: 700, color: "#bbb", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 4 }}>Name</div>
-                    <input value={lbName} onChange={e => setLbName(e.target.value)} onBlur={() => save()}
-                      style={{ width: "100%", padding: "6px 10px", border: "1.5px solid #e8e4dc", borderRadius: 8, fontFamily: "'DM Sans', sans-serif", fontSize: 12, outline: "none", boxSizing: "border-box" }} />
-                  </div>
-                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 7 }}>
-                    <div>
-                      <div style={{ fontSize: 9, fontWeight: 700, color: "#bbb", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 4 }}>{isTripType ? "Start" : "Date"}</div>
-                      <input type="date" value={lbDateStart} onChange={e => setLbDateStart(e.target.value)} onBlur={() => save()}
-                        style={{ width: "100%", padding: "6px 6px", border: "1.5px solid #e8e4dc", borderRadius: 8, fontFamily: "'DM Sans', sans-serif", fontSize: 10, outline: "none", boxSizing: "border-box" }} />
-                    </div>
-                    <div>
-                      <div style={{ fontSize: 9, fontWeight: 700, color: "#bbb", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 4 }}>End</div>
-                      <input type="date" value={lbDateEnd} onChange={e => setLbDateEnd(e.target.value)} onBlur={() => save()}
-                        style={{ width: "100%", padding: "6px 6px", border: "1.5px solid #e8e4dc", borderRadius: 8, fontFamily: "'DM Sans', sans-serif", fontSize: 10, outline: "none", boxSizing: "border-box" }} />
-                    </div>
-                  </div>
-                  <div>
-                    <div style={{ fontSize: 9, fontWeight: 700, color: "#bbb", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 4 }}>{isTripType ? "Destination" : "Location"}</div>
-                    <div style={{ display: "flex", gap: 6 }}>
-                      <input value={lbCity} onChange={e => setLbCity(e.target.value)} placeholder={isTripType ? "City (e.g. Orlando, FL)" : "Venue or city"}
-                        onKeyDown={e => { if (e.key === "Enter") fetchWeather(); }}
-                        style={{ flex: 1, padding: "6px 10px", border: "1.5px solid #e8e4dc", borderRadius: 8, fontFamily: "'DM Sans', sans-serif", fontSize: 12, outline: "none" }} />
-                      <button onClick={fetchWeather} disabled={wxLoading || !lbCity.trim()} style={{ ...btnBase, padding: "6px 10px", background: "#f5f3ef", color: "#555", fontSize: 12, border: "none", flexShrink: 0 }}>
-                        {wxLoading ? "\u2026" : "\u26C5"}
-                      </button>
-                    </div>
-                    {lbWeather?.error && <div style={{ fontSize: 11, color: "#e05555", marginTop: 4 }}>{lbWeather.error}</div>}
-                    {lbWeather?.days && lbWeather.days.length > 0 && (
-                      <div style={{ marginTop: 6, maxHeight: 140, overflowY: "auto", display: "flex", flexDirection: "column", gap: 3 }}>
-                        {lbWeather.days.filter(d => {
-                          if (!lbDateStart && !lbDateEnd) return true;
-                          return d.date >= (lbDateStart || "0") && d.date <= (lbDateEnd || "9999");
-                        }).slice(0, 14).map(d => (
-                          <div key={d.date} style={{ display: "flex", alignItems: "center", gap: 8, padding: "3px 6px", borderRadius: 7, background: "#faf9f6" }}>
-                            <span style={{ fontSize: 13 }}>{wxIcon(d.code)}</span>
-                            <span style={{ fontSize: 11, fontWeight: 700, color: "#555", flex: 1 }}>{new Date(d.date + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" })}</span>
-                            <span style={{ fontSize: 11, color: "#1a1a1a", fontWeight: 700 }}>{d.high}\u00B0</span>
-                            <span style={{ fontSize: 10, color: "#bbb" }}>{d.low}\u00B0</span>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                  {isTripType && (
-                    <>
-                      <div>
-                        <div style={{ fontSize: 9, fontWeight: 700, color: "#bbb", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 4 }}>Hotel</div>
-                        <input value={tripDetails.hotel || ""} onChange={e => setTripDetails(d => ({ ...d, hotel: e.target.value }))} onBlur={() => saveTripDetails({})}
-                          placeholder="Hotel name\u2026"
-                          style={{ width: "100%", padding: "6px 10px", border: "1.5px solid #e8e4dc", borderRadius: 8, fontFamily: "'DM Sans', sans-serif", fontSize: 12, outline: "none", boxSizing: "border-box" }} />
-                      </div>
-                      <div>
-                        <div style={{ fontSize: 9, fontWeight: 700, color: "#bbb", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 4 }}>Activities</div>
-                        <div style={{ display: "flex", flexDirection: "column", gap: 3, marginBottom: 5 }}>
-                          {(tripDetails.activities || []).map((act, i) => (
-                            <div key={i} style={{ display: "flex", alignItems: "center", gap: 6, padding: "5px 8px", background: "#faf9f6", borderRadius: 7, border: "1px solid #e8e4dc" }}>
-                              <span style={{ flex: 1, fontSize: 12, color: "#444", fontWeight: 600 }}>{act}</span>
-                              <button onClick={() => { const next = (tripDetails.activities || []).filter((_, j) => j !== i); saveTripDetails({ activities: next }); }}
-                                style={{ background: "none", border: "none", cursor: "pointer", color: "#ccc", fontSize: 14, lineHeight: 1, padding: "0 2px" }}
-                                onMouseEnter={e => e.currentTarget.style.color = "#e05555"}
-                                onMouseLeave={e => e.currentTarget.style.color = "#ccc"}>×</button>
-                            </div>
-                          ))}
-                        </div>
-                        <div style={{ display: "flex", gap: 5 }}>
-                          <input value={newActivity} onChange={e => setNewActivity(e.target.value)}
-                            onKeyDown={e => { if (e.key === "Enter" && newActivity.trim()) { saveTripDetails({ activities: [...(tripDetails.activities || []), newActivity.trim()] }); setNewActivity(""); } }}
-                            placeholder="Add activity\u2026"
-                            style={{ flex: 1, padding: "5px 8px", border: "1.5px solid #e8e4dc", borderRadius: 8, fontFamily: "'DM Sans', sans-serif", fontSize: 12, outline: "none" }} />
-                          <button onClick={() => { if (newActivity.trim()) { saveTripDetails({ activities: [...(tripDetails.activities || []), newActivity.trim()] }); setNewActivity(""); } }}
-                            style={{ padding: "5px 10px", background: "#1a1a1a", color: "#fff", border: "none", borderRadius: 8, cursor: "pointer", fontSize: 13, fontWeight: 700, fontFamily: "'DM Sans', sans-serif" }}>+</button>
-                        </div>
-                      </div>
-                    </>
-                  )}
+          {/* ── TRIP ── */}
+          <button onClick={() => toggleAccordion("trip")} style={{ ...acHdrStyle }}>
+            <span style={{ fontSize: 10, fontWeight: 700, color: "#aaa", textTransform: "uppercase", letterSpacing: "0.1em" }}>Trip</span>
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#ccc" strokeWidth="2.5" strokeLinecap="round" style={{ transform: openAccordions.trip ? "rotate(180deg)" : "none", transition: "transform 0.2s" }}><polyline points="6 9 12 15 18 9"/></svg>
+          </button>
+          {openAccordions.trip && (
+            <div style={{ padding: "12px 16px 14px", display: "flex", flexDirection: "column", gap: 10 }}>
+              {/* Name */}
+              <div>
+                <div style={{ fontSize: 9, fontWeight: 700, color: "#bbb", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 4 }}>Name</div>
+                <input value={lbName} onChange={e => setLbName(e.target.value)} onBlur={() => save()}
+                  style={{ width: "100%", padding: "6px 10px", border: "1.5px solid #e8e4dc", borderRadius: 8, fontFamily: "'DM Sans', sans-serif", fontSize: 12, outline: "none", boxSizing: "border-box" }} />
+              </div>
+              {/* Dates */}
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 7 }}>
+                <div>
+                  <div style={{ fontSize: 9, fontWeight: 700, color: "#bbb", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 4 }}>Start</div>
+                  <input type="date" value={lbDateStart} onChange={e => setLbDateStart(e.target.value)} onBlur={() => save()}
+                    style={{ width: "100%", padding: "6px 6px", border: "1.5px solid #e8e4dc", borderRadius: 8, fontFamily: "'DM Sans', sans-serif", fontSize: 10, outline: "none", boxSizing: "border-box" }} />
                 </div>
-              )}
-            </>
-          )}
-
-          {isInsightType && (
-            <>
-              <button onClick={() => toggleAccordion("insights")} style={{ ...acHdrStyle }}>
-                <span style={{ fontSize: 10, fontWeight: 700, color: "#aaa", textTransform: "uppercase", letterSpacing: "0.1em" }}>Wear Insights</span>
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#ccc" strokeWidth="2.5" strokeLinecap="round" style={{ transform: openAccordions.insights ? "rotate(180deg)" : "none", transition: "transform 0.2s" }}><polyline points="6 9 12 15 18 9"/></svg>
-              </button>
-              {openAccordions.insights && (
-                <div style={{ padding: "12px 16px 14px", display: "flex", flexDirection: "column", gap: 10 }}>
-                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 7 }}>
-                    <div style={statTileStyle}>
-                      <div style={{ fontSize: 15, fontWeight: 800, color: "#1a1a1a", lineHeight: 1.2 }}>{avgWearCount.toFixed(1)}</div>
-                      <div style={{ fontSize: 9, color: "#aaa", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", marginTop: 3 }}>Avg Wears</div>
-                    </div>
-                    <div style={statTileStyle}>
-                      <div style={{ fontSize: 15, fontWeight: 800, color: "#1a1a1a", lineHeight: 1.2 }}>{unwornPackCount}</div>
-                      <div style={{ fontSize: 9, color: "#aaa", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", marginTop: 3 }}>Unworn</div>
-                    </div>
-                  </div>
-                  <div>
-                    <div style={{ fontSize: 9, fontWeight: 700, color: "#bbb", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 6 }}>Most Worn Pieces</div>
-                    {mostWornPackItems.length === 0 ? (
-                      <div style={{ fontSize: 11, color: "#bbb" }}>Wear data will show up here as you log outfits.</div>
-                    ) : (
-                      <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
-                        {mostWornPackItems.map(item => (
-                          <div key={item.id} style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 8px", background: "#faf9f6", borderRadius: 8 }}>
-                            <div style={{ flex: 1, minWidth: 0, fontSize: 11, fontWeight: 700, color: "#1a1a1a", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{item.name}</div>
-                            <div style={{ fontSize: 10, color: "#888", fontWeight: 700 }}>{item.wornCount}x</div>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                  <div>
-                    <div style={{ fontSize: 9, fontWeight: 700, color: "#bbb", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 6 }}>Repeat Pieces Across Looks</div>
-                    {repeatedItems.length === 0 ? (
-                      <div style={{ fontSize: 11, color: "#bbb" }}>No repeat pieces yet.</div>
-                    ) : (
-                      <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
-                        {repeatedItems.slice(0, 4).map(({ item, count }) => (
-                          <div key={item.id} style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 8px", background: "#faf9f6", borderRadius: 8 }}>
-                            <div style={{ flex: 1, minWidth: 0, fontSize: 11, fontWeight: 700, color: "#1a1a1a", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{item.name}</div>
-                            <div style={{ fontSize: 10, color: "#888", fontWeight: 700 }}>{count} looks</div>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
+                <div>
+                  <div style={{ fontSize: 9, fontWeight: 700, color: "#bbb", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 4 }}>End</div>
+                  <input type="date" value={lbDateEnd} onChange={e => setLbDateEnd(e.target.value)} onBlur={() => save()}
+                    style={{ width: "100%", padding: "6px 6px", border: "1.5px solid #e8e4dc", borderRadius: 8, fontFamily: "'DM Sans', sans-serif", fontSize: 10, outline: "none", boxSizing: "border-box" }} />
                 </div>
-              )}
-            </>
-          )}
-
-          {isInspirationType && (
-            <>
-              <button onClick={() => toggleAccordion("inspiration")} style={{ ...acHdrStyle }}>
-                <span style={{ fontSize: 10, fontWeight: 700, color: "#aaa", textTransform: "uppercase", letterSpacing: "0.1em" }}>Inspiration</span>
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#ccc" strokeWidth="2.5" strokeLinecap="round" style={{ transform: openAccordions.inspiration ? "rotate(180deg)" : "none", transition: "transform 0.2s" }}><polyline points="6 9 12 15 18 9"/></svg>
-              </button>
-              {openAccordions.inspiration && (
-                <div style={{ padding: "12px 16px 14px", display: "flex", flexDirection: "column", gap: 10 }}>
-                  <div style={{ padding: "10px 12px", background: "#faf9f6", borderRadius: 10, border: "1px solid #f0ece4" }}>
-                    <div style={{ fontSize: 10, fontWeight: 700, color: "#bbb", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 5 }}>Linked Moodboard</div>
-                    <div style={{ fontSize: 12, fontWeight: 700, color: linkedMoodboardId && linkedMoodboardIdx >= 0 && moodboards[linkedMoodboardIdx] ? "#1a1a1a" : "#bbb" }}>
-                      {linkedMoodboardId && linkedMoodboardIdx >= 0 && moodboards[linkedMoodboardIdx]
-                        ? (moodboards[linkedMoodboardIdx].name || "Linked Board")
-                        : "No moodboard linked yet"}
-                    </div>
-                  </div>
-                  <button onClick={() => setView("moodboard")} style={{ width: "100%", padding: "8px 10px", background: "#1a1a1a", color: "#fff", border: "none", borderRadius: 10, cursor: "pointer", fontSize: 12, fontWeight: 700, fontFamily: "'DM Sans', sans-serif" }}>
-                    Open Moodboard
-                  </button>
-                  <button onClick={() => setShowLinkModal(true)} style={{ width: "100%", padding: "8px 10px", background: "#f5f3ef", color: "#666", border: "none", borderRadius: 10, cursor: "pointer", fontSize: 12, fontWeight: 700, fontFamily: "'DM Sans', sans-serif" }}>
-                    {linkedMoodboardId ? "Change Linked Board" : "Link a Board"}
+              </div>
+              {/* Destination + Weather */}
+              <div>
+                <div style={{ fontSize: 9, fontWeight: 700, color: "#bbb", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 4 }}>Destination</div>
+                <div style={{ display: "flex", gap: 6 }}>
+                  <input value={lbCity} onChange={e => setLbCity(e.target.value)} placeholder="City (e.g. Orlando, FL)"
+                    onKeyDown={e => { if (e.key === "Enter") fetchWeather(); }}
+                    style={{ flex: 1, padding: "6px 10px", border: "1.5px solid #e8e4dc", borderRadius: 8, fontFamily: "'DM Sans', sans-serif", fontSize: 12, outline: "none" }} />
+                  <button onClick={fetchWeather} disabled={wxLoading || !lbCity.trim()} style={{ ...btnBase, padding: "6px 10px", background: "#f5f3ef", color: "#555", fontSize: 12, border: "none", flexShrink: 0 }}>
+                    {wxLoading ? "\u2026" : "\u26C5"}
                   </button>
                 </div>
-              )}
-            </>
+                {lbWeather?.error && <div style={{ fontSize: 11, color: "#e05555", marginTop: 4 }}>{lbWeather.error}</div>}
+                {lbWeather?.days && lbWeather.days.length > 0 && (
+                  <div style={{ marginTop: 6, maxHeight: 140, overflowY: "auto", display: "flex", flexDirection: "column", gap: 3 }}>
+                    {lbWeather.days.filter(d => {
+                      if (!lookbook.dateStart && !lookbook.dateEnd) return true;
+                      return d.date >= (lookbook.dateStart || "0") && d.date <= (lookbook.dateEnd || "9999");
+                    }).slice(0, 14).map(d => (
+                      <div key={d.date} style={{ display: "flex", alignItems: "center", gap: 8, padding: "3px 6px", borderRadius: 7, background: "#faf9f6" }}>
+                        <span style={{ fontSize: 13 }}>{wxIcon(d.code)}</span>
+                        <span style={{ fontSize: 11, fontWeight: 700, color: "#555", flex: 1 }}>{new Date(d.date + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" })}</span>
+                        <span style={{ fontSize: 11, color: "#1a1a1a", fontWeight: 700 }}>{d.high}\u00B0</span>
+                        <span style={{ fontSize: 10, color: "#bbb" }}>{d.low}\u00B0</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+              {/* Hotel */}
+              <div>
+                <div style={{ fontSize: 9, fontWeight: 700, color: "#bbb", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 4 }}>Hotel</div>
+                <input value={tripDetails.hotel || ""} onChange={e => setTripDetails(d => ({ ...d, hotel: e.target.value }))} onBlur={() => saveTripDetails({})}
+                  placeholder="Hotel name\u2026"
+                  style={{ width: "100%", padding: "6px 10px", border: "1.5px solid #e8e4dc", borderRadius: 8, fontFamily: "'DM Sans', sans-serif", fontSize: 12, outline: "none", boxSizing: "border-box" }} />
+              </div>
+              {/* Activities */}
+              <div>
+                <div style={{ fontSize: 9, fontWeight: 700, color: "#bbb", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 4 }}>Activities</div>
+                <div style={{ display: "flex", flexDirection: "column", gap: 3, marginBottom: 5 }}>
+                  {(tripDetails.activities || []).map((act, i) => (
+                    <div key={i} style={{ display: "flex", alignItems: "center", gap: 6, padding: "5px 8px", background: "#faf9f6", borderRadius: 7, border: "1px solid #e8e4dc" }}>
+                      <span style={{ flex: 1, fontSize: 12, color: "#444", fontWeight: 600 }}>{act}</span>
+                      <button onClick={() => { const next = (tripDetails.activities || []).filter((_, j) => j !== i); saveTripDetails({ activities: next }); }}
+                        style={{ background: "none", border: "none", cursor: "pointer", color: "#ccc", fontSize: 14, lineHeight: 1, padding: "0 2px" }}
+                        onMouseEnter={e => e.currentTarget.style.color = "#e05555"}
+                        onMouseLeave={e => e.currentTarget.style.color = "#ccc"}>×</button>
+                    </div>
+                  ))}
+                </div>
+                <div style={{ display: "flex", gap: 5 }}>
+                  <input value={newActivity} onChange={e => setNewActivity(e.target.value)}
+                    onKeyDown={e => { if (e.key === "Enter" && newActivity.trim()) { saveTripDetails({ activities: [...(tripDetails.activities || []), newActivity.trim()] }); setNewActivity(""); } }}
+                    placeholder="Add activity\u2026"
+                    style={{ flex: 1, padding: "5px 8px", border: "1.5px solid #e8e4dc", borderRadius: 8, fontFamily: "'DM Sans', sans-serif", fontSize: 12, outline: "none" }} />
+                  <button onClick={() => { if (newActivity.trim()) { saveTripDetails({ activities: [...(tripDetails.activities || []), newActivity.trim()] }); setNewActivity(""); } }}
+                    style={{ padding: "5px 10px", background: "#1a1a1a", color: "#fff", border: "none", borderRadius: 8, cursor: "pointer", fontSize: 13, fontWeight: 700, fontFamily: "'DM Sans', sans-serif" }}>+</button>
+                </div>
+              </div>
+              {/* Other notes */}
+              <div>
+                <div style={{ fontSize: 9, fontWeight: 700, color: "#bbb", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 4 }}>Other Notes</div>
+                <textarea value={tripDetails.notes || ""} onChange={e => setTripDetails(d => ({ ...d, notes: e.target.value }))} onBlur={() => saveTripDetails({})}
+                  placeholder="Reservations, dress codes, reminders\u2026"
+                  style={{ width: "100%", padding: "6px 10px", border: "1.5px solid #e8e4dc", borderRadius: 8, fontFamily: "'DM Sans', sans-serif", fontSize: 12, outline: "none", resize: "vertical", minHeight: 56, boxSizing: "border-box" }} />
+              </div>
+            </div>
           )}
 
           {/* ── NOTES ── */}
@@ -3743,10 +3583,8 @@ function LookbookViewer({ lookbook, outfits, allItems, closetItems, onClose, onU
           <button onClick={() => toggleAccordion("looks")} style={{ ...acHdrStyle }}>
             <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
               <span style={{ fontSize: 10, fontWeight: 700, color: "#aaa", textTransform: "uppercase", letterSpacing: "0.1em" }}>Looks</span>
-              {(looks.length + (isPlanningType ? plannedSlots.length : 0)) > 0 && (
-                <span style={{ fontSize: 9, fontWeight: 700, color: "#fff", background: "#1a1a1a", borderRadius: 20, padding: "1px 7px" }}>
-                  {isPlanningType ? `${looks.length}/${looks.length + plannedSlots.length}` : looks.length}
-                </span>
+              {(looks.length + plannedSlots.length) > 0 && (
+                <span style={{ fontSize: 9, fontWeight: 700, color: "#fff", background: "#1a1a1a", borderRadius: 20, padding: "1px 7px" }}>{looks.length}/{looks.length + plannedSlots.length}</span>
               )}
             </div>
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#ccc" strokeWidth="2.5" strokeLinecap="round" style={{ transform: openAccordions.looks ? "rotate(180deg)" : "none", transition: "transform 0.2s" }}><polyline points="6 9 12 15 18 9"/></svg>
@@ -3754,7 +3592,7 @@ function LookbookViewer({ lookbook, outfits, allItems, closetItems, onClose, onU
           {openAccordions.looks && (
             <div style={{ padding: "8px 16px 12px", display: "flex", flexDirection: "column", gap: 4 }}>
               {/* Packing list toggle */}
-              {isTripType && looks.length > 0 && (
+              {looks.length > 0 && (
                 <>
                   <button onClick={() => setShowPackList(p => !p)} style={{ width: "100%", padding: "6px 10px", background: showPackList ? "#f0faf4" : "#f5f3ef", border: showPackList ? "1.5px solid #b6e8c8" : "none", borderRadius: 9, cursor: "pointer", fontSize: 11, fontWeight: 700, color: showPackList ? "#2d6a3f" : "#666", fontFamily: "'DM Sans', sans-serif", textAlign: "left", marginBottom: 2 }}>
                     <SvgLuggage size={12} color="currentColor" style={{ marginRight: 5 }} />Packing List ({packItems.length})
@@ -3806,7 +3644,7 @@ function LookbookViewer({ lookbook, outfits, allItems, closetItems, onClose, onU
               })}
 
               {/* Planned slot rows */}
-              {isPlanningType && plannedSlots.map((slot, si) => {
+              {plannedSlots.map((slot, si) => {
                 const slotDateLabel = slot.date ? new Date(slot.date + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" }) : null;
                 const slotWxRow = slot.date ? getWxForDate(slot.date) : null;
                 return (
@@ -3831,10 +3669,8 @@ function LookbookViewer({ lookbook, outfits, allItems, closetItems, onClose, onU
 
               {/* Action buttons */}
               <button onClick={() => setShowAddLooks(true)} style={{ width: "100%", padding: "7px", background: "#f5f3ef", border: "none", borderRadius: 9, cursor: "pointer", fontSize: 11, fontWeight: 700, color: "#666", fontFamily: "'DM Sans', sans-serif", marginTop: 2 }}>+ Add Outfit</button>
-              {isPlanningType && (
-                <button onClick={() => { const next = [...plannedSlots, { id: Date.now() + "_" + Math.random().toString(36).slice(2), name: "", date: "" }]; setPlannedSlots(next); save({ plannedSlots: next }); }}
-                  style={{ width: "100%", padding: "7px", background: "transparent", border: "1.5px dashed #d0cbc3", borderRadius: 9, cursor: "pointer", fontSize: 11, fontWeight: 700, color: "#bbb", fontFamily: "'DM Sans', sans-serif" }}>+ Plan a Slot</button>
-              )}
+              <button onClick={() => { const next = [...plannedSlots, { id: Date.now() + "_" + Math.random().toString(36).slice(2), name: "", date: "" }]; setPlannedSlots(next); save({ plannedSlots: next }); }}
+                style={{ width: "100%", padding: "7px", background: "transparent", border: "1.5px dashed #d0cbc3", borderRadius: 9, cursor: "pointer", fontSize: 11, fontWeight: 700, color: "#bbb", fontFamily: "'DM Sans', sans-serif" }}>+ Plan a Slot</button>
             </div>
           )}
 
@@ -4974,6 +4810,7 @@ function StatsTab({ itemsDb, outfitsDb, lookbooksDb, wishlistDb, outfitCalendar,
     const wName = (wi.name||"").toLowerCase().split(" ")[0];
     return items.some(ci => ci.category === wCat && (ci.name||"").toLowerCase().includes(wName));
   });
+  const wishlistTotalValue = wishItems.reduce((s,i) => s+parsePrice(i.price), 0);
 
   // ── Closet health score ──
   const healthScore = (() => {
@@ -5080,6 +4917,8 @@ function StatsTab({ itemsDb, outfitsDb, lookbooksDb, wishlistDb, outfitCalendar,
   ];
 
   // ── UI helpers ──
+  const SI = ({ d }) => <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight:6, verticalAlign:"middle", display:"inline-block", flexShrink:0 }}>{d}</svg>;
+
   const Card = ({ children, style={} }) => (
     <div style={{ background:"#fff", borderRadius:20, border:"1.5px solid #e8e4dc", padding:"20px 22px", ...style }}>{children}</div>
   );
@@ -5100,7 +4939,7 @@ function StatsTab({ itemsDb, outfitsDb, lookbooksDb, wishlistDb, outfitCalendar,
     </div>
   );
 
-  const tabs = [["identity","✦ Identity"],["gaps","◈ Closet Gaps"],["wear","◷ Wear Patterns"],["spending","$ Spending"]];
+  const tabs = [["profile","✦ Profile"],["intelligence","◈ Intelligence"],["habits","◷ Habits"],["budget","$ Budget"]];
 
   return (
     <div className="fade-up">
@@ -5125,21 +4964,18 @@ function StatsTab({ itemsDb, outfitsDb, lookbooksDb, wishlistDb, outfitCalendar,
         </div>
       ) : (<>
 
-      {statsView === "identity" && (
+      {/* ══════════════════ PROFILE ══════════════════ */}
+      {statsView === "profile" && (
         <div style={{ display:"flex", flexDirection:"column", gap:16 }}>
+
+          {/* Archetype hero */}
           {displayArchetype ? (
             <div style={{ background:"linear-gradient(135deg,#1a1a1a 0%,#2a2a2a 100%)", borderRadius:24, padding:"30px 28px", color:"#fff", position:"relative", overflow:"hidden" }}>
               <div style={{ position:"absolute", top:-20, right:-10, fontFamily:"'Cormorant Garamond',serif", fontSize:160, fontStyle:"italic", opacity:0.04, lineHeight:1, pointerEvents:"none", userSelect:"none" }}>✦</div>
-              <div style={{ fontSize:10, fontWeight:700, color:"rgba(255,255,255,0.4)", textTransform:"uppercase", letterSpacing:"0.12em", marginBottom:10 }}>Style Identity</div>
+              <div style={{ fontSize:10, fontWeight:700, color:"rgba(255,255,255,0.4)", textTransform:"uppercase", letterSpacing:"0.12em", marginBottom:10 }}>Your Style Archetype</div>
               <div style={{ fontFamily:"'Cormorant Garamond',serif", fontSize:40, fontWeight:300, fontStyle:"italic", letterSpacing:"-0.01em", lineHeight:1.1, marginBottom:10 }}>{displayArchetype.label}</div>
-              <div style={{ fontSize:13, color:"rgba(255,255,255,0.72)", lineHeight:1.7, maxWidth:520, marginBottom:16 }}>{styleThesis}</div>
-              {inferredStyleWords.length > 0 && (
-                <div style={{ display:"flex", flexWrap:"wrap", gap:6, marginBottom:16 }}>
-                  {inferredStyleWords.map(word => (
-                    <div key={word} style={{ fontSize:11, color:"rgba(255,255,255,0.7)", background:"rgba(255,255,255,0.08)", borderRadius:20, padding:"4px 10px", backdropFilter:"blur(4px)" }}>{word}</div>
-                  ))}
-                </div>
-              )}
+              <div style={{ fontSize:13, color:"rgba(255,255,255,0.65)", lineHeight:1.7, maxWidth:380, marginBottom:16 }}>{displayArchetype.desc}</div>
+              {/* Evidence pills */}
               {archetypeEvidence.length > 0 && !quizResult && (
                 <div style={{ display:"flex", flexWrap:"wrap", gap:6, marginBottom:20 }}>
                   {archetypeEvidence.map((e,i) => (
@@ -5147,19 +4983,25 @@ function StatsTab({ itemsDb, outfitsDb, lookbooksDb, wishlistDb, outfitCalendar,
                   ))}
                 </div>
               )}
+              {/* Archetype palette */}
               <div style={{ display:"flex", gap:8, marginBottom:24 }}>
                 {(displayArchetype.palette||[]).map((hex,i) => (
                   <div key={i} style={{ width:28, height:28, borderRadius:"50%", background:hex, border:"2px solid rgba(255,255,255,0.15)", boxShadow:"0 2px 8px rgba(0,0,0,0.3)" }} />
                 ))}
               </div>
               <div style={{ display:"flex", gap:24, flexWrap:"wrap", alignItems:"center" }}>
-                {[{label:"Pieces",value:items.length},{label:"Total Wears",value:totalWears},{label:"Lead Color",value:topColors[0]?.[0] || "—"},{label:"Top Occasion",value:topOccasions[0]?.[0] || "—"}].map(s=>(
+                {[{label:"Pieces",value:items.length},{label:"Total Value",value:`$${totalValue.toFixed(0)}`},{label:"Total Wears",value:totalWears},{label:"Avg CPW",value:cpwItems.length>0?`$${(cpwItems.reduce((s,i)=>s+i.cpw,0)/cpwItems.length).toFixed(1)}`:"—"}].map(s=>(
                   <div key={s.label}>
                     <div style={{ fontSize:22, fontWeight:800 }}>{s.value}</div>
                     <div style={{ fontSize:10, fontWeight:700, color:"rgba(255,255,255,0.4)", textTransform:"uppercase", letterSpacing:"0.07em" }}>{s.label}</div>
                   </div>
                 ))}
                 {quizResult && <button onClick={()=>{setQuizResult(null);setQuizAnswers({});}} style={{ marginLeft:"auto", fontSize:11, color:"rgba(255,255,255,0.4)", background:"transparent", border:"1px solid rgba(255,255,255,0.15)", borderRadius:20, padding:"4px 12px", cursor:"pointer", fontFamily:"'DM Sans',sans-serif", fontWeight:600 }}>Retake quiz</button>}
+              </div>
+              {/* Health score badge */}
+              <div style={{ position:"absolute", top:22, right:22, background:"rgba(255,255,255,0.08)", borderRadius:16, padding:"10px 16px", textAlign:"center", backdropFilter:"blur(8px)" }}>
+                <div style={{ fontSize:28, fontWeight:900, color:healthLabel[1] }}>{healthScore}</div>
+                <div style={{ fontSize:9, fontWeight:700, color:"rgba(255,255,255,0.45)", textTransform:"uppercase", letterSpacing:"0.08em" }}>{healthLabel[0]}</div>
               </div>
             </div>
           ) : archetypeQuiz ? (
@@ -5189,7 +5031,7 @@ function StatsTab({ itemsDb, outfitsDb, lookbooksDb, wishlistDb, outfitCalendar,
               <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", flexWrap:"wrap", gap:16 }}>
                 <div style={{ flex:1, minWidth:200 }}>
                   <div style={{ fontFamily:"'Cormorant Garamond',serif", fontSize:26, fontWeight:300, fontStyle:"italic", color:"#b0a898", marginBottom:8 }}>What's your style archetype?</div>
-                  <div style={{ fontSize:13, color:"#bbb", lineHeight:1.7, maxWidth:420, marginBottom:14 }}>Answer 3 quick questions to discover your style personality, then we’ll use your colors, occasions, and outfit formulas to sharpen the rest of the tab.</div>
+                  <div style={{ fontSize:13, color:"#bbb", lineHeight:1.7, maxWidth:340, marginBottom:14 }}>Answer 3 quick questions to discover your style personality — or tag items with occasions and we'll figure it out automatically.</div>
                   <div style={{ display:"flex", flexWrap:"wrap", gap:6 }}>
                     {Object.entries(ARCHETYPES).slice(0,4).map(([occ,a]) => (
                       <div key={occ} style={{ padding:"4px 12px", borderRadius:20, background:"#fff", border:"1px solid #e8e4dc", fontSize:11, fontWeight:700, color:"#888" }}>{a.label}</div>
@@ -5202,61 +5044,28 @@ function StatsTab({ itemsDb, outfitsDb, lookbooksDb, wishlistDb, outfitCalendar,
             </div>
           )}
 
-          <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:14 }}>
-            <Card>
-              <CardTitle icon={<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="8" cy="9" r="1.5" fill="currentColor" stroke="none"/><circle cx="15" cy="9" r="1.5" fill="currentColor" stroke="none"/><circle cx="12" cy="15" r="1.5" fill="currentColor" stroke="none"/></svg>}>Color DNA</CardTitle>
-              <div style={{ display:"flex", gap:10, flexWrap:"wrap", alignItems:"flex-end" }}>
-                {topColors.map(([color,count],i) => {
-                  const hex = COLOR_HEX[color]||"#ccc";
-                  const size = i===0?64:i===1?54:i===2?48:40;
-                  const pct = Math.round((count/items.length)*100);
-                  return (
-                    <div key={color} style={{ display:"flex", flexDirection:"column", alignItems:"center", gap:5 }}>
-                      <div style={{ width:size, height:size, borderRadius:"50%", background:hex, border:(color==="White"||color==="Cream")?"1.5px solid #e0dbd0":"none", boxShadow:"0 4px 14px rgba(0,0,0,0.12)" }} />
-                      <div style={{ fontSize:10, fontWeight:700, color:"#555" }}>{color}</div>
-                      <div style={{ fontSize:10, color:"#bbb" }}>{pct}%</div>
-                    </div>
-                  );
-                })}
-              </div>
-              <div style={{ marginTop:14, fontSize:12, color:"#888", lineHeight:1.6 }}>
-                {topColors[0] ? `Your wardrobe is led by ${topColors[0][0].toLowerCase()} and supported by a tight, repeatable palette.` : "Add more color tags to reveal the palette story."}
-              </div>
-            </Card>
-            <Card>
-              <CardTitle icon={<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 19h16"/><path d="M4 15h10"/><path d="M4 11h16"/><path d="M4 7h8"/></svg>}>Style Spectrum</CardTitle>
-              <div style={{ display:"flex", flexDirection:"column", gap:12 }}>
-                {styleSpectrum.map(scale => (
-                  <div key={scale.left}>
-                    <div style={{ display:"flex", justifyContent:"space-between", marginBottom:5, fontSize:11, fontWeight:700 }}>
-                      <span style={{ color:"#777" }}>{scale.left}</span>
-                      <span style={{ color:"#aaa" }}>{scale.right}</span>
-                    </div>
-                    <div style={{ height:7, background:"#f0ece4", borderRadius:99, position:"relative" }}>
-                      <div style={{ position:"absolute", left:`calc(${scale.value}% - 7px)`, top:-4, width:14, height:14, borderRadius:"50%", background:"#1a1a1a", boxShadow:"0 2px 6px rgba(0,0,0,0.18)" }} />
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </Card>
-          </div>
-
+          {/* Color DNA */}
           <Card>
-            <CardTitle icon={<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 3H5a2 2 0 00-2 2v4m6-6h10a2 2 0 012 2v4M9 3v18m0 0h10a2 2 0 002-2V9M9 21H5a2 2 0 01-2-2V9m0 0h18"/></svg>}>Signature Outfit Formulas</CardTitle>
-            <div style={{ fontSize:12, color:"#bbb", marginBottom:12 }}>The combinations you return to most often when you get dressed.</div>
-            {outfitFormula.length===0 ? <div style={{ fontSize:12, color:"#ccc" }}>Build more outfits to discover your formula</div> : (
-              <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fit,minmax(220px,1fr))", gap:10 }}>
-                {outfitFormula.map(([pair,count],i) => (
-                  <div key={pair} style={{ border:"1.5px solid #ece8e0", borderRadius:16, padding:"14px 16px", background:i===0?"#faf7f2":"#fff" }}>
-                    <div style={{ fontSize:10, fontWeight:700, color:"#aaa", textTransform:"uppercase", letterSpacing:"0.07em", marginBottom:6 }}>Formula {i+1}</div>
-                    <div style={{ fontSize:15, fontWeight:800, color:"#1a1a1a", marginBottom:4 }}>{pair}</div>
-                    <div style={{ fontSize:12, color:"#888" }}>{count} outfit{count!==1?"s":""}</div>
+            <CardTitle icon={<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="8" cy="9" r="1.5" fill="currentColor" stroke="none"/><circle cx="15" cy="9" r="1.5" fill="currentColor" stroke="none"/><circle cx="12" cy="15" r="1.5" fill="currentColor" stroke="none"/></svg>}>Color DNA</CardTitle>
+            <div style={{ display:"flex", gap:10, flexWrap:"wrap", alignItems:"flex-end" }}>
+              {topColors.map(([color,count],i) => {
+                const hex = COLOR_HEX[color]||"#ccc";
+                const size = i===0?64:i===1?54:i===2?48:40;
+                const pct = Math.round((count/items.length)*100);
+                return (
+                  <div key={color} style={{ display:"flex", flexDirection:"column", alignItems:"center", gap:5 }}>
+                    <div style={{ width:size, height:size, borderRadius:"50%", background:hex, border:(color==="White"||color==="Cream")?"1.5px solid #e0dbd0":"none", boxShadow:"0 4px 14px rgba(0,0,0,0.12)", transition:"transform 0.15s" }}
+                      onMouseEnter={e=>e.currentTarget.style.transform="scale(1.08)"}
+                      onMouseLeave={e=>e.currentTarget.style.transform="scale(1)"} />
+                    <div style={{ fontSize:10, fontWeight:700, color:"#555" }}>{color}</div>
+                    <div style={{ fontSize:10, color:"#bbb" }}>{pct}%</div>
                   </div>
-                ))}
-              </div>
-            )}
+                );
+              })}
+            </div>
           </Card>
 
+          {/* Two col: Occasions + Seasons */}
           <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:14 }}>
             <Card>
               <CardTitle icon={<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>}>Occasions</CardTitle>
@@ -5300,55 +5109,11 @@ function StatsTab({ itemsDb, outfitsDb, lookbooksDb, wishlistDb, outfitCalendar,
               </div>
             </Card>
           </div>
-        </div>
-      )}
 
-      {statsView === "gaps" && (
-        <div style={{ display:"flex", flexDirection:"column", gap:16 }}>
-          <Card style={{ background:"#fcfaf6" }}>
-            <CardTitle icon={<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>}>What Your Closet Needs Next</CardTitle>
-            {topGapInsights.length === 0 && gaps.length === 0 ? (
-              <div style={{ display:"flex", alignItems:"center", gap:10, padding:"12px 0", color:"#3aaa6e", fontSize:13, fontWeight:700 }}>
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
-                Your wardrobe looks well-rounded right now.
-              </div>
-            ) : (
-              <>
-                {topGapInsights.length > 0 && (
-                  <div style={{ display:"flex", flexDirection:"column", gap:10, marginBottom:16 }}>
-                    {topGapInsights.map((ins,i) => (
-                      <div key={i} style={{ display:"flex", alignItems:"flex-start", gap:12, padding:"14px 16px", borderRadius:16, background:ins.priority==="high"?"#fff8f0":ins.priority==="medium"?"#f8f8ff":"#f9fdf9", border:`1.5px solid ${ins.priority==="high"?"#f5c89a":ins.priority==="medium"?"#d8d2f8":"#c8ecd8"}` }}>
-                        <span style={{ fontSize:22, lineHeight:1, flexShrink:0, marginTop:1 }}>{ins.emoji}</span>
-                        <div style={{ flex:1 }}>
-                          <div style={{ fontSize:12, color:"#444", lineHeight:1.6, fontWeight:500 }}>{ins.msg}</div>
-                          <div style={{ fontSize:10, fontWeight:700, color:ins.priority==="high"?"#e07000":ins.priority==="medium"?"#6d63c8":"#2f8a58", marginTop:4, textTransform:"uppercase", letterSpacing:"0.06em" }}>{ins.priority} impact</div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-                {gaps.length > 0 && (
-                  <>
-                    <div style={{ fontSize:11, fontWeight:700, color:"#aaa", textTransform:"uppercase", letterSpacing:"0.07em", marginBottom:10 }}>Thin categories</div>
-                    <div style={{ display:"flex", flexWrap:"wrap", gap:8 }}>
-                      {gaps.map(({cat,count}) => (
-                        <div key={cat} style={{ padding:"8px 14px", borderRadius:20, background:count===0?"#fff0f0":"#fff8ee", border:`1px solid ${count===0?"#ffc5c5":"#f5c842"}`, fontSize:12, fontWeight:700, color:count===0?"#e05555":"#a07000", display:"flex", alignItems:"center", gap:8 }}>
-                          <span>{count===0?"✕":"!"}</span>
-                          <span>{cat}</span>
-                          <span style={{ fontWeight:500, opacity:0.7 }}>{count===0?"none":`only ${count}`}</span>
-                        </div>
-                      ))}
-                    </div>
-                  </>
-                )}
-              </>
-            )}
-          </Card>
-
+          {/* Top categories + brands */}
           <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:14 }}>
             <Card>
-              <CardTitle icon={<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>}>Category Balance</CardTitle>
-              <div style={{ fontSize:12, color:"#bbb", marginBottom:12 }}>Where the closet feels full versus thin.</div>
+              <CardTitle icon={<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>}>Categories</CardTitle>
               <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
                 {topCategories.slice(0,6).map(([cat,count]) => {
                   const pct = Math.round((count/(topCategories[0]?.[1]||1))*100);
@@ -5367,73 +5132,38 @@ function StatsTab({ itemsDb, outfitsDb, lookbooksDb, wishlistDb, outfitCalendar,
               </div>
             </Card>
             <Card>
-              <CardTitle icon={<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18"/><path d="M6 12h12"/><path d="M9 18h6"/></svg>}>Duplicates & Concentration</CardTitle>
-              {duplicateSignals.length === 0 ? (
-                <div style={{ fontSize:12, color:"#888", lineHeight:1.6 }}>Nothing looks overly repetitive yet. Your closet is fairly spread out.</div>
-              ) : (
-                <div style={{ display:"flex", flexDirection:"column", gap:10 }}>
-                  {duplicateSignals.map(signal => (
-                    <div key={signal.label} style={{ padding:"12px 14px", borderRadius:14, background:"#faf9f6", border:"1px solid #ece8e0" }}>
-                      <div style={{ fontSize:12, fontWeight:800, color:"#1a1a1a", marginBottom:4 }}>{signal.label}</div>
-                      <div style={{ fontSize:12, color:"#888", lineHeight:1.5 }}>{signal.detail}</div>
-                    </div>
-                  ))}
+              <CardTitle icon={<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20.59 13.41l-7.17 7.17a2 2 0 01-2.83 0L2 12V2h10l8.59 8.59a2 2 0 010 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg>}>Brands</CardTitle>
+              {topBrands.length===0 ? <div style={{ fontSize:12,color:"#ccc",paddingTop:8 }}>No brands tagged yet</div> : (
+                <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
+                  {topBrands.slice(0,6).map(([brand,count]) => {
+                    const pct = Math.round((count/(topBrands[0]?.[1]||1))*100);
+                    return (
+                      <div key={brand}>
+                        <div style={{ display:"flex", justifyContent:"space-between", marginBottom:3 }}>
+                          <span style={{ fontSize:12, fontWeight:700, color:"#444", overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap", maxWidth:110 }}>{brand}</span>
+                          <span style={{ fontSize:11, color:"#aaa", fontWeight:600 }}>{count}</span>
+                        </div>
+                        <div style={{ height:4, background:"#f0ece4", borderRadius:99 }}>
+                          <div style={{ height:"100%", width:`${pct}%`, background:"#7c6fe0", borderRadius:99 }} />
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
               )}
             </Card>
           </div>
 
-          <Card>
-            <CardTitle icon={<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20V10"/><path d="M18 20V4"/><path d="M6 20v-4"/></svg>}>Best Next Additions</CardTitle>
-            <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fit,minmax(220px,1fr))", gap:10 }}>
-              {nextAdditions.map(rec => (
-                <div key={rec.label} style={{ border:"1.5px solid #ece8e0", borderRadius:16, padding:"14px 16px", background:"#fff" }}>
-                  <div style={{ fontSize:10, fontWeight:700, color:"#aaa", textTransform:"uppercase", letterSpacing:"0.07em", marginBottom:6 }}>{rec.label}</div>
-                  <div style={{ fontSize:15, fontWeight:800, color:"#1a1a1a", marginBottom:4 }}>{rec.value}</div>
-                  <div style={{ fontSize:12, color:"#888", lineHeight:1.5 }}>{rec.note}</div>
-                </div>
-              ))}
-            </div>
-          </Card>
-
-          <Card>
-            <CardTitle icon={<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20.84 4.61a5.5 5.5 0 00-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 00-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 000-7.78z"/></svg>}>Wishlist Overlap</CardTitle>
-            <div style={{ fontSize:12, color:"#bbb", marginBottom:12 }}>Catch wishlist items that may repeat what you already own.</div>
-            {wishlistOverlap.length === 0 ? (
-              <div style={{ fontSize:12, color:"#3aaa6e", fontWeight:700 }}>Your wishlist looks distinct from your current closet.</div>
-            ) : (
-              <div>
-                <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:10 }}>
-                  <div style={{ fontSize:22, fontWeight:900, color:"#e05555" }}>{wishlistOverlap.length}</div>
-                  <div style={{ fontSize:12, color:"#888" }}>wishlist item{wishlistOverlap.length!==1?"s":""} may already have a close closet match</div>
-                </div>
-                {wishlistOverlap.slice(0,4).map(wi=>(
-                  <div key={wi.id} style={{ display:"flex", alignItems:"center", gap:8, padding:"6px 0", borderBottom:"1px solid #f5f3ef" }}>
-                    <div style={{ width:32, height:32, borderRadius:8, overflow:"hidden", background:"#f5f3ef", flexShrink:0 }}>
-                      {wi.image?<img src={wi.image} alt="" style={{ width:"100%", height:"100%", objectFit:"contain" }}/>:<HangerIcon size={12} color="#ddd"/>}
-                    </div>
-                    <div style={{ flex:1, minWidth:0 }}>
-                      <div style={{ fontSize:12, fontWeight:700, color:"#1a1a1a", overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{wi.name}</div>
-                      <div style={{ fontSize:11, color:"#e05555" }}>{wi.category} · likely overlap</div>
-                    </div>
-                    {wi.price && <div style={{ fontSize:12, fontWeight:700, color:"#9a6fe0" }}>{wi.price}</div>}
-                  </div>
-                ))}
-              </div>
-            )}
-          </Card>
-        </div>
-      )}
-
-      {statsView === "wear" && (
-        <div style={{ display:"flex", flexDirection:"column", gap:16 }}>
+          {/* This week — wear tracker strip */}
           <Card>
             <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:16 }}>
               <CardTitle icon={<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>}>This Week</CardTitle>
               <div style={{ display:"flex", gap:6, alignItems:"center" }}>
-                {weekLogged === 7 && <div style={{ fontSize:11, fontWeight:700, color:"#3aaa6e", display:"flex", alignItems:"center", gap:4 }}>Perfect week!</div>}
+                {weekStrip.filter(d=>d.outfitIds.length>0).length === 7 && (
+                  <div style={{ fontSize:11, fontWeight:700, color:"#3aaa6e", display:"flex", alignItems:"center", gap:4 }}>🔥 Perfect week!</div>
+                )}
                 <div style={{ fontSize:12, color:"#aaa", fontWeight:600 }}>
-                  <span style={{ color:"#1a1a1a", fontWeight:800 }}>{weekLogged}</span>/7 days
+                  <span style={{ color:"#1a1a1a", fontWeight:800 }}>{weekStrip.filter(d=>d.outfitIds.length>0).length}</span>/7 days
                 </div>
               </div>
             </div>
@@ -5447,7 +5177,13 @@ function StatsTab({ itemsDb, outfitsDb, lookbooksDb, wishlistDb, outfitCalendar,
                 return (
                   <div key={day.key} style={{ flex:1, display:"flex", flexDirection:"column", alignItems:"center", gap:5 }}>
                     <div style={{ fontSize:10, fontWeight:700, color:day.isToday?"#1a1a1a":"#bbb", textTransform:"uppercase", letterSpacing:"0.06em" }}>{dayLabel}</div>
-                    <div style={{ width:"100%", aspectRatio:"3/4", borderRadius:14, background: preview?.previewImage ? `url(${preview.previewImage}) center/cover` : wore ? "#1a1a1a" : day.isToday ? "#faf9f6" : "#f5f3ef", border: day.isToday && !wore ? "2px dashed #1a1a1a" : wore ? "none" : "1.5px solid #e8e4dc", display:"flex", alignItems:"center", justifyContent:"center", overflow:"hidden", position:"relative", transition:"transform 0.12s" }}
+                    <div style={{
+                      width:"100%", aspectRatio:"3/4", borderRadius:14,
+                      background: preview?.previewImage ? `url(${preview.previewImage}) center/cover` : wore ? "#1a1a1a" : day.isToday ? "#faf9f6" : "#f5f3ef",
+                      border: day.isToday && !wore ? "2px dashed #1a1a1a" : wore ? "none" : "1.5px solid #e8e4dc",
+                      display:"flex", alignItems:"center", justifyContent:"center",
+                      overflow:"hidden", position:"relative", transition:"transform 0.12s",
+                    }}
                       onMouseEnter={e=>e.currentTarget.style.transform="scale(1.04)"}
                       onMouseLeave={e=>e.currentTarget.style.transform="scale(1)"}>
                       {!preview?.previewImage && (wore ? (
@@ -5472,36 +5208,191 @@ function StatsTab({ itemsDb, outfitsDb, lookbooksDb, wishlistDb, outfitCalendar,
             )}
           </Card>
 
-          <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:14 }}>
-            {mostWorn.filter(i=>i.wornCount>0).length > 0 && (
-              <Card>
-                <CardTitle icon={<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>}>Signature Pieces</CardTitle>
-                <div style={{ fontSize:12, color:"#bbb", marginBottom:12 }}>Your most-reached-for items.</div>
-                <div style={{ display:"flex", gap:10, overflowX:"auto", paddingBottom:4 }}>
-                  {mostWorn.filter(i=>i.wornCount>0).slice(0,6).map((item,idx) => (
-                    <div key={item.id} onClick={()=>onViewItem(item)} style={{ flexShrink:0, width:90, cursor:"pointer", textAlign:"center" }}>
-                      <div style={{ position:"relative" }}>
-                        <div style={{ width:90, height:90, borderRadius:16, overflow:"hidden", background:"#f5f3ef", border:"1.5px solid #e8e4dc", marginBottom:6 }}>
-                          {item.image ? <img src={item.image} alt="" style={{ width:"100%", height:"100%", objectFit:"contain" }} /> : <div style={{ display:"flex", alignItems:"center", justifyContent:"center", height:"100%" }}><HangerIcon size={20} color="#ddd" /></div>}
-                        </div>
-                        {idx===0 && <div style={{ position:"absolute", top:-6, right:-6, background:"#f0c840", borderRadius:"50%", width:20, height:20, display:"flex", alignItems:"center", justifyContent:"center", fontSize:10 }}>★</div>}
+          {/* Signature pieces */}
+          {mostWorn.filter(i=>i.wornCount>0).length > 0 && (
+            <Card>
+              <CardTitle icon={<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>}>Signature Pieces</CardTitle>
+              <div style={{ fontSize:12, color:"#bbb", marginBottom:12 }}>Your most-reached-for items</div>
+              <div style={{ display:"flex", gap:10, overflowX:"auto", paddingBottom:4 }}>
+                {mostWorn.filter(i=>i.wornCount>0).slice(0,6).map((item,idx) => (
+                  <div key={item.id} onClick={()=>onViewItem(item)} style={{ flexShrink:0, width:90, cursor:"pointer", textAlign:"center" }}>
+                    <div style={{ position:"relative" }}>
+                      <div style={{ width:90, height:90, borderRadius:16, overflow:"hidden", background:"#f5f3ef", border:"1.5px solid #e8e4dc", marginBottom:6 }}>
+                        {item.image ? <img src={item.image} alt="" style={{ width:"100%", height:"100%", objectFit:"contain" }} /> : <div style={{ display:"flex", alignItems:"center", justifyContent:"center", height:"100%" }}><HangerIcon size={20} color="#ddd" /></div>}
                       </div>
-                      <div style={{ fontSize:10, fontWeight:700, color:"#1a1a1a", overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{item.name}</div>
-                      <div style={{ fontSize:10, color:"#aaa" }}>{item.wornCount}× worn</div>
+                      {idx===0 && <div style={{ position:"absolute", top:-6, right:-6, background:"#f0c840", borderRadius:"50%", width:20, height:20, display:"flex", alignItems:"center", justifyContent:"center", fontSize:10 }}>★</div>}
+                    </div>
+                    <div style={{ fontSize:10, fontWeight:700, color:"#1a1a1a", overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{item.name}</div>
+                    <div style={{ fontSize:10, color:"#aaa" }}>{item.wornCount}× worn</div>
+                  </div>
+                ))}
+              </div>
+            </Card>
+          )}
+        </div>
+      )}
+
+      {/* ══════════════════ INTELLIGENCE ══════════════════ */}
+      {statsView === "intelligence" && (
+        <div style={{ display:"flex", flexDirection:"column", gap:16 }}>
+
+          {/* Cost per wear — best */}
+          <Card>
+            <CardTitle icon={<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg>}>Best Cost Per Wear</CardTitle>
+            <div style={{ fontSize:12, color:"#bbb", marginBottom:12 }}>Your best investments — price ÷ wears</div>
+            {cpwItems.length===0 ? <div style={{ fontSize:12, color:"#ccc" }}>Add prices and start marking outfits worn to see this</div> : (
+              cpwItems.slice(0,5).map(item => (
+                <ItemRow key={item.id} item={item} sub={`$${item.cpw.toFixed(2)}/wear · ${item.wornCount}× worn · $${parsePrice(item.price).toFixed(0)}`} onClick={()=>onViewItem(item)} />
+              ))
+            )}
+          </Card>
+
+          {/* Cost per wear — worst */}
+          <Card>
+            <CardTitle icon={<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>}>Worst Cost Per Wear</CardTitle>
+            <div style={{ fontSize:12, color:"#bbb", marginBottom:12 }}>Items that need more love to justify their price</div>
+            {worstCpw.length===0 ? <div style={{ fontSize:12, color:"#ccc" }}>Add prices to items to see this</div> : (
+              worstCpw.map(item => (
+                <ItemRow key={item.id} item={item} sub={`$${item.cpw.toFixed(2)}/wear · ${item.wornCount||0}× worn · $${parsePrice(item.price).toFixed(0)}`} onClick={()=>onViewItem(item)} />
+              ))
+            )}
+          </Card>
+
+          {/* Outfit formula */}
+          <Card>
+            <CardTitle icon={<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 3H5a2 2 0 00-2 2v4m6-6h10a2 2 0 012 2v4M9 3v18m0 0h10a2 2 0 002-2V9M9 21H5a2 2 0 01-2-2V9m0 0h18"/></svg>}>Your Outfit Formula</CardTitle>
+            <div style={{ fontSize:12, color:"#bbb", marginBottom:12 }}>Category combinations that appear together most in your outfits</div>
+            {outfitFormula.length===0 ? <div style={{ fontSize:12, color:"#ccc" }}>Build more outfits to discover your formula</div> : (
+              <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
+                {outfitFormula.map(([pair,count],i) => (
+                  <div key={pair} style={{ display:"flex", alignItems:"center", gap:10 }}>
+                    <div style={{ width:22, height:22, borderRadius:6, background:"#f5f3ef", display:"flex", alignItems:"center", justifyContent:"center", fontSize:10, fontWeight:800, color:"#aaa", flexShrink:0 }}>{i+1}</div>
+                    <div style={{ flex:1, fontSize:12, fontWeight:700, color:"#1a1a1a" }}>{pair}</div>
+                    <div style={{ fontSize:11, color:"#aaa", fontWeight:600 }}>{count}×</div>
+                    <div style={{ width:60, height:4, background:"#f0ece4", borderRadius:99 }}>
+                      <div style={{ height:"100%", width:`${(count/(outfitFormula[0]?.[1]||1))*100}%`, background:"#1a1a1a", borderRadius:99 }} />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </Card>
+
+          {/* Wardrobe gaps + smart insights */}
+          <Card>
+            <CardTitle icon={<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>}>Wardrobe Gaps & Insights</CardTitle>
+            {gapInsights.length === 0 && gaps.length === 0 ? (
+              <div style={{ display:"flex", alignItems:"center", gap:10, padding:"12px 0", color:"#3aaa6e", fontSize:13, fontWeight:700 }}>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                Your wardrobe looks well-rounded — no major gaps!
+              </div>
+            ) : (<>
+              {gapInsights.length > 0 && (
+                <div style={{ display:"flex", flexDirection:"column", gap:10, marginBottom:16 }}>
+                  {gapInsights.map((ins,i) => (
+                    <div key={i} style={{ display:"flex", alignItems:"flex-start", gap:12, padding:"14px 16px", borderRadius:16, background:ins.priority==="high"?"#fff8f0":ins.priority==="medium"?"#f8f8ff":"#f9fdf9", border:`1.5px solid ${ins.priority==="high"?"#f5c89a":ins.priority==="medium"?"#d8d2f8":"#c8ecd8"}` }}>
+                      <span style={{ fontSize:22, lineHeight:1, flexShrink:0, marginTop:1 }}>{ins.emoji}</span>
+                      <div style={{ flex:1 }}>
+                        <div style={{ fontSize:12, color:"#444", lineHeight:1.6, fontWeight:500 }}>{ins.msg}</div>
+                        {ins.priority==="high" && <div style={{ fontSize:10, fontWeight:700, color:"#e07000", marginTop:4, textTransform:"uppercase", letterSpacing:"0.06em" }}>High priority</div>}
+                      </div>
                     </div>
                   ))}
                 </div>
-              </Card>
-            )}
-            <Card>
-              <CardTitle icon={<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0112 20c-7 0-11-8-11-8a18.45 18.45 0 015.06-5.94"/><path d="M9.9 4.24A9.12 9.12 0 0112 4c7 0 11 8 11 8a18.5 18.5 0 01-2.16 3.19"/><line x1="1" y1="1" x2="23" y2="23"/></svg>}>Needs Styling</CardTitle>
-              <div style={{ fontSize:12, color:"#bbb", marginBottom:12 }}>High-value or unworn pieces worth revisiting before buying more.</div>
-              {neglectedValue.length === 0 ? <div style={{ fontSize:12, color:"#888" }}>Everything with a price tag has been worn at least once.</div> : neglectedValue.map(item => (
-                <ItemRow key={item.id} item={item} sub={`$${parsePrice(item.price).toFixed(0)} · ${item.wornCount||0}× worn`} onClick={()=>onViewItem(item)} />
-              ))}
-            </Card>
-          </div>
+              )}
+              {gaps.length > 0 && (<>
+                <div style={{ fontSize:11, fontWeight:700, color:"#aaa", textTransform:"uppercase", letterSpacing:"0.07em", marginBottom:10 }}>Missing or thin categories</div>
+                <div style={{ display:"flex", flexWrap:"wrap", gap:8 }}>
+                  {gaps.map(({cat,count}) => (
+                    <div key={cat} style={{ padding:"8px 14px", borderRadius:20, background:count===0?"#fff0f0":"#fff8ee", border:`1px solid ${count===0?"#ffc5c5":"#f5c842"}`, fontSize:12, fontWeight:700, color:count===0?"#e05555":"#a07000", display:"flex", alignItems:"center", gap:8 }}>
+                      <span>{count===0?"✕":"!"}</span>
+                      <span>{cat}</span>
+                      <span style={{ fontWeight:500, opacity:0.7 }}>{count===0?"none":`only ${count}`}</span>
+                    </div>
+                  ))}
+                </div>
+                <div style={{ marginTop:12, fontSize:12, color:"#aaa", lineHeight:1.6 }}>
+                  💡 Add these to your <strong style={{ color:"#888" }}>Wishlist</strong> to track what you're looking for next
+                </div>
+              </>)}
+            </>)}
+          </Card>
 
+          {/* Never worn */}
+          {unworn.length > 0 && (
+            <Card>
+              <CardTitle icon={<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0112 20c-7 0-11-8-11-8a18.45 18.45 0 015.06-5.94"/><path d="M9.9 4.24A9.12 9.12 0 0112 4c7 0 11 8 11 8a18.5 18.5 0 01-2.16 3.19"/><line x1="1" y1="1" x2="23" y2="23"/></svg>}>Never Worn <span style={{ fontSize:11, fontWeight:600, color:"#e05555", marginLeft:6 }}>{unworn.length} items</span></CardTitle>
+              <div style={{ fontSize:12, color:"#bbb", marginBottom:12 }}>Wear them or list them for sale</div>
+              <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill,minmax(80px,1fr))", gap:10 }}>
+                {unworn.slice(0,12).map(item => (
+                  <div key={item.id} onClick={()=>onViewItem(item)} style={{ cursor:"pointer", borderRadius:12, overflow:"hidden", background:"#faf9f6", border:"1.5px solid #e8e4dc" }}
+                    onMouseEnter={e=>e.currentTarget.style.borderColor="#e05555"}
+                    onMouseLeave={e=>e.currentTarget.style.borderColor="#e8e4dc"}>
+                    <div style={{ aspectRatio:"1/1", display:"flex", alignItems:"center", justifyContent:"center", padding:4 }}>
+                      {item.image ? <img src={item.image} alt="" style={{ width:"100%", height:"100%", objectFit:"contain" }} /> : <HangerIcon size={16} color="#ddd" />}
+                    </div>
+                    <div style={{ padding:"3px 6px 5px", fontSize:9, fontWeight:700, color:"#888", overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{item.name}</div>
+                  </div>
+                ))}
+              </div>
+            </Card>
+          )}
+        </div>
+      )}
+
+      {/* ══════════════════ HABITS ══════════════════ */}
+      {statsView === "habits" && (
+        <div style={{ display:"flex", flexDirection:"column", gap:16 }}>
+
+          {/* This week strip */}
+          <Card>
+            <CardTitle icon={<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>}>This Week</CardTitle>
+            <div style={{ display:"flex", gap:6 }}>
+              {weekStrip.map(day => {
+                const dayLabel = day.date.toLocaleDateString("en-US", { weekday:"short" });
+                const dateLabel = day.date.toLocaleDateString("en-US", { month:"numeric", day:"numeric" });
+                const wore = day.outfitIds.length > 0;
+                const outfitPreviews = day.outfitIds.map(id => outfits.find(o => o.id === id)).filter(Boolean);
+                return (
+                  <div key={day.key} style={{ flex:1, display:"flex", flexDirection:"column", alignItems:"center", gap:4 }}>
+                    <div style={{ fontSize:9, fontWeight:700, color: day.isToday ? "#1a1a1a" : "#bbb", textTransform:"uppercase", letterSpacing:"0.06em" }}>{dayLabel}</div>
+                    <div style={{
+                      width:"100%", aspectRatio:"1/1", borderRadius:12,
+                      background: wore ? "#1a1a1a" : day.isToday ? "#f5f3ef" : "#f5f3ef",
+                      border: day.isToday ? "2px solid #1a1a1a" : "1.5px solid #e8e4dc",
+                      display:"flex", alignItems:"center", justifyContent:"center",
+                      overflow:"hidden", position:"relative",
+                    }}>
+                      {outfitPreviews[0]?.previewImage ? (
+                        <img src={outfitPreviews[0].previewImage} alt="" style={{ width:"100%", height:"100%", objectFit:"cover" }} />
+                      ) : wore ? (
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                      ) : (
+                        <div style={{ width:6, height:6, borderRadius:"50%", background: day.isToday ? "#1a1a1a" : "#ddd" }} />
+                      )}
+                      {day.outfitIds.length > 1 && (
+                        <div style={{ position:"absolute", bottom:3, right:3, background:"rgba(255,255,255,0.9)", borderRadius:6, padding:"1px 4px", fontSize:8, fontWeight:800, color:"#1a1a1a" }}>+{day.outfitIds.length}</div>
+                      )}
+                    </div>
+                    <div style={{ fontSize:9, color:"#bbb", fontWeight:500 }}>{dateLabel}</div>
+                  </div>
+                );
+              })}
+            </div>
+            <div style={{ marginTop:12, display:"flex", alignItems:"center", justifyContent:"space-between" }}>
+              <div style={{ fontSize:11, color:"#888" }}>
+                <span style={{ fontWeight:700, color:"#1a1a1a" }}>{weekStrip.filter(d=>d.outfitIds.length>0).length}</span> of 7 days tracked this week
+              </div>
+              {weekStrip.filter(d=>d.outfitIds.length>0).length === 7 && (
+                <div style={{ fontSize:11, fontWeight:700, color:"#3aaa6e", display:"flex", alignItems:"center", gap:4 }}>
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                  Perfect week!
+                </div>
+              )}
+            </div>
+          </Card>
+
+          {/* Wear frequency heatmap */}
           <Card>
             <CardTitle icon={<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>}>Outfit Frequency <span style={{ fontSize:11, fontWeight:500, color:"#bbb", marginLeft:6 }}>last 12 weeks</span></CardTitle>
             <div style={{ overflowX:"auto" }}>
@@ -5533,6 +5424,7 @@ function StatsTab({ itemsDb, outfitsDb, lookbooksDb, wishlistDb, outfitCalendar,
             </div>
           </Card>
 
+          {/* Monthly stats */}
           <Card>
             <CardTitle icon={<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>}>Monthly Activity</CardTitle>
             <div style={{ display:"flex", flexDirection:"column", gap:14 }}>
@@ -5551,6 +5443,24 @@ function StatsTab({ itemsDb, outfitsDb, lookbooksDb, wishlistDb, outfitCalendar,
             </div>
           </Card>
 
+          {/* Most active season */}
+          <Card>
+            <CardTitle icon={<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 8h1a4 4 0 010 8h-1"/><path d="M2 8h16v9a4 4 0 01-4 4H6a4 4 0 01-4-4V8z"/><line x1="6" y1="1" x2="6" y2="4"/><line x1="10" y1="1" x2="10" y2="4"/><line x1="14" y1="1" x2="14" y2="4"/></svg>}>Season Breakdown</CardTitle>
+            <div style={{ display:"flex", gap:8, flexWrap:"wrap" }}>
+              {topSeasons.map(([s,count]) => {
+                const pct = Math.round((count/items.length)*100);
+                return (
+                  <div key={s} style={{ background:SEASON_COLORS[s]||"#f5f3ef", borderRadius:14, padding:"12px 16px", textAlign:"center", minWidth:80 }}>
+                    <div style={{ fontSize:18, fontWeight:800, color:SEASON_TEXT[s]||"#888" }}>{pct}%</div>
+                    <div style={{ fontSize:10, fontWeight:700, color:SEASON_TEXT[s]||"#888", opacity:0.8, marginTop:2 }}>{s}</div>
+                    <div style={{ fontSize:10, color:SEASON_TEXT[s]||"#888", opacity:0.5 }}>{count} items</div>
+                  </div>
+                );
+              })}
+            </div>
+          </Card>
+
+          {/* Getting dressed score */}
           <Card>
             <CardTitle icon={<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>}>Wardrobe Health Score</CardTitle>
             <div style={{ display:"flex", alignItems:"center", gap:20, marginBottom:16 }}>
@@ -5569,7 +5479,7 @@ function StatsTab({ itemsDb, outfitsDb, lookbooksDb, wishlistDb, outfitCalendar,
               </div>
               <div>
                 <div style={{ fontSize:16, fontWeight:800, color:healthLabel[1], marginBottom:4 }}>{healthLabel[0]}</div>
-                <div style={{ fontSize:12, color:"#888", lineHeight:1.6 }}>Higher scores come from wearing what you own, keeping category balance, and getting more value from each piece.</div>
+                <div style={{ fontSize:12, color:"#888", lineHeight:1.6 }}>Based on wear frequency,<br/>category balance, and cost per wear</div>
               </div>
             </div>
             <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
@@ -5593,7 +5503,8 @@ function StatsTab({ itemsDb, outfitsDb, lookbooksDb, wishlistDb, outfitCalendar,
         </div>
       )}
 
-      {statsView === "spending" && (() => {
+      {/* ══════════════════ BUDGET ══════════════════ */}
+      {statsView === "budget" && (() => {
         const spentThisMonth = items.filter(i=>(i.purchaseDate||"").startsWith(thisMonth)).reduce((s,i)=>s+parsePrice(i.price),0);
         const spentThisYear  = items.filter(i=>(i.purchaseDate||"").startsWith(String(now.getFullYear()))).reduce((s,i)=>s+parsePrice(i.price),0);
         const moPct   = monthlyBudget > 0 ? Math.min((spentThisMonth / monthlyBudget) * 100, 100) : 0;
@@ -5642,7 +5553,12 @@ function StatsTab({ itemsDb, outfitsDb, lookbooksDb, wishlistDb, outfitCalendar,
 
           {/* Summary stats */}
           <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill,minmax(140px,1fr))", gap:12 }}>
-            {spendingStats.map(s=>(
+            {[
+              { label:"Closet Value", value:`$${totalValue.toFixed(0)}`, color:"#1a1a1a", bg:"#fafaf8" },
+              { label:"Avg Item Price", value: items.filter(i=>parsePrice(i.price)>0).length>0?`$${(totalValue/items.filter(i=>parsePrice(i.price)>0).length).toFixed(0)}`:"—", color:"#2090c0", bg:"#f0f8ff" },
+              { label:"Wishlist Value", value:wishlistTotalValue>0?`$${wishlistTotalValue.toFixed(0)}`:"—", color:"#9a6fe0", bg:"#f8f0ff" },
+              { label:"Added This Month", value:items.filter(i=>(i.purchaseDate||"").startsWith(thisMonth)).length, color:"#3aaa6e", bg:"#f0faf4" },
+            ].map(s=>(
               <div key={s.label} style={{ background:s.bg, borderRadius:16, padding:"16px 18px", textAlign:"center", border:"1.5px solid #e8e4dc" }}>
                 <div style={{ fontSize:24, fontWeight:900, color:s.color, lineHeight:1 }}>{s.value}</div>
                 <div style={{ fontSize:10, fontWeight:700, color:"#aaa", textTransform:"uppercase", letterSpacing:"0.07em", marginTop:6 }}>{s.label}</div>
@@ -5685,32 +5601,46 @@ function StatsTab({ itemsDb, outfitsDb, lookbooksDb, wishlistDb, outfitCalendar,
             )}
           </Card>
 
-          <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:14 }}>
-            <Card>
-              <CardTitle icon={<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg>}>Best Value</CardTitle>
-              <div style={{ fontSize:12, color:"#bbb", marginBottom:12 }}>Items delivering the strongest cost per wear.</div>
-              {cpwItems.length===0 ? <div style={{ fontSize:12, color:"#ccc" }}>Add prices and start marking outfits worn to see this</div> : (
-                cpwItems.slice(0,5).map(item => (
-                  <ItemRow key={item.id} item={item} sub={`$${item.cpw.toFixed(2)}/wear · ${item.wornCount}× worn · $${parsePrice(item.price).toFixed(0)}`} onClick={()=>onViewItem(item)} />
-                ))
-              )}
-            </Card>
-            <Card>
-              <CardTitle icon={<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>}>Needs More Wear</CardTitle>
-              <div style={{ fontSize:12, color:"#bbb", marginBottom:12 }}>Pieces that are expensive relative to how often they get worn.</div>
-              {worstCpw.length===0 ? <div style={{ fontSize:12, color:"#ccc" }}>Add prices to items to see this</div> : (
-                worstCpw.map(item => (
-                  <ItemRow key={item.id} item={item} sub={`$${item.cpw.toFixed(2)}/wear · ${item.wornCount||0}× worn · $${parsePrice(item.price).toFixed(0)}`} onClick={()=>onViewItem(item)} />
-                ))
-              )}
-            </Card>
-          </div>
-
+          {/* Most valuable items */}
           <Card>
             <CardTitle icon={<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M6 3h12l4 6-10 13L2 9z"/><path d="M11 3L8 9l4 13 4-13-3-6"/><path d="M2 9h20"/></svg>}>Most Valuable Items</CardTitle>
             {[...items].sort((a,b)=>parsePrice(b.price)-parsePrice(a.price)).filter(i=>parsePrice(i.price)>0).slice(0,6).map(item=>(
               <ItemRow key={item.id} item={item} sub={`$${parsePrice(item.price).toFixed(0)} · $${(parsePrice(item.price)/Math.max(item.wornCount||0,1)).toFixed(2)}/wear`} onClick={()=>onViewItem(item)} />
             ))}
+          </Card>
+
+          {/* Wishlist intelligence */}
+          <Card>
+            <CardTitle icon={<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20.84 4.61a5.5 5.5 0 00-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 00-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 000-7.78z"/></svg>}>Wishlist Intelligence</CardTitle>
+            <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap:10, marginBottom:14 }}>
+              {[
+                { label:"Wishlist Items", value:wishItems.length, color:"#9a6fe0" },
+                { label:"Total Value", value:wishlistTotalValue>0?`$${wishlistTotalValue.toFixed(0)}`:"—", color:"#9a6fe0" },
+                { label:"Closet Overlap", value:wishlistOverlap.length, color:wishlistOverlap.length>0?"#e05555":"#3aaa6e" },
+              ].map(s=>(
+                <div key={s.label} style={{ background:"#faf9f6", borderRadius:12, padding:"10px 12px", textAlign:"center" }}>
+                  <div style={{ fontSize:20, fontWeight:800, color:s.color }}>{s.value}</div>
+                  <div style={{ fontSize:9, fontWeight:700, color:"#bbb", textTransform:"uppercase", letterSpacing:"0.06em", marginTop:3 }}>{s.label}</div>
+                </div>
+              ))}
+            </div>
+            {wishlistOverlap.length > 0 && (
+              <div>
+                <div style={{ fontSize:11, fontWeight:700, color:"#e05555", marginBottom:8 }}>⚠ You may already own versions of these:</div>
+                {wishlistOverlap.slice(0,4).map(wi=>(
+                  <div key={wi.id} style={{ display:"flex", alignItems:"center", gap:8, padding:"6px 0", borderBottom:"1px solid #f5f3ef" }}>
+                    <div style={{ width:32, height:32, borderRadius:8, overflow:"hidden", background:"#f5f3ef", flexShrink:0 }}>
+                      {wi.image?<img src={wi.image} alt="" style={{ width:"100%", height:"100%", objectFit:"contain" }}/>:<HangerIcon size={12} color="#ddd"/>}
+                    </div>
+                    <div style={{ flex:1, minWidth:0 }}>
+                      <div style={{ fontSize:12, fontWeight:700, color:"#1a1a1a", overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{wi.name}</div>
+                      <div style={{ fontSize:11, color:"#e05555" }}>{wi.category} · already in closet</div>
+                    </div>
+                    {wi.price && <div style={{ fontSize:12, fontWeight:700, color:"#9a6fe0" }}>{wi.price}</div>}
+                  </div>
+                ))}
+              </div>
+            )}
           </Card>
         </div>
         );
@@ -6244,70 +6174,75 @@ const SALE_STATUS_META = {
   archived: { label: "Archived", bg: "#f5f3ef", color: "#aaa",    border: "#e0dbd0" },
 };
 
-const PLATFORM_FEE_CALC = {
-  "Poshmark":  (p) => p >= 15 ? p * 0.20 : 2.95,
-  "Depop":     (p) => p * 0.10,
-  "Mercari":   (p) => p * 0.10,
-  "eBay":      (p) => p * 0.1295,
-  "ThredUp":   () => 0,
-  "Facebook":  (p) => p * 0.05,
-  "Vinted":    () => 0,
-  "Instagram": (p) => p * 0.05,
-  "Other":     () => 0,
-};
-const PLATFORM_FEE_LABELS = {
-  "Poshmark": "20% (or $2.95 flat under $15)",
-  "Depop": "10%", "Mercari": "10%", "eBay": "12.95%",
-  "ThredUp": "Variable (they set price)", "Facebook": "5% (shipping orders)",
-  "Vinted": "Buyer pays fee", "Instagram": "5%", "Other": "—",
-};
-
-const CONDITION_BADGE = {
-  "New with tags": { bg: "#f0faf4", color: "#2d6a3f", border: "#b6e8c8" },
-  "Like new":      { bg: "#f5f0ff", color: "#7c6fe0", border: "#c4b0f0" },
-  "Good":          { bg: "#fff8ee", color: "#a07000", border: "#f5c842" },
-  "Fair":          { bg: "#fef2f2", color: "#e05555", border: "#fca5a5" },
-  "Poor":          { bg: "#f5f3ef", color: "#aaa",    border: "#e0dbd0" },
-};
-
-const getDaysListed = (item) => {
-  if (!item.listedDate) return null;
-  return Math.floor((Date.now() - new Date(item.listedDate + "T00:00:00")) / 86400000);
-};
-const getDaysBadgeStyle = (days) => {
-  if (days < 14) return { color: "#2d6a3f", bg: "#f0faf4" };
-  if (days < 30) return { color: "#a07000", bg: "#fff8ee" };
-  return { color: "#e05555", bg: "#fef2f2" };
-};
-
 function SellerDashboard({ itemsDb, allClosetItems, onViewItem }) {
   const forSaleItems = itemsDb.rows.filter(i => i.forSale);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
-  const [sortBy, setSortBy] = useState("dateAdded");
-  const [viewMode, setViewMode] = useState("list");
   const [editingId, setEditingId] = useState(null);
   const [editVals, setEditVals] = useState({});
-  const [genLoading, setGenLoading] = useState(null);
+  // Bulk list
   const [showBulkModal, setShowBulkModal] = useState(false);
   const [bulkSearch, setBulkSearch] = useState("");
   const [bulkSelected, setBulkSelectedLocal] = useState(new Set());
   const [bulkPlatform, setBulkPlatform] = useState("");
   const [bulkCondition, setBulkCondition] = useState("");
   const [bulkPrice, setBulkPrice] = useState("");
-  const [showBulkPriceModal, setShowBulkPriceModal] = useState(false);
-  const [bulkPriceSelected, setBulkPriceSelected] = useState(new Set());
-  const [bulkDiscountPct, setBulkDiscountPct] = useState(10);
+  // Sold confirmation modal
   const [soldConfirmItem, setSoldConfirmItem] = useState(null);
   const [soldPrice, setSoldPrice] = useState("");
   const [soldPlatform, setSoldPlatform] = useState("");
   const [soldShipping, setSoldShipping] = useState("");
   const [soldDate, setSoldDate] = useState(new Date().toISOString().slice(0, 10));
-  const [soldRemoveFromCloset, setSoldRemoveFromCloset] = useState(true);
-  const [showBulkMenu, setShowBulkMenu] = useState(false);
-  const [gridEditItem, setGridEditItem] = useState(null);
 
-  // Stats (moved here from right-rail)
+  const updateItem = (item, patch) => itemsDb.update({ ...item, ...patch });
+
+  const moveBackToCloset = (item) => {
+    itemsDb.update({ ...item, forSale: false, saleStatus: undefined, salePrice: undefined, salePlatform: undefined, saleNotes: undefined });
+  };
+
+  const openSoldConfirm = (item) => {
+    setSoldConfirmItem(item);
+    setSoldPrice(item.salePrice || "");
+    setSoldPlatform(item.salePlatform || "");
+    setSoldShipping("");
+    setSoldDate(new Date().toISOString().slice(0, 10));
+  };
+
+  const confirmSold = () => {
+    if (!soldConfirmItem) return;
+    updateItem(soldConfirmItem, {
+      saleStatus: "sold",
+      soldDate: soldDate,
+      salePrice: soldPrice,
+      salePlatform: soldPlatform,
+      shippingCost: soldShipping,
+      netRevenue: soldPrice && soldShipping
+        ? String((parseFloat(soldPrice)||0) - (parseFloat(soldShipping)||0))
+        : soldPrice,
+    });
+    setSoldConfirmItem(null);
+  };
+
+  const startEdit = (item) => {
+    setEditingId(item.id);
+    setEditVals({ salePrice: item.salePrice || "", salePlatform: item.salePlatform || "", saleNotes: item.saleNotes || "", saleStatus: item.saleStatus || "listed" });
+  };
+
+  const saveEdit = (item) => {
+    updateItem(item, editVals);
+    setEditingId(null);
+  };
+
+  const filtered = forSaleItems.filter(i => {
+    const matchStatus = statusFilter === "all" || (i.saleStatus || "listed") === statusFilter;
+    const q = search.trim().toLowerCase();
+    const matchSearch = !q || i.name.toLowerCase().includes(q) || (i.brand || "").toLowerCase().includes(q);
+    return matchStatus && matchSearch;
+  });
+
+  const PLATFORMS = ["Depop", "Poshmark", "eBay", "Mercari", "ThredUp", "Facebook", "Instagram", "Vinted", "Other"];
+
+  // Stats
   const listed = forSaleItems.filter(i => i.saleStatus === "listed" || !i.saleStatus).length;
   const pending = forSaleItems.filter(i => i.saleStatus === "pending").length;
   const drafts = forSaleItems.filter(i => i.saleStatus === "draft").length;
@@ -6316,449 +6251,279 @@ function SellerDashboard({ itemsDb, allClosetItems, onViewItem }) {
     .reduce((s, i) => s + (parseFloat((i.netRevenue || i.salePrice || "").replace(/[^0-9.]/g, "")) || 0), 0);
   const potentialEarnings = forSaleItems.filter(i => i.saleStatus !== "sold")
     .reduce((s, i) => s + (parseFloat((i.salePrice || "").replace(/[^0-9.]/g, "")) || 0), 0);
+  // Earned vs spent
   const totalSpent = itemsDb.rows.reduce((s, i) => s + (parseFloat((i.price||"").replace(/[^0-9.]/g,""))||0), 0);
   const earnedPct = totalSpent > 0 ? Math.min(100, (totalEarned / totalSpent) * 100) : 0;
+  // Time to sell
   const soldWithDates = forSaleItems.filter(i => i.saleStatus === "sold" && i.soldDate && i.listedDate);
   const avgDaysToSell = soldWithDates.length > 0
     ? Math.round(soldWithDates.reduce((s, i) => s + Math.max(0, (new Date(i.soldDate) - new Date(i.listedDate)) / 86400000), 0) / soldWithDates.length)
     : null;
-  const sellThrough = forSaleItems.length > 0 ? Math.round((sold / forSaleItems.length) * 100) : 0;
 
-  const updateItem = (item, patch) => itemsDb.update({ ...item, ...patch });
-  const moveBackToCloset = (item) => {
-    itemsDb.update({ ...item, forSale: false, saleStatus: undefined, salePrice: undefined, salePlatform: undefined, saleNotes: undefined, saleUrl: undefined, saleDescription: undefined });
-  };
-  const openSoldConfirm = (item) => {
-    setSoldConfirmItem(item); setSoldPrice(item.salePrice || ""); setSoldPlatform(item.salePlatform || "");
-    setSoldShipping(""); setSoldDate(new Date().toISOString().slice(0, 10)); setSoldRemoveFromCloset(true);
-  };
-  const confirmSold = () => {
-    if (!soldConfirmItem) return;
-    const spNum = parseFloat(soldPrice || 0) || 0;
-    const shipNum = parseFloat(soldShipping || 0) || 0;
-    const feeCalc = PLATFORM_FEE_CALC[soldPlatform];
-    const platformFee = feeCalc ? feeCalc(spNum) : 0;
-    updateItem(soldConfirmItem, { saleStatus: "sold", soldDate, salePrice: soldPrice, salePlatform: soldPlatform, shippingCost: soldShipping, netRevenue: String(spNum - shipNum - platformFee), ...(soldRemoveFromCloset ? { forSale: false } : {}) });
-    setSoldConfirmItem(null);
-  };
-  const startEdit = (item) => {
-    setEditingId(item.id);
-    setEditVals({ salePrice: item.salePrice || "", salePlatform: item.salePlatform || "", saleCondition: item.saleCondition || "", saleNotes: item.saleNotes || "", saleStatus: item.saleStatus || "listed", saleUrl: item.saleUrl || "", saleDescription: item.saleDescription || "" });
-  };
-  const saveEdit = (item) => { updateItem(item, editVals); setEditingId(null); };
-  const generateDescription = async (item) => {
-    const apiKey = process.env.REACT_APP_ANTHROPIC_KEY || "";
-    if (!apiKey) { alert("No API key configured (REACT_APP_ANTHROPIC_KEY)"); return; }
-    setGenLoading(item.id);
-    try {
-      const prompt = `Write a short, engaging resale listing description for this clothing item. Be specific, appealing, and honest. Keep it under 80 words.\n- Name: ${item.name}\n- Brand: ${item.brand || "N/A"}\n- Category: ${item.category || ""}\n- Color: ${item.color || ""}\n- Size: ${item.size || ""}\n- Condition: ${item.saleCondition || "Good"}\n- Original price: ${item.price || ""}\n- Notes: ${item.notes || ""}\nOutput only the description text, no labels or headers.`;
-      const res = await fetch("https://api.anthropic.com/v1/messages", { method: "POST", headers: { "Content-Type": "application/json", "x-api-key": apiKey, "anthropic-version": "2023-06-01", "anthropic-dangerous-direct-browser-access": "true" }, body: JSON.stringify({ model: "claude-sonnet-4-6", max_tokens: 200, messages: [{ role: "user", content: prompt }] }) });
-      const data = await res.json();
-      const desc = data?.content?.[0]?.text?.trim() || "";
-      if (desc) setEditVals(v => ({ ...v, saleDescription: desc }));
-    } catch (e) { console.error("Generate description error:", e); }
-    setGenLoading(null);
-  };
-
-  const sortedFiltered = (() => {
-    const base = forSaleItems.filter(i => {
-      const matchStatus = statusFilter === "all" || (i.saleStatus || "listed") === statusFilter;
-      const q = search.trim().toLowerCase();
-      return matchStatus && (!q || i.name.toLowerCase().includes(q) || (i.brand || "").toLowerCase().includes(q));
-    });
-    return [...base].sort((a, b) => {
-      if (sortBy === "price") return (parseFloat((b.salePrice||"").replace(/[^0-9.]/g,""))||0) - (parseFloat((a.salePrice||"").replace(/[^0-9.]/g,""))||0);
-      if (sortBy === "days") return (getDaysListed(b) ?? -1) - (getDaysListed(a) ?? -1);
-      if (sortBy === "status") return SALE_STATUSES.indexOf(a.saleStatus||"listed") - SALE_STATUSES.indexOf(b.saleStatus||"listed");
-      return (b.listedDate || b.id || "").localeCompare(a.listedDate || a.id || "");
-    });
-  })();
-
-  const PLATFORMS = ["Depop", "Poshmark", "eBay", "Mercari", "ThredUp", "Facebook", "Instagram", "Vinted", "Other"];
+  // Bulk list closet items
   const closetOnlyItems = (allClosetItems || itemsDb.rows).filter(i => !i.forSale);
   const bulkFiltered = closetOnlyItems.filter(i => !bulkSearch || i.name.toLowerCase().includes(bulkSearch.toLowerCase()));
+
   const applyBulkList = () => {
     if (bulkSelected.size === 0) return;
     const today = new Date().toISOString().slice(0, 10);
-    bulkSelected.forEach(id => { const item = closetOnlyItems.find(i => i.id === id); if (item) itemsDb.update({ ...item, forSale: true, saleStatus: "listed", listedDate: today, salePlatform: bulkPlatform || undefined, saleCondition: bulkCondition || undefined, salePrice: bulkPrice || undefined }); });
+    bulkSelected.forEach(id => {
+      const item = closetOnlyItems.find(i => i.id === id);
+      if (item) itemsDb.update({ ...item, forSale: true, saleStatus: "listed", listedDate: today, salePlatform: bulkPlatform || undefined, saleCondition: bulkCondition || undefined, salePrice: bulkPrice || undefined });
+    });
     setShowBulkModal(false); setBulkSelectedLocal(new Set()); setBulkSearch(""); setBulkPlatform(""); setBulkCondition(""); setBulkPrice("");
   };
-  const applyBulkPrice = () => {
-    if (bulkPriceSelected.size === 0) return;
-    const factor = 1 - (bulkDiscountPct / 100);
-    bulkPriceSelected.forEach(id => { const item = forSaleItems.find(i => i.id === id); if (!item) return; const current = parseFloat((item.salePrice || "").replace(/[^0-9.]/g, "")) || 0; if (current > 0) itemsDb.update({ ...item, salePrice: String(Math.round(current * factor)) }); });
-    setShowBulkPriceModal(false); setBulkPriceSelected(new Set()); setBulkDiscountPct(10);
-  };
-  const activePriceItems = forSaleItems.filter(i => (i.saleStatus === "listed" || i.saleStatus === "pending") && parseFloat((i.salePrice || "").replace(/[^0-9.]/g, "")) > 0);
 
-  // Shared edit form fields (used in both list inline + grid modal)
-  const editFormFields = (genItem) => (
-    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-      <div style={{ display: "flex", gap: 8 }}>
-        <input value={editVals.salePrice} onChange={e => setEditVals(v => ({ ...v, salePrice: e.target.value }))} placeholder="Sale price"
-          style={{ flex: 1, padding: "7px 10px", border: "1.5px solid #e8e4dc", borderRadius: 10, fontFamily: "'DM Sans', sans-serif", fontSize: 12, outline: "none" }} />
-        <select value={editVals.salePlatform} onChange={e => setEditVals(v => ({ ...v, salePlatform: e.target.value }))}
-          style={{ flex: 1, padding: "7px 32px 7px 10px", border: "1.5px solid #e8e4dc", borderRadius: 10, fontFamily: "'DM Sans', sans-serif", fontSize: 12, appearance: "none", WebkitAppearance: "none", backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='11' height='11' viewBox='0 0 24 24' fill='none' stroke='%23999' stroke-width='2.5' stroke-linecap='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E")`, backgroundRepeat: "no-repeat", backgroundPosition: "right 10px center", backgroundColor: "#fff" }}>
-          <option value="">Platform…</option>
-          {PLATFORMS.map(p => <option key={p} value={p}>{p}</option>)}
-        </select>
+  if (forSaleItems.length === 0) return (
+    <div className="fade-up">
+      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "60px 0 40px", gap: 14 }}>
+        <div><SvgTag size={40} color="#ddd" /></div>
+        <div style={{ fontSize: 18, fontWeight: 800, color: "#1a1a1a" }}>No items listed for sale</div>
+        <div style={{ fontSize: 13, color: "#aaa", textAlign: "center", maxWidth: 280 }}>Open any item in your closet and tap "List for Sale" to move it here</div>
       </div>
-      <select value={editVals.saleCondition} onChange={e => setEditVals(v => ({ ...v, saleCondition: e.target.value }))}
-        style={{ padding: "7px 32px 7px 10px", border: "1.5px solid #e8e4dc", borderRadius: 10, fontFamily: "'DM Sans', sans-serif", fontSize: 12, appearance: "none", WebkitAppearance: "none", backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='11' height='11' viewBox='0 0 24 24' fill='none' stroke='%23999' stroke-width='2.5' stroke-linecap='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E")`, backgroundRepeat: "no-repeat", backgroundPosition: "right 10px center", backgroundColor: "#fff" }}>
-        <option value="">Condition…</option>
-        {["New with tags", "Like new", "Good", "Fair", "Poor"].map(c => <option key={c} value={c}>{c}</option>)}
-      </select>
-      <input value={editVals.saleUrl} onChange={e => setEditVals(v => ({ ...v, saleUrl: e.target.value }))} placeholder="Listing URL (e.g. depop.com/…)"
-        style={{ padding: "7px 10px", border: "1.5px solid #e8e4dc", borderRadius: 10, fontFamily: "'DM Sans', sans-serif", fontSize: 12, outline: "none" }} />
-      <div style={{ position: "relative" }}>
-        <textarea value={editVals.saleDescription} onChange={e => setEditVals(v => ({ ...v, saleDescription: e.target.value }))} placeholder="Listing description…" rows={3}
-          style={{ width: "100%", padding: "7px 10px 28px", border: "1.5px solid #e8e4dc", borderRadius: 10, fontFamily: "'DM Sans', sans-serif", fontSize: 12, outline: "none", resize: "vertical", boxSizing: "border-box" }} />
-        <button onClick={() => generateDescription(genItem)} disabled={genLoading === genItem.id}
-          style={{ position: "absolute", bottom: 7, right: 7, padding: "3px 10px", background: genLoading === genItem.id ? "#f0ece4" : "#1a1a1a", color: genLoading === genItem.id ? "#aaa" : "#fff", border: "none", borderRadius: 7, cursor: genLoading === genItem.id ? "not-allowed" : "pointer", fontSize: 10, fontWeight: 700, fontFamily: "'DM Sans', sans-serif" }}>
-          {genLoading === genItem.id ? "Generating…" : "✦ Generate"}
+      <div style={{ display: "flex", justifyContent: "center" }}>
+        <button onClick={() => setShowBulkModal(true)} style={{ padding: "10px 22px", background: "#1a1a1a", color: "#fff", border: "none", borderRadius: 12, cursor: "pointer", fontFamily: "'DM Sans', sans-serif", fontSize: 13, fontWeight: 700 }}>
+          + Bulk List from Closet
         </button>
       </div>
-      <input value={editVals.saleNotes} onChange={e => setEditVals(v => ({ ...v, saleNotes: e.target.value }))} placeholder="Notes"
-        style={{ padding: "7px 10px", border: "1.5px solid #e8e4dc", borderRadius: 10, fontFamily: "'DM Sans', sans-serif", fontSize: 12, outline: "none" }} />
-    </div>
-  );
-
-  // ── Left panel ──
-  const leftPanel = (
-    <div style={{ width: 210, flexShrink: 0, position: "sticky", top: 24, maxHeight: "calc(100vh - 48px)", overflowY: "auto", display: "flex", flexDirection: "column", gap: 14 }}>
-      {/* Search */}
-      <div style={{ position: "relative" }}>
-        <span style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)", pointerEvents: "none", display: "flex" }}>
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#bbb" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-        </span>
-        <input className="closet-search" value={search} onChange={e => setSearch(e.target.value)} placeholder="Search listings…" />
-      </div>
-      {/* Stats cards */}
-      {forSaleItems.length > 0 && (<>
-        <div className="right-card">
-          <div className="right-card-title">Listings</div>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6, marginBottom: 6 }}>
-            {[{ label: "Drafts", value: drafts, bg: "#f5f3ef", color: "#888" }, { label: "Listed", value: listed, bg: "#f0faf4", color: "#2d6a3f" }, { label: "Pending", value: pending, bg: "#fff8ee", color: "#a07000" }, { label: "Sold", value: sold, bg: "#f5f0ff", color: "#7c6fe0" }].map(s => (
-              <div key={s.label} style={{ background: s.bg, borderRadius: 8, padding: "8px 10px", textAlign: "center" }}>
-                <div style={{ fontSize: 16, fontWeight: 800, color: s.color }}>{s.value}</div>
-                <div style={{ fontSize: 9, fontWeight: 700, color: "#aaa", textTransform: "uppercase", letterSpacing: "0.07em" }}>{s.label}</div>
-              </div>
-            ))}
-          </div>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6 }}>
-            <div style={{ background: "#fafaf8", borderRadius: 8, padding: "8px 10px", textAlign: "center" }}>
-              <div style={{ fontSize: 14, fontWeight: 800, color: "#2d6a3f" }}>{totalEarned > 0 ? `$${totalEarned.toFixed(0)}` : "—"}</div>
-              <div style={{ fontSize: 9, fontWeight: 700, color: "#aaa", textTransform: "uppercase", letterSpacing: "0.07em" }}>Earned</div>
-            </div>
-            <div style={{ background: "#fafaf8", borderRadius: 8, padding: "8px 10px", textAlign: "center" }}>
-              <div style={{ fontSize: 14, fontWeight: 800, color: "#888" }}>{potentialEarnings > 0 ? `$${potentialEarnings.toFixed(0)}` : "—"}</div>
-              <div style={{ fontSize: 9, fontWeight: 700, color: "#aaa", textTransform: "uppercase", letterSpacing: "0.07em" }}>Potential</div>
-            </div>
-          </div>
-        </div>
-        <div className="right-card">
-          <div className="right-card-title">Performance</div>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
-            <span style={{ fontSize: 12, color: "#888" }}>Sell-through</span>
-            <span style={{ fontSize: 13, fontWeight: 800, color: "#7c6fe0" }}>{sellThrough}%</span>
-          </div>
-          <div style={{ height: 5, borderRadius: 6, background: "#e8e4dc", overflow: "hidden", marginBottom: 8 }}>
-            <div style={{ height: "100%", borderRadius: 6, background: "#7c6fe0", width: sellThrough + "%", transition: "width 0.5s" }} />
-          </div>
-          <div style={{ fontSize: 11, color: "#aaa" }}>{sold} of {forSaleItems.length} sold</div>
-          {avgDaysToSell !== null && (
-            <div style={{ marginTop: 8, paddingTop: 8, borderTop: "1px solid #f0ece4", fontSize: 11, color: "#888" }}>
-              Avg time to sell: <strong style={{ color: "#1a1a1a" }}>{avgDaysToSell}d</strong>
-            </div>
-          )}
-        </div>
-        {totalSpent > 0 && (
-          <div className="right-card">
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 8 }}>
-              <div className="right-card-title" style={{ marginBottom: 0 }}>Wardrobe Payback</div>
-              <span style={{ fontSize: 12, fontWeight: 800, color: "#7c6fe0" }}>{earnedPct.toFixed(1)}%</span>
-            </div>
-            <div style={{ height: 6, borderRadius: 8, background: "#e8e4dc", overflow: "hidden", marginBottom: 6 }}>
-              <div style={{ height: "100%", borderRadius: 8, background: "linear-gradient(90deg, #7c6fe0, #3aaa6e)", width: earnedPct + "%", transition: "width 0.5s" }} />
-            </div>
-            <div style={{ display: "flex", justifyContent: "space-between" }}>
-              <span style={{ fontSize: 10, color: "#aaa" }}>Sold: <strong style={{ color: "#2d6a3f" }}>${totalEarned.toFixed(0)}</strong></span>
-              <span style={{ fontSize: 10, color: "#aaa" }}>Spent: <strong style={{ color: "#1a1a1a" }}>${totalSpent.toFixed(0)}</strong></span>
-            </div>
-          </div>
-        )}
-      </>)}
-    </div>
-  );
-
-  // ── Top toolbar ──
-  const topBar = (
-    <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 16, flexWrap: "wrap" }}>
-      {/* Status filter pills */}
-      <div style={{ display: "flex", gap: 5, flexWrap: "wrap", flex: 1 }}>
-        {[["all", "All"], ...SALE_STATUSES.map(s => [s, SALE_STATUS_META[s].label])].map(([val, lbl]) => (
-          <button key={val} onClick={() => setStatusFilter(val)}
-            style={{ padding: "5px 13px", border: "1.5px solid", borderRadius: 20, cursor: "pointer", fontSize: 12, fontWeight: 700, fontFamily: "'DM Sans', sans-serif", transition: "all 0.12s",
-              background: statusFilter === val ? "#1a1a1a" : "#f5f3ef",
-              borderColor: statusFilter === val ? "#1a1a1a" : "#e8e4dc",
-              color: statusFilter === val ? "#fff" : "#777" }}>
-            {lbl}
-          </button>
-        ))}
-      </div>
-      {/* Sort */}
-      <select value={sortBy} onChange={e => setSortBy(e.target.value)}
-        style={{ padding: "6px 32px 6px 10px", border: "1.5px solid #e8e4dc", borderRadius: 10, fontFamily: "'DM Sans', sans-serif", fontSize: 12, outline: "none", cursor: "pointer", color: "#555", appearance: "none", WebkitAppearance: "none", backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23999' stroke-width='2.5' stroke-linecap='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E")`, backgroundRepeat: "no-repeat", backgroundPosition: "right 10px center", backgroundColor: "#faf9f6" }}>
-        <option value="dateAdded">Date Added</option>
-        <option value="days">Days Listed</option>
-        <option value="price">Price ↓</option>
-        <option value="status">Status</option>
-      </select>
-      {/* View toggle */}
-      <div style={{ display: "flex", background: "#f5f2ed", borderRadius: 10, padding: 3, gap: 2 }}>
-        {[
-          ["list", <svg key="l" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>],
-          ["grid", <svg key="g" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>],
-        ].map(([mode, icon]) => (
-          <button key={mode} onClick={() => setViewMode(mode)} style={{ padding: "5px 8px", border: "none", borderRadius: 8, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", background: viewMode === mode ? "#fff" : "transparent", color: viewMode === mode ? "#1a1a1a" : "#bbb", boxShadow: viewMode === mode ? "0 1px 4px rgba(0,0,0,0.08)" : "none" }}>{icon}</button>
-        ))}
-      </div>
-      {/* Bulk Actions */}
-      <div style={{ position: "relative" }}>
-        {showBulkMenu && <div style={{ position: "fixed", inset: 0, zIndex: 99 }} onClick={() => setShowBulkMenu(false)} />}
-        <button onClick={() => setShowBulkMenu(v => !v)}
-          style={{ padding: "6px 13px", background: "#f5f3ef", border: "1.5px solid #e8e4dc", borderRadius: 10, cursor: "pointer", fontFamily: "'DM Sans', sans-serif", fontSize: 12, fontWeight: 700, color: "#555", display: "flex", alignItems: "center", gap: 6 }}>
-          <span>Bulk Actions</span>
-          <span style={{ fontSize: 10, opacity: 0.5 }}>▾</span>
-        </button>
-        {showBulkMenu && (
-          <div style={{ position: "absolute", top: "100%", right: 0, marginTop: 4, background: "#fff", border: "1.5px solid #e8e4dc", borderRadius: 10, overflow: "hidden", boxShadow: "0 4px 16px rgba(0,0,0,0.08)", zIndex: 100, minWidth: 150 }}>
-            <button onClick={() => { setShowBulkModal(true); setShowBulkMenu(false); }}
-              style={{ display: "block", width: "100%", padding: "10px 14px", background: "none", border: "none", cursor: "pointer", fontFamily: "'DM Sans', sans-serif", fontSize: 12, fontWeight: 600, color: "#1a1a1a", textAlign: "left" }}>
-              List from Closet
-            </button>
-            {activePriceItems.length > 0 && (
-              <button onClick={() => { setShowBulkPriceModal(true); setShowBulkMenu(false); }}
-                style={{ display: "block", width: "100%", padding: "10px 14px", background: "none", border: "none", borderTop: "1px solid #f0ece4", cursor: "pointer", fontFamily: "'DM Sans', sans-serif", fontSize: 12, fontWeight: 600, color: "#1a1a1a", textAlign: "left" }}>
-                Adjust Prices
-              </button>
-            )}
-          </div>
-        )}
-      </div>
+      {showBulkModal && <BulkListModal items={bulkFiltered} search={bulkSearch} setSearch={setBulkSearch} selected={bulkSelected} setSelected={setBulkSelectedLocal} platform={bulkPlatform} setPlatform={setBulkPlatform} condition={bulkCondition} setCondition={setBulkCondition} price={bulkPrice} setPrice={setBulkPrice} platforms={PLATFORMS} onApply={applyBulkList} onClose={() => setShowBulkModal(false)} />}
     </div>
   );
 
   return (
-    <div className="fade-up" style={{ display: "flex", gap: 24, alignItems: "flex-start" }}>
-      {leftPanel}
-      <div style={{ flex: 1, minWidth: 0 }}>
-        {topBar}
-        {/* Item list / grid */}
-        {forSaleItems.length === 0 ? (
-          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "80px 0 40px", gap: 14 }}>
-            <HangerIcon size={40} color="#ddd" />
-            <div style={{ fontSize: 18, fontWeight: 800, color: "#1a1a1a" }}>No items listed for sale</div>
-            <div style={{ fontSize: 13, color: "#aaa", textAlign: "center", maxWidth: 260 }}>Open any item in your closet and tap "List for Sale" to move it here, or use Bulk Actions to list multiple items.</div>
+    <div className="fade-up">
+      {/* Stats row */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(120px, 1fr))", gap: 10, marginBottom: 20 }}>
+        {[
+          { label: "Drafts", value: drafts, bg: "#f5f3ef", color: "#888" },
+          { label: "Listed", value: listed, bg: "#f0faf4", color: "#2d6a3f" },
+          { label: "Pending", value: pending, bg: "#fff8ee", color: "#a07000" },
+          { label: "Sold", value: sold, bg: "#f5f0ff", color: "#7c6fe0" },
+          { label: "Earned", value: totalEarned > 0 ? `$${totalEarned.toFixed(0)}` : "—", bg: "#f0faf4", color: "#2d6a3f" },
+          { label: "Potential", value: potentialEarnings > 0 ? `$${potentialEarnings.toFixed(0)}` : "—", bg: "#fafaf8", color: "#888" },
+        ].map(s => (
+          <div key={s.label} style={{ background: s.bg, borderRadius: 14, padding: "12px 14px", textAlign: "center" }}>
+            <div style={{ fontSize: 20, fontWeight: 800, color: s.color }}>{s.value}</div>
+            <div style={{ fontSize: 10, fontWeight: 700, color: "#aaa", textTransform: "uppercase", letterSpacing: "0.07em", marginTop: 2 }}>{s.label}</div>
           </div>
-        ) : sortedFiltered.length === 0 ? (
-          <div style={{ textAlign: "center", padding: "40px 0", color: "#ccc", fontSize: 13, fontWeight: 600 }}>No items match this filter</div>
-        ) : viewMode === "grid" ? (
-          /* ── GRID VIEW ── */
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(140px, 1fr))", gap: 12 }}>
-            {sortedFiltered.map(item => {
-              const status = item.saleStatus || "listed";
-              const meta = SALE_STATUS_META[status] || SALE_STATUS_META.listed;
-              const days = getDaysListed(item);
-              const showDays = days !== null && (status === "listed" || status === "pending");
-              const dayStyle = showDays ? getDaysBadgeStyle(days) : null;
-              const salePrice = parseFloat((item.salePrice || "").replace(/[^0-9.]/g, "")) || 0;
-              return (
-                <div key={item.id} style={{ borderRadius: 16, overflow: "hidden", background: "#fff", border: "1.5px solid #e8e4dc", position: "relative", boxShadow: "0 2px 8px rgba(0,0,0,0.04)" }}>
-                  <div style={{ position: "absolute", top: 8, right: 8, zIndex: 2, background: meta.bg, border: `1px solid ${meta.border}`, borderRadius: 12, padding: "2px 7px", fontSize: 9, fontWeight: 700, color: meta.color }}>{meta.label}</div>
-                  {showDays && <div style={{ position: "absolute", top: 8, left: 8, zIndex: 2, background: dayStyle.bg, borderRadius: 12, padding: "2px 7px", fontSize: 9, fontWeight: 700, color: dayStyle.color }}>{days}d</div>}
-                  <div onClick={() => onViewItem(item)} style={{ aspectRatio: "1/1", background: "#f8f6f2", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                    {item.image ? <img src={item.image} alt={item.name} style={{ width: "100%", height: "100%", objectFit: "contain", padding: 8 }} /> : <HangerIcon size={28} color="#ddd" />}
-                  </div>
-                  <div style={{ padding: "8px 10px 10px" }}>
-                    <div style={{ fontSize: 11, fontWeight: 800, color: "#1a1a1a", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{item.name}</div>
-                    {item.brand && <div style={{ fontSize: 10, color: "#bbb", marginTop: 1 }}>{item.brand}</div>}
-                    <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 6 }}>
-                      {salePrice > 0 ? <span style={{ fontSize: 13, fontWeight: 800, color: "#2d6a3f" }}>${salePrice.toFixed(0)}</span> : <span style={{ fontSize: 11, color: "#ccc" }}>No price</span>}
-                      {item.salePlatform && <span style={{ fontSize: 9, background: "#f5f2ed", borderRadius: 6, padding: "1px 6px", color: "#777", fontWeight: 600 }}>{item.salePlatform}</span>}
-                    </div>
-                    {item.saleCondition && CONDITION_BADGE[item.saleCondition] && (() => { const cb = CONDITION_BADGE[item.saleCondition]; return <div style={{ marginTop: 5, display: "inline-block", background: cb.bg, border: `1px solid ${cb.border}`, borderRadius: 8, padding: "2px 7px", fontSize: 9, fontWeight: 700, color: cb.color }}>{item.saleCondition}</div>; })()}
-                    <div style={{ display: "flex", gap: 4, marginTop: 8 }}>
-                      <button onClick={() => { startEdit(item); setGridEditItem(item); }} style={{ flex: 1, padding: "5px 0", background: "#f5f2ed", border: "none", borderRadius: 6, cursor: "pointer", fontSize: 10, fontWeight: 700, color: "#555", fontFamily: "'DM Sans', sans-serif", display: "flex", alignItems: "center", justifyContent: "center", gap: 4 }}>
-                        <SvgEdit size={10} color="#555" /> Edit
-                      </button>
-                      {status !== "sold" && (
-                        <button onClick={() => openSoldConfirm(item)} style={{ flex: 1, padding: "5px 0", background: "#eff6ff", border: "1px solid #93c5fd", borderRadius: 6, cursor: "pointer", fontSize: 10, fontWeight: 700, color: "#2563eb", fontFamily: "'DM Sans', sans-serif", display: "flex", alignItems: "center", justifyContent: "center", gap: 4 }}>
-                          <SvgTag size={10} color="#2563eb" /> Sold
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        ) : (
-          /* ── LIST VIEW ── */
-          <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-            {sortedFiltered.map(item => {
-              const status = item.saleStatus || "listed";
-              const meta = SALE_STATUS_META[status] || SALE_STATUS_META.listed;
-              const origPrice = parseFloat((item.price || "").replace(/[^0-9.]/g, "")) || 0;
-              const salePrice = parseFloat((item.salePrice || "").replace(/[^0-9.]/g, "")) || 0;
-              const isEditing = editingId === item.id;
-              const days = getDaysListed(item);
-              const showDays = days !== null && (status === "listed" || status === "pending");
-              const dayStyle = showDays ? getDaysBadgeStyle(days) : null;
-              return (
-                <div key={item.id} style={{ background: "#fff", borderRadius: 18, border: "1.5px solid #e8e4dc", overflow: "hidden", boxShadow: "0 2px 10px rgba(0,0,0,0.04)", display: "flex" }}>
-                  <div onClick={() => onViewItem(item)} style={{ width: 100, flexShrink: 0, background: item.image ? `url(${item.image}) center/contain no-repeat #f8f6f2` : "#f8f6f2", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                    {!item.image && <HangerIcon size={28} color="#ddd" />}
-                  </div>
-                  <div style={{ flex: 1, padding: "14px 16px", display: "flex", flexDirection: "column", gap: 8, minWidth: 0 }}>
-                    <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 8 }}>
-                      <div style={{ minWidth: 0 }}>
-                        <div style={{ fontSize: 14, fontWeight: 800, color: "#1a1a1a", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{item.name}</div>
-                        {item.brand && <div style={{ fontSize: 12, color: "#aaa", marginTop: 1 }}>{item.brand}</div>}
-                      </div>
-                      <select value={status} onChange={e => { if (e.target.value === "sold") { openSoldConfirm(item); } else updateItem(item, { saleStatus: e.target.value, ...(e.target.value === "listed" ? { listedDate: item.listedDate || new Date().toISOString().slice(0,10) } : {}) }); }}
-                        style={{ padding: "4px 32px 4px 10px", border: `1.5px solid ${meta.border}`, borderRadius: 20, color: meta.color, fontSize: 11, fontWeight: 700, fontFamily: "'DM Sans', sans-serif", cursor: "pointer", flexShrink: 0, appearance: "none", WebkitAppearance: "none", backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2.5' stroke-linecap='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E")`, backgroundRepeat: "no-repeat", backgroundPosition: "right 9px center", backgroundColor: meta.bg }}>
-                        {SALE_STATUSES.map(s => <option key={s} value={s}>{SALE_STATUS_META[s].label}</option>)}
-                      </select>
-                    </div>
-                    <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-                      {origPrice > 0 && <span style={{ fontSize: 12, color: "#bbb", textDecoration: "line-through" }}>${origPrice.toFixed(0)}</span>}
-                      {salePrice > 0 && <span style={{ fontSize: 14, fontWeight: 800, color: "#2d6a3f" }}>${salePrice.toFixed(0)}</span>}
-                      {item.salePlatform && <span style={{ fontSize: 11, background: "#f5f2ed", borderRadius: 8, padding: "2px 8px", color: "#666", fontWeight: 600 }}>{item.salePlatform}</span>}
-                      {origPrice > 0 && salePrice > 0 && origPrice > salePrice && <span style={{ fontSize: 11, color: "#e05555", fontWeight: 700 }}>-{Math.round((1 - salePrice/origPrice)*100)}%</span>}
-                      {item.shippingCost && <span style={{ fontSize: 11, color: "#aaa" }}>ship: ${item.shippingCost}</span>}
-                      {showDays && <span style={{ fontSize: 11, fontWeight: 700, color: dayStyle.color, background: dayStyle.bg, borderRadius: 8, padding: "2px 8px" }}>{days}d listed</span>}
-                      {item.saleCondition && CONDITION_BADGE[item.saleCondition] && (() => { const cb = CONDITION_BADGE[item.saleCondition]; return <span style={{ fontSize: 11, fontWeight: 700, color: cb.color, background: cb.bg, border: `1px solid ${cb.border}`, borderRadius: 8, padding: "2px 8px" }}>{item.saleCondition}</span>; })()}
-                    </div>
-                    {isEditing ? (
-                      <>
-                        {editFormFields(item)}
-                        <div style={{ display: "flex", gap: 8 }}>
-                          <button onClick={() => saveEdit(item)} style={{ flex: 1, padding: "7px", background: "#1a1a1a", color: "#fff", border: "none", borderRadius: 10, cursor: "pointer", fontSize: 12, fontWeight: 700, fontFamily: "'DM Sans', sans-serif" }}>Save</button>
-                          <button onClick={() => setEditingId(null)} style={{ flex: 1, padding: "7px", background: "#f5f2ed", border: "none", borderRadius: 10, cursor: "pointer", fontSize: 12, fontWeight: 700, color: "#888", fontFamily: "'DM Sans', sans-serif" }}>Cancel</button>
-                        </div>
-                      </>
-                    ) : (
-                      <>
-                        {item.saleDescription && <div style={{ fontSize: 11, color: "#555", lineHeight: 1.5, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{item.saleDescription}</div>}
-                        {item.saleUrl && <a href={item.saleUrl} target="_blank" rel="noopener noreferrer" style={{ fontSize: 11, color: "#7c6fe0", textDecoration: "none", fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", display: "block" }}>↗ View Listing</a>}
-                        {item.saleNotes && <div style={{ fontSize: 11, color: "#888", fontStyle: "italic" }}>{item.saleNotes}</div>}
-                        {item.soldDate && <div style={{ fontSize: 11, color: "#7c6fe0", fontWeight: 600 }}>Sold {new Date(item.soldDate + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}{item.netRevenue ? ` · Net $${parseFloat(item.netRevenue).toFixed(0)}` : ""}</div>}
-                        <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginTop: 2 }}>
-                          <button onClick={() => startEdit(item)} style={{ padding: "5px 11px", background: "#f5f2ed", border: "none", borderRadius: 8, cursor: "pointer", fontSize: 11, fontWeight: 700, color: "#555", fontFamily: "'DM Sans', sans-serif", display: "flex", alignItems: "center", gap: 5 }}>
-                            <SvgEdit size={11} color="#555" /> Edit
-                          </button>
-                          {status !== "sold" && (
-                            <button onClick={() => openSoldConfirm(item)} style={{ padding: "5px 11px", background: "#eff6ff", border: "1.5px solid #93c5fd", borderRadius: 8, cursor: "pointer", fontSize: 11, fontWeight: 700, color: "#2563eb", fontFamily: "'DM Sans', sans-serif", display: "flex", alignItems: "center", gap: 5 }}>
-                              <SvgTag size={11} color="#2563eb" /> Mark Sold
-                            </button>
-                          )}
-                          {status === "draft" && (
-                            <button onClick={() => updateItem(item, { saleStatus: "listed", listedDate: new Date().toISOString().slice(0,10) })} style={{ padding: "5px 11px", background: "#f0faf4", border: "1.5px solid #b6e8c8", borderRadius: 8, cursor: "pointer", fontSize: 11, fontWeight: 700, color: "#2d6a3f", fontFamily: "'DM Sans', sans-serif", display: "flex", alignItems: "center", gap: 5 }}>
-                              → List Now
-                            </button>
-                          )}
-                          <button onClick={() => moveBackToCloset(item)} style={{ padding: "5px 11px", background: "#f5f3ef", border: "none", borderRadius: 8, cursor: "pointer", fontSize: 11, fontWeight: 700, color: "#777", fontFamily: "'DM Sans', sans-serif", display: "flex", alignItems: "center", gap: 5 }}>
-                            <HangerIcon size={12} color="#999" /> Back to Closet
-                          </button>
-                        </div>
-                      </>
-                    )}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        )}
+        ))}
       </div>
 
-      {/* Bulk List Modal */}
-      {showBulkModal && <BulkListModal items={bulkFiltered} search={bulkSearch} setSearch={setBulkSearch} selected={bulkSelected} setSelected={setBulkSelectedLocal} platform={bulkPlatform} setPlatform={setBulkPlatform} condition={bulkCondition} setCondition={setBulkCondition} price={bulkPrice} setPrice={setBulkPrice} platforms={PLATFORMS} onApply={applyBulkList} onClose={() => setShowBulkModal(false)} />}
-      {/* Bulk Price Modal */}
-      {showBulkPriceModal && <BulkPriceModal items={activePriceItems} selected={bulkPriceSelected} setSelected={setBulkPriceSelected} discountPct={bulkDiscountPct} setDiscountPct={setBulkDiscountPct} onApply={applyBulkPrice} onClose={() => { setShowBulkPriceModal(false); setBulkPriceSelected(new Set()); setBulkDiscountPct(10); }} />}
-
-      {/* Grid Edit Modal */}
-      {gridEditItem && (
-        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.2)", zIndex: 99999, display: "flex", alignItems: "center", justifyContent: "center" }}
-          onClick={() => setGridEditItem(null)}>
-          <div onClick={e => e.stopPropagation()} style={{ background: "#fff", borderRadius: 22, padding: "24px", width: 420, maxHeight: "88vh", overflowY: "auto", boxShadow: "0 20px 60px rgba(0,0,0,0.18)", fontFamily: "'DM Sans', sans-serif" }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 20 }}>
-              {gridEditItem.image && <img src={gridEditItem.image} alt={gridEditItem.name} style={{ width: 44, height: 44, borderRadius: 10, objectFit: "contain", background: "#f8f6f2", border: "1px solid #e8e4dc" }} />}
-              <div>
-                <div style={{ fontSize: 15, fontWeight: 800, color: "#1a1a1a" }}>{gridEditItem.name}</div>
-                {gridEditItem.brand && <div style={{ fontSize: 12, color: "#aaa" }}>{gridEditItem.brand}</div>}
-              </div>
-            </div>
-            {editFormFields(gridEditItem)}
-            <div style={{ display: "flex", gap: 8, marginTop: 16 }}>
-              <button onClick={() => { saveEdit(gridEditItem); setGridEditItem(null); }} style={{ flex: 1, padding: "10px", background: "#1a1a1a", color: "#fff", border: "none", borderRadius: 12, cursor: "pointer", fontSize: 13, fontWeight: 700 }}>Save</button>
-              <button onClick={() => setGridEditItem(null)} style={{ padding: "10px 18px", background: "#f5f3ef", color: "#888", border: "none", borderRadius: 12, cursor: "pointer", fontSize: 13, fontWeight: 700 }}>Cancel</button>
-            </div>
+      {/* Earned vs spent bar */}
+      {totalSpent > 0 && (
+        <div style={{ background: "#fff", borderRadius: 16, border: "1.5px solid #e8e4dc", padding: "16px 18px", marginBottom: 14 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 10 }}>
+            <span style={{ fontSize: 13, fontWeight: 800, color: "#1a1a1a" }}>Wardrobe Payback</span>
+            <span style={{ fontSize: 13, fontWeight: 800, color: "#7c6fe0" }}>{earnedPct.toFixed(1)}% recouped</span>
           </div>
+          <div style={{ height: 8, borderRadius: 8, background: "#e8e4dc", overflow: "hidden", marginBottom: 8 }}>
+            <div style={{ height: "100%", borderRadius: 8, background: "linear-gradient(90deg, #7c6fe0, #3aaa6e)", width: earnedPct + "%", transition: "width 0.5s" }} />
+          </div>
+          <div style={{ display: "flex", justifyContent: "space-between" }}>
+            <span style={{ fontSize: 11, color: "#aaa" }}>Sold: <strong style={{ color: "#2d6a3f" }}>${totalEarned.toFixed(0)}</strong></span>
+            <span style={{ fontSize: 11, color: "#aaa" }}>Total spent: <strong style={{ color: "#1a1a1a" }}>${totalSpent.toFixed(0)}</strong></span>
+          </div>
+          {avgDaysToSell !== null && (
+            <div style={{ marginTop: 10, paddingTop: 10, borderTop: "1px solid #f0ece4", fontSize: 12, color: "#888" }}>
+              ⏱ Avg time to sell: <strong style={{ color: "#1a1a1a" }}>{avgDaysToSell} days</strong>
+            </div>
+          )}
         </div>
       )}
 
-      {/* Sold Confirmation Modal */}
-      {soldConfirmItem && (() => {
-        const spNum = parseFloat(soldPrice || 0) || 0;
-        const shipNum = parseFloat(soldShipping || 0) || 0;
-        const feeCalc = PLATFORM_FEE_CALC[soldPlatform];
-        const platformFee = feeCalc ? feeCalc(spNum) : 0;
-        const netAfterAll = spNum - shipNum - platformFee;
+      {/* Sold history chart */}
+      {sold > 0 && (() => {
+        const soldItems = forSaleItems.filter(i => i.saleStatus === "sold" && i.soldDate);
+        const byMonth = {};
+        soldItems.forEach(i => {
+          const m = i.soldDate.slice(0, 7);
+          if (!byMonth[m]) byMonth[m] = { count: 0, revenue: 0 };
+          byMonth[m].count++;
+          byMonth[m].revenue += parseFloat((i.netRevenue || i.salePrice||"").replace(/[^0-9.]/g,""))||0;
+        });
+        const months = Object.keys(byMonth).sort().slice(-6);
+        const maxRev = Math.max(...months.map(m => byMonth[m].revenue), 1);
         return (
-          <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", zIndex: 99999, display: "flex", alignItems: "center", justifyContent: "center" }}
-            onClick={() => setSoldConfirmItem(null)}>
-            <div onClick={e => e.stopPropagation()} style={{ background: "#fff", borderRadius: 22, padding: "28px", width: 380, boxShadow: "0 20px 60px rgba(0,0,0,0.2)", fontFamily: "'DM Sans', sans-serif" }}>
-              <div style={{ fontSize: 17, fontWeight: 800, color: "#1a1a1a", marginBottom: 4 }}>🎉 Mark as Sold</div>
-              <div style={{ fontSize: 13, color: "#888", marginBottom: 20 }}>{soldConfirmItem.name}</div>
-              <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 20 }}>
-                <div><label style={{ fontSize: 11, fontWeight: 700, color: "#aaa", textTransform: "uppercase", letterSpacing: "0.07em", display: "block", marginBottom: 4 }}>Final Sale Price</label>
-                  <input value={soldPrice} onChange={e => setSoldPrice(e.target.value)} placeholder="e.g. 35" style={{ width: "100%", padding: "9px 12px", border: "1.5px solid #e8e4dc", borderRadius: 10, fontFamily: "'DM Sans', sans-serif", fontSize: 13, outline: "none", boxSizing: "border-box" }} /></div>
-                <div><label style={{ fontSize: 11, fontWeight: 700, color: "#aaa", textTransform: "uppercase", letterSpacing: "0.07em", display: "block", marginBottom: 4 }}>Platform</label>
-                  <select value={soldPlatform} onChange={e => setSoldPlatform(e.target.value)} style={{ width: "100%", padding: "9px 28px 9px 12px", border: "1.5px solid #e8e4dc", borderRadius: 10, fontFamily: "'DM Sans', sans-serif", fontSize: 13, outline: "none" }}>
-                    <option value="">Select platform…</option>
-                    {PLATFORMS.map(p => <option key={p} value={p}>{p}</option>)}
-                  </select>
-                  {soldPlatform && PLATFORM_FEE_LABELS[soldPlatform] && <div style={{ fontSize: 10, color: "#aaa", marginTop: 4 }}>Fee: {PLATFORM_FEE_LABELS[soldPlatform]}</div>}
-                </div>
-                <div><label style={{ fontSize: 11, fontWeight: 700, color: "#aaa", textTransform: "uppercase", letterSpacing: "0.07em", display: "block", marginBottom: 4 }}>Shipping Cost</label>
-                  <input value={soldShipping} onChange={e => setSoldShipping(e.target.value)} placeholder="e.g. 4.50" style={{ width: "100%", padding: "9px 12px", border: "1.5px solid #e8e4dc", borderRadius: 10, fontFamily: "'DM Sans', sans-serif", fontSize: 13, outline: "none", boxSizing: "border-box" }} /></div>
-                <div><label style={{ fontSize: 11, fontWeight: 700, color: "#aaa", textTransform: "uppercase", letterSpacing: "0.07em", display: "block", marginBottom: 4 }}>Date Sold</label>
-                  <input type="date" value={soldDate} onChange={e => setSoldDate(e.target.value)} style={{ width: "100%", padding: "9px 12px", border: "1.5px solid #e8e4dc", borderRadius: 10, fontFamily: "'DM Sans', sans-serif", fontSize: 13, outline: "none", boxSizing: "border-box" }} /></div>
-                {spNum > 0 && (
-                  <div style={{ background: "#f0faf4", borderRadius: 10, padding: "12px 14px" }}>
-                    <div style={{ fontSize: 12, color: "#555", marginBottom: 6, fontWeight: 700 }}>Earnings Breakdown</div>
-                    <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-                      <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, color: "#555" }}><span>Sale price</span><span style={{ fontWeight: 700 }}>${spNum.toFixed(2)}</span></div>
-                      {shipNum > 0 && <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, color: "#888" }}><span>Shipping</span><span>-${shipNum.toFixed(2)}</span></div>}
-                      {platformFee > 0 && <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, color: "#888" }}><span>{soldPlatform} fee</span><span>-${platformFee.toFixed(2)}</span></div>}
-                      <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13, color: "#2d6a3f", fontWeight: 800, borderTop: "1px solid #d8f0e4", paddingTop: 6, marginTop: 2 }}><span>Net earnings</span><span>${netAfterAll.toFixed(2)}</span></div>
-                    </div>
+          <div style={{ background: "#fff", borderRadius: 16, border: "1.5px solid #e8e4dc", padding: "16px 18px", marginBottom: 18 }}>
+            <div style={{ fontSize: 13, fontWeight: 800, color: "#1a1a1a", marginBottom: 14 }}><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{marginRight:6,verticalAlign:"middle"}}><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>Sales History</div>
+            <div style={{ display: "flex", alignItems: "flex-end", gap: 10, height: 70 }}>
+              {months.map(m => {
+                const d = new Date(m + "-01T00:00:00");
+                const label = d.toLocaleDateString("en-US", { month: "short" });
+                return (
+                  <div key={m} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 3 }}>
+                    <div style={{ fontSize: 9, color: "#7c6fe0", fontWeight: 700 }}>${byMonth[m].revenue.toFixed(0)}</div>
+                    <div style={{ width: "100%", background: "#7c6fe0", borderRadius: "4px 4px 0 0", height: `${Math.max(4, (byMonth[m].revenue / maxRev) * 44)}px` }} />
+                    <div style={{ fontSize: 9, color: "#aaa", fontWeight: 600 }}>{label}</div>
                   </div>
-                )}
-              </div>
-              <label style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 14, cursor: "pointer" }}>
-                <input type="checkbox" checked={soldRemoveFromCloset} onChange={e => setSoldRemoveFromCloset(e.target.checked)} style={{ width: 15, height: 15, accentColor: "#7c6fe0", cursor: "pointer" }} />
-                <span style={{ fontSize: 12, color: "#555", fontWeight: 600 }}>Remove from my active closet</span>
-              </label>
-              <div style={{ display: "flex", gap: 8 }}>
-                <button onClick={confirmSold} style={{ flex: 1, padding: "11px", background: "#7c6fe0", color: "#fff", border: "none", borderRadius: 12, cursor: "pointer", fontSize: 13, fontWeight: 700 }}>Confirm Sale</button>
-                <button onClick={() => setSoldConfirmItem(null)} style={{ padding: "11px 18px", background: "#f5f3ef", color: "#888", border: "none", borderRadius: 12, cursor: "pointer", fontSize: 13, fontWeight: 700 }}>Cancel</button>
-              </div>
+                );
+              })}
             </div>
           </div>
         );
       })()}
+
+      {/* Toolbar */}
+      <div style={{ display: "flex", gap: 8, marginBottom: 16, flexWrap: "wrap", alignItems: "center" }}>
+        <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search listings…"
+          style={{ flex: "1 1 160px", padding: "8px 14px", border: "1.5px solid #e8e4dc", borderRadius: 12, fontFamily: "'DM Sans', sans-serif", fontSize: 13, outline: "none", background: "#faf9f6" }} />
+        <div style={{ display: "flex", background: "#f5f2ed", borderRadius: 10, padding: 3, gap: 2 }}>
+          {[["all", "All"], ...SALE_STATUSES.map(s => [s, SALE_STATUS_META[s].label])].map(([val, lbl]) => (
+            <button key={val} onClick={() => setStatusFilter(val)} style={{
+              padding: "5px 10px", border: "none", borderRadius: 8, cursor: "pointer",
+              background: statusFilter === val ? "#fff" : "transparent",
+              color: statusFilter === val ? "#1a1a1a" : "#aaa",
+              fontFamily: "'DM Sans', sans-serif", fontSize: 11, fontWeight: 700,
+              boxShadow: statusFilter === val ? "0 1px 4px rgba(0,0,0,0.08)" : "none"
+            }}>{lbl}</button>
+          ))}
+        </div>
+        <button onClick={() => setShowBulkModal(true)} style={{ padding: "8px 14px", background: "#fff8ee", border: "1.5px solid #f5c842", borderRadius: 10, cursor: "pointer", fontFamily: "'DM Sans', sans-serif", fontSize: 12, fontWeight: 700, color: "#a07000", whiteSpace: "nowrap" }}>
+          + Bulk List
+        </button>
+      </div>
+
+      {/* Listings */}
+      {filtered.length === 0 ? (
+        <div style={{ textAlign: "center", padding: "40px 0", color: "#ccc", fontSize: 13, fontWeight: 600 }}>No items match this filter</div>
+      ) : (
+        <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+          {filtered.map(item => {
+            const status = item.saleStatus || "listed";
+            const meta = SALE_STATUS_META[status] || SALE_STATUS_META.listed;
+            const origPrice = parseFloat((item.price || "").replace(/[^0-9.]/g, "")) || 0;
+            const salePrice = parseFloat((item.salePrice || "").replace(/[^0-9.]/g, "")) || 0;
+            const isEditing = editingId === item.id;
+            return (
+              <div key={item.id} style={{ background: "#fff", borderRadius: 18, border: "1.5px solid #e8e4dc", overflow: "hidden", boxShadow: "0 2px 10px rgba(0,0,0,0.04)", display: "flex" }}>
+                {/* Image */}
+                <div onClick={() => onViewItem(item)} style={{ width: 100, flexShrink: 0, background: item.image ? `url(${item.image}) center/contain no-repeat #f8f6f2` : "#f8f6f2", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                  {!item.image && <HangerIcon size={28} color="#ddd" />}
+                </div>
+
+                {/* Info */}
+                <div style={{ flex: 1, padding: "14px 16px", display: "flex", flexDirection: "column", gap: 8, minWidth: 0 }}>
+                  <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 8 }}>
+                    <div style={{ minWidth: 0 }}>
+                      <div style={{ fontSize: 14, fontWeight: 800, color: "#1a1a1a", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{item.name}</div>
+                      {item.brand && <div style={{ fontSize: 12, color: "#aaa", marginTop: 1 }}>{item.brand}</div>}
+                    </div>
+                    <select value={status} onChange={e => {
+                      if (e.target.value === "sold") { openSoldConfirm(item); }
+                      else updateItem(item, { saleStatus: e.target.value, ...(e.target.value === "listed" ? { listedDate: item.listedDate || new Date().toISOString().slice(0,10) } : {}) });
+                    }}
+                      style={{ padding: "4px 10px", background: meta.bg, border: `1.5px solid ${meta.border}`, borderRadius: 20, color: meta.color, fontSize: 11, fontWeight: 700, fontFamily: "'DM Sans', sans-serif", cursor: "pointer", flexShrink: 0 }}>
+                      {SALE_STATUSES.map(s => <option key={s} value={s}>{SALE_STATUS_META[s].label}</option>)}
+                    </select>
+                  </div>
+
+                  {/* Prices row */}
+                  <div style={{ display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
+                    {origPrice > 0 && <span style={{ fontSize: 12, color: "#bbb", textDecoration: "line-through" }}>${origPrice.toFixed(0)} orig</span>}
+                    {salePrice > 0 && <span style={{ fontSize: 14, fontWeight: 800, color: "#2d6a3f" }}>${salePrice.toFixed(0)}</span>}
+                    {item.salePlatform && <span style={{ fontSize: 11, background: "#f5f2ed", borderRadius: 8, padding: "2px 8px", color: "#666", fontWeight: 600 }}>{item.salePlatform}</span>}
+                    {origPrice > 0 && salePrice > 0 && origPrice > salePrice && (
+                      <span style={{ fontSize: 11, color: "#e05555", fontWeight: 700 }}>-{Math.round((1 - salePrice/origPrice)*100)}%</span>
+                    )}
+                    {item.shippingCost && <span style={{ fontSize: 11, color: "#aaa" }}>ship: ${item.shippingCost}</span>}
+                  </div>
+
+                  {/* Edit form */}
+                  {isEditing ? (
+                    <div style={{ display: "flex", flexDirection: "column", gap: 8, marginTop: 4 }}>
+                      <div style={{ display: "flex", gap: 8 }}>
+                        <input value={editVals.salePrice} onChange={e => setEditVals(v => ({ ...v, salePrice: e.target.value }))}
+                          placeholder="Sale price (e.g. 25)"
+                          style={{ flex: 1, padding: "7px 10px", border: "1.5px solid #e8e4dc", borderRadius: 10, fontFamily: "'DM Sans', sans-serif", fontSize: 12 }} />
+                        <select value={editVals.salePlatform} onChange={e => setEditVals(v => ({ ...v, salePlatform: e.target.value }))}
+                          style={{ flex: 1, padding: "7px 10px", border: "1.5px solid #e8e4dc", borderRadius: 10, fontFamily: "'DM Sans', sans-serif", fontSize: 12 }}>
+                          <option value="">Platform…</option>
+                          {PLATFORMS.map(p => <option key={p} value={p}>{p}</option>)}
+                        </select>
+                      </div>
+                      <input value={editVals.saleNotes} onChange={e => setEditVals(v => ({ ...v, saleNotes: e.target.value }))}
+                        placeholder="Notes (e.g. listing URL, condition)"
+                        style={{ padding: "7px 10px", border: "1.5px solid #e8e4dc", borderRadius: 10, fontFamily: "'DM Sans', sans-serif", fontSize: 12 }} />
+                      <div style={{ display: "flex", gap: 8 }}>
+                        <button onClick={() => saveEdit(item)} style={{ flex: 1, padding: "7px", background: "#1a1a1a", color: "#fff", border: "none", borderRadius: 10, cursor: "pointer", fontSize: 12, fontWeight: 700, fontFamily: "'DM Sans', sans-serif" }}>Save</button>
+                        <button onClick={() => setEditingId(null)} style={{ flex: 1, padding: "7px", background: "#f5f2ed", border: "none", borderRadius: 10, cursor: "pointer", fontSize: 12, fontWeight: 700, color: "#888", fontFamily: "'DM Sans', sans-serif" }}>Cancel</button>
+                      </div>
+                    </div>
+                  ) : (
+                    <>
+                      {item.saleNotes && <div style={{ fontSize: 11, color: "#888", fontStyle: "italic" }}>{item.saleNotes}</div>}
+                      {item.soldDate && <div style={{ fontSize: 11, color: "#7c6fe0", fontWeight: 600 }}>Sold {new Date(item.soldDate + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}{item.netRevenue ? ` · Net $${parseFloat(item.netRevenue).toFixed(0)}` : ""}</div>}
+                      {/* Actions */}
+                      <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginTop: 2 }}>
+                        <button onClick={() => startEdit(item)} style={{ padding: "5px 12px", background: "#f5f2ed", border: "none", borderRadius: 8, cursor: "pointer", fontSize: 11, fontWeight: 700, color: "#555", fontFamily: "'DM Sans', sans-serif" }}>✏ Edit</button>
+                        {status !== "sold" && (
+                          <button onClick={() => openSoldConfirm(item)} style={{ padding: "5px 12px", background: "#f5f0ff", border: "1.5px solid #c4b0f0", borderRadius: 8, cursor: "pointer", fontSize: 11, fontWeight: 700, color: "#7c6fe0", fontFamily: "'DM Sans', sans-serif" }}>
+                            <SvgCheck size={11} color="#7c6fe0" style={{marginRight:4}} />Mark Sold
+                          </button>
+                        )}
+                        {status === "draft" && (
+                          <button onClick={() => updateItem(item, { saleStatus: "listed", listedDate: new Date().toISOString().slice(0,10) })} style={{ padding: "5px 12px", background: "#f0faf4", border: "1.5px solid #b6e8c8", borderRadius: 8, cursor: "pointer", fontSize: 11, fontWeight: 700, color: "#2d6a3f", fontFamily: "'DM Sans', sans-serif" }}>
+                            → List Now
+                          </button>
+                        )}
+                        <button onClick={() => moveBackToCloset(item)} style={{ padding: "5px 12px", background: "#fef2f2", border: "none", borderRadius: 8, cursor: "pointer", fontSize: 11, fontWeight: 700, color: "#e05555", fontFamily: "'DM Sans', sans-serif" }}>↩ Back to Closet</button>
+                      </div>
+                    </>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Bulk List Modal */}
+      {showBulkModal && <BulkListModal items={bulkFiltered} search={bulkSearch} setSearch={setBulkSearch} selected={bulkSelected} setSelected={setBulkSelectedLocal} platform={bulkPlatform} setPlatform={setBulkPlatform} condition={bulkCondition} setCondition={setBulkCondition} price={bulkPrice} setPrice={setBulkPrice} platforms={PLATFORMS} onApply={applyBulkList} onClose={() => setShowBulkModal(false)} />}
+
+      {/* Sold Confirmation Modal */}
+      {soldConfirmItem && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", zIndex: 99999, display: "flex", alignItems: "center", justifyContent: "center" }}
+          onClick={() => setSoldConfirmItem(null)}>
+          <div onClick={e => e.stopPropagation()} style={{ background: "#fff", borderRadius: 22, padding: "28px", width: 360, boxShadow: "0 20px 60px rgba(0,0,0,0.2)", fontFamily: "'DM Sans', sans-serif" }}>
+            <div style={{ fontSize: 17, fontWeight: 800, color: "#1a1a1a", marginBottom: 4 }}>🎉 Mark as Sold</div>
+            <div style={{ fontSize: 13, color: "#888", marginBottom: 20 }}>{soldConfirmItem.name}</div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 20 }}>
+              <div>
+                <label style={{ fontSize: 11, fontWeight: 700, color: "#aaa", textTransform: "uppercase", letterSpacing: "0.07em", display: "block", marginBottom: 4 }}>Final Sale Price</label>
+                <input value={soldPrice} onChange={e => setSoldPrice(e.target.value)} placeholder="e.g. 35"
+                  style={{ width: "100%", padding: "9px 12px", border: "1.5px solid #e8e4dc", borderRadius: 10, fontFamily: "'DM Sans', sans-serif", fontSize: 13, outline: "none", boxSizing: "border-box" }} />
+              </div>
+              <div>
+                <label style={{ fontSize: 11, fontWeight: 700, color: "#aaa", textTransform: "uppercase", letterSpacing: "0.07em", display: "block", marginBottom: 4 }}>Platform</label>
+                <select value={soldPlatform} onChange={e => setSoldPlatform(e.target.value)}
+                  style={{ width: "100%", padding: "9px 12px", border: "1.5px solid #e8e4dc", borderRadius: 10, fontFamily: "'DM Sans', sans-serif", fontSize: 13, outline: "none" }}>
+                  <option value="">Select platform…</option>
+                  {["Depop", "Poshmark", "eBay", "Mercari", "ThredUp", "Facebook", "Instagram", "Vinted", "Other"].map(p => <option key={p} value={p}>{p}</option>)}
+                </select>
+              </div>
+              <div>
+                <label style={{ fontSize: 11, fontWeight: 700, color: "#aaa", textTransform: "uppercase", letterSpacing: "0.07em", display: "block", marginBottom: 4 }}>Shipping Cost (optional)</label>
+                <input value={soldShipping} onChange={e => setSoldShipping(e.target.value)} placeholder="e.g. 4.50"
+                  style={{ width: "100%", padding: "9px 12px", border: "1.5px solid #e8e4dc", borderRadius: 10, fontFamily: "'DM Sans', sans-serif", fontSize: 13, outline: "none", boxSizing: "border-box" }} />
+              </div>
+              <div>
+                <label style={{ fontSize: 11, fontWeight: 700, color: "#aaa", textTransform: "uppercase", letterSpacing: "0.07em", display: "block", marginBottom: 4 }}>Date Sold</label>
+                <input type="date" value={soldDate} onChange={e => setSoldDate(e.target.value)}
+                  style={{ width: "100%", padding: "9px 12px", border: "1.5px solid #e8e4dc", borderRadius: 10, fontFamily: "'DM Sans', sans-serif", fontSize: 13, outline: "none", boxSizing: "border-box" }} />
+              </div>
+              {soldPrice && soldShipping && (
+                <div style={{ background: "#f0faf4", borderRadius: 10, padding: "10px 14px", fontSize: 13, color: "#2d6a3f", fontWeight: 700 }}>
+                  Net: ${(parseFloat(soldPrice||0) - parseFloat(soldShipping||0)).toFixed(2)} after shipping
+                </div>
+              )}
+            </div>
+            <div style={{ display: "flex", gap: 8 }}>
+              <button onClick={confirmSold} style={{ flex: 1, padding: "11px", background: "#7c6fe0", color: "#fff", border: "none", borderRadius: 12, cursor: "pointer", fontSize: 13, fontWeight: 700 }}>Confirm Sale</button>
+              <button onClick={() => setSoldConfirmItem(null)} style={{ padding: "11px 18px", background: "#f5f3ef", color: "#888", border: "none", borderRadius: 12, cursor: "pointer", fontSize: 13, fontWeight: 700 }}>Cancel</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -6770,7 +6535,7 @@ function BulkListModal({ items, search, setSearch, selected, setSelected, platfo
     setSelected(next);
   };
   return (
-    <div style={{ position: "fixed", inset: 0, zIndex: 99999, display: "flex", alignItems: "center", justifyContent: "center" }}
+    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", zIndex: 99999, display: "flex", alignItems: "center", justifyContent: "center" }}
       onClick={onClose}>
       <div onClick={e => e.stopPropagation()} style={{ background: "#fff", borderRadius: 22, width: "min(720px, 95vw)", maxHeight: "86vh", display: "flex", flexDirection: "column", boxShadow: "0 20px 60px rgba(0,0,0,0.2)", fontFamily: "'DM Sans', sans-serif" }}>
         {/* Header */}
@@ -6832,225 +6597,9 @@ function BulkListModal({ items, search, setSearch, selected, setSelected, platfo
   );
 }
 
-function BulkPriceModal({ items, selected, setSelected, discountPct, setDiscountPct, onApply, onClose }) {
-  const toggle = (id) => {
-    const next = new Set(selected);
-    if (next.has(id)) next.delete(id); else next.add(id);
-    setSelected(next);
-  };
-  const toggleAll = () => {
-    if (selected.size === items.length) setSelected(new Set());
-    else setSelected(new Set(items.map(i => i.id)));
-  };
-  return (
-    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", zIndex: 99999, display: "flex", alignItems: "center", justifyContent: "center" }}
-      onClick={onClose}>
-      <div onClick={e => e.stopPropagation()} style={{ background: "#fff", borderRadius: 22, width: "min(560px, 95vw)", maxHeight: "82vh", display: "flex", flexDirection: "column", boxShadow: "0 20px 60px rgba(0,0,0,0.2)", fontFamily: "'DM Sans', sans-serif" }}>
-        {/* Header */}
-        <div style={{ padding: "22px 24px 16px", borderBottom: "1px solid #e8e4dc" }}>
-          <div style={{ fontSize: 17, fontWeight: 800, marginBottom: 2 }}>Bulk Price Editor</div>
-          <div style={{ fontSize: 13, color: "#aaa", marginBottom: 14 }}>Drop prices on selected listings by a percentage.</div>
-          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-            <label style={{ fontSize: 12, fontWeight: 700, color: "#555" }}>Discount %</label>
-            <input type="number" min={1} max={90} value={discountPct} onChange={e => setDiscountPct(Math.min(90, Math.max(1, parseInt(e.target.value) || 1)))}
-              style={{ width: 70, padding: "7px 10px", border: "1.5px solid #e8e4dc", borderRadius: 10, fontFamily: "'DM Sans', sans-serif", fontSize: 14, fontWeight: 700, outline: "none", textAlign: "center" }} />
-            <span style={{ fontSize: 13, color: "#888" }}>off current price</span>
-            <button onClick={toggleAll} style={{ marginLeft: "auto", padding: "5px 12px", background: "#f5f2ed", border: "none", borderRadius: 8, cursor: "pointer", fontSize: 11, fontWeight: 700, color: "#555", fontFamily: "'DM Sans', sans-serif" }}>
-              {selected.size === items.length ? "Deselect All" : "Select All"}
-            </button>
-          </div>
-        </div>
-        {/* Items list */}
-        <div style={{ flex: 1, overflowY: "auto", padding: "14px 24px", display: "flex", flexDirection: "column", gap: 8 }}>
-          {items.map(item => {
-            const isSelected = selected.has(item.id);
-            const currentPrice = parseFloat((item.salePrice || "").replace(/[^0-9.]/g, "")) || 0;
-            const newPrice = Math.round(currentPrice * (1 - discountPct / 100));
-            return (
-              <div key={item.id} onClick={() => toggle(item.id)} style={{ display: "flex", alignItems: "center", gap: 10, padding: "9px 12px", border: `1.5px solid ${isSelected ? "#7c6fe0" : "#e8e4dc"}`, borderRadius: 12, cursor: "pointer", background: isSelected ? "#f5f0ff" : "#fff", transition: "all 0.1s" }}>
-                <div style={{ width: 36, height: 36, borderRadius: 8, background: item.image ? `url(${item.image}) center/contain no-repeat #f8f6f2` : "#f8f6f2", flexShrink: 0, border: "1px solid #e8e4dc" }} />
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: 12, fontWeight: 700, color: "#1a1a1a", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{item.name}</div>
-                  {item.salePlatform && <div style={{ fontSize: 10, color: "#aaa" }}>{item.salePlatform}</div>}
-                </div>
-                <div style={{ textAlign: "right", flexShrink: 0 }}>
-                  <div style={{ fontSize: 13, color: "#bbb", textDecoration: "line-through", fontWeight: 600 }}>${currentPrice.toFixed(0)}</div>
-                  {isSelected && <div style={{ fontSize: 14, fontWeight: 800, color: "#2d6a3f" }}>${newPrice.toFixed(0)}</div>}
-                </div>
-                <div style={{ width: 20, height: 20, borderRadius: "50%", border: `2px solid ${isSelected ? "#7c6fe0" : "#ddd"}`, background: isSelected ? "#7c6fe0" : "#fff", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                  {isSelected && <SvgCheck size={10} color="#fff" />}
-                </div>
-              </div>
-            );
-          })}
-        </div>
-        {/* Footer */}
-        <div style={{ padding: "14px 24px", borderTop: "1px solid #e8e4dc", display: "flex", gap: 8, alignItems: "center" }}>
-          <span style={{ fontSize: 13, color: "#888", flex: 1 }}>{selected.size} item{selected.size !== 1 ? "s" : ""} selected</span>
-          <button onClick={onClose} style={{ padding: "9px 18px", background: "#f5f3ef", border: "none", borderRadius: 10, cursor: "pointer", fontSize: 13, fontWeight: 700, color: "#888" }}>Cancel</button>
-          <button onClick={onApply} disabled={selected.size === 0} style={{ padding: "9px 22px", background: selected.size > 0 ? "#7c6fe0" : "#e0dbd2", color: "#fff", border: "none", borderRadius: 10, cursor: selected.size > 0 ? "pointer" : "not-allowed", fontSize: 13, fontWeight: 700 }}>
-            Apply -{discountPct}%
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
 // ── Moodboard ─────────────────────────────────────────────────────────────────
-function MoodboardPreviewSurface({ board, compact = false }) {
-  const items = (board?.items || []).filter(Boolean);
-  const previewAspect = compact ? 1.6 : 1.7;
-  if (items.length === 0) {
-    return (
-      <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column", gap: 8, color: "#cfc7bc" }}>
-        <SvgSparkle size={compact ? 20 : 24} color="#d8d0c4" />
-        <div style={{ fontSize: compact ? 10 : 11, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase" }}>Blank Board</div>
-      </div>
-    );
-  }
-
-  const padding = 40;
-  const minX = Math.min(...items.map(item => item.x || 0));
-  const minY = Math.min(...items.map(item => item.y || 0));
-  const maxX = Math.max(...items.map(item => (item.x || 0) + (item.w || 120)));
-  const maxY = Math.max(...items.map(item => (item.y || 0) + (item.h || 120)));
-  const rawW = Math.max(620, maxX - minX + padding * 2);
-  const rawH = Math.max(460, maxY - minY + padding * 2);
-  const contentW = Math.max(rawW, rawH * previewAspect);
-  const contentH = Math.max(rawH, contentW / previewAspect);
-  const outerAspect = previewAspect;
-  const boardAspect = contentW / contentH;
-  const fitByWidth = boardAspect > outerAspect;
-
-  return (
-    <div style={{ position:"absolute", inset:0, display:"flex", alignItems:"center", justifyContent:"center", padding: compact ? 10 : 12 }}>
-      <div style={{ position:"relative", width: fitByWidth ? "100%" : "auto", height: fitByWidth ? "auto" : "100%", aspectRatio: `${contentW} / ${contentH}` }}>
-        {items.map(item => {
-          const left = ((item.x - minX + padding) / contentW) * 100;
-          const top = ((item.y - minY + padding) / contentH) * 100;
-          const width = ((item.w || 120) / contentW) * 100;
-          const height = ((item.h || 120) / contentH) * 100;
-
-          if (item.type === "text") {
-            return (
-              <div
-                key={item.id}
-                style={{
-                  position:"absolute",
-                  left:`${left}%`,
-                  top:`${top}%`,
-                  width:`${width}%`,
-                  minHeight:`${height}%`,
-                  transform:`rotate(${item.rotation || 0}deg)`,
-                  transformOrigin:"center",
-                  background:item.transparentBg ? "transparent" : (item.bg || "#fff9e6"),
-                  borderRadius:8,
-                  padding: compact ? "5px 6px" : "6px 7px",
-                  color:item.color || "#1a1a1a",
-                  fontSize: Math.max(compact ? 8 : 9, (item.fontSize || 14) * (compact ? 0.5 : 0.58)),
-                  fontWeight:item.bold ? 800 : 600,
-                  fontStyle:item.italic ? "italic" : "normal",
-                  lineHeight:1.25,
-                  overflow:"hidden",
-                  boxShadow:item.transparentBg ? "none" : "0 2px 8px rgba(0,0,0,0.08)",
-                  whiteSpace:"pre-wrap",
-                }}
-              >
-                {(item.text || "").slice(0, compact ? 35 : 70)}
-              </div>
-            );
-          }
-
-          return (
-            <div
-              key={item.id}
-              style={{
-                position:"absolute",
-                left:`${left}%`,
-                top:`${top}%`,
-                width:`${width}%`,
-                height:`${height}%`,
-                transform:`rotate(${item.rotation || 0}deg)`,
-                transformOrigin:"center",
-                opacity:item.opacity ?? 1,
-                overflow:item.transparent ? "visible" : "hidden",
-                borderRadius:4,
-                boxShadow:"0 2px 10px rgba(0,0,0,0.08)",
-              }}
-            >
-              <img src={item.src} alt="" style={{ width:"100%", height:"100%", display:"block", objectFit:item.transparent ? "contain" : "cover", transform:item.flipH ? "scaleX(-1)" : "none" }} />
-            </div>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
-
-function MoodboardPreviewChip({ board, onClick, compact = false, showOpenButton = true }) {
-  const [hovered, setHovered] = useState(false);
-
-  return (
-    <button
-      onClick={onClick}
-      style={{
-        width: "100%",
-        border: "1.5px solid #e8e4dc",
-        borderRadius: compact ? 16 : 20,
-        background: board?.bg || "#f5f3ef",
-        cursor: "pointer",
-        overflow: "hidden",
-        textAlign: "left",
-        padding: 0,
-        boxShadow: compact ? "0 2px 10px rgba(0,0,0,0.04)" : "0 8px 28px rgba(0,0,0,0.05)",
-        transition: "transform 0.15s ease, box-shadow 0.15s ease",
-        position: "relative",
-      }}
-      onMouseEnter={e => {
-        setHovered(true);
-        e.currentTarget.style.transform = "translateY(-2px)";
-        e.currentTarget.style.boxShadow = compact ? "0 8px 20px rgba(0,0,0,0.10)" : "0 14px 34px rgba(0,0,0,0.12)";
-      }}
-      onMouseLeave={e => {
-        setHovered(false);
-        e.currentTarget.style.transform = "translateY(0)";
-        e.currentTarget.style.boxShadow = compact ? "0 2px 10px rgba(0,0,0,0.04)" : "0 8px 28px rgba(0,0,0,0.05)";
-      }}
-    >
-      <div style={{ position: "relative", aspectRatio: compact ? "16 / 10" : "17 / 10", background: board?.bg || "#f5f3ef" }}>
-        <MoodboardPreviewSurface board={board} compact={compact} />
-        {/* Hover overlay */}
-        <div style={{
-          position: "absolute", inset: 0,
-          background: "rgba(0,0,0,0.52)",
-          opacity: hovered ? 1 : 0,
-          transition: "opacity 0.18s",
-          display: "flex", flexDirection: "column", justifyContent: "space-between",
-          padding: "12px 14px",
-          pointerEvents: "none",
-        }}>
-          <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 6 }}>
-            <div style={{ fontSize: compact ? 12 : 13, fontWeight: 800, color: "#fff", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1 }}>
-              {board?.name || "Untitled Board"}
-            </div>
-            {board?.linkedLb && <div style={{ flexShrink: 0, background: "rgba(58,170,110,0.9)", color: "#fff", borderRadius: 20, padding: "2px 8px", fontSize: 10, fontWeight: 700 }}>Lookbook</div>}
-            {board?.pinned && <span style={{ flexShrink: 0, color: "#f0c840", fontSize: 13 }}>★</span>}
-          </div>
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-            <div style={{ fontSize: 11, color: "rgba(255,255,255,0.7)" }}>
-              {(board?.items || []).length} item{(board?.items || []).length !== 1 ? "s" : ""}
-            </div>
-            {showOpenButton && <div style={{ fontSize: 11, fontWeight: 700, color: "#fff" }}>Open Board →</div>}
-          </div>
-        </div>
-      </div>
-    </button>
-  );
-}
-
 // ── MoodboardInfoPanel — reads active board from Moodboard via localStorage ──
-function MoodboardInfoPanel({ activeIdx, setActiveIdx, boards: boardsProp, updateBoards, updateBoardById, removeBoardById, lookbooksDb, createLookbook, addMoodboardToLookbook, onGoToLookbook, closetItems, isEditing, setIsEditing }) {
+function MoodboardInfoPanel({ activeIdx, setActiveIdx, boards: boardsProp, updateBoards, updateBoardById, removeBoardById, lookbooksDb, createLookbook, addMoodboardToLookbook, onGoToLookbook }) {
   const ARCHIVE_KEY = "wardrobe_moodboards_archived_v1";
 
   const data = boardsProp || [];
@@ -7087,71 +6636,6 @@ function MoodboardInfoPanel({ activeIdx, setActiveIdx, boards: boardsProp, updat
     return null;
   };
 
-  const generatePalette = () => {
-    if (!board) return;
-    const imageItems = (board.items||[]).filter(i=>i.type!=="text"&&i.src);
-    if (imageItems.length===0) return;
-    const buckets = {};
-    let pending = imageItems.length;
-    const finish = () => {
-      if (--pending > 0) return;
-      const sorted = Object.entries(buckets).sort((a,b)=>b[1]-a[1]);
-      const colors = sorted.slice(0,6).map(([hex])=>hex);
-      if (colors.length > 0) save(data.map((b,i)=>i===activeIdx?{...b,palette:colors}:b));
-    };
-    imageItems.forEach(item => {
-      try {
-        const img = new Image();
-        img.crossOrigin = "anonymous";
-        img.onload = () => {
-          try {
-            const c = document.createElement("canvas"); c.width=40; c.height=40;
-            const ctx = c.getContext("2d"); ctx.drawImage(img,0,0,40,40);
-            const data2 = ctx.getImageData(0,0,40,40).data;
-            for (let p=0;p<data2.length;p+=16) {
-              const r=Math.round(data2[p]/32)*32, g=Math.round(data2[p+1]/32)*32, b=Math.round(data2[p+2]/32)*32, a=data2[p+3];
-              if (a<128) continue;
-              if (r>220&&g>220&&b>220) continue; // skip near-white
-              if (r<20&&g<20&&b<20) continue; // skip near-black
-              const hex=`#${r.toString(16).padStart(2,"0")}${g.toString(16).padStart(2,"0")}${b.toString(16).padStart(2,"0")}`;
-              buckets[hex]=(buckets[hex]||0)+1;
-            }
-          } catch {}
-          finish();
-        };
-        img.onerror = finish;
-        img.src = item.src;
-      } catch { finish(); }
-    });
-  };
-
-  // Closet color matching
-  const closetSuggestions = (() => {
-    if (!board?.palette?.length || !(closetItems||[]).length) return [];
-    const paletteHexes = board.palette.map(h=>h.toLowerCase());
-    // Simple matching: check if closet item color name maps to a palette hue
-    const colorNameToHues = {
-      "black":["#000","#1a1a1a","#202020"],"white":["#fff","#ffffff","#f0f0f0"],
-      "red":["#c00","#e00","#c80"],"pink":["#f080a0","#e06080","#e0a0b0"],
-      "orange":["#e06000","#e08000","#f0a000"],"yellow":["#e0e000","#f0c000","#e0c000"],
-      "green":["#008000","#406040","#608060","#204020"],"blue":["#0060c0","#2060c0","#4080e0"],
-      "navy":["#002060","#002040","#203060"],"purple":["#800080","#6040a0","#8060c0"],
-      "brown":["#604020","#805040","#a06040"],"beige":["#e0d0a0","#d0c080","#c0b060"],
-      "gray":["#808080","#a0a0a0","#606060"],"grey":["#808080","#a0a0a0","#606060"],
-      "cream":["#f0e8c0","#e8dca0","#e0d080"],"tan":["#c0a060","#d0b060","#c0a040"],
-    };
-    return (closetItems||[]).filter(item=>{
-      if (!item.image||!item.color) return false;
-      const colorKey = item.color.toLowerCase();
-      const hues = colorNameToHues[colorKey]||[];
-      return paletteHexes.some(ph=>hues.some(h=>{
-        const r1=parseInt(ph.slice(1,3)||"00",16),g1=parseInt(ph.slice(3,5)||"00",16),b1=parseInt(ph.slice(5,7)||"00",16);
-        const r2=parseInt(h.slice(1,3)||"00",16),g2=parseInt(h.slice(3,5)||"00",16),b2=parseInt(h.slice(5,7)||"00",16);
-        return Math.abs(r1-r2)+Math.abs(g1-g2)+Math.abs(b1-b2)<120;
-      }));
-    }).slice(0,8);
-  })();
-
   const archiveBoard = () => {
     if (!board) return;
     try {
@@ -7162,7 +6646,6 @@ function MoodboardInfoPanel({ activeIdx, setActiveIdx, boards: boardsProp, updat
     if (removeBoardById) removeBoardById(board.id);
     else save(data.filter((_,i) => i !== activeIdx));
     setActiveIdx(Math.max(0, activeIdx - 1));
-    if (setIsEditing) setIsEditing(false);
     setConfirmArchive(false);
   };
 
@@ -7184,35 +6667,13 @@ function MoodboardInfoPanel({ activeIdx, setActiveIdx, boards: boardsProp, updat
   if (data.length === 0) return (
     <div className="right-card">
       <div className="right-card-title">Boards</div>
-      <div style={{fontSize:12,color:"#bbb",textAlign:"center",padding:"12px 0",lineHeight:1.7}}>Use the Add button in the top right to create your first board.</div>
+      <div style={{fontSize:12,color:"#bbb",textAlign:"center",padding:"12px 0"}}>No boards yet</div>
+      <button onClick={() => {
+        const updated = [{ id: uid(), name: "Board 1", items: [], bg: "#ffffff" }];
+        save(updated); setActiveIdx(0);
+      }} style={{width:"100%",padding:"9px 0",background:"#1a1a1a",color:"#fff",border:"none",borderRadius:10,cursor:"pointer",fontFamily:"'DM Sans',sans-serif",fontSize:12,fontWeight:700}}>+ Create Board</button>
     </div>
   );
-
-  if (!isEditing) {
-    const pinnedCount = data.filter(b => b.pinned).length;
-    const linkedCount = data.filter(b => b.linkedLb).length;
-
-    return (
-      <>
-        <div className="right-card">
-          <div className="right-card-title">Board Library</div>
-          <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:10, marginBottom:12 }}>
-            {[
-              { label:"Boards", value:data.length },
-              { label:"Pinned", value:pinnedCount },
-              { label:"Linked", value:linkedCount },
-              { label:"Colors", value:data.reduce((sum, b) => sum + (b.palette?.length || 0), 0) },
-            ].map(stat => (
-              <div key={stat.label} style={{ padding:"10px 12px", borderRadius:14, background:"#faf8f4", border:"1px solid #ece8e0" }}>
-                <div style={{ fontSize:18, fontWeight:800, color:"#1a1a1a" }}>{stat.value}</div>
-                <div style={{ fontSize:10, fontWeight:700, color:"#aaa", textTransform:"uppercase", letterSpacing:"0.08em" }}>{stat.label}</div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </>
-    );
-  }
 
   return (
     <>
@@ -7220,21 +6681,18 @@ function MoodboardInfoPanel({ activeIdx, setActiveIdx, boards: boardsProp, updat
     <div className="right-card">
       <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:10}}>
         <div className="right-card-title" style={{marginBottom:0}}>Board</div>
-        <div style={{display:"flex",gap:6,alignItems:"center"}}>
-          <button onClick={() => save(data.map((b,i) => i===activeIdx ? {...b, pinned:!b.pinned} : b))} title={board?.pinned ? "Unpin board" : "Pin board"}
-            style={{padding:"4px 8px",background:"none",border:"1px solid #e0dbd2",borderRadius:8,cursor:"pointer",fontSize:14,lineHeight:1,color:board?.pinned?"#f0c840":"#ccc",fontFamily:"'DM Sans',sans-serif"}}>
-            {board?.pinned?"★":"☆"}
-          </button>
-          <button onClick={() => setIsEditing && setIsEditing(false)} style={{padding:"4px 10px",background:"#f5f3ef",color:"#666",border:"none",borderRadius:8,cursor:"pointer",fontSize:11,fontWeight:700,fontFamily:"'DM Sans',sans-serif"}}>Library</button>
-        </div>
+        <button onClick={() => {
+          const updated = [...data, {id:uid(), name:`Board ${data.length+1}`, items:[], bg:"#ffffff"}];
+          save(updated); setActiveIdx(updated.length-1);
+        }} style={{padding:"4px 10px",background:"#1a1a1a",color:"#fff",border:"none",borderRadius:8,cursor:"pointer",fontSize:11,fontWeight:700,fontFamily:"'DM Sans',sans-serif"}}>+ New</button>
       </div>
       <select
         value={activeIdx}
         onChange={e => setActiveIdx(Number(e.target.value))}
         style={{width:"100%",padding:"8px 32px 8px 12px",border:"1.5px solid #e0dbd2",borderRadius:10,fontFamily:"'DM Sans',sans-serif",fontSize:13,fontWeight:700,background:"#fafaf8",color:"#1a1a1a",outline:"none",cursor:"pointer",appearance:"auto",boxSizing:"border-box"}}
       >
-        {[...data.map((b,i)=>({b,i}))].sort((a,z)=>(z.b.pinned?1:0)-(a.b.pinned?1:0)).map(({b,i}) => (
-          <option key={b.id} value={i}>{b.pinned?"★ ":""}{b.name}</option>
+        {data.map((b,i) => (
+          <option key={b.id} value={i}>{b.name}</option>
         ))}
       </select>
     </div>
@@ -7257,36 +6715,12 @@ function MoodboardInfoPanel({ activeIdx, setActiveIdx, boards: boardsProp, updat
             placeholder="Mood, theme, inspiration…" rows={3}
             style={{width:"100%",padding:"7px 10px",border:"1px solid #e0dbd2",borderRadius:10,fontFamily:"'DM Sans',sans-serif",fontSize:12,outline:"none",background:"#fafal8",resize:"none",lineHeight:1.5,boxSizing:"border-box"}} />
         </div>
-        <div>
-          <label style={{display:"block",fontSize:10,fontWeight:700,color:"#aaa",textTransform:"uppercase",letterSpacing:"0.08em",marginBottom:5}}>Tags</label>
-          <div style={{display:"flex",flexWrap:"wrap",gap:4}}>
-            {MOODBOARD_TAGS.map(tag => {
-              const active = (board.tags||[]).includes(tag);
-              return (
-                <button key={tag} onClick={() => {
-                  const tags = board.tags||[];
-                  const next = active ? tags.filter(t=>t!==tag) : [...tags,tag];
-                  save(data.map((b,i)=>i===activeIdx?{...b,tags:next}:b));
-                }} style={{padding:"3px 8px",borderRadius:20,fontSize:10,fontWeight:700,cursor:"pointer",background:active?"#1a1a1a":"#f5f3ef",color:active?"#fff":"#888",border:active?"none":"1px solid #e0dbd2",fontFamily:"'DM Sans',sans-serif"}}>
-                  {tag}
-                </button>
-              );
-            })}
-          </div>
-        </div>
       </div>
     </div>
 
     {/* ── Color Palette ── */}
     <div className="right-card" style={{marginTop:12}}>
-      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:8}}>
-        <div className="right-card-title" style={{marginBottom:0}}>Color Palette</div>
-        <button onClick={generatePalette} title="Generate palette from board images"
-          style={{padding:"3px 8px",background:"#f5f3ef",border:"1px solid #e0dbd2",borderRadius:8,cursor:"pointer",fontSize:10,fontWeight:700,color:"#666",fontFamily:"'DM Sans',sans-serif",display:"flex",alignItems:"center",gap:4}}>
-          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><path d="M12 2l1.5 4h4l-3 3 1.5 4L12 11l-4 2 1.5-4-3-3h4z"/></svg>
-          Generate
-        </button>
-      </div>
+      <div className="right-card-title">Color Palette</div>
       <div style={{display:"grid",gridTemplateColumns:"repeat(4,52px)",rowGap:6,columnGap:6,marginBottom:12}}>
         {palette.map((color,idx) => (
           <div key={idx} style={{position:"relative",width:52,height:52,lineHeight:0,flexShrink:0}}>
@@ -7326,25 +6760,7 @@ function MoodboardInfoPanel({ activeIdx, setActiveIdx, boards: boardsProp, updat
           />
         </div>
       )}
-      {palette.length===0 && <div style={{fontSize:11,color:"#ccc",textAlign:"center",padding:"8px 0"}}>Tap + to build your palette · or Generate from images</div>}
-    </div>
-
-    {/* ── Closet Suggestions ── */}
-    <div className="right-card" style={{marginTop:12}}>
-      <div className="right-card-title">From Your Closet</div>
-      {closetSuggestions.length === 0 ? (
-        <div style={{fontSize:11,color:"#ccc",textAlign:"center",padding:"8px 0",lineHeight:1.6}}>
-          {palette.length===0 ? "Build a color palette to see matching pieces" : "No closet items match this palette yet"}
-        </div>
-      ) : (
-        <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
-          {closetSuggestions.map(item=>(
-            <div key={item.id} title={item.name} style={{width:48,height:60,borderRadius:10,overflow:"hidden",background:"#f5f2ed",border:"1.5px solid #e8e4dc",flexShrink:0}}>
-              <img src={item.image} alt={item.name} style={{width:"100%",height:"100%",objectFit:"contain"}} />
-            </div>
-          ))}
-        </div>
-      )}
+      {palette.length===0 && <div style={{fontSize:11,color:"#ccc",textAlign:"center",padding:"8px 0"}}>Tap + to build your palette</div>}
     </div>
 
     {/* ── Lookbooks ── */}
@@ -7463,7 +6879,7 @@ function MoodboardInfoPanel({ activeIdx, setActiveIdx, boards: boardsProp, updat
 }
 
 
-function Moodboard({ closetItems = [], activeIdx, setActiveIdx, boards: boardsProp, updateBoards, removeBoardById, isEditing, setIsEditing, searchQuery = "", tagFilter = "All", statusFilter = "All" }) {
+function Moodboard({ closetItems = [], activeIdx, setActiveIdx, boards: boardsProp, updateBoards, removeBoardById }) {
   const closetItemsForMoodboard = closetItems;
   // Use prop-based boards (Supabase-backed) if provided, else fall back to localStorage
   const STORAGE_KEY = "wardrobe_moodboards_v1";
@@ -7493,13 +6909,6 @@ function Moodboard({ closetItems = [], activeIdx, setActiveIdx, boards: boardsPr
   const [showClosetPicker, setShowClosetPicker] = useState(false);
   const [editingTextId, setEditingTextId] = useState(null);
   const [editingTextVal, setEditingTextVal] = useState("");
-  const [editingBoardName, setEditingBoardName] = useState(false);
-  const [boardNameVal, setBoardNameVal] = useState("");
-  const [mbSort, setMbSort] = useState("pinned");
-  const [mbZoom, setMbZoom] = useState(250);
-  const [zoom, setZoom] = useState(1.0);
-  const [multiSelectedIds, setMultiSelectedIds] = useState(new Set());
-  const [cropState, setCropState] = useState(null); // {id, origSrc, displayW, displayH, cropRect: {x,y,w,h}}
 
   // ── Undo/redo history ──
   const history = useRef([]);   // array of board item snapshots
@@ -7540,12 +6949,19 @@ function Moodboard({ closetItems = [], activeIdx, setActiveIdx, boards: boardsPr
       if (i !== activeIdx) return b;
       const newItems = typeof updater === "function" ? updater(b.items || []) : updater;
       pushHistory(newItems);
-      return {...b, items: newItems, updatedAt: new Date().toISOString()};
+      return {...b, items: newItems};
     }));
   };
 
   const updateBoardMeta = (patch) => {
-    setBoards(bs => bs.map((b,i) => i===activeIdx ? {...b, ...patch, updatedAt: new Date().toISOString()} : b));
+    setBoards(bs => bs.map((b,i) => i===activeIdx ? {...b, ...patch} : b));
+  };
+
+  const addBoard = () => {
+    const name = `Board ${boards.length + 1}`;
+    setBoards(bs => [...bs, {id:uid(), name, items:[], bg:"#ffffff"}]);
+    setActiveIdx(boards.length);
+    setSelectedId(null);
   };
 
   const importImages = (files) => {
@@ -7582,109 +6998,63 @@ function Moodboard({ closetItems = [], activeIdx, setActiveIdx, boards: boardsPr
     setSelectedId(newItem.id);
   };
 
-  const removeItem = (id) => { updateBoard(items => items.filter(i => i.id!==id)); setSelectedId(null); setMultiSelectedIds(new Set()); };
-  const bringForward = (id) => { const maxZ=Math.max(...items.map(i=>i.zIndex||0)); updateBoard(items=>items.map(i=>i.id===id?{...i,zIndex:maxZ+1000}:i)); };
-  const sendBackward = (id) => { const minZ=Math.min(...items.map(i=>i.zIndex||0)); updateBoard(items=>items.map(i=>i.id===id?{...i,zIndex:minZ-1000}:i)); };
-  const bringForwardOne = (id) => {
-    const item=items.find(i=>i.id===id); if(!item) return;
-    const curZ=item.zIndex||0;
-    const above=items.filter(i=>i.id!==id&&(i.zIndex||0)>curZ);
-    if(above.length===0) return;
-    const nextZ=Math.min(...above.map(i=>i.zIndex||0));
-    updateBoard(items=>items.map(i=>i.id===id?{...i,zIndex:nextZ+1}:i));
-  };
-  const sendBackwardOne = (id) => {
-    const item=items.find(i=>i.id===id); if(!item) return;
-    const curZ=item.zIndex||0;
-    const below=items.filter(i=>i.id!==id&&(i.zIndex||0)<curZ);
-    if(below.length===0) return;
-    const prevZ=Math.max(...below.map(i=>i.zIndex||0));
-    updateBoard(items=>items.map(i=>i.id===id?{...i,zIndex:prevZ-1}:i));
-  };
-  const toggleLock = (id) => { updateBoard(items=>items.map(i=>i.id===id?{...i,locked:!i.locked}:i)); };
+  const removeItem = (id) => { updateBoard(items => items.filter(i => i.id!==id)); setSelectedId(null); };
+  const bringForward = (id) => { const maxZ=Math.max(...items.map(i=>i.zIndex||0)); updateBoard(items=>items.map(i=>i.id===id?{...i,zIndex:maxZ+1}:i)); };
+  const sendBackward = (id) => { const minZ=Math.min(...items.map(i=>i.zIndex||0)); updateBoard(items=>items.map(i=>i.id===id?{...i,zIndex:minZ-1}:i)); };
   const updateItem = (id, patch) => { updateBoard(items=>items.map(i=>i.id===id?{...i,...patch}:i)); };
   const duplicateItem = (id) => { const item=items.find(i=>i.id===id); if(!item)return; const copy={...item,id:uid(),x:item.x+20,y:item.y+20,zIndex:Math.floor(Date.now()/1000000)}; updateBoard(items=>[...items,copy]); setSelectedId(copy.id); };
 
   // ── Keyboard shortcuts ──
   useEffect(() => {
     const onKey = (e) => {
-      if (editingTextId) return;
+      if (editingTextId) return; // don't intercept while typing
       const tag = document.activeElement?.tagName;
       if (tag === "INPUT" || tag === "TEXTAREA") return;
       if ((e.metaKey || e.ctrlKey) && e.key === "z") { e.preventDefault(); undo(); return; }
       if ((e.metaKey || e.ctrlKey) && (e.key === "y" || (e.shiftKey && e.key === "z"))) { e.preventDefault(); redo(); return; }
       if (!selectedId) return;
-      const selItem = items.find(i=>i.id===selectedId);
-      if (e.key === "Delete" || e.key === "Backspace") {
-        e.preventDefault();
-        if (selItem?.locked) return; // can't delete locked
-        if (multiSelectedIds.size > 1) { updateBoard(its=>its.filter(i=>!multiSelectedIds.has(i.id))); setSelectedId(null); setMultiSelectedIds(new Set()); }
-        else removeItem(selectedId);
-        return;
-      }
-      if (e.key === "Escape") { setSelectedId(null); setMultiSelectedIds(new Set()); return; }
-      if (selItem?.locked) return; // skip nudge for locked
+      if (e.key === "Delete" || e.key === "Backspace") { e.preventDefault(); removeItem(selectedId); return; }
+      if (e.key === "Escape") { setSelectedId(null); return; }
       const NUDGE = e.shiftKey ? 10 : 1;
-      if (e.key === "ArrowLeft")  { e.preventDefault(); updateItem(selectedId, { x: (selItem?.x||0) - NUDGE }); return; }
-      if (e.key === "ArrowRight") { e.preventDefault(); updateItem(selectedId, { x: (selItem?.x||0) + NUDGE }); return; }
-      if (e.key === "ArrowUp")    { e.preventDefault(); updateItem(selectedId, { y: (selItem?.y||0) - NUDGE }); return; }
-      if (e.key === "ArrowDown")  { e.preventDefault(); updateItem(selectedId, { y: (selItem?.y||0) + NUDGE }); return; }
+      if (e.key === "ArrowLeft")  { e.preventDefault(); updateItem(selectedId, { x: (items.find(i=>i.id===selectedId)?.x||0) - NUDGE }); return; }
+      if (e.key === "ArrowRight") { e.preventDefault(); updateItem(selectedId, { x: (items.find(i=>i.id===selectedId)?.x||0) + NUDGE }); return; }
+      if (e.key === "ArrowUp")    { e.preventDefault(); updateItem(selectedId, { y: (items.find(i=>i.id===selectedId)?.y||0) - NUDGE }); return; }
+      if (e.key === "ArrowDown")  { e.preventDefault(); updateItem(selectedId, { y: (items.find(i=>i.id===selectedId)?.y||0) + NUDGE }); return; }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [selectedId, items, editingTextId, multiSelectedIds]);
+  }, [selectedId, items, editingTextId]);
 
   // ── Mouse interaction ──
   const onMouseDown = (e, id, mode) => {
     e.stopPropagation(); e.preventDefault();
     const item = items.find(i=>i.id===id);
     if (!item) return;
-    // Shift-click: toggle multi-select
-    if (mode === "drag" && e.shiftKey) {
-      setMultiSelectedIds(prev => { const next=new Set(prev); if(next.has(id)) next.delete(id); else next.add(id); return next; });
-      setSelectedId(id);
-      return;
-    }
     setSelectedId(id);
-    if (item.locked) return; // locked: select only, no drag/resize/rotate
-    if (!e.shiftKey) {
-      // Non-shift drag: clear multi-select unless this item is already in it
-      if (!multiSelectedIds.has(id)) setMultiSelectedIds(new Set());
-    }
+    bringForward(id);
     if (mode === "drag") {
-      // If item is in a multi-selection, drag all of them together
-      const ids = multiSelectedIds.size > 1 && multiSelectedIds.has(id) ? [...multiSelectedIds] : [id];
-      if (ids.length > 1) {
-        const offsets = {};
-        ids.forEach(sid => { const si=items.find(i=>i.id===sid); if(si) offsets[sid]={ox:e.clientX/zoom-si.x, oy:e.clientY/zoom-si.y}; });
-        dragging.current = {id, multiOffsets:offsets};
-      } else {
-        dragging.current = {id, startX:e.clientX/zoom-item.x, startY:e.clientY/zoom-item.y};
-      }
+      dragging.current = {id, startX:e.clientX-item.x, startY:e.clientY-item.y};
     } else if (mode === "resize") {
       resizing.current = {id, startX:e.clientX, startY:e.clientY, startW:item.w, startH:item.h};
     } else if (mode === "rotate") {
       const canvas = canvasRef.current;
       const canvasRect = canvas?.getBoundingClientRect();
-      const cx = (canvasRect?.left||0) + (item.x + item.w/2) * zoom;
-      const cy = (canvasRect?.top||0)  + (item.y + item.h/2) * zoom;
+      // item center in page coords
+      const cx = (canvasRect?.left||0) + item.x + item.w/2;
+      const cy = (canvasRect?.top||0)  + item.y + item.h/2;
       rotating.current = {id, cx, cy, startAngle: Math.atan2(e.clientY-cy, e.clientX-cx) * 180/Math.PI, startRotation: item.rotation||0};
     }
   };
 
   const onMouseMove = (e) => {
     if (dragging.current) {
-      const {id,startX,startY,multiOffsets}=dragging.current;
+      const {id,startX,startY}=dragging.current;
       skipHistory.current = true;
-      if (multiOffsets) {
-        setBoards(bs=>bs.map((b,i)=>i!==activeIdx?b:{...b,items:(b.items||[]).map(it=>{ const off=multiOffsets[it.id]; return off?{...it,x:e.clientX/zoom-off.ox,y:e.clientY/zoom-off.oy}:it; })}));
-      } else {
-        setBoards(bs=>bs.map((b,i)=>i!==activeIdx?b:{...b,items:(b.items||[]).map(it=>it.id===id?{...it,x:e.clientX/zoom-startX,y:e.clientY/zoom-startY}:it)}));
-      }
+      setBoards(bs=>bs.map((b,i)=>i!==activeIdx?b:{...b,items:(b.items||[]).map(it=>it.id===id?{...it,x:e.clientX-startX,y:e.clientY-startY}:it)}));
       skipHistory.current = false;
     } else if (resizing.current) {
       const {id,startX,startY,startW,startH}=resizing.current;
-      const dx=(e.clientX-startX)/zoom; const dy=(e.clientY-startY)/zoom;
+      const dx=e.clientX-startX; const dy=e.clientY-startY;
       skipHistory.current = true;
       setBoards(bs=>bs.map((b,i)=>i!==activeIdx?b:{...b,items:(b.items||[]).map(it=>it.id===id?{...it,w:Math.max(60,startW+dx),h:Math.max(40,startH+dy)}:it)}));
       skipHistory.current = false;
@@ -7700,6 +7070,7 @@ function Moodboard({ closetItems = [], activeIdx, setActiveIdx, boards: boardsPr
 
   const onMouseUp = () => {
     if (dragging.current || resizing.current || rotating.current) {
+      // Push to history on release
       pushHistory(items);
     }
     dragging.current = null; resizing.current = null; rotating.current = null;
@@ -7752,109 +7123,22 @@ function Moodboard({ closetItems = [], activeIdx, setActiveIdx, boards: boardsPr
     <div style={{display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",height:"60vh",gap:16}}>
       <div><SvgSparkle size={40} color="#ddd" /></div>
       <div style={{fontSize:18,fontWeight:800,color:"#1a1a1a"}}>No moodboards yet</div>
-      <div style={{fontSize:13,color:"#aaa"}}>Use the Add button in the top right to start your first board.</div>
+      <div style={{fontSize:13,color:"#aaa"}}>Create a board in the right panel and start arranging inspiration</div>
+      <button onClick={addBoard} style={{padding:"12px 28px",background:"#1a1a1a",color:"#fff",border:"none",borderRadius:14,cursor:"pointer",fontFamily:"'DM Sans',sans-serif",fontSize:14,fontWeight:700}}>+ Create Moodboard</button>
     </div>
   );
-
-  if (!isEditing) {
-    const visibleBoards = boards
-      .map((b, i) => ({ b, i }))
-      .filter(({ b }) => {
-        const matchesSearch = !searchQuery || (b.name || "").toLowerCase().includes(searchQuery.toLowerCase()) || (b.notes || "").toLowerCase().includes(searchQuery.toLowerCase());
-        const matchesTag = tagFilter === "All" || (b.tags || []).includes(tagFilter);
-        const matchesStatus = statusFilter === "All"
-          || (statusFilter === "Pinned" && !!b.pinned)
-          || (statusFilter === "Linked" && !!b.linkedLb)
-          || (statusFilter === "Unlinked" && !b.linkedLb);
-        return matchesSearch && matchesTag && matchesStatus;
-      });
-    const sorted = [...visibleBoards].sort((a,z) => {
-      const aTime = a.b.updatedAt || a.b.createdAt || a.b.id || "";
-      const zTime = z.b.updatedAt || z.b.createdAt || z.b.id || "";
-      if (mbSort === "az") return (a.b.name || "").localeCompare(z.b.name || "");
-      if (mbSort === "items") return (z.b.items?.length || 0) - (a.b.items?.length || 0);
-      if (mbSort === "newest") return String(zTime).localeCompare(String(aTime));
-      if ((z.b.pinned ? 1 : 0) !== (a.b.pinned ? 1 : 0)) return (z.b.pinned ? 1 : 0) - (a.b.pinned ? 1 : 0);
-      return String(zTime).localeCompare(String(aTime));
-    });
-    return (
-      <div className="fade-up">
-        <div style={{ display:"flex", gap:10, marginBottom:18, alignItems:"center", justifyContent:"space-between", flexWrap:"wrap" }}>
-          <div style={{ display:"flex", gap:8, flexWrap:"wrap", alignItems:"center" }}>
-            <select value={mbSort} onChange={e => setMbSort(e.target.value)} className="pill-select">
-              <option value="pinned">Sort: Pinned First</option>
-              <option value="newest">Sort: Recently Updated</option>
-              <option value="az">Sort: A - Z</option>
-              <option value="items">Sort: Most Items</option>
-            </select>
-          </div>
-          <div style={{ display:"flex", alignItems:"center", gap:10, marginLeft:"auto" }}>
-            <div style={{ display:"flex", alignItems:"center", gap:8 }}>
-              <SvgBox size={11} color="#bbb" />
-              <input type="range" min={210} max={320} step={10} value={mbZoom} onChange={e => setMbZoom(Number(e.target.value))}
-                style={{ width:72, accentColor:"#1a1a1a", cursor:"pointer" }} />
-              <SvgBox size={16} color="#bbb" />
-            </div>
-          </div>
-        </div>
-
-        {sorted.length === 0 ? (
-          <div style={{ textAlign:"center", padding:"80px 24px" }}>
-            <div style={{ fontFamily:"'Cormorant Garamond', serif", fontSize:28, fontWeight:300, fontStyle:"italic", color:"#b0a898", marginBottom:8 }}>No boards match these filters</div>
-            <div style={{ fontSize:13, color:"#bbb" }}>Try a different search or filter from the left sidebar.</div>
-          </div>
-        ) : (
-          <div style={{ display:"grid", gridTemplateColumns:`repeat(auto-fill, minmax(${mbZoom}px, 1fr))`, gap:16 }}>
-            {sorted.map(({b,i})=>(
-              <MoodboardPreviewChip key={b.id} board={b} onClick={() => { setActiveIdx(i); setIsEditing && setIsEditing(true); }} />
-            ))}
-          </div>
-        )}
-      </div>
-    );
-  }
 
   return (
     <div style={{display:"flex",flexDirection:"column",height:"calc(100vh - 160px)",userSelect:"none",padding:"0 4px"}}>
 
-      {/* Inline board name */}
-      {board && (
-        <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:8,minHeight:26,flexWrap:"wrap"}}>
-          {editingBoardName ? (
-            <input autoFocus value={boardNameVal} onChange={e=>setBoardNameVal(e.target.value)}
-              onBlur={()=>{updateBoardMeta({name:boardNameVal});setEditingBoardName(false);}}
-              onKeyDown={e=>{if(e.key==="Enter"||e.key==="Escape"){updateBoardMeta({name:boardNameVal});setEditingBoardName(false);}e.stopPropagation();}}
-              style={{fontSize:15,fontWeight:800,color:"#1a1a1a",border:"none",borderBottom:"2px solid #1a1a1a",outline:"none",background:"transparent",fontFamily:"'DM Sans',sans-serif",padding:"2px 0",minWidth:80}} />
-          ) : (
-            <div onClick={()=>{setEditingBoardName(true);setBoardNameVal(board.name||"");}}
-              style={{fontSize:15,fontWeight:800,color:"#1a1a1a",cursor:"text",padding:"2px 6px",borderRadius:6,borderBottom:"1.5px solid transparent"}}
-              onMouseEnter={e=>e.currentTarget.style.background="#f5f3ef"}
-              onMouseLeave={e=>e.currentTarget.style.background="transparent"}
-              title="Click to rename">
-              {board.name||"Untitled Board"}
-            </div>
-          )}
-          {board.pinned&&<span style={{color:"#f0c840",fontSize:12}}>★</span>}
-          {(board.tags||[]).map(t=>(
-            <span key={t} style={{fontSize:9,fontWeight:700,padding:"2px 6px",borderRadius:20,background:"#f5f3ef",color:"#888",border:"1px solid #e0dbd2"}}>{t}</span>
-          ))}
-        </div>
-      )}
-
       {/* Toolbar */}
       <div style={{display:"flex",gap:8,marginBottom:10,flexWrap:"wrap",alignItems:"center"}}>
         <input ref={fileRef} type="file" accept="image/*" multiple style={{display:"none"}} onChange={e=>{importImages(e.target.files);e.target.value="";}} />
-        <button onClick={() => setIsEditing && setIsEditing(false)} style={{padding:"8px 14px",background:"#f5f3ef",border:"none",borderRadius:10,cursor:"pointer",fontFamily:"'DM Sans',sans-serif",fontSize:12,fontWeight:700,color:"#666",display:"flex",alignItems:"center",gap:8}}><SvgArrowL size={13} color="#666" />All Boards</button>
         <button onClick={()=>fileRef.current.click()} style={{padding:"8px 16px",background:"#1a1a1a",color:"#fff",border:"none",borderRadius:10,cursor:"pointer",fontFamily:"'DM Sans',sans-serif",fontSize:12,fontWeight:700,display:"flex",alignItems:"center",gap:8}}><SvgCamera size={13} color="#fff" />Import Images</button>
         <button onClick={addTextNote} style={{padding:"8px 16px",background:"#fff9e6",border:"1.5px solid #f0e0a0",borderRadius:10,cursor:"pointer",fontFamily:"'DM Sans',sans-serif",fontSize:12,fontWeight:700,color:"#7a6000",display:"flex",alignItems:"center",gap:8}}><SvgEdit size={13} color="#7a6000" />Add Text</button>
         <button onClick={()=>setShowUrlImport(u=>!u)} style={{padding:"8px 14px",background:showUrlImport?"#f0f4ff":"#f5f3ef",border:showUrlImport?"1.5px solid #a0b4f0":"none",borderRadius:10,cursor:"pointer",fontFamily:"'DM Sans',sans-serif",fontSize:12,fontWeight:700,color:showUrlImport?"#3a5fe0":"#666",display:"flex",alignItems:"center",gap:8}}><SvgLink size={13} color="currentColor" />URL</button>
         <button onClick={()=>setShowClosetPicker(p=>!p)} style={{padding:"8px 14px",background:showClosetPicker?"#f0faf4":"#f5f3ef",border:showClosetPicker?"1.5px solid #b6e8c8":"none",borderRadius:10,cursor:"pointer",fontFamily:"'DM Sans',sans-serif",fontSize:12,fontWeight:700,color:showClosetPicker?"#2d6a3f":"#666",display:"flex",alignItems:"center",gap:8}}><SvgHanger size={13} color="currentColor" />From Closet</button>
         <div style={{display:"flex",gap:6,marginLeft:"auto",alignItems:"center"}}>
-          <div style={{display:"flex",alignItems:"center",gap:2,background:"#f5f3ef",borderRadius:8,padding:"2px 4px"}}>
-            <button onClick={()=>setZoom(z=>Math.max(0.25,z-0.25))} style={{width:22,height:22,border:"none",background:"none",cursor:"pointer",fontSize:14,color:"#666",display:"flex",alignItems:"center",justifyContent:"center",fontFamily:"'DM Sans',sans-serif"}}>−</button>
-            <span style={{fontSize:10,fontWeight:700,color:"#888",minWidth:30,textAlign:"center"}}>{Math.round(zoom*100)}%</span>
-            <button onClick={()=>setZoom(z=>Math.min(2.0,z+0.25))} style={{width:22,height:22,border:"none",background:"none",cursor:"pointer",fontSize:14,color:"#666",display:"flex",alignItems:"center",justifyContent:"center",fontFamily:"'DM Sans',sans-serif"}}>+</button>
-          </div>
           <button onClick={undo} title="Undo (⌘Z)" style={{padding:"7px 10px",background:"#f5f3ef",border:"none",borderRadius:8,cursor:"pointer",fontSize:11,fontWeight:700,color:"#666",fontFamily:"'DM Sans',sans-serif",display:"flex",alignItems:"center",gap:5}}>
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><path d="M3 7v6h6"/><path d="M21 17a9 9 0 00-9-9 9 9 0 00-6 2.3L3 13"/></svg>
           </button>
@@ -7876,7 +7160,6 @@ function Moodboard({ closetItems = [], activeIdx, setActiveIdx, boards: boardsPr
                 setBoards(bs => bs.filter((_, i) => i !== activeIdx));
               }
               if (setActiveIdx) setActiveIdx(Math.max(0, activeIdx - 1));
-              if (setIsEditing) setIsEditing(false);
             }
           }} title="Archive this board" style={{padding:"7px 10px",background:"#f5f3ef",border:"none",borderRadius:8,cursor:"pointer",fontSize:11,color:"#777",fontFamily:"'DM Sans',sans-serif",display:"flex",alignItems:"center",gap:5}}>
             <SvgArrowDn size={13} color="#777" />
@@ -7890,7 +7173,6 @@ function Moodboard({ closetItems = [], activeIdx, setActiveIdx, boards: boardsPr
                 setBoards(bs => bs.filter((_, i) => i !== activeIdx));
               }
               if (setActiveIdx) setActiveIdx(Math.max(0, activeIdx - 1));
-              if (setIsEditing) setIsEditing(false);
             }
           }} title="Delete this board" style={{padding:"7px 10px",background:"#fef2f2",border:"none",borderRadius:8,cursor:"pointer",fontSize:11,color:"#e05555",fontFamily:"'DM Sans',sans-serif",display:"flex",alignItems:"center",gap:5}}>
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 011-1h4a1 1 0 011 1v2"/></svg>
@@ -7930,127 +7212,56 @@ function Moodboard({ closetItems = [], activeIdx, setActiveIdx, boards: boardsPr
       )}
 
       {/* Selected item toolbar */}
-      {/* Multi-select toolbar */}
-      {multiSelectedIds.size > 1 && (
-        <div style={{display:"flex",gap:6,marginBottom:8,alignItems:"center",padding:"8px 12px",background:"#f0f6ff",borderRadius:12,border:"1px solid #c8ddf8"}}>
-          <span style={{fontSize:10,fontWeight:700,color:"#3a6fd8",flexShrink:0}}>{multiSelectedIds.size} SELECTED</span>
-          <button onClick={()=>bringForward(selectedId)} style={{padding:"5px 10px",fontSize:11,background:"#e8f0fe",border:"none",borderRadius:8,cursor:"pointer",fontWeight:700,color:"#3a6fd8",fontFamily:"'DM Sans',sans-serif"}}>↑↑ Front</button>
-          <button onClick={()=>sendBackward(selectedId)} style={{padding:"5px 10px",fontSize:11,background:"#e8f0fe",border:"none",borderRadius:8,cursor:"pointer",fontWeight:700,color:"#3a6fd8",fontFamily:"'DM Sans',sans-serif"}}>↓↓ Back</button>
-          <button onClick={()=>{updateBoard(its=>its.filter(i=>!multiSelectedIds.has(i.id)));setSelectedId(null);setMultiSelectedIds(new Set());}} style={{padding:"5px 10px",fontSize:11,background:"#fef2f2",border:"none",borderRadius:8,cursor:"pointer",fontWeight:700,color:"#e05555",fontFamily:"'DM Sans',sans-serif",marginLeft:"auto"}}>Remove All</button>
-          <button onClick={()=>{setSelectedId(null);setMultiSelectedIds(new Set());}} style={{padding:"5px 8px",fontSize:11,background:"#f5f3ef",border:"none",borderRadius:8,cursor:"pointer",color:"#888",fontFamily:"'DM Sans',sans-serif"}}>✕</button>
-        </div>
-      )}
-      {selectedItem && multiSelectedIds.size <= 1 && (
+      {selectedItem && (
         <div style={{display:"flex",gap:6,marginBottom:8,alignItems:"center",flexWrap:"wrap",padding:"8px 12px",background:"#faf9f6",borderRadius:12,border:"1px solid #e8e4dc"}}>
           <span style={{fontSize:10,fontWeight:700,color:"#aaa",flexShrink:0}}>SELECTED</span>
-          {/* 4-level z-order */}
-          <button onClick={()=>bringForward(selectedId)} title="Bring to front" style={{padding:"5px 8px",fontSize:11,background:"#f5f2ed",border:"none",borderRadius:8,cursor:"pointer",fontWeight:700,color:"#555",fontFamily:"'DM Sans',sans-serif"}}>↑↑</button>
-          <button onClick={()=>bringForwardOne(selectedId)} title="Forward one" style={{padding:"5px 8px",fontSize:11,background:"#f5f2ed",border:"none",borderRadius:8,cursor:"pointer",fontWeight:700,color:"#555",fontFamily:"'DM Sans',sans-serif"}}>↑</button>
-          <button onClick={()=>sendBackwardOne(selectedId)} title="Back one" style={{padding:"5px 8px",fontSize:11,background:"#f5f2ed",border:"none",borderRadius:8,cursor:"pointer",fontWeight:700,color:"#555",fontFamily:"'DM Sans',sans-serif"}}>↓</button>
-          <button onClick={()=>sendBackward(selectedId)} title="Send to back" style={{padding:"5px 8px",fontSize:11,background:"#f5f2ed",border:"none",borderRadius:8,cursor:"pointer",fontWeight:700,color:"#555",fontFamily:"'DM Sans',sans-serif"}}>↓↓</button>
+          <button onClick={()=>bringForward(selectedId)} style={{padding:"5px 10px",fontSize:11,background:"#f5f2ed",border:"none",borderRadius:8,cursor:"pointer",fontWeight:700,color:"#555",fontFamily:"'DM Sans',sans-serif"}}><SvgArrowUp size={12} color="#555" style={{marginRight:4}} />Fwd</button>
+          <button onClick={()=>sendBackward(selectedId)} style={{padding:"5px 10px",fontSize:11,background:"#f5f2ed",border:"none",borderRadius:8,cursor:"pointer",fontWeight:700,color:"#555",fontFamily:"'DM Sans',sans-serif"}}><SvgArrowDn size={12} color="#555" style={{marginRight:4}} />Back</button>
           <button onClick={()=>duplicateItem(selectedId)} style={{padding:"5px 10px",fontSize:11,background:"#f5f2ed",border:"none",borderRadius:8,cursor:"pointer",fontWeight:700,color:"#555",fontFamily:"'DM Sans',sans-serif"}}><SvgCopy size={12} color="#555" style={{marginRight:4}} />Dupe</button>
-          {/* Lock/unlock */}
-          <button onClick={()=>toggleLock(selectedId)} title={selectedItem.locked?"Unlock":"Lock"}
-            style={{padding:"5px 10px",fontSize:11,background:selectedItem.locked?"#fff9e6":"#f5f2ed",border:selectedItem.locked?"1px solid #f0c840":"none",borderRadius:8,cursor:"pointer",fontWeight:700,color:selectedItem.locked?"#a07000":"#555",fontFamily:"'DM Sans',sans-serif"}}>
-            {selectedItem.locked?"🔒":"🔓"}
-          </button>
-          {!selectedItem.locked && selectedItem.type !== "text" && (
+          {selectedItem.type !== "text" && (
             <>
               <button onClick={()=>updateItem(selectedId,{flipH:!selectedItem.flipH})} style={{padding:"5px 10px",fontSize:11,background:selectedItem.flipH?"#1a1a1a":"#f5f2ed",border:"none",borderRadius:8,cursor:"pointer",fontWeight:700,color:selectedItem.flipH?"#fff":"#555",fontFamily:"'DM Sans',sans-serif"}}>⇆ Flip</button>
               <label style={{fontSize:10,fontWeight:700,color:"#aaa",flexShrink:0}}>Opacity</label>
               <input type="range" min="0.1" max="1" step="0.05" value={selectedItem.opacity??1}
                 onChange={e=>updateItem(selectedId,{opacity:parseFloat(e.target.value)})}
-                style={{width:64}} />
-              <button onClick={()=>{ setCropState({id:selectedId,origSrc:selectedItem.src,displayW:selectedItem.w,displayH:selectedItem.h,cropRect:{x:0,y:0,w:selectedItem.w,h:selectedItem.h}}); }} style={{padding:"5px 10px",fontSize:11,background:"#f0f6ff",border:"1px solid #c8ddf8",borderRadius:8,cursor:"pointer",fontWeight:700,color:"#3a6fd8",fontFamily:"'DM Sans',sans-serif"}}>Crop</button>
+                style={{width:72}} />
             </>
           )}
-          {!selectedItem.locked && selectedItem.type === "text" && (
+          {selectedItem.type === "text" && (
             <>
-              <select value={selectedItem.fontFamily||"DM Sans"} onChange={e=>updateItem(selectedId,{fontFamily:e.target.value})}
-                style={{padding:"4px 6px",border:"1px solid #e0dbd2",borderRadius:8,fontFamily:"'DM Sans',sans-serif",fontSize:10,fontWeight:700,background:"#fafaf8",outline:"none",cursor:"pointer"}}>
-                <option value="DM Sans">DM Sans</option>
-                <option value="'Cormorant Garamond',serif">Cormorant</option>
-                <option value="Georgia,serif">Georgia</option>
-                <option value="monospace">Mono</option>
-              </select>
               <label style={{fontSize:10,fontWeight:700,color:"#aaa",flexShrink:0}}>Size</label>
-              <input type="range" min="10" max="72" step="1" value={selectedItem.fontSize??14}
+              <input type="range" min="10" max="48" step="1" value={selectedItem.fontSize??14}
                 onChange={e=>updateItem(selectedId,{fontSize:parseInt(e.target.value)})}
-                style={{width:60}} />
+                style={{width:64}} />
               <input type="color" value={selectedItem.color??"#1a1a1a"} onChange={e=>updateItem(selectedId,{color:e.target.value})}
                 style={{width:26,height:26,border:"none",borderRadius:6,cursor:"pointer",padding:0}} title="Text color" />
-              <button onClick={()=>updateItem(selectedId,{bold:!selectedItem.bold})}
-                style={{padding:"5px 8px",fontSize:12,background:selectedItem.bold?"#1a1a1a":"#f5f3ef",color:selectedItem.bold?"#fff":"#555",border:"none",borderRadius:8,cursor:"pointer",fontWeight:800,fontFamily:"'DM Sans',sans-serif"}}>B</button>
-              <button onClick={()=>updateItem(selectedId,{italic:!selectedItem.italic})}
-                style={{padding:"5px 8px",fontSize:12,background:selectedItem.italic?"#1a1a1a":"#f5f3ef",color:selectedItem.italic?"#fff":"#555",border:"none",borderRadius:8,cursor:"pointer",fontWeight:700,fontStyle:"italic",fontFamily:"Georgia,serif"}}>I</button>
               <button onClick={()=>updateItem(selectedId,{transparentBg:!selectedItem.transparentBg})}
                 style={{padding:"5px 10px",fontSize:11,background:selectedItem.transparentBg?"#1a1a1a":"#f5f3ef",color:selectedItem.transparentBg?"#fff":"#555",border:"none",borderRadius:8,cursor:"pointer",fontWeight:700,fontFamily:"'DM Sans',sans-serif"}}>
-                {selectedItem.transparentBg?"No BG":"BG"}
+                {selectedItem.transparentBg?"◻ No BG":"◼ BG"}
               </button>
               {!selectedItem.transparentBg && (
                 <input type="color" value={selectedItem.bg??"#fff9e6"} onChange={e=>updateItem(selectedId,{bg:e.target.value})}
                   style={{width:26,height:26,border:"none",borderRadius:6,cursor:"pointer",padding:0}} title="Background color" />
               )}
+              <button onClick={()=>updateItem(selectedId,{bold:!selectedItem.bold})}
+                style={{padding:"5px 10px",fontSize:12,background:selectedItem.bold?"#1a1a1a":"#f5f3ef",color:selectedItem.bold?"#fff":"#555",border:"none",borderRadius:8,cursor:"pointer",fontWeight:800,fontFamily:"'DM Sans',sans-serif"}}>B</button>
             </>
           )}
           <button onClick={()=>removeItem(selectedId)} style={{padding:"5px 10px",fontSize:11,background:"#fef2f2",border:"none",borderRadius:8,cursor:"pointer",fontWeight:700,color:"#e05555",fontFamily:"'DM Sans',sans-serif",marginLeft:"auto"}}><SvgTrash size={12} color="#e05555" style={{marginRight:4}} />Remove</button>
         </div>
       )}
 
-      {/* Crop overlay */}
-      {cropState && (() => {
-        const cs = cropState;
-        const applyCrop = () => {
-          const {id,origSrc,displayW,displayH,cropRect:{x,y,w,h}} = cs;
-          const img = new Image();
-          img.crossOrigin = "anonymous";
-          img.onload = () => {
-            const scaleX = img.naturalWidth / displayW;
-            const scaleY = img.naturalHeight / displayH;
-            const c = document.createElement("canvas");
-            c.width = Math.round(w * scaleX); c.height = Math.round(h * scaleY);
-            c.getContext("2d").drawImage(img, x*scaleX, y*scaleY, w*scaleX, h*scaleY, 0, 0, c.width, c.height);
-            updateItem(id, {src: c.toDataURL("image/jpeg",0.92), w: Math.round(w), h: Math.round(h)});
-            setCropState(null);
-          };
-          img.onerror = () => { updateItem(id, {w: Math.round(w), h: Math.round(h)}); setCropState(null); };
-          img.src = origSrc;
-        };
-        return (
-          <div style={{position:"relative",flex:1,background:"rgba(0,0,0,0.7)",borderRadius:20,overflow:"hidden",minHeight:400,display:"flex",alignItems:"center",justifyContent:"center"}}>
-            <div style={{position:"relative",display:"inline-block"}}>
-              <img src={cs.origSrc} alt="" draggable={false} style={{display:"block",maxWidth:"100%",maxHeight:"60vh",opacity:0.5}} />
-              <div style={{position:"absolute",left:cs.cropRect.x,top:cs.cropRect.y,width:cs.cropRect.w,height:cs.cropRect.h,border:"2px solid #fff",boxSizing:"border-box",cursor:"move"}}
-                onMouseDown={e=>{e.stopPropagation();const ox=e.clientX-cs.cropRect.x,oy=e.clientY-cs.cropRect.y;const mv=(ev)=>setCropState(p=>({...p,cropRect:{...p.cropRect,x:Math.max(0,Math.min(ev.clientX-ox,p.displayW-p.cropRect.w)),y:Math.max(0,Math.min(ev.clientY-oy,p.displayH-p.cropRect.h))}}));const up=()=>{window.removeEventListener("mousemove",mv);window.removeEventListener("mouseup",up);};window.addEventListener("mousemove",mv);window.addEventListener("mouseup",up);}}>
-                <div style={{position:"absolute",inset:0,background:"rgba(255,255,255,0.1)"}} />
-                {/* Corner handles */}
-                {[{s:"nw",x:0,y:0},{s:"ne",x:"100%",y:0},{s:"sw",x:0,y:"100%"},{s:"se",x:"100%",y:"100%"}].map(({s,x,y})=>(
-                  <div key={s} onMouseDown={e=>{e.stopPropagation();const startX=e.clientX,startY=e.clientY,startR=cs.cropRect;const mv=(ev)=>{const dx=ev.clientX-startX,dy=ev.clientY-startY;let nr={...startR};if(s.includes("e"))nr.w=Math.max(30,startR.w+dx);if(s.includes("s"))nr.h=Math.max(30,startR.h+dy);if(s.includes("w")){nr.x=startR.x+dx;nr.w=Math.max(30,startR.w-dx);}if(s.includes("n")){nr.y=startR.y+dy;nr.h=Math.max(30,startR.h-dy);}setCropState(p=>({...p,cropRect:nr}));};const up=()=>{window.removeEventListener("mousemove",mv);window.removeEventListener("mouseup",up);};window.addEventListener("mousemove",mv);window.addEventListener("mouseup",up);}}
-                    style={{position:"absolute",left:x,top:y,width:12,height:12,background:"#fff",borderRadius:2,transform:"translate(-50%,-50%)",cursor:`${s}-resize`,zIndex:10}} />
-                ))}
-              </div>
-            </div>
-            <div style={{position:"absolute",bottom:16,left:"50%",transform:"translateX(-50%)",display:"flex",gap:8}}>
-              <button onClick={applyCrop} style={{padding:"10px 24px",background:"#1a1a1a",color:"#fff",border:"none",borderRadius:10,cursor:"pointer",fontSize:13,fontWeight:700,fontFamily:"'DM Sans',sans-serif"}}>Apply Crop</button>
-              <button onClick={()=>setCropState(null)} style={{padding:"10px 20px",background:"#f5f3ef",color:"#555",border:"none",borderRadius:10,cursor:"pointer",fontSize:13,fontWeight:600,fontFamily:"'DM Sans',sans-serif"}}>Cancel</button>
-            </div>
-          </div>
-        );
-      })()}
-
       {/* Canvas */}
-      {!cropState && (
-      <div style={{flex:1,position:"relative",overflow:"hidden",borderRadius:20,border:"1.5px solid #e8e4dc",minHeight:400}}>
       <div
         ref={canvasRef}
-        onMouseDown={e=>{if(e.target===canvasRef.current){setSelectedId(null);setMultiSelectedIds(new Set()); if(editingTextId){setEditingTextId(null); updateItem(editingTextId,{text:editingTextVal}); setEditingTextId(null);}}}}
+        onMouseDown={e=>{if(e.target===canvasRef.current){setSelectedId(null); if(editingTextId){setEditingTextId(null); updateItem(editingTextId,{text:editingTextVal}); setEditingTextId(null);}}}}
         onMouseMove={onMouseMove}
         onMouseUp={onMouseUp}
         onTouchMove={onTouchMove}
         onTouchEnd={onTouchEnd}
         onDragOver={e=>e.preventDefault()}
         onDrop={e=>{e.preventDefault();importImages(e.dataTransfer.files);}}
-        style={{position:"absolute",top:0,left:0,width:`${100/zoom}%`,height:`${100/zoom}%`,background:board?.bg||"#ffffff",cursor:"default",transform:`scale(${zoom})`,transformOrigin:"top left"}}
+        style={{flex:1,position:"relative",background:board?.bg||"#ffffff",borderRadius:20,border:"1.5px solid #e8e4dc",overflow:"hidden",cursor:"default",minHeight:400}}
       >
         {items.length===0&&(
           <div style={{position:"absolute",inset:0,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",pointerEvents:"none",gap:10}}>
@@ -8062,16 +7273,19 @@ function Moodboard({ closetItems = [], activeIdx, setActiveIdx, boards: boardsPr
 
         {[...items].sort((a,b)=>(a.zIndex||0)-(b.zIndex||0)).map(item=>{
           const isSelected = item.id === selectedId;
-          const isMulti = multiSelectedIds.has(item.id);
           const isEditingText = item.id === editingTextId;
-          const selColor = item.locked ? "#f0c840" : isMulti ? "#3a6fd8" : "#2d6a3f";
 
           if (item.type === "text") {
             return (
               <div key={item.id}
                 onMouseDown={e=>{ if(!isEditingText) onMouseDown(e,item.id,"drag"); }}
                 onTouchStart={e=>{ if(!isEditingText) onTouchStart(e,item.id,"drag"); }}
-                onDoubleClick={e=>{ if(item.locked) return; e.stopPropagation(); setEditingTextId(item.id); setEditingTextVal(item.text||""); setSelectedId(item.id); }}
+                onDoubleClick={e=>{
+                  e.stopPropagation();
+                  setEditingTextId(item.id);
+                  setEditingTextVal(item.text||"");
+                  setSelectedId(item.id);
+                }}
                 style={{
                   position:"absolute",left:item.x,top:item.y,
                   width:item.w,minHeight:item.h,
@@ -8079,37 +7293,44 @@ function Moodboard({ closetItems = [], activeIdx, setActiveIdx, boards: boardsPr
                   zIndex:item.zIndex||1,
                   background:item.transparentBg?"transparent":(item.bg||"#fff9e6"),
                   borderRadius:10,padding:"10px 14px",
-                  cursor:item.locked?"not-allowed":isEditingText?"text":"move",
-                  outline:(isSelected||isMulti)?`2px solid ${selColor}`:"2px solid transparent",
+                  cursor:isEditingText?"text":"move",
+                  outline:isSelected?"2px solid #2d6a3f":"2px solid transparent",
                   outlineOffset:2,
-                  boxShadow:item.transparentBg?"none":((isSelected||isMulti)?"0 4px 20px rgba(0,0,0,0.15)":"0 2px 8px rgba(0,0,0,0.08)"),
+                  boxShadow:item.transparentBg?"none":(isSelected?"0 4px 20px rgba(0,0,0,0.15)":"0 2px 8px rgba(0,0,0,0.08)"),
                   fontSize:item.fontSize||14,
                   fontWeight:item.bold?800:500,
-                  fontStyle:item.italic?"italic":"normal",
                   color:item.color||"#1a1a1a",
-                  fontFamily:item.fontFamily||"'DM Sans',sans-serif",
+                  fontFamily:"'DM Sans',sans-serif",
                   lineHeight:1.5,
                   wordBreak:"break-word",
                   userSelect:isEditingText?"text":"none",
                 }}
               >
                 {isEditingText ? (
-                  <textarea ref={editingTextRef} autoFocus value={editingTextVal}
+                  <textarea
+                    ref={editingTextRef}
+                    autoFocus
+                    value={editingTextVal}
                     onChange={e=>setEditingTextVal(e.target.value)}
                     onBlur={()=>{ updateItem(item.id,{text:editingTextVal}); setEditingTextId(null); }}
                     onKeyDown={e=>{ if(e.key==="Escape"||((e.metaKey||e.ctrlKey)&&e.key==="Enter")){ updateItem(item.id,{text:editingTextVal}); setEditingTextId(null); } e.stopPropagation(); }}
-                    style={{width:"100%",minHeight:40,background:"transparent",border:"none",outline:"none",fontFamily:item.fontFamily||"'DM Sans',sans-serif",fontSize:item.fontSize||14,fontWeight:item.bold?800:500,fontStyle:item.italic?"italic":"normal",color:item.color||"#1a1a1a",resize:"none",lineHeight:1.5,padding:0}}
+                    style={{
+                      width:"100%",minHeight:40,background:"transparent",border:"none",outline:"none",
+                      fontFamily:"'DM Sans',sans-serif",fontSize:item.fontSize||14,fontWeight:item.bold?800:500,
+                      color:item.color||"#1a1a1a",resize:"none",lineHeight:1.5,padding:0,
+                    }}
                   />
                 ) : item.text}
-                {item.locked&&<span style={{position:"absolute",top:3,left:4,fontSize:9,opacity:0.6}}>🔒</span>}
-                {isSelected&&!isEditingText&&!item.locked&&(
+                {isSelected&&!isEditingText&&(
                   <>
+                    {/* Resize handle */}
                     <div onMouseDown={e=>onMouseDown(e,item.id,"resize")} onTouchStart={e=>onTouchStart(e,item.id,"resize")}
                       style={{position:"absolute",bottom:0,right:0,width:18,height:18,cursor:"se-resize",display:"flex",alignItems:"center",justifyContent:"center"}}>
-                      <div style={{width:8,height:8,borderRight:`2px solid ${selColor}`,borderBottom:`2px solid ${selColor}`,borderRadius:1}} />
+                      <div style={{width:8,height:8,borderRight:"2px solid #2d6a3f",borderBottom:"2px solid #2d6a3f",borderRadius:1}} />
                     </div>
+                    {/* Rotation handle — top center */}
                     <div onMouseDown={e=>onMouseDown(e,item.id,"rotate")} onTouchStart={e=>onTouchStart(e,item.id,"rotate")}
-                      style={{position:"absolute",top:-22,left:"50%",transform:"translateX(-50%)",width:16,height:16,borderRadius:"50%",background:selColor,cursor:"grab",display:"flex",alignItems:"center",justifyContent:"center",boxShadow:"0 1px 4px rgba(0,0,0,0.2)"}}>
+                      style={{position:"absolute",top:-22,left:"50%",transform:"translateX(-50%)",width:16,height:16,borderRadius:"50%",background:"#2d6a3f",cursor:"grab",display:"flex",alignItems:"center",justifyContent:"center",boxShadow:"0 1px 4px rgba(0,0,0,0.2)"}}>
                       <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3" strokeLinecap="round"><path d="M21 7v6h-6"/><path d="M3 17a9 9 0 019-9 9 9 0 016 2.3l3 2.7"/></svg>
                     </div>
                   </>
@@ -8127,26 +7348,27 @@ function Moodboard({ closetItems = [], activeIdx, setActiveIdx, boards: boardsPr
                 width:item.w,height:item.h,
                 transform:`rotate(${item.rotation||0}deg)`,
                 zIndex:item.zIndex||1,
-                cursor:item.locked?"not-allowed":"move",
-                outline:(isSelected||isMulti)?`2px solid ${selColor}`:"2px solid transparent",
+                cursor:"move",
+                outline:isSelected?"2px solid #2d6a3f":"2px solid transparent",
                 outlineOffset:3,
                 opacity:item.opacity??1,
-                boxShadow:(isSelected||isMulti)?"0 4px 24px rgba(0,0,0,0.18)":"0 2px 10px rgba(0,0,0,0.08)",
+                boxShadow:isSelected?"0 4px 24px rgba(0,0,0,0.18)":"0 2px 10px rgba(0,0,0,0.08)",
                 borderRadius:4,
                 overflow:item.transparent?"visible":"hidden",
               }}
             >
               <img src={item.src} alt="" draggable={false}
                 style={{width:"100%",height:"100%",objectFit:item.transparent?"contain":"cover",display:"block",pointerEvents:"none",background:item.transparent?"transparent":undefined,transform:item.flipH?"scaleX(-1)":"none"}} />
-              {item.locked&&<span style={{position:"absolute",top:4,left:4,fontSize:10,opacity:0.7,background:"rgba(255,255,255,0.7)",borderRadius:4,padding:"1px 3px"}}>🔒</span>}
-              {isSelected&&!item.locked&&(
+              {isSelected&&(
                 <>
+                  {/* Resize handle */}
                   <div onMouseDown={e=>onMouseDown(e,item.id,"resize")} onTouchStart={e=>onTouchStart(e,item.id,"resize")}
-                    style={{position:"absolute",bottom:0,right:0,width:22,height:22,cursor:"se-resize",background:`rgba(45,106,63,0.85)`,display:"flex",alignItems:"center",justifyContent:"center",borderRadius:"4px 0 4px 0"}}>
+                    style={{position:"absolute",bottom:0,right:0,width:22,height:22,cursor:"se-resize",background:"rgba(45,106,63,0.85)",display:"flex",alignItems:"center",justifyContent:"center",borderRadius:"4px 0 4px 0"}}>
                     <div style={{width:8,height:8,borderRight:"2px solid #fff",borderBottom:"2px solid #fff",borderRadius:1}} />
                   </div>
+                  {/* Rotation handle — top center */}
                   <div onMouseDown={e=>onMouseDown(e,item.id,"rotate")} onTouchStart={e=>onTouchStart(e,item.id,"rotate")}
-                    style={{position:"absolute",top:-22,left:"50%",transform:"translateX(-50%)",width:18,height:18,borderRadius:"50%",background:selColor,cursor:"grab",display:"flex",alignItems:"center",justifyContent:"center",boxShadow:"0 1px 4px rgba(0,0,0,0.2)"}}>
+                    style={{position:"absolute",top:-22,left:"50%",transform:"translateX(-50%)",width:18,height:18,borderRadius:"50%",background:"#2d6a3f",cursor:"grab",display:"flex",alignItems:"center",justifyContent:"center",boxShadow:"0 1px 4px rgba(0,0,0,0.2)"}}>
                     <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3" strokeLinecap="round"><path d="M21 7v6h-6"/><path d="M3 17a9 9 0 019-9 9 9 0 016 2.3l3 2.7"/></svg>
                   </div>
                 </>
@@ -8155,8 +7377,6 @@ function Moodboard({ closetItems = [], activeIdx, setActiveIdx, boards: boardsPr
           );
         })}
       </div>
-      </div>
-      )}
     </div>
   );
 }
@@ -9967,22 +9187,9 @@ function OutfitCalendar({ outfits, calendar, onSaveCalendar, month, onMonthChang
   const nextWeek = () => { const d = new Date(weekAnchor + "T00:00:00"); d.setDate(d.getDate() + 7); setWeekAnchor(d.toISOString().slice(0, 10)); };
   const weekLabel = (() => { const s = new Date(weekDays[0] + "T00:00:00"); const e = new Date(weekDays[6] + "T00:00:00"); return s.toLocaleDateString("en-US", { month: "short", day: "numeric" }) + " – " + e.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }); })();
 
-  const prevMonthDays = new Date(year, mo, 0).getDate();
   const cells = [];
-  for (let i = 0; i < firstDay; i++) {
-    const d = prevMonthDays - firstDay + 1 + i;
-    const prevMo = mo === 0 ? 11 : mo - 1;
-    const prevYr = mo === 0 ? year - 1 : year;
-    cells.push({ day: d, month: prevMo, year: prevYr, overflow: true });
-  }
-  for (let d = 1; d <= daysInMonth; d++) cells.push({ day: d, month: mo, year, overflow: false });
-  // Fill trailing days to complete the last row
-  const remainder = cells.length % 7;
-  if (remainder !== 0) {
-    const nextMo = mo === 11 ? 0 : mo + 1;
-    const nextYr = mo === 11 ? year + 1 : year;
-    for (let d = 1; d <= 7 - remainder; d++) cells.push({ day: d, month: nextMo, year: nextYr, overflow: true });
-  }
+  for (let i = 0; i < firstDay; i++) cells.push(null);
+  for (let d = 1; d <= daysInMonth; d++) cells.push(d);
 
   // Season helpers
   const getSeason = (dateStr) => {
@@ -10179,9 +9386,9 @@ function OutfitCalendar({ outfits, calendar, onSaveCalendar, month, onMonthChang
 
       {/* Month Calendar grid */}
       {calView === "month" && <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 4 }}>
-        {cells.map((cell, idx) => {
-          const { day, month: cellMo, year: cellYr, overflow } = cell;
-          const dateStr = cellYr + "-" + String(cellMo + 1).padStart(2, "0") + "-" + String(day).padStart(2, "0");
+        {cells.map((day, idx) => {
+          if (!day) return <div key={"blank-" + idx} />;
+          const dateStr = year + "-" + String(mo + 1).padStart(2, "0") + "-" + String(day).padStart(2, "0");
           const ids = getIds(dateStr);
           const isToday = dateStr === todayStr;
           const isPast = dateStr < todayStr;
@@ -10194,24 +9401,24 @@ function OutfitCalendar({ outfits, calendar, onSaveCalendar, month, onMonthChang
 
           return (
             <div key={dateStr}
-              draggable={!overflow && !!cellOutfit}
-              onDragStart={!overflow && cellOutfit ? () => { setDraggingInfo({ outfitId: ids[0], fromDate: dateStr }); } : undefined}
-              onDragEnd={!overflow && cellOutfit ? () => setDraggingInfo(null) : undefined}
-              onClick={overflow ? undefined : () => { setDayPopup(dateStr); setDayPopupTab(0); setShowDayAdd(false); setDayAddSearch(""); }}
-              onDragOver={overflow ? undefined : e => { e.preventDefault(); setDragOver(dateStr); }}
-              onDragLeave={overflow ? undefined : () => setDragOver(null)}
-              onDrop={overflow ? undefined : e => { e.preventDefault(); setDragOver(null); if (draggingInfo) { moveOutfitToDay(draggingInfo.outfitId, draggingInfo.fromDate, dateStr); setDraggingInfo(null); } }}
+              draggable={!!cellOutfit}
+              onDragStart={cellOutfit ? () => { setDraggingInfo({ outfitId: ids[0], fromDate: dateStr }); } : undefined}
+              onDragEnd={cellOutfit ? () => setDraggingInfo(null) : undefined}
+              onClick={() => { setDayPopup(dateStr); setDayPopupTab(0); setShowDayAdd(false); setDayAddSearch(""); }}
+              onDragOver={e => { e.preventDefault(); setDragOver(dateStr); }}
+              onDragLeave={() => setDragOver(null)}
+              onDrop={e => { e.preventDefault(); setDragOver(null); if (draggingInfo) { moveOutfitToDay(draggingInfo.outfitId, draggingInfo.fromDate, dateStr); setDraggingInfo(null); } }}
               style={{
                 borderRadius: 8,
-                border: overflow ? "1px solid #f5f3ef" : isToday ? "2px solid #1a1a1a" : isDragOver ? "1.5px dashed #2d6a3f" : "1px solid #ede9e2",
-                background: overflow ? "#faf9f7" : isDragOver ? "#f0faf4" : isEmptyFuture ? "#fff" : cellOutfit ? "#f5f3ef" : "#fff",
-                cursor: overflow ? "default" : "pointer", aspectRatio: "3/4", overflow: "hidden", position: "relative",
+                border: isToday ? "2px solid #1a1a1a" : isDragOver ? "1.5px dashed #2d6a3f" : "1px solid #ede9e2",
+                background: isDragOver ? "#f0faf4" : isEmptyFuture ? "#fff" : cellOutfit ? "#f5f3ef" : "#fff",
+                cursor: "pointer", aspectRatio: "3/4", overflow: "hidden", position: "relative",
                 transition: "box-shadow 0.12s",
-                opacity: overflow ? 0.32 : isPast ? 0.55 : 1,
-                filter: overflow ? "none" : isPast ? "saturate(0.45)" : "none",
+                opacity: isPast ? 0.55 : 1,
+                filter: isPast ? "saturate(0.45)" : "none",
               }}
-              onMouseEnter={overflow ? undefined : e => { setHoveredDay(dateStr); e.currentTarget.style.boxShadow = "0 2px 10px rgba(0,0,0,0.08)"; if(isPast) e.currentTarget.style.opacity="0.8"; }}
-              onMouseLeave={overflow ? undefined : e => { setHoveredDay(null); e.currentTarget.style.boxShadow = "none"; if(isPast) e.currentTarget.style.opacity="0.55"; }}
+              onMouseEnter={e => { setHoveredDay(dateStr); e.currentTarget.style.boxShadow = "0 2px 10px rgba(0,0,0,0.08)"; if(isPast) e.currentTarget.style.opacity="0.8"; }}
+              onMouseLeave={e => { setHoveredDay(null); e.currentTarget.style.boxShadow = "none"; if(isPast) e.currentTarget.style.opacity="0.55"; }}
             >
               {/* Outfit image — absolutely fills cell (works because cell has aspectRatio) */}
               {cellOutfit?.previewImage && (
@@ -10219,16 +9426,16 @@ function OutfitCalendar({ outfits, calendar, onSaveCalendar, month, onMonthChang
               )}
 
               {/* Linen texture for unplanned future days */}
-              {isEmptyFuture && !isDragOver && !overflow && (
+              {isEmptyFuture && !isDragOver && (
                 <div style={{ position: "absolute", inset: 0, backgroundImage: "repeating-linear-gradient(45deg, transparent, transparent 3px, rgba(0,0,0,0.018) 3px, rgba(0,0,0,0.018) 6px)", zIndex: 1 }} />
               )}
 
               {/* Season start marker */}
-              {!overflow && seasonMark && <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 2, background: SEASON_COLORS[seasonMark], zIndex: 4 }} />}
-              {!overflow && seasonMark && <div style={{ position: "absolute", top: 2, left: "50%", transform: "translateX(-50%)", background: SEASON_COLORS[seasonMark], color: "#fff", fontSize: 6, fontWeight: 800, padding: "1px 4px", borderRadius: "0 0 4px 4px", zIndex: 4, whiteSpace: "nowrap", fontFamily: "'DM Sans', sans-serif", textTransform: "uppercase", letterSpacing: "0.05em" }}>{seasonMark}</div>}
+              {seasonMark && <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 2, background: SEASON_COLORS[seasonMark], zIndex: 4 }} />}
+              {seasonMark && <div style={{ position: "absolute", top: 2, left: "50%", transform: "translateX(-50%)", background: SEASON_COLORS[seasonMark], color: "#fff", fontSize: 6, fontWeight: 800, padding: "1px 4px", borderRadius: "0 0 4px 4px", zIndex: 4, whiteSpace: "nowrap", fontFamily: "'DM Sans', sans-serif", textTransform: "uppercase", letterSpacing: "0.05em" }}>{seasonMark}</div>}
 
               {/* Custom marker bars */}
-              {!overflow && markersOnDate(dateStr).map((mk, mki) => {
+              {markersOnDate(dateStr).map((mk, mki) => {
                 const topOff = (seasonMark ? 12 : 0) + mki * 10;
                 return (<>
                   <div key={mk.id + "_bar"} onClick={e => { e.stopPropagation(); openEditMarker(mk); }} style={{ position: "absolute", top: topOff, left: 0, right: 0, height: 2, background: mk.color, zIndex: 4, cursor: "pointer" }} />
@@ -10240,7 +9447,7 @@ function OutfitCalendar({ outfits, calendar, onSaveCalendar, month, onMonthChang
               {ids.length > 1 && <div style={{ position: "absolute", top: 4, right: 4, background: "rgba(26,26,26,0.7)", color: "#fff", borderRadius: 8, padding: "1px 5px", fontSize: 7, fontWeight: 800, fontFamily: "'DM Sans', sans-serif", zIndex: 5 }}>+{ids.length - 1}</div>}
 
               {/* Event pills — visible even on empty days */}
-              {!overflow && dayEvts.length > 0 && (
+              {dayEvts.length > 0 && (
                 <div style={{ position: "absolute", bottom: ids.length > 0 ? 0 : 18, left: 0, right: 0, zIndex: 5 }}>
                   {dayEvts.slice(0, 2).map(ev => (
                     <div key={ev.id} onClick={e => { e.stopPropagation(); openEditEvent(ev); }}
@@ -10273,7 +9480,7 @@ function OutfitCalendar({ outfits, calendar, onSaveCalendar, month, onMonthChang
                 <div style={{ flex: 1 }} />
 
                 {/* Outfit name — hover only, as gradient fade */}
-                {!overflow && ids.length > 0 && hoveredDay === dateStr && (
+                {ids.length > 0 && hoveredDay === dateStr && (
                   <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, padding: "5px 6px", background: "#fff", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 4, pointerEvents: "auto" }} onClick={e => e.stopPropagation()}>
                     <div style={{ flex: 1, fontSize: 7, color: "#1a1a1a", fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontFamily: "'DM Sans', sans-serif" }}>
                       {outfits.find(o=>o.id===ids[0])?.name || ""}
@@ -10282,7 +9489,7 @@ function OutfitCalendar({ outfits, calendar, onSaveCalendar, month, onMonthChang
                   </div>
                 )}
                 {/* Empty hint */}
-                {ids.length === 0 && !isPast && !overflow && (
+                {ids.length === 0 && !isPast && (
                   <div style={{ fontSize: 14, color: "#d8d2ca", textAlign: "center", lineHeight: 1 }}>+</div>
                 )}
               </div>
@@ -10603,6 +9810,12 @@ function UpcomingEventsCard({ events, onAdd, onRemove, onSelect, onEdit }) {
   return (
     <div className="right-card">
       <div className="right-card-title">Upcoming Events</div>
+      {/* Type pills */}
+      <div style={{ display: "flex", gap: 5, marginBottom: 10, flexWrap: "wrap" }}>
+        {EVENT_TYPE_OPTIONS.map(([val, lbl, clr]) => (
+          <button key={val} onClick={() => setType(val)} style={{ padding: "4px 10px", borderRadius: 20, border: type === val ? `1.5px solid ${clr}` : "1.5px solid #e8e4dc", background: type === val ? clr : "#fff", color: type === val ? "#fff" : "#888", fontSize: 11, fontWeight: 700, cursor: "pointer", fontFamily: "'DM Sans', sans-serif" }}>{lbl}</button>
+        ))}
+      </div>
       {/* Name */}
       <input value={name} onChange={e => setName(e.target.value)} onKeyDown={e => { if (e.key === "Enter") handleAdd(); }} placeholder="Event name..." style={{ width: "100%", boxSizing: "border-box", padding: "8px 12px", border: "1.5px solid #e8e4dc", borderRadius: 10, fontFamily: "'DM Sans', sans-serif", fontSize: 12, outline: "none", marginBottom: 8 }} />
       {/* Date row */}
@@ -10613,7 +9826,7 @@ function UpcomingEventsCard({ events, onAdd, onRemove, onSelect, onEdit }) {
       {multiDay && (
         <input type="date" value={endDate} min={startDate} onChange={e => setEndDate(e.target.value)} placeholder="End date" style={{ width: "100%", boxSizing: "border-box", padding: "7px 8px", border: "1.5px solid #e8e4dc", borderRadius: 10, fontFamily: "'DM Sans', sans-serif", fontSize: 11, outline: "none", marginBottom: 8 }} />
       )}
-      <button onClick={handleAdd} disabled={!canAdd} style={{ width: "100%", padding: "8px", borderRadius: 10, border: "none", background: canAdd ? "#1a1a1a" : "#e8e4dc", color: canAdd ? "#fff" : "#aaa", fontFamily: "'DM Sans', sans-serif", fontSize: 12, fontWeight: 700, cursor: canAdd ? "pointer" : "default", marginBottom: upcoming.length > 0 ? 12 : 0 }}>Add to Calendar</button>
+      <button onClick={handleAdd} disabled={!canAdd} style={{ width: "100%", padding: "8px", borderRadius: 10, border: "none", background: canAdd ? typeColor : "#e8e4dc", color: canAdd ? "#fff" : "#aaa", fontFamily: "'DM Sans', sans-serif", fontSize: 12, fontWeight: 700, cursor: canAdd ? "pointer" : "default", marginBottom: upcoming.length > 0 ? 12 : 0 }}>Add to Calendar</button>
       {upcoming.length > 0 && (
         <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
           {upcoming.slice(0, 5).map(ev => {
@@ -11199,10 +10412,6 @@ export default function App() {
   const [activeLookbook, setActiveLookbook] = useState(null);
   const [activeLookbookView, setActiveLookbookView] = useState("editorial");
   const [moodboardActiveIdx, setMoodboardActiveIdx] = useState(0);
-  const [isMoodboardEditing, setIsMoodboardEditing] = useState(false);
-  const [moodboardSearch, setMoodboardSearch] = useState("");
-  const [moodboardTagFilter, setMoodboardTagFilter] = useState("All");
-  const [moodboardStatusFilter, setMoodboardStatusFilter] = useState("All");
   const LOOKBOOK_TYPES = ["trip", "event", "season", "capsule", "inspiration"];
   const LOOKBOOK_OCCASIONS = ["All", "WFH", "Disney", "Universal", "Date Night", "Travel", "Sport", "Weekend", "Event"];
   const LOOKBOOK_OCCASION_ALIASES = {
@@ -11234,41 +10443,11 @@ export default function App() {
   const [newLbDateStart, setNewLbDateStart] = useState("");
   const [newLbTags, setNewLbTags] = useState([]);
   const [newLbType, setNewLbType] = useState("trip");
-
-  useEffect(() => {
-    if ((moodboardsDb.boards || []).length === 0) {
-      setMoodboardActiveIdx(0);
-      setIsMoodboardEditing(false);
-      return;
-    }
-    if (moodboardActiveIdx >= moodboardsDb.boards.length) {
-      setMoodboardActiveIdx(Math.max(0, moodboardsDb.boards.length - 1));
-    }
-  }, [moodboardsDb.boards, moodboardActiveIdx]);
-
-  const createNewMoodboard = () => {
-    const now = new Date().toISOString();
-    moodboardsDb.updateBoards(prev => {
-      const current = prev || [];
-      const next = [...current, {
-        id: uid(),
-        name: `Board ${current.length + 1}`,
-        items: [],
-        bg: "#ffffff",
-        pinned: false,
-        tags: [],
-        createdAt: now,
-        updatedAt: now,
-      }];
-      setMoodboardActiveIdx(next.length - 1);
-      return next;
-    });
-    setIsMoodboardEditing(true);
-    setTab("moodboard");
-  };
   const [newLbCity, setNewLbCity] = useState("");
   const [newLbDateEnd, setNewLbDateEnd] = useState("");
   const [newLbSelected, setNewLbSelected] = useState([]);
+  const [newLbMoodboardId, setNewLbMoodboardId] = useState("");
+  const [newLbCalEventId, setNewLbCalEventId] = useState("");
 
   const saveWishlistsMeta = (wls) => {
     setWishlistsLocal(wls);
@@ -11316,16 +10495,18 @@ export default function App() {
       coverImage: newLbCover,
       dateStart: newLbDateStart,
       dateEnd: newLbDateEnd,
+      city: newLbCity,
       outfitIds: newLbSelected,
       type: newLbType,
       tags: newLbTags,
-      city: newLbCity,
-      tripDetails: { hotel: "", activities: [], notes: "" },
       lookMeta: {},
+      ...(newLbMoodboardId ? { moodboardId: newLbMoodboardId } : {}),
+      ...(newLbCalEventId ? { linkedCalEventId: newLbCalEventId } : {}),
     };
     setLookbookModal(false);
     setNewLbName(""); setNewLbNotes(""); setNewLbCover("");
     setNewLbDateStart(""); setNewLbDateEnd(""); setNewLbSelected([]); setNewLbTags([]); setNewLbType("trip"); setNewLbCity("");
+    setNewLbMoodboardId(""); setNewLbCalEventId("");
     // Try wrapped {id, data} schema first, fall back to flat insert
     let { error } = await supabase.from("lookbooks").insert({ id: newLb.id, data: newLb });
     if (error) {
@@ -11549,8 +10730,8 @@ export default function App() {
     outfits: ["My Outfits", ""],
     lookbooks: ["Lookbooks", ""],
     stats: ["Style Profile", "Your wardrobe in focus"],
-    moodboard: ["Moodboard", ""],
-    seller: ["Seller Dashboard", ""],
+    moodboard: ["Moodboard", "Inspire yourself"],
+    seller: ["Seller Dashboard", "What's for sale"],
     wishlist: ["Wishlist", ""],
     settings: ["Settings", "Customize your wardrobe"],
   };
@@ -11704,10 +10885,9 @@ export default function App() {
                   fontFamily: "'DM Sans', sans-serif",
                 }}>{outfitSelectMode ? "Cancel" : "Select"}</button>
               )}
-              {tab !== "stats" && tab !== "home" && tab !== "settings" && (
+              {tab !== "stats" && tab !== "moodboard" && tab !== "home" && tab !== "settings" && (
                 <button className="btn-primary" onClick={() => {
                   if (tab === "outfits") openNewOutfit();
-                  else if (tab === "moodboard") createNewMoodboard();
                   else if (tab === "lookbooks") setLookbookModal(true);
                   else if (tab === "wishlist") { setEditItem(null); setWishlistDest(true); setModal("item"); }
                   else { setEditItem(null); setWishlistDest(false); setModal("item"); }
@@ -11742,8 +10922,8 @@ export default function App() {
           {/* Content — 2-column layout (left sidebar + main) */}
           {tab !== "home" && <div className="app-layout">
 
-        {/* ── LEFT SIDEBAR (closet + outfits + lookbooks + moodboard) ── */}
-        {(tab === "closet" || tab === "outfits" || tab === "lookbooks" || (tab === "moodboard" && !isMoodboardEditing)) && (
+        {/* ── LEFT SIDEBAR (closet + outfits + lookbooks) ── */}
+        {(tab === "closet" || tab === "outfits" || tab === "lookbooks") && (
           <div className="app-left-sidebar">
             <div className="closet-sidebar" style={{ position: "sticky", top: 80 }}>
               {tab === "closet" && (<>
@@ -11796,46 +10976,6 @@ export default function App() {
                   {["All", ...LOOKBOOK_TYPES.map(t => t[0].toUpperCase() + t.slice(1))].map(typeLabel => (
                     <button key={typeLabel} className={"sidebar-btn" + (lbTypeFilter === typeLabel ? " active" : "")} onClick={() => setLbTypeFilter(typeLabel)}>{typeLabel}</button>
                   ))}
-                </div>
-              </>)}
-              {tab === "moodboard" && (<>
-                <div className="sidebar-section">
-                  <div style={{ position: "relative" }}>
-                    <span style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)", pointerEvents: "none", display:"flex" }}><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#bbb" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{pointerEvents:"none"}}><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg></span>
-                    <input className="closet-search" value={moodboardSearch} onChange={e => setMoodboardSearch(e.target.value)} placeholder="Search boards…" />
-                  </div>
-                </div>
-                <div style={{ background: "#fff", borderRadius: 16, border: "1px solid #ece8e0", padding: "18px 16px", marginBottom: 12 }}>
-                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
-                    <div style={{ fontSize: 10, fontWeight: 700, color: "#c0b8b0", textTransform: "uppercase", letterSpacing: "0.1em" }}>Tags</div>
-                    {moodboardTagFilter !== "All" && <button onClick={() => setMoodboardTagFilter("All")} style={{ fontSize: 10, color: "#aaa", background: "none", border: "none", cursor: "pointer", fontFamily: "'DM Sans', sans-serif", fontWeight: 600 }}>Clear</button>}
-                  </div>
-                  <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
-                    {MOODBOARD_TAGS.map(tag => {
-                      const active = moodboardTagFilter === tag;
-                      return (
-                        <button
-                          key={tag}
-                          onClick={() => setMoodboardTagFilter(active ? "All" : tag)}
-                          style={{
-                            padding: "8px 16px",
-                            borderRadius: 999,
-                            border: `1.5px solid ${active ? "#1a1a1a" : "#ddd3c6"}`,
-                            background: active ? "#1a1a1a" : "#f8f6f2",
-                            color: active ? "#fff" : "#8a867f",
-                            cursor: "pointer",
-                            fontFamily: "'DM Sans', sans-serif",
-                            fontSize: 12,
-                            fontWeight: 700,
-                            lineHeight: 1,
-                            transition: "all 0.15s",
-                          }}
-                        >
-                          {tag}
-                        </button>
-                      );
-                    })}
-                  </div>
                 </div>
               </>)}
             </div>
@@ -12246,7 +11386,6 @@ export default function App() {
                     <div style={{ display: "grid", gridTemplateColumns: `repeat(auto-fill, minmax(${lbZoom}px, 1fr))`, gap: 16 }}>
                       {filtered.map((lb, i) => {
                         const lbOutfits = (lb.outfitIds || []).map(id => outfitsDb.rows.find(o => o.id === id)).filter(Boolean);
-                        const lbTypeMeta = getLookbookTypeMeta(lb.type);
                         const previewItems = lbOutfits.slice(0, 4).flatMap(o =>
                           (o.layers || o.itemIds || []).slice(0, 1).map(id => allItems.find(x => x.id === id)).filter(Boolean)
                         );
@@ -12277,9 +11416,6 @@ export default function App() {
                               </div>
                             )}
                             <div style={{ padding: "12px 14px 14px" }}>
-                              <div style={{ display: "inline-flex", alignItems: "center", padding: "3px 8px", borderRadius: 20, background: lbTypeMeta.bg, color: lbTypeMeta.color, fontSize: 10, fontWeight: 700, marginBottom: 8 }}>
-                                {lbTypeMeta.label}
-                              </div>
                               <div style={{ fontSize: 15, fontWeight: 700, color: "#1a1a1a", lineHeight: 1.3 }}>{lb.name}</div>
                               <div style={{ display: "flex", gap: 8, marginTop: 4, alignItems: "center", flexWrap: "wrap" }}>
                                 <span style={{ fontSize: 11, color: "#aaa", fontWeight: 600 }}>{lbOutfits.length} look{lbOutfits.length !== 1 ? "s" : ""}</span>
@@ -12329,19 +11465,7 @@ export default function App() {
             {tab === "seller" && <SellerDashboard itemsDb={itemsDb} allClosetItems={itemsDb.rows.filter(i => !i.forSale)} onViewItem={(item) => setItemDetail(item)} />}
 
             {/* MOODBOARD */}
-            {tab === "moodboard" && <Moodboard
-              closetItems={itemsDb.rows.filter(i => !i.forSale)}
-              activeIdx={moodboardActiveIdx}
-              setActiveIdx={setMoodboardActiveIdx}
-              boards={moodboardsDb.boards}
-              updateBoards={moodboardsDb.updateBoards}
-              removeBoardById={moodboardsDb.removeBoardById}
-              isEditing={isMoodboardEditing}
-              setIsEditing={setIsMoodboardEditing}
-              searchQuery={moodboardSearch}
-              tagFilter={moodboardTagFilter}
-              statusFilter={moodboardStatusFilter}
-            />}
+            {tab === "moodboard" && <Moodboard closetItems={itemsDb.rows.filter(i => !i.forSale)} activeIdx={moodboardActiveIdx} setActiveIdx={setMoodboardActiveIdx} boards={moodboardsDb.boards} updateBoards={moodboardsDb.updateBoards} removeBoardById={moodboardsDb.removeBoardById} />}
 
             {/* SETTINGS */}
             {tab === "settings" && <SettingsTab
@@ -12409,20 +11533,19 @@ export default function App() {
           )}
         </div>
 
-        {/* ── RIGHT PANEL (closet / outfits / moodboard canvas) ── */}
-        {(["closet","outfits"].includes(tab) || (tab === "moodboard" && isMoodboardEditing)) && <div className="app-right-panel" style={{ top: 24 }}>
+        {/* ── RIGHT PANEL (closet / outfits / moodboard only) ── */}
+        {["closet","outfits","moodboard"].includes(tab) && <div className="app-right-panel" style={{ top: 24 }}>
 
-          {/* Moodboard board info (canvas mode only) */}
+          {/* Sort moved to top toolbar for closet/outfits */}
+
+          {/* Moodboard board info */}
           {tab === "moodboard" && <MoodboardInfoPanel
             activeIdx={moodboardActiveIdx} setActiveIdx={setMoodboardActiveIdx}
             boards={moodboardsDb.boards} updateBoards={moodboardsDb.updateBoards} updateBoardById={moodboardsDb.updateBoardById} removeBoardById={moodboardsDb.removeBoardById}
-            closetItems={itemsDb.rows}
-            isEditing={isMoodboardEditing}
-            setIsEditing={setIsMoodboardEditing}
             lookbooksDb={lookbooksDb.rows}
             createLookbook={async ({id: newId, name, moodboardId}) => {
               const lbId = newId || uid();
-              const newLb = { id: lbId, name, notes: "", coverImage: "", dateStart: "", dateEnd: "", outfitIds: [], lookMeta: {}, moodboardId, type: "inspiration" };
+              const newLb = { id: lbId, name, notes: "", coverImage: "", dateStart: "", dateEnd: "", outfitIds: [], lookMeta: {}, moodboardId };
               let { error } = await supabase.from("lookbooks").insert({ id: lbId, data: newLb });
               if (error) ({ error } = await supabase.from("lookbooks").insert(newLb));
               await lookbooksDb.refresh();
@@ -12432,9 +11555,11 @@ export default function App() {
               if (!lb) return;
               const updated = { ...lb, moodboardId: board.id };
               await lookbooksDb.update(updated);
+              // Set immediately — don't wait for refresh
               setActiveLookbook(updated);
             }}
             onGoToLookbook={(lb) => {
+              // lb already has moodboardId set by setLinkedLb
               const fresh = lookbooksDb.rows.find(r => r.id === lb.id);
               const withMb = { ...(fresh || lb), moodboardId: lb.moodboardId || fresh?.moodboardId };
               setActiveLookbookView("moodboard");
@@ -12584,163 +11709,9 @@ export default function App() {
 
         </div>}
 
-        {/* ── RIGHT PANEL (seller tab) ── */}
-        {tab === "seller" && (() => {
-          const forSaleItems = itemsDb.rows.filter(i => i.forSale);
-          const listed = forSaleItems.filter(i => i.saleStatus === "listed" || !i.saleStatus).length;
-          const pending = forSaleItems.filter(i => i.saleStatus === "pending").length;
-          const drafts = forSaleItems.filter(i => i.saleStatus === "draft").length;
-          const sold = forSaleItems.filter(i => i.saleStatus === "sold").length;
-          const totalEarned = forSaleItems.filter(i => i.saleStatus === "sold")
-            .reduce((s, i) => s + (parseFloat((i.netRevenue || i.salePrice || "").replace(/[^0-9.]/g, "")) || 0), 0);
-          const potentialEarnings = forSaleItems.filter(i => i.saleStatus !== "sold")
-            .reduce((s, i) => s + (parseFloat((i.salePrice || "").replace(/[^0-9.]/g, "")) || 0), 0);
-          const totalSpent = itemsDb.rows.reduce((s, i) => s + (parseFloat((i.price||"").replace(/[^0-9.]/g,""))||0), 0);
-          const earnedPct = totalSpent > 0 ? Math.min(100, (totalEarned / totalSpent) * 100) : 0;
-          const soldWithDates = forSaleItems.filter(i => i.saleStatus === "sold" && i.soldDate && i.listedDate);
-          const avgDaysToSell = soldWithDates.length > 0
-            ? Math.round(soldWithDates.reduce((s, i) => s + Math.max(0, (new Date(i.soldDate) - new Date(i.listedDate)) / 86400000), 0) / soldWithDates.length)
-            : null;
-          const sellThrough = forSaleItems.length > 0 ? Math.round((sold / forSaleItems.length) * 100) : 0;
-          // Platform breakdown (sold items only)
-          const platformMap = {};
-          forSaleItems.filter(i => i.saleStatus === "sold" && i.salePlatform).forEach(i => {
-            if (!platformMap[i.salePlatform]) platformMap[i.salePlatform] = { count: 0, revenue: 0 };
-            platformMap[i.salePlatform].count++;
-            platformMap[i.salePlatform].revenue += parseFloat((i.netRevenue || i.salePrice||"").replace(/[^0-9.]/g,""))||0;
-          });
-          const platforms = Object.entries(platformMap).sort((a,b) => b[1].revenue - a[1].revenue);
-          // Sales history chart
-          const soldItems = forSaleItems.filter(i => i.saleStatus === "sold" && i.soldDate);
-          const byMonth = {};
-          soldItems.forEach(i => {
-            const m = i.soldDate.slice(0, 7);
-            if (!byMonth[m]) byMonth[m] = { count: 0, revenue: 0 };
-            byMonth[m].count++;
-            byMonth[m].revenue += parseFloat((i.netRevenue || i.salePrice||"").replace(/[^0-9.]/g,""))||0;
-          });
-          const months = Object.keys(byMonth).sort().slice(-6);
-          const maxRev = Math.max(...months.map(m => byMonth[m].revenue), 1);
-          // Sell candidates: non-listed closet items unworn or not worn in 12+ months
-          const twelveMonthsAgo = new Date();
-          twelveMonthsAgo.setFullYear(twelveMonthsAgo.getFullYear() - 1);
-          const sellCandidates = itemsDb.rows.filter(i => {
-            if (i.forSale) return false;
-            if ((i.wornCount || 0) === 0) return true;
-            if (i.lastWorn && new Date(i.lastWorn) < twelveMonthsAgo) return true;
-            if (!i.lastWorn && i.purchaseDate && new Date(i.purchaseDate) < twelveMonthsAgo) return true;
-            return false;
-          }).sort((a, b) => (a.wornCount || 0) - (b.wornCount || 0)).slice(0, 6);
-          // Best category analytics
-          const soldCats = {};
-          forSaleItems.filter(i => i.saleStatus === "sold" && i.category).forEach(i => {
-            const cat = i.category;
-            if (!soldCats[cat]) soldCats[cat] = { totalDays: 0, count: 0, pctSum: 0, pctCount: 0 };
-            if (i.listedDate && i.soldDate) {
-              soldCats[cat].totalDays += Math.max(0, (new Date(i.soldDate) - new Date(i.listedDate)) / 86400000);
-              soldCats[cat].count++;
-            }
-            const orig = parseFloat((i.price || "").replace(/[^0-9.]/g, "")) || 0;
-            const sale = parseFloat((i.salePrice || "").replace(/[^0-9.]/g, "")) || 0;
-            if (orig > 0 && sale > 0) { soldCats[cat].pctSum += (sale / orig) * 100; soldCats[cat].pctCount++; }
-          });
-          const topCats = Object.entries(soldCats).filter(([, d]) => d.count > 0)
-            .map(([cat, d]) => ({ cat, avgDays: Math.round(d.totalDays / d.count), avgPct: d.pctCount > 0 ? Math.round(d.pctSum / d.pctCount) : null }))
-            .sort((a, b) => a.avgDays - b.avgDays).slice(0, 3);
-          if (sellCandidates.length === 0 && months.length === 0 && platforms.length === 0 && topCats.length === 0) return null;
-          return (
-            <div className="app-right-panel" style={{ top: 24 }}>
-              {/* Sell Candidates */}
-              {sellCandidates.length > 0 && (
-                <div className="right-card">
-                  <div className="right-card-title">Sell Candidates</div>
-                  <div style={{ fontSize: 11, color: "#aaa", marginBottom: 10 }}>Unworn or not worn in 12+ months</div>
-                  <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                    {sellCandidates.map(item => {
-                      const origPrice = parseFloat((item.price || "").replace(/[^0-9.]/g, "")) || 0;
-                      const suggestedPrice = origPrice > 0 ? Math.round(origPrice * 0.4) : null;
-                      const today = new Date().toISOString().slice(0, 10);
-                      return (
-                        <div key={item.id} style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                          <div style={{ width: 40, height: 40, borderRadius: 8, background: item.image ? `url(${item.image}) center/contain no-repeat #f8f6f2` : "#f8f6f2", flexShrink: 0, border: "1px solid #e8e4dc" }} />
-                          <div style={{ flex: 1, minWidth: 0 }}>
-                            <div style={{ fontSize: 11, fontWeight: 700, color: "#1a1a1a", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{item.name}</div>
-                            <div style={{ fontSize: 10, color: "#aaa" }}>{item.category}{suggestedPrice ? ` · suggest $${suggestedPrice}` : ""}</div>
-                          </div>
-                          <button onClick={() => itemsDb.update({ ...item, forSale: true, saleStatus: "listed", listedDate: today, ...(suggestedPrice ? { salePrice: String(suggestedPrice) } : {}) })}
-                            style={{ padding: "4px 9px", background: "#f0faf4", border: "1.5px solid #b6e8c8", borderRadius: 8, cursor: "pointer", fontSize: 10, fontWeight: 700, color: "#2d6a3f", fontFamily: "'DM Sans', sans-serif", whiteSpace: "nowrap", flexShrink: 0 }}>
-                            List →
-                          </button>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
-              {/* Best Category */}
-              {topCats.length > 0 && (
-                <div className="right-card">
-                  <div className="right-card-title">Best Category</div>
-                  <div style={{ fontSize: 11, color: "#aaa", marginBottom: 10 }}>Fastest-selling categories</div>
-                  <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                    {topCats.map(({ cat, avgDays, avgPct }, idx) => (
-                      <div key={cat} style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                        <div style={{ width: 18, height: 18, borderRadius: "50%", background: idx === 0 ? "#fff8ee" : "#f5f3ef", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                          <span style={{ fontSize: 9, fontWeight: 800, color: idx === 0 ? "#a07000" : "#aaa" }}>#{idx + 1}</span>
-                        </div>
-                        <div style={{ flex: 1, minWidth: 0 }}>
-                          <div style={{ fontSize: 12, fontWeight: 700, color: "#1a1a1a", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{cat}</div>
-                          <div style={{ fontSize: 10, color: "#aaa" }}>avg {avgDays}d to sell{avgPct !== null ? ` · ${avgPct}% of asking` : ""}</div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-              {/* Sales History chart */}
-              {months.length > 0 && (
-                <div className="right-card">
-                  <div className="right-card-title">Sales History</div>
-                  <div style={{ display: "flex", alignItems: "flex-end", gap: 6, height: 60 }}>
-                    {months.map(m => {
-                      const d = new Date(m + "-01T00:00:00");
-                      const label = d.toLocaleDateString("en-US", { month: "short" });
-                      return (
-                        <div key={m} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 2 }}>
-                          <div style={{ fontSize: 8, color: "#7c6fe0", fontWeight: 700 }}>${byMonth[m].revenue.toFixed(0)}</div>
-                          <div style={{ width: "100%", background: "#7c6fe0", borderRadius: "3px 3px 0 0", height: `${Math.max(4, (byMonth[m].revenue / maxRev) * 36)}px` }} />
-                          <div style={{ fontSize: 8, color: "#aaa", fontWeight: 600 }}>{label}</div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
-              {/* Platform breakdown */}
-              {platforms.length > 0 && (
-                <div className="right-card">
-                  <div className="right-card-title">By Platform</div>
-                  <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                    {platforms.map(([name, data]) => (
-                      <div key={name} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
-                        <span style={{ fontSize: 12, fontWeight: 600, color: "#555" }}>{name}</span>
-                        <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
-                          <span style={{ fontSize: 11, color: "#aaa" }}>{data.count}×</span>
-                          <span style={{ fontSize: 13, fontWeight: 800, color: "#2d6a3f" }}>${data.revenue.toFixed(0)}</span>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
-          );
-        })()}
-
         {/* ── RIGHT PANEL (lookbooks tab) — packing lists ── */}
         {tab === "lookbooks" && (() => {
           const lbsWithPacking = lookbooksDb.rows.filter(lb => {
-            if ((lb.type || "trip") !== "trip") return false;
             const lbOutfits = (lb.outfitIds || []).map(id => outfitsDb.rows.find(o => o.id === id)).filter(Boolean);
             const allLayerIds = lbOutfits.flatMap(o => o.layers || o.itemIds || []);
             return allLayerIds.length > 0;
@@ -12844,7 +11815,7 @@ export default function App() {
         </div>
         <div style={{ display: "flex", gap: 10, marginBottom: 14 }}>
           <div style={{ flex: 1 }}>
-            <label style={{ display: "block", fontSize: 11, fontWeight: 600, color: "#999", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 6 }}>{newLbType === "trip" ? "Start Date" : newLbType === "event" ? "Event Date" : "Start Date"}</label>
+            <label style={{ display: "block", fontSize: 11, fontWeight: 600, color: "#999", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 6 }}>Start Date</label>
             <input type="date" value={newLbDateStart} onChange={e => setNewLbDateStart(e.target.value)} style={inputStyle} />
           </div>
           <div style={{ flex: 1 }}>
@@ -12853,24 +11824,92 @@ export default function App() {
           </div>
         </div>
         <div style={{ marginBottom: 14 }}>
-          <label style={{ display: "block", fontSize: 11, fontWeight: 600, color: "#999", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 6 }}>
-            {newLbType === "trip" ? "Destination (for weather)" : newLbType === "event" ? "Location (optional)" : "Location / City (optional)"}
-          </label>
-          <input value={newLbCity} onChange={e => setNewLbCity(e.target.value)} placeholder={newLbType === "event" ? "e.g. Nashville, TN" : "e.g. Orlando, FL"} style={inputStyle} />
+          <label style={{ display: "block", fontSize: 11, fontWeight: 600, color: "#999", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 6 }}>City (for weather)</label>
+          <input value={newLbCity} onChange={e => setNewLbCity(e.target.value)} placeholder="e.g. Orlando, FL" style={inputStyle} />
         </div>
         <div style={{ marginBottom: 14 }}>
           <label style={{ display: "block", fontSize: 11, fontWeight: 600, color: "#999", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 6 }}>Lookbook Type</label>
           <select value={newLbType} onChange={e => setNewLbType(e.target.value)} style={inputStyle}>
-            {LOOKBOOK_TYPES.map(type => <option key={type} value={type}>{getLookbookTypeMeta(type).label}</option>)}
+            {LOOKBOOK_TYPES.map(type => <option key={type} value={type}>{type[0].toUpperCase() + type.slice(1)}</option>)}
           </select>
-          <div style={{ fontSize: 11, color: "#aaa", marginTop: 6 }}>
-            {newLbType === "trip" && "Trip lookbooks focus on weather, packing, hotel, and day-by-day planning."}
-            {newLbType === "event" && "Event lookbooks focus on one occasion, its location, and the looks around it."}
-            {newLbType === "season" && "Season lookbooks focus on wardrobe value, repeats, and wear patterns."}
-            {newLbType === "capsule" && "Capsule lookbooks focus on a tight, repeatable set of pieces and looks."}
-            {newLbType === "inspiration" && "Inspiration lookbooks focus on moodboards, references, and styling notes."}
-          </div>
+          {newLbType === "trip" && <div style={{ fontSize: 11, color: "#bbb", marginTop: 5 }}>Trip lookbooks focus on weather, packing, hotel, and day-by-day planning.</div>}
+          {newLbType === "event" && <div style={{ fontSize: 11, color: "#bbb", marginTop: 5 }}>Event lookbooks are built around a specific occasion or date.</div>}
+          {newLbType === "season" && <div style={{ fontSize: 11, color: "#bbb", marginTop: 5 }}>Season lookbooks collect looks for a recurring time of year.</div>}
         </div>
+
+        {/* ── Link Calendar Event ── */}
+        {calendarEvents.length > 0 && (
+          <div style={{ marginBottom: 14 }}>
+            <label style={{ display: "block", fontSize: 11, fontWeight: 600, color: "#999", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 6 }}>Link Calendar Event</label>
+            <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
+              {calendarEvents.map(ev => {
+                const sel = newLbCalEventId === ev.id;
+                const fmtD = d => d ? new Date(d + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : "";
+                return (
+                  <div key={ev.id}
+                    onClick={() => {
+                      if (sel) {
+                        setNewLbCalEventId("");
+                        if (newLbDateStart === ev.startDate) setNewLbDateStart("");
+                        if (newLbDateEnd === ev.endDate) setNewLbDateEnd("");
+                      } else {
+                        setNewLbCalEventId(ev.id);
+                        if (ev.startDate) setNewLbDateStart(ev.startDate);
+                        if (ev.endDate) setNewLbDateEnd(ev.endDate);
+                        if (!newLbName.trim()) setNewLbName(ev.name);
+                      }
+                    }}
+                    style={{ display: "flex", alignItems: "center", gap: 10, padding: "9px 12px", borderRadius: 12, border: sel ? "1.5px solid #1a1a1a" : "1.5px solid #e8e4dc", background: sel ? "#f5f3ef" : "#fafaf8", cursor: "pointer", transition: "all 0.12s" }}>
+                    <div style={{ width: 18, height: 18, borderRadius: "50%", border: "2px solid", borderColor: sel ? "#1a1a1a" : "#ccc", background: sel ? "#1a1a1a" : "transparent", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                      {sel && <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>}
+                    </div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: 13, fontWeight: 700, color: "#1a1a1a", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{ev.name}</div>
+                      {(ev.startDate || ev.endDate) && (
+                        <div style={{ fontSize: 11, color: "#aaa", marginTop: 1 }}>
+                          {[fmtD(ev.startDate), fmtD(ev.endDate)].filter(Boolean).join(" \u2013 ")}
+                        </div>
+                      )}
+                    </div>
+                    {ev.type && <div style={{ fontSize: 10, fontWeight: 700, color: "#bbb", background: "#f0ece4", borderRadius: 6, padding: "2px 7px", flexShrink: 0 }}>{ev.type}</div>}
+                  </div>
+                );
+              })}
+            </div>
+            {newLbCalEventId && <div style={{ fontSize: 11, color: "#888", marginTop: 5 }}>&#10003; Dates auto-filled from event. You can adjust them above.</div>}
+          </div>
+        )}
+
+        {/* ── Link Moodboard ── */}
+        {moodboardsDb.boards.length > 0 && (
+          <div style={{ marginBottom: 14 }}>
+            <label style={{ display: "block", fontSize: 11, fontWeight: 600, color: "#999", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 6 }}>Link Moodboard</label>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6 }}>
+              {moodboardsDb.boards.map(b => {
+                const sel = newLbMoodboardId === b.id;
+                const thumb = b.items?.[0]?.src || null;
+                return (
+                  <div key={b.id}
+                    onClick={() => setNewLbMoodboardId(sel ? "" : b.id)}
+                    style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 10px", borderRadius: 10, border: sel ? "1.5px solid #1a1a1a" : "1.5px solid #e8e4dc", background: sel ? "#f5f3ef" : "#fafaf8", cursor: "pointer", transition: "all 0.12s" }}>
+                    {thumb ? (
+                      <div style={{ width: 28, height: 28, borderRadius: 6, background: `url(${thumb}) center/cover`, flexShrink: 0 }} />
+                    ) : (
+                      <div style={{ width: 28, height: 28, borderRadius: 6, background: "#e8e4dc", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#aaa" strokeWidth="2" strokeLinecap="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>
+                      </div>
+                    )}
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: 12, fontWeight: 700, color: sel ? "#1a1a1a" : "#555", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{b.name || "Untitled Board"}</div>
+                    </div>
+                    {sel && <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#1a1a1a" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
         {outfitsDb.rows.length > 0 && (
           <div style={{ marginBottom: 18 }}>
             <label style={{ display: "block", fontSize: 11, fontWeight: 600, color: "#999", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 10 }}>Add Looks (optional)</label>
@@ -13108,7 +12147,7 @@ export default function App() {
               style={{ width: "100%", padding: "10px 12px", borderRadius: 10, border: "1.5px solid #e8e4dc", fontSize: 13, fontFamily: "'DM Sans', sans-serif", fontWeight: 600, outline: "none", boxSizing: "border-box", marginBottom: 14 }} autoFocus />
             <button onClick={async () => {
               if (!outfitBulkNewLbName.trim()) return;
-              const newLb = { id: Date.now().toString(36) + Math.random().toString(36).slice(2), name: outfitBulkNewLbName.trim(), outfitIds: [...selectedOutfitIds], type: "capsule", tags: [], notes: "", lookMeta: {} };
+              const newLb = { id: Date.now().toString(36) + Math.random().toString(36).slice(2), name: outfitBulkNewLbName.trim(), outfitIds: [...selectedOutfitIds], type: "collection", tags: [], notes: "", lookMeta: {} };
               await lookbooksDb.update(newLb);
               setOutfitBulkNewLb(false); setOutfitSelectMode(false); setSelectedOutfitIds(new Set());
             }} style={{ width: "100%", padding: "11px 0", background: "#1a1a1a", border: "none", borderRadius: 12, cursor: "pointer", fontFamily: "'DM Sans', sans-serif", fontSize: 13, fontWeight: 700, color: "#fff", marginBottom: 8 }}>Create Lookbook</button>

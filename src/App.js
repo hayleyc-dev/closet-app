@@ -8033,6 +8033,16 @@ function SettingsTab({
   outfitSort, setOutfitSort,
   wlSort, setWlSort,
   guestMode, setGuestMode,
+  temperatureUnit, setTemperatureUnit,
+  travelCityBehavior, setTravelCityBehavior,
+  outfitReminderDay, setOutfitReminderDay,
+  outfitReminderTime, setOutfitReminderTime,
+  rainyDaySuggestions, setRainyDaySuggestions,
+  hideSoldByDefault, setHideSoldByDefault,
+  hideArchivedByDefault, setHideArchivedByDefault,
+  defaultClosetViewMode, setDefaultClosetViewMode,
+  defaultOnlyUnworn, setDefaultOnlyUnworn,
+  defaultOnlyInSeason, setDefaultOnlyInSeason,
   allDb,
   closetSort, setClosetSort,
   closetSeasonFilter, setClosetSeasonFilter,
@@ -8052,6 +8062,11 @@ function SettingsTab({
   const [themeId, setThemeId] = useState(() => { try { return localStorage.getItem(THEME_KEY) || "parchment"; } catch { return "parchment"; } });
   const [homeCityInput, setHomeCityInput] = useState(homeCity || "");
   const [homeCitySaved, setHomeCitySaved] = useState(false);
+  const [showAdvancedAppearance, setShowAdvancedAppearance] = useState(Boolean(accentOverride));
+  const [styleGoal, setStyleGoal] = useState(() => { try { return localStorage.getItem("wardrobe_style_goal_v1") || ""; } catch { return ""; } });
+  const [shoppingIntention, setShoppingIntention] = useState(() => { try { return localStorage.getItem("wardrobe_shopping_intention_v1") || ""; } catch { return ""; } });
+  const [buyLessOf, setBuyLessOf] = useState(() => { try { return localStorage.getItem("wardrobe_buy_less_v1") || ""; } catch { return ""; } });
+  const [buyMoreOf, setBuyMoreOf] = useState(() => { try { return localStorage.getItem("wardrobe_buy_more_v1") || ""; } catch { return ""; } });
 
   // Wear counts
   const [wornItems, setWornItems] = useState(() => itemsDb.rows.filter(i => (i.wornCount || 0) > 0).sort((a,b) => (b.wornCount||0)-(a.wornCount||0)));
@@ -8211,7 +8226,25 @@ function SettingsTab({
   const [showResetConfirm, setShowResetConfirm] = useState(false);
   const effectiveAccent = accentOverride || activeTheme.accent;
 
-  const TABS = [["appearance","Appearance"],["preferences","Preferences"],["data","Data"],["account","Account"]];
+  useEffect(() => { try { localStorage.setItem("wardrobe_style_goal_v1", styleGoal); } catch {} }, [styleGoal]);
+  useEffect(() => { try { localStorage.setItem("wardrobe_shopping_intention_v1", shoppingIntention); } catch {} }, [shoppingIntention]);
+  useEffect(() => { try { localStorage.setItem("wardrobe_buy_less_v1", buyLessOf); } catch {} }, [buyLessOf]);
+  useEffect(() => { try { localStorage.setItem("wardrobe_buy_more_v1", buyMoreOf); } catch {} }, [buyMoreOf]);
+
+  const parsePrice = (p) => parseFloat((p || "").replace(/[^0-9.]/g, "")) || 0;
+  const now = new Date();
+  const thisMonth = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,"0")}`;
+  const thisYear = String(now.getFullYear());
+  const spentThisMonth = itemsDb.rows.filter(i => (i.purchaseDate||"").startsWith(thisMonth)).reduce((s,i) => s + parsePrice(i.price), 0);
+  const spentThisYear = itemsDb.rows.filter(i => (i.purchaseDate||"").startsWith(thisYear)).reduce((s,i) => s + parsePrice(i.price), 0);
+  const monthPct = monthlyBudget > 0 ? Math.min((spentThisMonth / monthlyBudget) * 100, 100) : 0;
+  const yearPct = annualBudget > 0 ? Math.min((spentThisYear / annualBudget) * 100, 100) : 0;
+  const monthOver = monthlyBudget > 0 && spentThisMonth > monthlyBudget;
+  const yearOver = annualBudget > 0 && spentThisYear > annualBudget;
+  const monthColor = monthPct > 90 ? "#e05555" : monthPct > 70 ? "#d97706" : "#3aaa6e";
+  const yearColor = yearPct > 90 ? "#e05555" : yearPct > 70 ? "#d97706" : "#3aaa6e";
+
+  const TABS = [["appearance","Appearance"],["goals","Goals"],["defaults","Wardrobe Defaults"],["backup","Backup & Recovery"],["account","Account"]];
 
   return (
     <div style={{ maxWidth:720, margin:"0 auto", padding:"4px 0 40px" }}>
@@ -8306,39 +8339,186 @@ function SettingsTab({
           </div>
         </Card>
 
-        {/* Accent Color Override */}
-        <Card>
-          <SectionLabel>Accent Color</SectionLabel>
-          <div style={{ display:"flex", alignItems:"center", gap:14 }}>
-            <input type="color" value={accentOverride || activeTheme.accent}
-              onChange={e => setAccentOverride(e.target.value)}
-              style={{ width:40, height:40, border:"1.5px solid #e0dbd2", borderRadius:10, cursor:"pointer", padding:2, background:"#fff" }} />
-            <div style={{ flex:1 }}>
-              <div style={{ fontSize:13, fontWeight:600, color:"#1a1a1a" }}>
-                {accentOverride ? "Custom override active" : "Using theme default"}
-              </div>
-              <div style={{ fontSize:11, color:"#aaa", marginTop:2 }}>
-                {accentOverride || activeTheme.accent}
-              </div>
-            </div>
-            {accentOverride && (
-              <button onClick={() => setAccentOverride("")} style={{
-                padding:"6px 12px", borderRadius:8, border:"1.5px solid #e0dbd2",
-                background:"#fff", color:"#888", fontSize:11, fontWeight:600, cursor:"pointer"
-              }}>Reset</button>
-            )}
-          </div>
-        </Card>
-
         {/* Toggles */}
         <Card>
           <SectionLabel>Display Options</SectionLabel>
           <Toggle value={showNavLabels} onChange={setShowNavLabels} label="Show nav labels" sub="Display text labels under sidebar icons" />
         </Card>
+
+        <Card>
+          <SectionLabel>Advanced Appearance</SectionLabel>
+          <button onClick={() => setShowAdvancedAppearance(v => !v)} style={{
+            width:"100%", display:"flex", alignItems:"center", justifyContent:"space-between",
+            padding:"12px 14px", borderRadius:12, border:"1.5px solid #e0dbd2", background:"#fafaf8",
+            cursor:"pointer", fontFamily:"'DM Sans',sans-serif", color:"#1a1a1a"
+          }}>
+            <div style={{ textAlign:"left" }}>
+              <div style={{ fontSize:13, fontWeight:700 }}>Accent override</div>
+              <div style={{ fontSize:11, color:"#aaa", marginTop:2 }}>{accentOverride ? accentOverride : "Using theme default"}</div>
+            </div>
+            <div style={{ fontSize:12, color:"#888", fontWeight:700 }}>{showAdvancedAppearance ? "Hide" : "Show"}</div>
+          </button>
+          {showAdvancedAppearance && (
+            <div style={{ display:"flex", alignItems:"center", gap:14, marginTop:14 }}>
+              <input type="color" value={accentOverride || activeTheme.accent}
+                onChange={e => setAccentOverride(e.target.value)}
+                style={{ width:40, height:40, border:"1.5px solid #e0dbd2", borderRadius:10, cursor:"pointer", padding:2, background:"#fff" }} />
+              <div style={{ flex:1 }}>
+                <div style={{ fontSize:13, fontWeight:600, color:"#1a1a1a" }}>
+                  {accentOverride ? "Custom override active" : "Using theme default"}
+                </div>
+                <div style={{ fontSize:11, color:"#aaa", marginTop:2 }}>
+                  {accentOverride || activeTheme.accent}
+                </div>
+              </div>
+              {accentOverride && (
+                <button onClick={() => setAccentOverride("")} style={{
+                  padding:"6px 12px", borderRadius:8, border:"1.5px solid #e0dbd2",
+                  background:"#fff", color:"#888", fontSize:11, fontWeight:600, cursor:"pointer"
+                }}>Reset</button>
+              )}
+            </div>
+          )}
+        </Card>
       </>)}
 
-      {/* ════════════ PREFERENCES ════════════ */}
-      {settingsTab === "preferences" && (<>
+      {/* ════════════ GOALS ════════════ */}
+      {settingsTab === "goals" && (<>
+
+        <Card>
+          <SectionLabel>Wardrobe Direction</SectionLabel>
+          <div style={{ display:"flex", flexDirection:"column", gap:14 }}>
+            <div>
+              <div style={{ fontSize:12, fontWeight:700, color:"#555", marginBottom:8 }}>Style goal</div>
+              <textarea
+                value={styleGoal}
+                onChange={e => setStyleGoal(e.target.value)}
+                placeholder="What are you optimizing for this season?"
+                rows={3}
+                style={{ width:"100%", padding:"10px 12px", borderRadius:12, border:"1.5px solid #e0dbd2", fontSize:13, fontFamily:"'DM Sans', sans-serif", background:"#fafaf8", color:"#1a1a1a", outline:"none", resize:"vertical" }}
+              />
+            </div>
+            <div>
+              <div style={{ fontSize:12, fontWeight:700, color:"#555", marginBottom:8 }}>Shopping intention</div>
+              <textarea
+                value={shoppingIntention}
+                onChange={e => setShoppingIntention(e.target.value)}
+                placeholder="Define how you want to shop right now: more intentional, fewer duplicates, event-specific, etc."
+                rows={3}
+                style={{ width:"100%", padding:"10px 12px", borderRadius:12, border:"1.5px solid #e0dbd2", fontSize:13, fontFamily:"'DM Sans', sans-serif", background:"#fafaf8", color:"#1a1a1a", outline:"none", resize:"vertical" }}
+              />
+            </div>
+          </div>
+        </Card>
+
+        <Card>
+          <SectionLabel>Buy Less / Buy More</SectionLabel>
+          <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:12 }}>
+            <div>
+              <div style={{ fontSize:12, fontWeight:700, color:"#555", marginBottom:8 }}>Buy less of</div>
+              <textarea
+                value={buyLessOf}
+                onChange={e => setBuyLessOf(e.target.value)}
+                placeholder="Impulse basics, duplicates, occasion-only pieces..."
+                rows={4}
+                style={{ width:"100%", padding:"10px 12px", borderRadius:12, border:"1.5px solid #e0dbd2", fontSize:13, fontFamily:"'DM Sans', sans-serif", background:"#fafaf8", color:"#1a1a1a", outline:"none", resize:"vertical" }}
+              />
+            </div>
+            <div>
+              <div style={{ fontSize:12, fontWeight:700, color:"#555", marginBottom:8 }}>Buy more of</div>
+              <textarea
+                value={buyMoreOf}
+                onChange={e => setBuyMoreOf(e.target.value)}
+                placeholder="Workhorse pieces, layering items, better shoes..."
+                rows={4}
+                style={{ width:"100%", padding:"10px 12px", borderRadius:12, border:"1.5px solid #e0dbd2", fontSize:13, fontFamily:"'DM Sans', sans-serif", background:"#fafaf8", color:"#1a1a1a", outline:"none", resize:"vertical" }}
+              />
+            </div>
+          </div>
+        </Card>
+
+        <Card>
+          <SectionLabel>Spending Targets</SectionLabel>
+          <div style={{ display:"flex", flexDirection:"column", gap:20 }}>
+
+            <div>
+              <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:10 }}>
+                <div>
+                  <div style={{ fontSize:13, fontWeight:700, color:"#1a1a1a" }}>Monthly Budget</div>
+                  <div style={{ fontSize:11, color:"#aaa", marginTop:1 }}>Resets each calendar month</div>
+                </div>
+                <div style={{ display:"flex", alignItems:"center", gap:6 }}>
+                  <span style={{ fontSize:13, color:"#888", fontWeight:600 }}>$</span>
+                  <input
+                    type="number" min="0" step="50"
+                    value={monthlyBudget || ""}
+                    onChange={e => setMonthlyBudget(parseFloat(e.target.value) || 0)}
+                    placeholder="0"
+                    style={{ width:90, padding:"7px 10px", border:"1.5px solid #e0dbd2", borderRadius:10, fontFamily:"'DM Sans',sans-serif", fontSize:13, fontWeight:700, textAlign:"right", outline:"none", background:"#fafaf8" }}
+                  />
+                </div>
+              </div>
+              {monthlyBudget > 0 && (
+                <div>
+                  <div style={{ display:"flex", justifyContent:"space-between", fontSize:11, fontWeight:600, marginBottom:5 }}>
+                    <span style={{ color: monthOver ? "#e05555" : "#888" }}>
+                      {monthOver ? `$${(spentThisMonth - monthlyBudget).toFixed(0)} over` : `$${spentThisMonth.toFixed(0)} spent`}
+                    </span>
+                    <span style={{ color:"#bbb" }}>${monthlyBudget.toFixed(0)} target</span>
+                  </div>
+                  <div style={{ height:8, borderRadius:99, background:"#f0ede8", overflow:"hidden" }}>
+                    <div style={{ height:"100%", width:`${monthPct}%`, background: monthColor, borderRadius:99, transition:"width 0.5s" }} />
+                  </div>
+                  <div style={{ fontSize:11, color: monthOver ? "#e05555" : monthColor, fontWeight:700, marginTop:5, textAlign:"right" }}>
+                    {monthOver ? "Over budget" : `$${Math.max(monthlyBudget - spentThisMonth, 0).toFixed(0)} remaining`}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div style={{ height:1, background:"#f0ede8" }} />
+
+            <div>
+              <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:10 }}>
+                <div>
+                  <div style={{ fontSize:13, fontWeight:700, color:"#1a1a1a" }}>Annual Budget</div>
+                  <div style={{ fontSize:11, color:"#aaa", marginTop:1 }}>Tracks spending across {thisYear}</div>
+                </div>
+                <div style={{ display:"flex", alignItems:"center", gap:6 }}>
+                  <span style={{ fontSize:13, color:"#888", fontWeight:600 }}>$</span>
+                  <input
+                    type="number" min="0" step="100"
+                    value={annualBudget || ""}
+                    onChange={e => setAnnualBudget(parseFloat(e.target.value) || 0)}
+                    placeholder="0"
+                    style={{ width:90, padding:"7px 10px", border:"1.5px solid #e0dbd2", borderRadius:10, fontFamily:"'DM Sans',sans-serif", fontSize:13, fontWeight:700, textAlign:"right", outline:"none", background:"#fafaf8" }}
+                  />
+                </div>
+              </div>
+              {annualBudget > 0 && (
+                <div>
+                  <div style={{ display:"flex", justifyContent:"space-between", fontSize:11, fontWeight:600, marginBottom:5 }}>
+                    <span style={{ color: yearOver ? "#e05555" : "#888" }}>
+                      {yearOver ? `$${(spentThisYear - annualBudget).toFixed(0)} over` : `$${spentThisYear.toFixed(0)} spent`}
+                    </span>
+                    <span style={{ color:"#bbb" }}>${annualBudget.toFixed(0)} target</span>
+                  </div>
+                  <div style={{ height:8, borderRadius:99, background:"#f0ede8", overflow:"hidden" }}>
+                    <div style={{ height:"100%", width:`${yearPct}%`, background: yearColor, borderRadius:99, transition:"width 0.5s" }} />
+                  </div>
+                  <div style={{ fontSize:11, color: yearOver ? "#e05555" : yearColor, fontWeight:700, marginTop:5, textAlign:"right" }}>
+                    {yearOver ? "Over budget" : `$${Math.max(annualBudget - spentThisYear, 0).toFixed(0)} remaining`}
+                  </div>
+                </div>
+              )}
+            </div>
+
+          </div>
+        </Card>
+      </>)}
+
+      {/* ════════════ WARDROBE DEFAULTS ════════════ */}
+      {settingsTab === "defaults" && (<>
 
         {/* Home Location */}
         <Card>
@@ -8381,108 +8561,77 @@ function SettingsTab({
           </div>
         </Card>
 
-        {/* Budget Targets */}
-        {(() => {
-          const parsePrice = (p) => parseFloat((p||"").replace(/[^0-9.]/g,"")) || 0;
-          const now = new Date();
-          const thisMonth = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,"0")}`;
-          const thisYear = String(now.getFullYear());
-          const spentThisMonth = itemsDb.rows.filter(i => (i.purchaseDate||"").startsWith(thisMonth)).reduce((s,i) => s+parsePrice(i.price), 0);
-          const spentThisYear = itemsDb.rows.filter(i => (i.purchaseDate||"").startsWith(thisYear)).reduce((s,i) => s+parsePrice(i.price), 0);
-          const monthPct = monthlyBudget > 0 ? Math.min((spentThisMonth / monthlyBudget) * 100, 100) : 0;
-          const yearPct = annualBudget > 0 ? Math.min((spentThisYear / annualBudget) * 100, 100) : 0;
-          const monthOver = monthlyBudget > 0 && spentThisMonth > monthlyBudget;
-          const yearOver = annualBudget > 0 && spentThisYear > annualBudget;
-          const monthColor = monthPct > 90 ? "#e05555" : monthPct > 70 ? "#d97706" : "#3aaa6e";
-          const yearColor = yearPct > 90 ? "#e05555" : yearPct > 70 ? "#d97706" : "#3aaa6e";
-          return (
-            <Card>
-              <SectionLabel>Spending Targets</SectionLabel>
-              <div style={{ display:"flex", flexDirection:"column", gap:20 }}>
-
-                {/* Monthly */}
-                <div>
-                  <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:10 }}>
-                    <div>
-                      <div style={{ fontSize:13, fontWeight:700, color:"#1a1a1a" }}>Monthly Budget</div>
-                      <div style={{ fontSize:11, color:"#aaa", marginTop:1 }}>Resets each calendar month</div>
-                    </div>
-                    <div style={{ display:"flex", alignItems:"center", gap:6 }}>
-                      <span style={{ fontSize:13, color:"#888", fontWeight:600 }}>$</span>
-                      <input
-                        type="number" min="0" step="50"
-                        value={monthlyBudget || ""}
-                        onChange={e => setMonthlyBudget(parseFloat(e.target.value) || 0)}
-                        placeholder="0"
-                        style={{ width:90, padding:"7px 10px", border:"1.5px solid #e0dbd2", borderRadius:10, fontFamily:"'DM Sans',sans-serif", fontSize:13, fontWeight:700, textAlign:"right", outline:"none", background:"#fafaf8" }}
-                      />
-                    </div>
-                  </div>
-                  {monthlyBudget > 0 && (
-                    <div>
-                      <div style={{ display:"flex", justifyContent:"space-between", fontSize:11, fontWeight:600, marginBottom:5 }}>
-                        <span style={{ color: monthOver ? "#e05555" : "#888" }}>
-                          {monthOver ? `$${(spentThisMonth - monthlyBudget).toFixed(0)} over` : `$${spentThisMonth.toFixed(0)} spent`}
-                        </span>
-                        <span style={{ color:"#bbb" }}>${monthlyBudget.toFixed(0)} target</span>
-                      </div>
-                      <div style={{ height:8, borderRadius:99, background:"#f0ede8", overflow:"hidden" }}>
-                        <div style={{ height:"100%", width:`${monthPct}%`, background: monthColor, borderRadius:99, transition:"width 0.5s" }} />
-                      </div>
-                      <div style={{ fontSize:11, color: monthOver ? "#e05555" : monthColor, fontWeight:700, marginTop:5, textAlign:"right" }}>
-                        {monthOver ? `Over budget` : `$${Math.max(monthlyBudget - spentThisMonth, 0).toFixed(0)} remaining`}
-                      </div>
-                    </div>
-                  )}
-                </div>
-
-                <div style={{ height:1, background:"#f0ede8" }} />
-
-                {/* Annual */}
-                <div>
-                  <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:10 }}>
-                    <div>
-                      <div style={{ fontSize:13, fontWeight:700, color:"#1a1a1a" }}>Annual Budget</div>
-                      <div style={{ fontSize:11, color:"#aaa", marginTop:1 }}>Tracks spending across {thisYear}</div>
-                    </div>
-                    <div style={{ display:"flex", alignItems:"center", gap:6 }}>
-                      <span style={{ fontSize:13, color:"#888", fontWeight:600 }}>$</span>
-                      <input
-                        type="number" min="0" step="100"
-                        value={annualBudget || ""}
-                        onChange={e => setAnnualBudget(parseFloat(e.target.value) || 0)}
-                        placeholder="0"
-                        style={{ width:90, padding:"7px 10px", border:"1.5px solid #e0dbd2", borderRadius:10, fontFamily:"'DM Sans',sans-serif", fontSize:13, fontWeight:700, textAlign:"right", outline:"none", background:"#fafaf8" }}
-                      />
-                    </div>
-                  </div>
-                  {annualBudget > 0 && (
-                    <div>
-                      <div style={{ display:"flex", justifyContent:"space-between", fontSize:11, fontWeight:600, marginBottom:5 }}>
-                        <span style={{ color: yearOver ? "#e05555" : "#888" }}>
-                          {yearOver ? `$${(spentThisYear - annualBudget).toFixed(0)} over` : `$${spentThisYear.toFixed(0)} spent`}
-                        </span>
-                        <span style={{ color:"#bbb" }}>${annualBudget.toFixed(0)} target</span>
-                      </div>
-                      <div style={{ height:8, borderRadius:99, background:"#f0ede8", overflow:"hidden" }}>
-                        <div style={{ height:"100%", width:`${yearPct}%`, background: yearColor, borderRadius:99, transition:"width 0.5s" }} />
-                      </div>
-                      <div style={{ fontSize:11, color: yearOver ? "#e05555" : yearColor, fontWeight:700, marginTop:5, textAlign:"right" }}>
-                        {yearOver ? `Over budget` : `$${Math.max(annualBudget - spentThisYear, 0).toFixed(0)} remaining`}
-                      </div>
-                    </div>
-                  )}
-                </div>
-
+        <Card>
+          <SectionLabel>Calendar + Weather Defaults</SectionLabel>
+          <div style={{ display:"flex", flexDirection:"column", gap:16 }}>
+            <div>
+              <div style={{ fontSize:12, fontWeight:700, color:"#555", marginBottom:8 }}>Temperature unit</div>
+              <div style={{ display:"flex", gap:8 }}>
+                {[["fahrenheit","Fahrenheit"],["celsius","Celsius"]].map(([v, l]) => (
+                  <button key={v} onClick={() => setTemperatureUnit(v)} style={{
+                    padding:"7px 14px", borderRadius:20,
+                    border: temperatureUnit===v ? "1.5px solid #1a1a1a" : "1.5px solid #e0dbd2",
+                    background: temperatureUnit===v ? "#1a1a1a" : "#fff",
+                    color: temperatureUnit===v ? "#fff" : "#888",
+                    cursor:"pointer", fontFamily:"'DM Sans',sans-serif", fontSize:12, fontWeight:700
+                  }}>{l}</button>
+                ))}
               </div>
-            </Card>
-          );
-        })()}
+            </div>
+            <div>
+              <div style={{ fontSize:12, fontWeight:700, color:"#555", marginBottom:8 }}>Travel city behavior</div>
+              <div style={{ display:"flex", gap:8, flexWrap:"wrap" }}>
+                {[["ask","Ask when traveling"],["home","Prefer home city"],["travel","Prefer travel city"]].map(([v, l]) => (
+                  <button key={v} onClick={() => setTravelCityBehavior(v)} style={{
+                    padding:"7px 14px", borderRadius:20,
+                    border: travelCityBehavior===v ? "1.5px solid #1a1a1a" : "1.5px solid #e0dbd2",
+                    background: travelCityBehavior===v ? "#1a1a1a" : "#fff",
+                    color: travelCityBehavior===v ? "#fff" : "#888",
+                    cursor:"pointer", fontFamily:"'DM Sans',sans-serif", fontSize:12, fontWeight:700
+                  }}>{l}</button>
+                ))}
+              </div>
+            </div>
+            <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:12 }}>
+              <div>
+                <div style={{ fontSize:12, fontWeight:700, color:"#555", marginBottom:8 }}>Outfit reminder day</div>
+                <select value={outfitReminderDay} onChange={e => setOutfitReminderDay(e.target.value)} style={{ width:"100%", padding:"10px 12px", borderRadius:10, border:"1.5px solid #e0dbd2", fontSize:13, fontFamily:"'DM Sans', sans-serif", background:"#fafaf8", color:"#1a1a1a", outline:"none" }}>
+                  {["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"].map(day => <option key={day} value={day}>{day}</option>)}
+                </select>
+              </div>
+              <div>
+                <div style={{ fontSize:12, fontWeight:700, color:"#555", marginBottom:8 }}>Outfit reminder time</div>
+                <input type="time" value={outfitReminderTime} onChange={e => setOutfitReminderTime(e.target.value)} style={{ width:"100%", padding:"10px 12px", borderRadius:10, border:"1.5px solid #e0dbd2", fontSize:13, fontFamily:"'DM Sans', sans-serif", background:"#fafaf8", color:"#1a1a1a", outline:"none" }} />
+              </div>
+            </div>
+            <Toggle value={rainyDaySuggestions} onChange={setRainyDaySuggestions} label="Rainy-day suggestions" sub="Prefer weather-aware prompts when rain is in the forecast" />
+          </div>
+        </Card>
 
         {/* Default sort + season */}
         <Card>
-          <SectionLabel>Default Closet View</SectionLabel>
+          <SectionLabel>Closet Rules</SectionLabel>
+          <div style={{ display:"flex", flexDirection:"column", gap:2, marginBottom:14 }}>
+            <Toggle value={hideSoldByDefault} onChange={setHideSoldByDefault} label="Hide sold items by default" sub="Keep sold pieces out of everyday browsing" />
+            <Toggle value={hideArchivedByDefault} onChange={setHideArchivedByDefault} label="Hide archived items by default" sub="Show only active wardrobe pieces in regular views" />
+            <Toggle value={defaultOnlyUnworn} onChange={setDefaultOnlyUnworn} label="Start with only unworn items" sub="Useful when you want outfit building to begin with underused pieces" />
+            <Toggle value={defaultOnlyInSeason} onChange={setDefaultOnlyInSeason} label="Start with only in-season items" sub="Bias closet browsing toward your saved season filter" />
+          </div>
           <div style={{ display:"flex", flexDirection:"column", gap:14 }}>
+            <div>
+              <div style={{ fontSize:12, fontWeight:700, color:"#555", marginBottom:8 }}>Default view mode</div>
+              <div style={{ display:"flex", gap:8 }}>
+                {[["grid","Grid"],["list","List"]].map(([v, l]) => (
+                  <button key={v} onClick={() => setDefaultClosetViewMode(v)} style={{
+                    padding:"7px 14px", borderRadius:20,
+                    border: defaultClosetViewMode===v ? "1.5px solid #1a1a1a" : "1.5px solid #e0dbd2",
+                    background: defaultClosetViewMode===v ? "#1a1a1a" : "#fff",
+                    color: defaultClosetViewMode===v ? "#fff" : "#888",
+                    cursor:"pointer", fontFamily:"'DM Sans',sans-serif", fontSize:12, fontWeight:700
+                  }}>{l}</button>
+                ))}
+              </div>
+            </div>
             <div>
               <div style={{ fontSize:12, fontWeight:700, color:"#555", marginBottom:8 }}>Default Sort</div>
               <div style={{ display:"flex", flexWrap:"wrap", gap:8 }}>
@@ -8558,8 +8707,8 @@ function SettingsTab({
         />
       </>)}
 
-      {/* ════════════ DATA & SYNC ════════════ */}
-      {settingsTab === "data" && (<>
+      {/* ════════════ BACKUP & RECOVERY ════════════ */}
+      {settingsTab === "backup" && (<>
 
         {/* Storage Usage */}
         {(() => {
@@ -8814,31 +8963,28 @@ function SettingsTab({
       {/* ════════════ ACCOUNT ════════════ */}
       {settingsTab === "account" && (<>
 
-        {/* Supabase Info */}
         <Card>
-          <SectionLabel>Database Connection</SectionLabel>
-          <div style={{ display:"flex", flexDirection:"column", gap:10 }}>
-            <div style={{ display:"flex", alignItems:"center", gap:10, padding:"10px 14px", background:"#f0faf4", borderRadius:12, border:"1px solid #c8e8d0" }}>
-              <div style={{ width:10, height:10, borderRadius:"50%", background:"#3aaa6e", flexShrink:0, boxShadow:"0 0 6px #3aaa6e" }} />
+          <SectionLabel>Sync</SectionLabel>
+          <div style={{ display:"flex", flexDirection:"column", gap:12 }}>
+            <div style={{ display:"flex", alignItems:"center", gap:10, padding:"12px 14px", background: guestMode ? "#fff8e8" : "#f0faf4", borderRadius:12, border: guestMode ? "1px solid #f0d888" : "1px solid #c8e8d0" }}>
+              <div style={{ width:10, height:10, borderRadius:"50%", background: guestMode ? "#d39b1b" : "#3aaa6e", flexShrink:0, boxShadow: guestMode ? "0 0 6px rgba(211,155,27,0.35)" : "0 0 6px #3aaa6e" }} />
               <div style={{ flex:1 }}>
-                <div style={{ fontSize:13, fontWeight:700, color:"#2d6a3f" }}>Connected to Supabase</div>
-                <div style={{ fontSize:11, color:"#5aaa7e", marginTop:1, fontFamily:"monospace" }}>
-                  {SUPABASE_URL.replace(/https?:\/\//, "").slice(0, 36)}
+                <div style={{ fontSize:13, fontWeight:700, color: guestMode ? "#8a6a10" : "#2d6a3f" }}>
+                  {guestMode ? "Local-only mode is on" : "Sync is active"}
+                </div>
+                <div style={{ fontSize:11, color: guestMode ? "#a3832d" : "#5aaa7e", marginTop:1 }}>
+                  {guestMode ? "Changes stay on this device until sync is turned back on." : `Last synced: ${fmtSynced(lastSynced)}`}
                 </div>
               </div>
+              <div style={{ textAlign:"right", fontSize:11, color: guestMode ? "#a3832d" : "#5aaa7e", fontWeight:700 }}>
+                {itemsDb.rows.length} items
+              </div>
+            </div>
+            <Toggle value={guestMode} onChange={setGuestMode} label="Local only mode" sub="Disable Supabase sync and keep wardrobe changes on this device only" />
+            <div style={{ fontSize:11, color:"#aaa", lineHeight:1.6 }}>
+              Connection: {SUPABASE_URL.replace(/https?:\/\//, "").slice(0, 36)}
             </div>
           </div>
-        </Card>
-
-        {/* Guest Mode */}
-        <Card>
-          <SectionLabel>Sync Mode</SectionLabel>
-          <Toggle value={guestMode} onChange={setGuestMode} label="Local only mode" sub="Disable Supabase sync — data stays on this device only" />
-          {guestMode && (
-            <div style={{ marginTop:12, padding:"10px 14px", background:"#fff8e8", borderRadius:10, border:"1px solid #f0d888", fontSize:12, color:"#8a6a10", fontWeight:600 }}>
-              Changes won't sync across devices while local mode is on.
-            </div>
-          )}
         </Card>
 
         {/* Clear All Data */}
@@ -10849,8 +10995,28 @@ export default function App() {
   const [lastSynced, setLastSynced] = useState(() => { try { return localStorage.getItem("wardrobe_last_synced_v1") || null; } catch { return null; } });
   const [monthlyBudget, setMonthlyBudgetState] = useState(() => { try { return parseFloat(localStorage.getItem("wardrobe_monthly_budget_v1")) || 0; } catch { return 0; } });
   const [annualBudget, setAnnualBudgetState] = useState(() => { try { return parseFloat(localStorage.getItem("wardrobe_annual_budget_v1")) || 0; } catch { return 0; } });
+  const [temperatureUnit, setTemperatureUnitState] = useState(() => { try { return localStorage.getItem("wardrobe_temperature_unit_v1") || "fahrenheit"; } catch { return "fahrenheit"; } });
+  const [travelCityBehavior, setTravelCityBehaviorState] = useState(() => { try { return localStorage.getItem("wardrobe_travel_city_behavior_v1") || "ask"; } catch { return "ask"; } });
+  const [outfitReminderDay, setOutfitReminderDayState] = useState(() => { try { return localStorage.getItem("wardrobe_outfit_reminder_day_v1") || "Sunday"; } catch { return "Sunday"; } });
+  const [outfitReminderTime, setOutfitReminderTimeState] = useState(() => { try { return localStorage.getItem("wardrobe_outfit_reminder_time_v1") || "19:00"; } catch { return "19:00"; } });
+  const [rainyDaySuggestions, setRainyDaySuggestionsState] = useState(() => { try { return localStorage.getItem("wardrobe_rainy_suggestions_v1") !== "0"; } catch { return true; } });
+  const [hideSoldByDefault, setHideSoldByDefaultState] = useState(() => { try { return localStorage.getItem("wardrobe_hide_sold_v1") === "1"; } catch { return false; } });
+  const [hideArchivedByDefault, setHideArchivedByDefaultState] = useState(() => { try { return localStorage.getItem("wardrobe_hide_archived_v1") !== "0"; } catch { return true; } });
+  const [defaultClosetViewMode, setDefaultClosetViewModeState] = useState(() => { try { return localStorage.getItem("wardrobe_default_view_mode_v1") || "grid"; } catch { return "grid"; } });
+  const [defaultOnlyUnworn, setDefaultOnlyUnwornState] = useState(() => { try { return localStorage.getItem("wardrobe_default_only_unworn_v1") === "1"; } catch { return false; } });
+  const [defaultOnlyInSeason, setDefaultOnlyInSeasonState] = useState(() => { try { return localStorage.getItem("wardrobe_default_only_in_season_v1") === "1"; } catch { return false; } });
   const setMonthlyBudget = (v) => { setMonthlyBudgetState(v); try { localStorage.setItem("wardrobe_monthly_budget_v1", String(v)); } catch {} };
   const setAnnualBudget = (v) => { setAnnualBudgetState(v); try { localStorage.setItem("wardrobe_annual_budget_v1", String(v)); } catch {} };
+  const setTemperatureUnit = (v) => { setTemperatureUnitState(v); try { localStorage.setItem("wardrobe_temperature_unit_v1", v); } catch {} };
+  const setTravelCityBehavior = (v) => { setTravelCityBehaviorState(v); try { localStorage.setItem("wardrobe_travel_city_behavior_v1", v); } catch {} };
+  const setOutfitReminderDay = (v) => { setOutfitReminderDayState(v); try { localStorage.setItem("wardrobe_outfit_reminder_day_v1", v); } catch {} };
+  const setOutfitReminderTime = (v) => { setOutfitReminderTimeState(v); try { localStorage.setItem("wardrobe_outfit_reminder_time_v1", v); } catch {} };
+  const setRainyDaySuggestions = (v) => { setRainyDaySuggestionsState(v); try { localStorage.setItem("wardrobe_rainy_suggestions_v1", v ? "1" : "0"); } catch {} };
+  const setHideSoldByDefault = (v) => { setHideSoldByDefaultState(v); try { localStorage.setItem("wardrobe_hide_sold_v1", v ? "1" : "0"); } catch {} };
+  const setHideArchivedByDefault = (v) => { setHideArchivedByDefaultState(v); try { localStorage.setItem("wardrobe_hide_archived_v1", v ? "1" : "0"); } catch {} };
+  const setDefaultClosetViewMode = (v) => { setDefaultClosetViewModeState(v); try { localStorage.setItem("wardrobe_default_view_mode_v1", v); } catch {} };
+  const setDefaultOnlyUnworn = (v) => { setDefaultOnlyUnwornState(v); try { localStorage.setItem("wardrobe_default_only_unworn_v1", v ? "1" : "0"); } catch {} };
+  const setDefaultOnlyInSeason = (v) => { setDefaultOnlyInSeasonState(v); try { localStorage.setItem("wardrobe_default_only_in_season_v1", v ? "1" : "0"); } catch {} };
   // ── Google / Supabase Auth session check ──────────────────────────────────
   useEffect(() => {
     // Check for an existing Supabase session (handles Google OAuth redirect callback)
@@ -11969,6 +12135,16 @@ export default function App() {
                 outfitSort={outfitSort} setOutfitSort={setOutfitSort}
                 wlSort={wlSort} setWlSort={setWlSort}
                 guestMode={guestMode} setGuestMode={setGuestMode}
+                temperatureUnit={temperatureUnit} setTemperatureUnit={setTemperatureUnit}
+                travelCityBehavior={travelCityBehavior} setTravelCityBehavior={setTravelCityBehavior}
+                outfitReminderDay={outfitReminderDay} setOutfitReminderDay={setOutfitReminderDay}
+                outfitReminderTime={outfitReminderTime} setOutfitReminderTime={setOutfitReminderTime}
+                rainyDaySuggestions={rainyDaySuggestions} setRainyDaySuggestions={setRainyDaySuggestions}
+                hideSoldByDefault={hideSoldByDefault} setHideSoldByDefault={setHideSoldByDefault}
+                hideArchivedByDefault={hideArchivedByDefault} setHideArchivedByDefault={setHideArchivedByDefault}
+                defaultClosetViewMode={defaultClosetViewMode} setDefaultClosetViewMode={setDefaultClosetViewMode}
+                defaultOnlyUnworn={defaultOnlyUnworn} setDefaultOnlyUnworn={setDefaultOnlyUnworn}
+                defaultOnlyInSeason={defaultOnlyInSeason} setDefaultOnlyInSeason={setDefaultOnlyInSeason}
                 allDb={{ items: itemsDb.rows, outfits: outfitsDb.rows, lookbooks: lookbooksDb.rows, wishlist: wishlistDb.rows, moodboards: moodboardsDb.boards }}
                 closetSort={closetSort} setClosetSort={v => { setClosetSort(v); try { localStorage.setItem("wardrobe_default_sort_v1", v); } catch {} }}
                 closetSeasonFilter={closetSeasonFilter} setClosetSeasonFilter={v => { setClosetSeasonFilter(v); try { localStorage.setItem("wardrobe_default_season_v1", v); } catch {} }}

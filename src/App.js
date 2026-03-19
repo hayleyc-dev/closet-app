@@ -3162,21 +3162,22 @@ function LookbookViewer({ lookbook, outfits, allItems, closetItems, onClose, onU
               ? moodboards[linkedMoodboardIdx].name || "Linked Board"
               : "Link Moodboard"}
           </button>
-          <button onClick={handleShare} style={{ ...btnBase, padding: "7px 14px", background: "#f5f3ef", color: "#555", fontSize: 12 }}>Share</button>
-          <button onClick={() => setPackingListView(true)} style={{ ...btnBase, padding: "7px 14px", background: "#f0faf4", color: "#2d6a3f", fontSize: 12, border: "1.5px solid #b6e8c8" }}>
-            <SvgLuggage size={12} color="#2d6a3f" style={{ marginRight: 5 }} />Pack List
-          </button>
+          {lbType === "trip" && (
+            <button onClick={() => setPackingListView(true)} style={{ ...btnBase, padding: "7px 14px", background: "#f0faf4", color: "#2d6a3f", fontSize: 12, border: "1.5px solid #b6e8c8" }}>
+              <SvgLuggage size={12} color="#2d6a3f" style={{ marginRight: 5 }} />Pack List
+            </button>
+          )}
           <button onClick={handleExport} disabled={exportingPdf} style={{ ...btnBase, padding: "7px 14px", background: "#f5f3ef", color: "#555", fontSize: 12 }}>
             {exportingPdf ? "Exporting\u2026" : "Export PDF"}
           </button>
           {onArchive && (
             <button onClick={() => {
-              if (window.confirm(`Archive "${lbName}"? You can restore it from Settings → Data.`)) {
+              if (window.confirm(`Archive "${lbName}"? You can restore it from Settings \u2192 Data.`)) {
                 const finalLb = { ...lookbook, name: lbName, notes, outfitIds: lookIds, lookMeta, tags: lbTags, city: lbCity, coverImage, moodboardId: linkedMoodboardId, tripDetails, dateStart: lbDateStart, dateEnd: lbDateEnd };
                 onArchive(finalLb);
               }
-            }} style={{ ...btnBase, padding: "7px 14px", background: "#fff8f8", color: "#e05555", fontSize: 12, border: "1.5px solid #ffd0d0" }}>
-              Archive
+            }} style={{ ...btnBase, padding: "7px 14px", background: "#f5f3ef", color: "#666", fontSize: 12, display: "flex", alignItems: "center", gap: 6 }}>
+              <SvgDownload size={12} color="#666" />Archive
             </button>
           )}
           <button onClick={() => {
@@ -3652,11 +3653,6 @@ function LookbookViewer({ lookbook, outfits, allItems, closetItems, onClose, onU
             </button>
             {openAccordions.trip && (
               <div style={{ padding: "12px 16px 14px", display: "flex", flexDirection: "column", gap: 10 }}>
-                <div>
-                  <div style={{ fontSize: 9, fontWeight: 700, color: "#bbb", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 4 }}>Name</div>
-                  <input value={lbName} onChange={e => setLbName(e.target.value)} onBlur={() => save()}
-                    style={{ width: "100%", padding: "6px 10px", border: "1.5px solid #e8e4dc", borderRadius: 8, fontFamily: "'DM Sans', sans-serif", fontSize: 12, outline: "none", boxSizing: "border-box" }} />
-                </div>
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 7 }}>
                   <div>
                     <div style={{ fontSize: 9, fontWeight: 700, color: "#bbb", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 4 }}>Start</div>
@@ -3743,11 +3739,6 @@ function LookbookViewer({ lookbook, outfits, allItems, closetItems, onClose, onU
             {openAccordions.event && (
               <div style={{ padding: "12px 16px 14px", display: "flex", flexDirection: "column", gap: 10 }}>
                 <div>
-                  <div style={{ fontSize: 9, fontWeight: 700, color: "#bbb", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 4 }}>Name</div>
-                  <input value={lbName} onChange={e => setLbName(e.target.value)} onBlur={() => save()}
-                    style={{ width: "100%", padding: "6px 10px", border: "1.5px solid #e8e4dc", borderRadius: 8, fontFamily: "'DM Sans', sans-serif", fontSize: 12, outline: "none", boxSizing: "border-box" }} />
-                </div>
-                <div>
                   <div style={{ fontSize: 9, fontWeight: 700, color: "#bbb", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 4 }}>Event Date</div>
                   <input type="date" value={eventDetails.eventDate} onChange={e => setEventDetails(d => ({ ...d, eventDate: e.target.value }))} onBlur={() => save()}
                     style={{ width: "100%", padding: "6px 8px", border: "1.5px solid #e8e4dc", borderRadius: 8, fontFamily: "'DM Sans', sans-serif", fontSize: 12, outline: "none", boxSizing: "border-box" }} />
@@ -3776,11 +3767,6 @@ function LookbookViewer({ lookbook, outfits, allItems, closetItems, onClose, onU
             </button>
             {openAccordions.season && (
               <div style={{ padding: "12px 16px 14px", display: "flex", flexDirection: "column", gap: 10 }}>
-                <div>
-                  <div style={{ fontSize: 9, fontWeight: 700, color: "#bbb", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 4 }}>Name</div>
-                  <input value={lbName} onChange={e => setLbName(e.target.value)} onBlur={() => save()}
-                    style={{ width: "100%", padding: "6px 10px", border: "1.5px solid #e8e4dc", borderRadius: 8, fontFamily: "'DM Sans', sans-serif", fontSize: 12, outline: "none", boxSizing: "border-box" }} />
-                </div>
                 <div>
                   <div style={{ fontSize: 9, fontWeight: 700, color: "#bbb", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 6 }}>Season</div>
                   <div style={{ display: "flex", gap: 5, flexWrap: "wrap" }}>
@@ -3839,11 +3825,6 @@ function LookbookViewer({ lookbook, outfits, allItems, closetItems, onClose, onU
             </button>
             {openAccordions.capsuleStats && (
               <div style={{ padding: "12px 16px 14px", display: "flex", flexDirection: "column", gap: 10 }}>
-                <div>
-                  <div style={{ fontSize: 9, fontWeight: 700, color: "#bbb", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 4 }}>Name</div>
-                  <input value={lbName} onChange={e => setLbName(e.target.value)} onBlur={() => save()}
-                    style={{ width: "100%", padding: "6px 10px", border: "1.5px solid #e8e4dc", borderRadius: 8, fontFamily: "'DM Sans', sans-serif", fontSize: 12, outline: "none", boxSizing: "border-box" }} />
-                </div>
                 {categoryBreakdown.length > 0 && (
                   <div>
                     <div style={{ fontSize: 9, fontWeight: 700, color: "#bbb", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 6 }}>Categories</div>
@@ -3904,11 +3885,6 @@ function LookbookViewer({ lookbook, outfits, allItems, closetItems, onClose, onU
             </button>
             {openAccordions.vibe && (
               <div style={{ padding: "12px 16px 14px", display: "flex", flexDirection: "column", gap: 10 }}>
-                <div>
-                  <div style={{ fontSize: 9, fontWeight: 700, color: "#bbb", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 4 }}>Name</div>
-                  <input value={lbName} onChange={e => setLbName(e.target.value)} onBlur={() => save()}
-                    style={{ width: "100%", padding: "6px 10px", border: "1.5px solid #e8e4dc", borderRadius: 8, fontFamily: "'DM Sans', sans-serif", fontSize: 12, outline: "none", boxSizing: "border-box" }} />
-                </div>
                 <div>
                   <div style={{ fontSize: 9, fontWeight: 700, color: "#bbb", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 4 }}>Linked Moodboard</div>
                   <select value={linkedMoodboardId || ""} onChange={e => { const mbId = e.target.value; save({ moodboardId: mbId || null }); }}

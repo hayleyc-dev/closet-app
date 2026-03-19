@@ -9475,9 +9475,21 @@ function OutfitCalendar({ outfits, calendar, onSaveCalendar, month, onMonthChang
   const nextWeek = () => { const d = new Date(weekAnchor + "T00:00:00"); d.setDate(d.getDate() + 7); setWeekAnchor(d.toISOString().slice(0, 10)); };
   const weekLabel = (() => { const s = new Date(weekDays[0] + "T00:00:00"); const e = new Date(weekDays[6] + "T00:00:00"); return s.toLocaleDateString("en-US", { month: "short", day: "numeric" }) + " – " + e.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }); })();
 
+  const prevMonthDays = new Date(year, mo, 0).getDate();
   const cells = [];
-  for (let i = 0; i < firstDay; i++) cells.push(null);
-  for (let d = 1; d <= daysInMonth; d++) cells.push(d);
+  for (let i = 0; i < firstDay; i++) {
+    const d = prevMonthDays - firstDay + 1 + i;
+    const prevMo = mo === 0 ? 11 : mo - 1;
+    const prevYr = mo === 0 ? year - 1 : year;
+    cells.push({ day: d, month: prevMo, year: prevYr, overflow: true });
+  }
+  for (let d = 1; d <= daysInMonth; d++) cells.push({ day: d, month: mo, year, overflow: false });
+  const remainder = cells.length % 7;
+  if (remainder !== 0) {
+    const nextMo = mo === 11 ? 0 : mo + 1;
+    const nextYr = mo === 11 ? year + 1 : year;
+    for (let d = 1; d <= 7 - remainder; d++) cells.push({ day: d, month: nextMo, year: nextYr, overflow: true });
+  }
 
   // Season helpers
   const getSeason = (dateStr) => {
@@ -9674,39 +9686,39 @@ function OutfitCalendar({ outfits, calendar, onSaveCalendar, month, onMonthChang
 
       {/* Month Calendar grid */}
       {calView === "month" && <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 4 }}>
-        {cells.map((day, idx) => {
-          if (!day) return <div key={"blank-" + idx} />;
-          const dateStr = year + "-" + String(mo + 1).padStart(2, "0") + "-" + String(day).padStart(2, "0");
+        {cells.map((cell, idx) => {
+          const { day, month: cellMo, year: cellYr, overflow } = cell;
+          const dateStr = cellYr + "-" + String(cellMo + 1).padStart(2, "0") + "-" + String(day).padStart(2, "0");
           const ids = getIds(dateStr);
-          const isToday = dateStr === todayStr;
+          const isToday = !overflow && dateStr === todayStr;
           const isPast = dateStr < todayStr;
           const wx = getWeatherForDate(dateStr);
-          const isDragOver = dragOver === dateStr;
+          const isDragOver = !overflow && dragOver === dateStr;
           const dayEvts = eventsOnDate(dateStr);
           const seasonMark = isSeasonStart(dateStr);
           const cellOutfit = ids.length > 0 ? outfits.find(x => x.id === ids[0]) : null;
           const isEmptyFuture = ids.length === 0 && !isPast;
 
           return (
-            <div key={dateStr}
-              draggable={!!cellOutfit}
-              onDragStart={cellOutfit ? () => { setDraggingInfo({ outfitId: ids[0], fromDate: dateStr }); } : undefined}
-              onDragEnd={cellOutfit ? () => setDraggingInfo(null) : undefined}
-              onClick={() => { setDayPopup(dateStr); setDayPopupTab(0); setShowDayAdd(false); setDayAddSearch(""); }}
-              onDragOver={e => { e.preventDefault(); setDragOver(dateStr); }}
-              onDragLeave={() => setDragOver(null)}
-              onDrop={e => { e.preventDefault(); setDragOver(null); if (draggingInfo) { moveOutfitToDay(draggingInfo.outfitId, draggingInfo.fromDate, dateStr); setDraggingInfo(null); } }}
+            <div key={dateStr + (overflow ? "-ov" : "")}
+              draggable={!overflow && !!cellOutfit}
+              onDragStart={!overflow && cellOutfit ? () => { setDraggingInfo({ outfitId: ids[0], fromDate: dateStr }); } : undefined}
+              onDragEnd={!overflow && cellOutfit ? () => setDraggingInfo(null) : undefined}
+              onClick={overflow ? undefined : () => { setDayPopup(dateStr); setDayPopupTab(0); setShowDayAdd(false); setDayAddSearch(""); }}
+              onDragOver={overflow ? undefined : e => { e.preventDefault(); setDragOver(dateStr); }}
+              onDragLeave={overflow ? undefined : () => setDragOver(null)}
+              onDrop={overflow ? undefined : e => { e.preventDefault(); setDragOver(null); if (draggingInfo) { moveOutfitToDay(draggingInfo.outfitId, draggingInfo.fromDate, dateStr); setDraggingInfo(null); } }}
               style={{
                 borderRadius: 8,
-                border: isToday ? "2px solid #1a1a1a" : isDragOver ? "1.5px dashed #2d6a3f" : "1px solid #ede9e2",
-                background: isDragOver ? "#f0faf4" : isEmptyFuture ? "#fff" : cellOutfit ? "#f5f3ef" : "#fff",
-                cursor: "pointer", aspectRatio: "3/4", overflow: "hidden", position: "relative",
+                border: overflow ? "1px solid #f5f3ef" : isToday ? "2px solid #1a1a1a" : isDragOver ? "1.5px dashed #2d6a3f" : "1px solid #ede9e2",
+                background: overflow ? "#faf9f7" : isDragOver ? "#f0faf4" : isEmptyFuture ? "#fff" : cellOutfit ? "#f5f3ef" : "#fff",
+                cursor: overflow ? "default" : "pointer", aspectRatio: "3/4", overflow: "hidden", position: "relative",
                 transition: "box-shadow 0.12s",
-                opacity: isPast ? 0.55 : 1,
-                filter: isPast ? "saturate(0.45)" : "none",
+                opacity: overflow ? 0.32 : isPast ? 0.55 : 1,
+                filter: overflow ? "none" : isPast ? "saturate(0.45)" : "none",
               }}
-              onMouseEnter={e => { setHoveredDay(dateStr); e.currentTarget.style.boxShadow = "0 2px 10px rgba(0,0,0,0.08)"; if(isPast) e.currentTarget.style.opacity="0.8"; }}
-              onMouseLeave={e => { setHoveredDay(null); e.currentTarget.style.boxShadow = "none"; if(isPast) e.currentTarget.style.opacity="0.55"; }}
+              onMouseEnter={overflow ? undefined : e => { setHoveredDay(dateStr); e.currentTarget.style.boxShadow = "0 2px 10px rgba(0,0,0,0.08)"; if(isPast) e.currentTarget.style.opacity="0.8"; }}
+              onMouseLeave={overflow ? undefined : e => { setHoveredDay(null); e.currentTarget.style.boxShadow = "none"; if(isPast) e.currentTarget.style.opacity="0.55"; }}
             >
               {/* Outfit image — absolutely fills cell (works because cell has aspectRatio) */}
               {cellOutfit?.previewImage && (
@@ -9714,16 +9726,16 @@ function OutfitCalendar({ outfits, calendar, onSaveCalendar, month, onMonthChang
               )}
 
               {/* Linen texture for unplanned future days */}
-              {isEmptyFuture && !isDragOver && (
+              {!overflow && isEmptyFuture && !isDragOver && (
                 <div style={{ position: "absolute", inset: 0, backgroundImage: "repeating-linear-gradient(45deg, transparent, transparent 3px, rgba(0,0,0,0.018) 3px, rgba(0,0,0,0.018) 6px)", zIndex: 1 }} />
               )}
 
               {/* Season start marker */}
-              {seasonMark && <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 2, background: SEASON_COLORS[seasonMark], zIndex: 4 }} />}
-              {seasonMark && <div style={{ position: "absolute", top: 2, left: "50%", transform: "translateX(-50%)", background: SEASON_COLORS[seasonMark], color: "#fff", fontSize: 6, fontWeight: 800, padding: "1px 4px", borderRadius: "0 0 4px 4px", zIndex: 4, whiteSpace: "nowrap", fontFamily: "'DM Sans', sans-serif", textTransform: "uppercase", letterSpacing: "0.05em" }}>{seasonMark}</div>}
+              {!overflow && seasonMark && <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 2, background: SEASON_COLORS[seasonMark], zIndex: 4 }} />}
+              {!overflow && seasonMark && <div style={{ position: "absolute", top: 2, left: "50%", transform: "translateX(-50%)", background: SEASON_COLORS[seasonMark], color: "#fff", fontSize: 6, fontWeight: 800, padding: "1px 4px", borderRadius: "0 0 4px 4px", zIndex: 4, whiteSpace: "nowrap", fontFamily: "'DM Sans', sans-serif", textTransform: "uppercase", letterSpacing: "0.05em" }}>{seasonMark}</div>}
 
               {/* Custom marker bars */}
-              {markersOnDate(dateStr).map((mk, mki) => {
+              {!overflow && markersOnDate(dateStr).map((mk, mki) => {
                 const topOff = (seasonMark ? 12 : 0) + mki * 10;
                 return (<>
                   <div key={mk.id + "_bar"} onClick={e => { e.stopPropagation(); openEditMarker(mk); }} style={{ position: "absolute", top: topOff, left: 0, right: 0, height: 2, background: mk.color, zIndex: 4, cursor: "pointer" }} />
@@ -9735,7 +9747,7 @@ function OutfitCalendar({ outfits, calendar, onSaveCalendar, month, onMonthChang
               {ids.length > 1 && <div style={{ position: "absolute", top: 4, right: 4, background: "rgba(26,26,26,0.7)", color: "#fff", borderRadius: 8, padding: "1px 5px", fontSize: 7, fontWeight: 800, fontFamily: "'DM Sans', sans-serif", zIndex: 5 }}>+{ids.length - 1}</div>}
 
               {/* Event pills — visible even on empty days */}
-              {dayEvts.length > 0 && (
+              {!overflow && dayEvts.length > 0 && (
                 <div style={{ position: "absolute", bottom: ids.length > 0 ? 0 : 18, left: 0, right: 0, zIndex: 5 }}>
                   {dayEvts.slice(0, 2).map(ev => (
                     <div key={ev.id} onClick={e => { e.stopPropagation(); openEditEvent(ev); }}
@@ -9768,7 +9780,7 @@ function OutfitCalendar({ outfits, calendar, onSaveCalendar, month, onMonthChang
                 <div style={{ flex: 1 }} />
 
                 {/* Outfit name — hover only, as gradient fade */}
-                {ids.length > 0 && hoveredDay === dateStr && (
+                {!overflow && ids.length > 0 && hoveredDay === dateStr && (
                   <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, padding: "5px 6px", background: "#fff", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 4, pointerEvents: "auto" }} onClick={e => e.stopPropagation()}>
                     <div style={{ flex: 1, fontSize: 7, color: "#1a1a1a", fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontFamily: "'DM Sans', sans-serif" }}>
                       {outfits.find(o=>o.id===ids[0])?.name || ""}
@@ -9777,7 +9789,7 @@ function OutfitCalendar({ outfits, calendar, onSaveCalendar, month, onMonthChang
                   </div>
                 )}
                 {/* Empty hint */}
-                {ids.length === 0 && !isPast && (
+                {!overflow && ids.length === 0 && !isPast && (
                   <div style={{ fontSize: 14, color: "#d8d2ca", textAlign: "center", lineHeight: 1 }}>+</div>
                 )}
               </div>

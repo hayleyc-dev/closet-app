@@ -6566,7 +6566,7 @@ function BulkListModal({ items, search, setSearch, selected, setSelected, platfo
     setSelected(next);
   };
   return (
-    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", zIndex: 99999, display: "flex", alignItems: "center", justifyContent: "center" }}
+    <div style={{ position: "fixed", inset: 0, zIndex: 99999, display: "flex", alignItems: "center", justifyContent: "center" }}
       onClick={onClose}>
       <div onClick={e => e.stopPropagation()} style={{ background: "#fff", borderRadius: 22, width: "min(720px, 95vw)", maxHeight: "86vh", display: "flex", flexDirection: "column", boxShadow: "0 20px 60px rgba(0,0,0,0.2)", fontFamily: "'DM Sans', sans-serif" }}>
         {/* Header */}

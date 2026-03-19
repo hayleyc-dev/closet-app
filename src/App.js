@@ -11814,19 +11814,36 @@ export default function App() {
                   </div>
                 </div>
                 <div style={{ background: "#fff", borderRadius: 16, border: "1px solid #ece8e0", padding: "18px 16px", marginBottom: 12 }}>
-                  <div style={{ fontSize: 10, fontWeight: 700, color: "#c0b8b0", textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 10 }}>Board Type</div>
-                  {["All", "Pinned", "Linked", "Unlinked"].map(typeLabel => (
-                    <button key={typeLabel} className={"sidebar-btn" + (moodboardStatusFilter === typeLabel ? " active" : "")} onClick={() => setMoodboardStatusFilter(typeLabel)}>{typeLabel}</button>
-                  ))}
-                </div>
-                <div style={{ background: "#fff", borderRadius: 16, border: "1px solid #ece8e0", padding: "18px 16px", marginBottom: 12 }}>
                   <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
                     <div style={{ fontSize: 10, fontWeight: 700, color: "#c0b8b0", textTransform: "uppercase", letterSpacing: "0.1em" }}>Tags</div>
                     {moodboardTagFilter !== "All" && <button onClick={() => setMoodboardTagFilter("All")} style={{ fontSize: 10, color: "#aaa", background: "none", border: "none", cursor: "pointer", fontFamily: "'DM Sans', sans-serif", fontWeight: 600 }}>Clear</button>}
                   </div>
-                  {["All", ...[...new Set((moodboardsDb.boards || []).flatMap(b => b.tags || []).filter(Boolean))]].map(tag => (
-                    <button key={tag} className={"sidebar-btn" + (moodboardTagFilter === tag ? " active" : "")} onClick={() => setMoodboardTagFilter(tag)}>{tag}</button>
-                  ))}
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
+                    {[...new Set((moodboardsDb.boards || []).flatMap(b => b.tags || []).filter(Boolean))].map(tag => {
+                      const active = moodboardTagFilter === tag;
+                      return (
+                        <button
+                          key={tag}
+                          onClick={() => setMoodboardTagFilter(active ? "All" : tag)}
+                          style={{
+                            padding: "8px 16px",
+                            borderRadius: 999,
+                            border: `1.5px solid ${active ? "#1a1a1a" : "#ddd3c6"}`,
+                            background: active ? "#1a1a1a" : "#f8f6f2",
+                            color: active ? "#fff" : "#8a867f",
+                            cursor: "pointer",
+                            fontFamily: "'DM Sans', sans-serif",
+                            fontSize: 12,
+                            fontWeight: 700,
+                            lineHeight: 1,
+                            transition: "all 0.15s",
+                          }}
+                        >
+                          {tag}
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
               </>)}
             </div>

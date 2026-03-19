@@ -7196,7 +7196,7 @@ function MoodboardGridCard({ board, onPreview, onEdit, onArchive, onDelete }) {
   );
 }
 
-function MoodboardPreviewPopup({ board, onClose, onEdit }) {
+function MoodboardPreviewPopup({ board, onClose, onEdit, onGoToLookbook }) {
   const items = board?.items || [];
   // Compute bounding box of all items to scale them to fit
   const allX = items.map(it=>it.x||0);
@@ -7216,16 +7216,47 @@ function MoodboardPreviewPopup({ board, onClose, onEdit }) {
     <div onClick={onClose} style={{position:"fixed",inset:0,zIndex:1000,background:"rgba(0,0,0,0.6)",display:"flex",alignItems:"center",justifyContent:"center",padding:24}}>
       <div onClick={e=>e.stopPropagation()} style={{background:board?.bg||"#f5f3ef",borderRadius:20,overflow:"hidden",boxShadow:"0 24px 80px rgba(0,0,0,0.28)",display:"flex",flexDirection:"column",maxWidth:"90vw",maxHeight:"90vh"}}>
         {/* Header */}
-        <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"14px 18px",background:"rgba(255,255,255,0.85)",borderBottom:"1px solid rgba(0,0,0,0.08)",backdropFilter:"blur(8px)"}}>
-          <div style={{fontSize:15,fontWeight:700,color:"#1a1a1a"}}>{board?.name||"Untitled Board"}</div>
-          <div style={{display:"flex",gap:8,alignItems:"center"}}>
-            <button onClick={onEdit} style={{padding:"6px 14px",background:"#1a1a1a",color:"#fff",border:"none",borderRadius:8,cursor:"pointer",fontSize:12,fontWeight:700,fontFamily:"'DM Sans',sans-serif",display:"flex",alignItems:"center",gap:6}}>
-              <SvgEdit size={11} color="#fff" />Edit Board
-            </button>
-            <button onClick={onClose} style={{width:30,height:30,borderRadius:8,background:"rgba(0,0,0,0.08)",border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#666" strokeWidth="2.5" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-            </button>
+        <div style={{padding:"14px 18px 12px",background:"rgba(255,255,255,0.88)",borderBottom:"1px solid rgba(0,0,0,0.08)",backdropFilter:"blur(8px)"}}>
+          <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:(board?.palette?.length||board?.linkedLb)?10:0}}>
+            <div style={{fontSize:15,fontWeight:700,color:"#1a1a1a"}}>{board?.name||"Untitled Board"}</div>
+            <div style={{display:"flex",gap:8,alignItems:"center"}}>
+              <button onClick={onEdit} style={{padding:"6px 14px",background:"#1a1a1a",color:"#fff",border:"none",borderRadius:8,cursor:"pointer",fontSize:12,fontWeight:700,fontFamily:"'DM Sans',sans-serif",display:"flex",alignItems:"center",gap:6}}>
+                <SvgEdit size={11} color="#fff" />Edit Board
+              </button>
+              <button onClick={onClose} style={{width:30,height:30,borderRadius:8,background:"rgba(0,0,0,0.08)",border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#666" strokeWidth="2.5" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+              </button>
+            </div>
           </div>
+          {/* Palette + lookbook row */}
+          {(board?.palette?.length > 0 || board?.linkedLb) && (
+            <div style={{display:"flex",alignItems:"center",gap:12,flexWrap:"wrap"}}>
+              {board?.palette?.length > 0 && (
+                <div style={{display:"flex",alignItems:"center",gap:0}}>
+                  {board.palette.map((color, i) => (
+                    <div key={i} style={{
+                      width:18, height:18, borderRadius:"50%", background:color,
+                      border:"2px solid #fff", outline:"1px solid rgba(0,0,0,0.08)",
+                      marginLeft: i===0 ? 0 : -5, zIndex: board.palette.length - i,
+                      position:"relative",
+                    }} />
+                  ))}
+                </div>
+              )}
+              {board?.linkedLb && (
+                <button onClick={()=>onGoToLookbook&&onGoToLookbook(board.linkedLb)} style={{
+                  display:"flex",alignItems:"center",gap:5,padding:"3px 10px 3px 7px",
+                  background:"#f0faf4",border:"1px solid #b6e8c8",borderRadius:20,
+                  cursor:onGoToLookbook?"pointer":"default",fontFamily:"'DM Sans',sans-serif",
+                  fontSize:11,fontWeight:700,color:"#2d6a3f",
+                }}>
+                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M2 3h6a4 4 0 014 4v14a3 3 0 00-3-3H2z"/><path d="M22 3h-6a4 4 0 00-4 4v14a3 3 0 013-3h7z"/></svg>
+                  {board.linkedLb.name||"Lookbook"}
+                </button>
+              )}
+            </div>
+          )}
+        </div>
         </div>
         {/* Canvas preview */}
         <div style={{overflow:"auto",flex:1}}>
@@ -7271,7 +7302,7 @@ function MoodboardPreviewPopup({ board, onClose, onEdit }) {
   );
 }
 
-function Moodboard({ closetItems = [], activeIdx, setActiveIdx, boards: boardsProp, updateBoards, removeBoardById, mbView = "grid", setMbView, mbSearch = "", mbTagFilter = "All" }) {
+function Moodboard({ closetItems = [], activeIdx, setActiveIdx, boards: boardsProp, updateBoards, removeBoardById, mbView = "grid", setMbView, mbSearch = "", mbTagFilter = "All", onGoToLookbook }) {
   const closetItemsForMoodboard = closetItems;
   // Use prop-based boards (Supabase-backed) if provided, else fall back to localStorage
   const STORAGE_KEY = "wardrobe_moodboards_v1";
@@ -7541,6 +7572,7 @@ function Moodboard({ closetItems = [], activeIdx, setActiveIdx, boards: boardsPr
             board={mbPreviewBoard}
             onClose={()=>setMbPreviewBoard(null)}
             onEdit={()=>{ const idx=boards.findIndex(x=>x.id===mbPreviewBoard.id); if(idx>=0){setActiveIdx(idx);setMbView&&setMbView("canvas");} setMbPreviewBoard(null); }}
+            onGoToLookbook={onGoToLookbook}
           />
         )}
         {boards.length === 0 ? (
@@ -11934,7 +11966,8 @@ export default function App() {
             {tab === "seller" && <SellerDashboard itemsDb={itemsDb} allClosetItems={itemsDb.rows.filter(i => !i.forSale)} onViewItem={(item) => setItemDetail(item)} />}
 
             {/* MOODBOARD */}
-            {tab === "moodboard" && <Moodboard closetItems={itemsDb.rows.filter(i => !i.forSale)} activeIdx={moodboardActiveIdx} setActiveIdx={setMoodboardActiveIdx} boards={moodboardsDb.boards} updateBoards={moodboardsDb.updateBoards} removeBoardById={moodboardsDb.removeBoardById} mbView={moodboardView} setMbView={setMoodboardView} mbSearch={moodboardSearch} mbTagFilter={moodboardTagFilter} />}
+            {tab === "moodboard" && <Moodboard closetItems={itemsDb.rows.filter(i => !i.forSale)} activeIdx={moodboardActiveIdx} setActiveIdx={setMoodboardActiveIdx} boards={moodboardsDb.boards} updateBoards={moodboardsDb.updateBoards} removeBoardById={moodboardsDb.removeBoardById} mbView={moodboardView} setMbView={setMoodboardView} mbSearch={moodboardSearch} mbTagFilter={moodboardTagFilter}
+              onGoToLookbook={(lb) => { const fresh = lookbooksDb.rows.find(r=>r.id===lb.id)||lb; setActiveLookbookView("editorial"); setTab("lookbooks"); setActiveLookbook(fresh); }} />}
 
             {/* SETTINGS */}
             {tab === "settings" && <SettingsTab

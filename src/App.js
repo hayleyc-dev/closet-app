@@ -6899,6 +6899,7 @@ function BulkPriceModal({ items, selected, setSelected, discountPct, setDiscount
 // ── Moodboard ─────────────────────────────────────────────────────────────────
 function MoodboardPreviewSurface({ board, compact = false }) {
   const items = (board?.items || []).filter(Boolean);
+  const previewAspect = compact ? 1.6 : 1.7;
   if (items.length === 0) {
     return (
       <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column", gap: 8, color: "#cfc7bc" }}>
@@ -6913,9 +6914,11 @@ function MoodboardPreviewSurface({ board, compact = false }) {
   const minY = Math.min(...items.map(item => item.y || 0));
   const maxX = Math.max(...items.map(item => (item.x || 0) + (item.w || 120)));
   const maxY = Math.max(...items.map(item => (item.y || 0) + (item.h || 120)));
-  const contentW = Math.max(620, maxX - minX + padding * 2);
-  const contentH = Math.max(760, maxY - minY + padding * 2);
-  const outerAspect = compact ? 1.2 : 4 / 5;
+  const rawW = Math.max(620, maxX - minX + padding * 2);
+  const rawH = Math.max(460, maxY - minY + padding * 2);
+  const contentW = Math.max(rawW, rawH * previewAspect);
+  const contentH = Math.max(rawH, contentW / previewAspect);
+  const outerAspect = previewAspect;
   const boardAspect = contentW / contentH;
   const fitByWidth = boardAspect > outerAspect;
 
@@ -7012,7 +7015,7 @@ function MoodboardPreviewChip({ board, onClick, compact = false, showOpenButton 
         e.currentTarget.style.boxShadow = compact ? "0 2px 10px rgba(0,0,0,0.04)" : "0 8px 28px rgba(0,0,0,0.05)";
       }}
     >
-      <div style={{ position: "relative", aspectRatio: compact ? "1.2 / 1" : "4 / 5", background: board?.bg || "#ffffff" }}>
+      <div style={{ position: "relative", aspectRatio: compact ? "16 / 10" : "17 / 10", background: board?.bg || "#ffffff" }}>
         {board?.pinned && (
           <div style={{ position: "absolute", top: 10, right: 12, zIndex: 3, fontSize: 13, color: "#f0c840" }}>★</div>
         )}
@@ -11751,7 +11754,7 @@ export default function App() {
           {tab !== "home" && <div className="app-layout">
 
         {/* ── LEFT SIDEBAR (closet + outfits + lookbooks + moodboard) ── */}
-        {(tab === "closet" || tab === "outfits" || tab === "lookbooks" || tab === "moodboard") && (
+        {(tab === "closet" || tab === "outfits" || tab === "lookbooks" || (tab === "moodboard" && !isMoodboardEditing)) && (
           <div className="app-left-sidebar">
             <div className="closet-sidebar" style={{ position: "sticky", top: 80 }}>
               {tab === "closet" && (<>

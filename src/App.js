@@ -11022,7 +11022,7 @@ export default function App() {
     lookbooks: ["Lookbooks", ""],
     stats: ["Style Profile", "Your wardrobe in focus"],
     moodboard: ["Moodboard", ""],
-    seller: ["Seller Dashboard", "What's for sale"],
+    seller: ["Seller Dashboard", ""],
     wishlist: ["Wishlist", ""],
     settings: ["Settings", "Customize your wardrobe"],
   };

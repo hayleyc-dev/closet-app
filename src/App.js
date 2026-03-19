@@ -12308,77 +12308,56 @@ export default function App() {
         </div>
 
         {/* ── Link Calendar Event ── */}
-        {calendarEvents.length > 0 && (
-          <div style={{ marginBottom: 14 }}>
-            <label style={{ display: "block", fontSize: 11, fontWeight: 600, color: "#999", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 6 }}>Link Calendar Event</label>
-            <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
-              {calendarEvents.map(ev => {
-                const sel = newLbCalEventId === ev.id;
-                const fmtD = d => d ? new Date(d + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : "";
-                return (
-                  <div key={ev.id}
-                    onClick={() => {
-                      if (sel) {
-                        setNewLbCalEventId("");
-                        if (newLbDateStart === ev.startDate) setNewLbDateStart("");
-                        if (newLbDateEnd === ev.endDate) setNewLbDateEnd("");
-                      } else {
-                        setNewLbCalEventId(ev.id);
-                        if (ev.startDate) setNewLbDateStart(ev.startDate);
-                        if (ev.endDate) setNewLbDateEnd(ev.endDate);
-                        if (!newLbName.trim()) setNewLbName(ev.name);
-                      }
-                    }}
-                    style={{ display: "flex", alignItems: "center", gap: 10, padding: "9px 12px", borderRadius: 12, border: sel ? "1.5px solid #1a1a1a" : "1.5px solid #e8e4dc", background: sel ? "#f5f3ef" : "#fafaf8", cursor: "pointer", transition: "all 0.12s" }}>
-                    <div style={{ width: 18, height: 18, borderRadius: "50%", border: "2px solid", borderColor: sel ? "#1a1a1a" : "#ccc", background: sel ? "#1a1a1a" : "transparent", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>
-                      {sel && <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>}
-                    </div>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontSize: 13, fontWeight: 700, color: "#1a1a1a", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{ev.name}</div>
-                      {(ev.startDate || ev.endDate) && (
-                        <div style={{ fontSize: 11, color: "#aaa", marginTop: 1 }}>
-                          {[fmtD(ev.startDate), fmtD(ev.endDate)].filter(Boolean).join(" \u2013 ")}
-                        </div>
-                      )}
-                    </div>
-                    {ev.type && <div style={{ fontSize: 10, fontWeight: 700, color: "#bbb", background: "#f0ece4", borderRadius: 6, padding: "2px 7px", flexShrink: 0 }}>{ev.type}</div>}
-                  </div>
-                );
-              })}
+        <div style={{ marginBottom: 14 }}>
+          <label style={{ display: "block", fontSize: 11, fontWeight: 600, color: "#999", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 6 }}>Link Calendar Event</label>
+          {calendarEvents.length === 0 ? (
+            <div style={{ padding: "10px 12px", background: "#faf9f6", borderRadius: 10, border: "1.5px solid #f0ece4" }}>
+              <div style={{ fontSize: 12, color: "#bbb", fontWeight: 600 }}>No events yet</div>
+              <div style={{ fontSize: 11, color: "#ccc", marginTop: 2 }}>Add events in the Outfits tab → Calendar view.</div>
             </div>
-            {newLbCalEventId && <div style={{ fontSize: 11, color: "#888", marginTop: 5 }}>&#10003; Dates auto-filled from event. You can adjust them above.</div>}
-          </div>
-        )}
+          ) : (
+            <>
+              <select value={newLbCalEventId} onChange={e => {
+                const id = e.target.value;
+                setNewLbCalEventId(id);
+                if (!id) return;
+                const ev = calendarEvents.find(x => x.id === id);
+                if (ev) {
+                  if (ev.startDate) setNewLbDateStart(ev.startDate);
+                  if (ev.endDate) setNewLbDateEnd(ev.endDate);
+                  if (!newLbName.trim()) setNewLbName(ev.name);
+                }
+              }} style={{ ...inputStyle, color: newLbCalEventId ? "#1a1a1a" : "#aaa" }}>
+                <option value="">— None —</option>
+                {calendarEvents.map(ev => {
+                  const fmtD = d => d ? new Date(d + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" }) : "";
+                  const dateRange = [fmtD(ev.startDate), fmtD(ev.endDate)].filter(Boolean).join("–");
+                  return <option key={ev.id} value={ev.id}>{ev.name}{dateRange ? ` (${dateRange})` : ""}</option>;
+                })}
+              </select>
+              {newLbCalEventId && <div style={{ fontSize: 11, color: "#888", marginTop: 5 }}>&#10003; Dates auto-filled. You can still adjust them above.</div>}
+            </>
+          )}
+        </div>
 
         {/* ── Link Moodboard ── */}
-        {moodboardsDb.boards.length > 0 && (
-          <div style={{ marginBottom: 14 }}>
-            <label style={{ display: "block", fontSize: 11, fontWeight: 600, color: "#999", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 6 }}>Link Moodboard</label>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6 }}>
-              {moodboardsDb.boards.map(b => {
-                const sel = newLbMoodboardId === b.id;
-                const thumb = b.items?.[0]?.src || null;
-                return (
-                  <div key={b.id}
-                    onClick={() => setNewLbMoodboardId(sel ? "" : b.id)}
-                    style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 10px", borderRadius: 10, border: sel ? "1.5px solid #1a1a1a" : "1.5px solid #e8e4dc", background: sel ? "#f5f3ef" : "#fafaf8", cursor: "pointer", transition: "all 0.12s" }}>
-                    {thumb ? (
-                      <div style={{ width: 28, height: 28, borderRadius: 6, background: `url(${thumb}) center/cover`, flexShrink: 0 }} />
-                    ) : (
-                      <div style={{ width: 28, height: 28, borderRadius: 6, background: "#e8e4dc", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>
-                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#aaa" strokeWidth="2" strokeLinecap="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>
-                      </div>
-                    )}
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontSize: 12, fontWeight: 700, color: sel ? "#1a1a1a" : "#555", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{b.name || "Untitled Board"}</div>
-                    </div>
-                    {sel && <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#1a1a1a" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>}
-                  </div>
-                );
-              })}
+        <div style={{ marginBottom: 14 }}>
+          <label style={{ display: "block", fontSize: 11, fontWeight: 600, color: "#999", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 6 }}>Link Moodboard</label>
+          {moodboardsDb.boards.length === 0 ? (
+            <div style={{ padding: "10px 12px", background: "#faf9f6", borderRadius: 10, border: "1.5px solid #f0ece4" }}>
+              <div style={{ fontSize: 12, color: "#bbb", fontWeight: 600 }}>No boards yet</div>
+              <div style={{ fontSize: 11, color: "#ccc", marginTop: 2 }}>Create one in the Moodboard tab first.</div>
             </div>
-          </div>
-        )}
+          ) : (
+            <select value={newLbMoodboardId} onChange={e => setNewLbMoodboardId(e.target.value)}
+              style={{ ...inputStyle, color: newLbMoodboardId ? "#1a1a1a" : "#aaa" }}>
+              <option value="">— None —</option>
+              {moodboardsDb.boards.map(b => (
+                <option key={b.id} value={b.id}>{b.name || "Untitled Board"}</option>
+              ))}
+            </select>
+          )}
+        </div>
 
         {outfitsDb.rows.length > 0 && (
           <div style={{ marginBottom: 18 }}>

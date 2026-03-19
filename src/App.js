@@ -10566,6 +10566,25 @@ function GoogleLogo() {
   );
 }
 
+function BrandIcon({ size = 40, radius = 12, style = {} }) {
+  return (
+    <img
+      src="/icon.svg?v=4"
+      alt="HC Closet"
+      width={size}
+      height={size}
+      style={{
+        width: size,
+        height: size,
+        borderRadius: radius,
+        display: "block",
+        objectFit: "cover",
+        ...style,
+      }}
+    />
+  );
+}
+
 function LoginScreen({ onAuth }) {
   const hasPassword = !!localStorage.getItem(PW_HASH_KEY);
   const [mode, setMode] = useState(hasPassword ? "login" : "setup");
@@ -10631,13 +10650,7 @@ function LoginScreen({ onAuth }) {
         background: "#fff", borderRadius: 20, padding: "48px 40px", width: 360,
         boxShadow: "0 8px 40px rgba(0,0,0,0.10)", display: "flex", flexDirection: "column", alignItems: "center",
       }}>
-        {/* Monogram */}
-        <div style={{
-          width: 52, height: 52, borderRadius: 14, background: "#1a1a1a",
-          display: "flex", alignItems: "center", justifyContent: "center",
-          fontFamily: "'Cormorant Garamond', serif", fontStyle: "italic", fontWeight: 300,
-          fontSize: 22, color: "#fff", letterSpacing: 1, marginBottom: 20,
-        }}>HC</div>
+        <BrandIcon size={52} radius={14} style={{ marginBottom: 20, boxShadow: "0 8px 24px rgba(0,0,0,0.08)" }} />
 
         <div style={{ fontFamily: "'Cormorant Garamond', serif", fontStyle: "italic", fontWeight: 300, fontSize: 26, color: "#1a1a1a", marginBottom: 6 }}>
           {mode === "setup" ? "Create a password" : "Welcome back"}
@@ -11221,19 +11234,7 @@ export default function App() {
       {/* ── Vertical nav sidebar ── */}
       <nav className="app-nav-sidebar" style={{ background: activeTheme.nav, borderRightColor: activeTheme.border }}>
         <div className="app-nav-logo" style={{ background: "transparent" }}>
-          <div style={{
-            width: 40, height: 40,
-            borderRadius: 12,
-            background: "linear-gradient(135deg, #2a2a2a 0%, #444 100%)",
-            display: "flex", alignItems: "center", justifyContent: "center",
-            fontFamily: "'Cormorant Garamond', serif",
-            fontStyle: "italic",
-            fontWeight: 300,
-            fontSize: 15,
-            letterSpacing: "0.05em",
-            color: "rgba(255,255,255,0.88)",
-            userSelect: "none",
-          }}>HC</div>
+          <BrandIcon size={40} radius={12} />
         </div>
         {NAV_ITEMS.map(n => {
           const active = tab === n.id;

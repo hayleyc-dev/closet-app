@@ -87,6 +87,7 @@ const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 const CATEGORIES = ["All", "Accessories", "Activewear", "Bags", "Denim", "Dresses", "Intimates", "Jewelry", "Knits", "Loungewear", "Outerwear", "Shoes", "Shorts + Skirts", "Sleepwear", "Socks + Tights", "Sweaters", "Swim", "Tops", "Trousers"];
 const COLORS = ["Black", "Blue", "Brown", "Clear", "Cream", "Gold", "Green", "Grey", "Orange", "Pink", "Purple", "Red", "Silver", "Tan", "White", "Yellow"];
+const MOODBOARD_TAGS = ["Inspiration", "Planning", "Travel", "Seasonal", "Wishlist", "Archive"];
 const COLOR_HEX = { Black:"#1a1a1a", Blue:"#4a7fc1", Brown:"#8b6250", Clear:"#e8e8e8", Cream:"#f5f0e8", Gold:"#d4a843", Green:"#5a8f5a", Grey:"#9a9a9a", Orange:"#e8823a", Pink:"#f0a0b8", Purple:"#9b72cf", Red:"#d45050", Silver:"#c0c0c0", Tan:"#c8a882", White:"#f8f8f8", Yellow:"#e8d050" };
 
 function getColorSwatch(name) {
@@ -7271,7 +7272,7 @@ function MoodboardInfoPanel({ activeIdx, setActiveIdx, boards: boardsProp, updat
         <div>
           <label style={{display:"block",fontSize:10,fontWeight:700,color:"#aaa",textTransform:"uppercase",letterSpacing:"0.08em",marginBottom:5}}>Tags</label>
           <div style={{display:"flex",flexWrap:"wrap",gap:4}}>
-            {["Inspiration","Planning","Travel","Seasonal","Wishlist","Archive"].map(tag => {
+            {MOODBOARD_TAGS.map(tag => {
               const active = (board.tags||[]).includes(tag);
               return (
                 <button key={tag} onClick={() => {
@@ -11822,7 +11823,7 @@ export default function App() {
                     {moodboardTagFilter !== "All" && <button onClick={() => setMoodboardTagFilter("All")} style={{ fontSize: 10, color: "#aaa", background: "none", border: "none", cursor: "pointer", fontFamily: "'DM Sans', sans-serif", fontWeight: 600 }}>Clear</button>}
                   </div>
                   <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
-                    {[...new Set((moodboardsDb.boards || []).flatMap(b => b.tags || []).filter(Boolean))].map(tag => {
+                    {MOODBOARD_TAGS.map(tag => {
                       const active = moodboardTagFilter === tag;
                       return (
                         <button

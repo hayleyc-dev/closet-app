@@ -12409,8 +12409,39 @@ export default function App() {
           )}
         </div>
 
-        {/* ── RIGHT PANEL (closet / outfits only) ── */}
-        {["closet","outfits"].includes(tab) && <div className="app-right-panel" style={{ top: 24 }}>
+        {/* ── RIGHT PANEL (closet / outfits / moodboard canvas) ── */}
+        {(["closet","outfits"].includes(tab) || (tab === "moodboard" && isMoodboardEditing)) && <div className="app-right-panel" style={{ top: 24 }}>
+
+          {/* Moodboard board info (canvas mode only) */}
+          {tab === "moodboard" && <MoodboardInfoPanel
+            activeIdx={moodboardActiveIdx} setActiveIdx={setMoodboardActiveIdx}
+            boards={moodboardsDb.boards} updateBoards={moodboardsDb.updateBoards} updateBoardById={moodboardsDb.updateBoardById} removeBoardById={moodboardsDb.removeBoardById}
+            closetItems={itemsDb.rows}
+            isEditing={isMoodboardEditing}
+            setIsEditing={setIsMoodboardEditing}
+            lookbooksDb={lookbooksDb.rows}
+            createLookbook={async ({id: newId, name, moodboardId}) => {
+              const lbId = newId || uid();
+              const newLb = { id: lbId, name, notes: "", coverImage: "", dateStart: "", dateEnd: "", outfitIds: [], lookMeta: {}, moodboardId, type: "inspiration" };
+              let { error } = await supabase.from("lookbooks").insert({ id: lbId, data: newLb });
+              if (error) ({ error } = await supabase.from("lookbooks").insert(newLb));
+              await lookbooksDb.refresh();
+            }}
+            addMoodboardToLookbook={async (lookbookId, board) => {
+              const lb = lookbooksDb.rows.find(l => l.id === lookbookId);
+              if (!lb) return;
+              const updated = { ...lb, moodboardId: board.id };
+              await lookbooksDb.update(updated);
+              setActiveLookbook(updated);
+            }}
+            onGoToLookbook={(lb) => {
+              const fresh = lookbooksDb.rows.find(r => r.id === lb.id);
+              const withMb = { ...(fresh || lb), moodboardId: lb.moodboardId || fresh?.moodboardId };
+              setActiveLookbookView("moodboard");
+              setTab("lookbooks");
+              setActiveLookbook(withMb);
+            }}
+          />}
 
           {tab === "outfits" && (() => {
             const todayKey = new Date().toISOString().slice(0, 10);

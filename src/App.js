@@ -8930,19 +8930,18 @@ function HomeTab({ outfitCalendar, outfitsDb, itemsDb, lookbooksDb, wishlistDb, 
   const todayOutfits = todayIds.map(id => outfitsDb.rows.find(o => o.id === id)).filter(Boolean);
 
   const pinnedLookbooks = lookbooksDb.rows.filter(lb => lb.pinned);
-
   const allItems = itemsDb.rows;
-
   const closetItems = allItems.filter(i => !i.forSale);
-  const parsePrice  = (p) => parseFloat((p || "").replace(/[^0-9.]/g, "")) || 0;
-  const totalValue  = closetItems.reduce((s, i) => s + parsePrice(i.price), 0);
-  const totalWears  = closetItems.reduce((s, i) => s + (i.wornCount || 0), 0);
+  const parsePrice = (p) => parseFloat((p || "").replace(/[^0-9.]/g, "")) || 0;
+  const totalValue = closetItems.reduce((s, i) => s + parsePrice(i.price), 0);
   const unwornCount = closetItems.filter(i => !(i.wornCount > 0)).length;
-  const missingImageCount = closetItems.filter(i => !i.image).length;
-  const cpwItems    = closetItems.filter(i => (i.wornCount || 0) > 0 && parsePrice(i.price) > 0);
+  const wornItems = closetItems.filter(i => (i.wornCount || 0) > 0);
+  const wornPct = closetItems.length > 0 ? Math.round(wornItems.length / closetItems.length * 100) : 0;
+  const cpwItems = closetItems.filter(i => (i.wornCount || 0) > 0 && parsePrice(i.price) > 0);
   const EXPECTED_CATS = ["Tops", "Trousers", "Dresses", "Outerwear", "Shoes", "Bags", "Accessories"];
   const catsPresent = new Set(closetItems.map(i => i.category || ""));
   const missingCatCount = EXPECTED_CATS.filter(c => !catsPresent.has(c)).length;
+  const totalWears = closetItems.reduce((s, i) => s + (i.wornCount || 0), 0);
   const healthScore = closetItems.length === 0 ? 0 : Math.min(100, Math.round(
     Math.min((totalWears / closetItems.length) * 20, 40) +
     Math.max(0, 30 - missingCatCount * 5) +
@@ -8951,23 +8950,49 @@ function HomeTab({ outfitCalendar, outfitsDb, itemsDb, lookbooksDb, wishlistDb, 
   const healthColor = healthScore >= 80 ? "#3aaa6e" : healthScore >= 60 ? "#2090c0" : healthScore >= 40 ? "#a07000" : "#e05555";
   const healthLabel = healthScore >= 80 ? "Thriving" : healthScore >= 60 ? "Healthy" : healthScore >= 40 ? "Growing" : "Needs Love";
 
-  const highPriorityWish = wishlistDb.rows.filter(i => i.priority === "high").slice(0, 3);
-  const highPriorityWishCount = wishlistDb.rows.filter(i => i.priority === "high").length;
+  // Monthly budget
+  const monthlyBudget = (() => { try { return parseFloat(localStorage.getItem("wardrobe_monthly_budget") || "") || 0; } catch { return 0; } })();
+  const thisMonthStart = new Date(now.getFullYear(), now.getMonth(), 1).getTime();
+  const monthlySpend = closetItems.reduce((s, i) => {
+    const d = new Date(i.purchaseDate || i.created_at || 0).getTime();
+    return d >= thisMonthStart ? s + parsePrice(i.price) : s;
+  }, 0);
 
-  // ── New In (added to closet in last 30 days) ─────────────────────────────
+  // Wear again suggestion
+  const wearAgainItem = useMemo(() => {
+    const sixtyDaysAgo = Date.now() - 60 * 24 * 60 * 60 * 1000;
+    const candidates = closetItems.filter(i => {
+      if (!i.image) return false;
+      if (!(i.wornCount > 0)) return true;
+      const lastWorn = new Date(i.lastWornDate || 0).getTime();
+      return lastWorn > 0 && lastWorn < sixtyDaysAgo;
+    });
+    if (candidates.length === 0) return null;
+    return candidates[Math.floor(Math.random() * candidates.length)];
+  }, []); // eslint-disable-line
+
+  // New In
   const thirtyDaysAgo = Date.now() - 30 * 24 * 60 * 60 * 1000;
   const newInItems = closetItems
-    .filter(i => {
-      const d = new Date(i.created_at || i.purchaseDate || 0).getTime();
-      return d >= thirtyDaysAgo;
-    })
+    .filter(i => { const d = new Date(i.created_at || i.purchaseDate || 0).getTime(); return d >= thirtyDaysAgo; })
     .sort((a, b) => new Date(b.created_at || b.purchaseDate || 0) - new Date(a.created_at || a.purchaseDate || 0))
-    .slice(0, 20);
+    .slice(0, 8);
+
+  // Seller stats
+  const sellerItems = allItems.filter(i => i.forSale || i.status === "listed" || i.status === "sold" || i.status === "pending");
+  const sellerListed = sellerItems.filter(i => (i.status === "listed" || i.forSale) && i.status !== "sold").length;
+  const sellerSold = sellerItems.filter(i => i.status === "sold").length;
+  const sellerPending = sellerItems.filter(i => i.status === "pending").length;
+  const sellerEarned = sellerItems.filter(i => i.status === "sold").reduce((s, i) => s + parsePrice(i.netRevenue || i.salePrice), 0);
+  const sellerPotential = sellerItems.filter(i => i.status !== "sold").reduce((s, i) => s + parsePrice(i.salePrice || i.price), 0);
+  const hasSeller = sellerItems.length > 0;
+
+  const highPriorityWish = wishlistDb.rows.filter(i => i.priority === "high").slice(0, 4);
 
   const fmtDate = (d) => d ? new Date(d + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" }) : null;
   const cardStyle = { background: "#fff", borderRadius: 16, border: "1.5px solid #e8e4dc", overflow: "hidden", boxShadow: "0 2px 12px rgba(0,0,0,0.04)" };
 
-  // ── Weather ──────────────────────────────────────────────────────────────
+  // Weather
   const homeCity = homeCityProp || "";
   const setHomeCity = (c) => { if (setHomeCityProp) setHomeCityProp(c); };
   const [homeCityInput, setHomeCityInput] = useState(homeCity);
@@ -8976,7 +9001,7 @@ function HomeTab({ outfitCalendar, outfitsDb, itemsDb, lookbooksDb, wishlistDb, 
   const [wxLoading, setWxLoading] = useState(false);
 
   const fetchHomeWeather = useCallback(async (city) => {
-    if (!city || homeWeatherProp) return; // skip if parent is handling it
+    if (!city || homeWeatherProp) return;
     setWxLoading(true);
     const q = city.split(",")[0].trim();
     try {
@@ -9010,12 +9035,11 @@ function HomeTab({ outfitCalendar, outfitsDb, itemsDb, lookbooksDb, wishlistDb, 
   const todayWx = homeWeather?.days?.find(d => d.date === todayKey);
   const [hoveredTodayId, setHoveredTodayId] = useState(null);
 
-  // ── Calendar peek — today + next 6 days ──────────────────────────────────
+  // Week strip
   const weekDays = (() => {
     const days = [];
     for (let i = 0; i < 7; i++) {
-      const d = new Date(now);
-      d.setDate(d.getDate() + i);
+      const d = new Date(now); d.setDate(d.getDate() + i);
       const key = d.toISOString().slice(0, 10);
       const ids = (() => { const v = outfitCalendar[key] || []; return Array.isArray(v) ? v : v ? [v] : []; })();
       days.push({ key, date: d, ids, isToday: i === 0 });
@@ -9024,492 +9048,343 @@ function HomeTab({ outfitCalendar, outfitsDb, itemsDb, lookbooksDb, wishlistDb, 
   })();
   const weekLogged = weekDays.filter(d => d.ids.length > 0).length;
 
-  // ── Upcoming trips ────────────────────────────────────────────────────────
+  // Upcoming trips
   const todayMidnight = new Date(todayKey + "T00:00:00");
   const upcomingTrips = lookbooksDb.rows
     .filter(lb => lb.dateStart || lb.dateEnd)
     .map(lb => {
       const start = lb.dateStart ? new Date(lb.dateStart + "T00:00:00") : null;
-      const end   = lb.dateEnd   ? new Date(lb.dateEnd   + "T00:00:00") : null;
+      const end = lb.dateEnd ? new Date(lb.dateEnd + "T00:00:00") : null;
       const daysUntil = start ? Math.round((start - todayMidnight) / 86400000) : null;
-      const isActive  = (start && start <= todayMidnight && end && end >= todayMidnight) ||
-                        (!start && end && end >= todayMidnight);
+      const isActive = (start && start <= todayMidnight && end && end >= todayMidnight) || (!start && end && end >= todayMidnight);
       return { ...lb, daysUntil, isActive };
     })
     .filter(lb => lb.isActive || (lb.daysUntil !== null && lb.daysUntil >= 0))
     .sort((a, b) => (a.isActive ? -1 : b.isActive ? 1 : (a.daysUntil || 0) - (b.daysUntil || 0)))
     .slice(0, 3);
 
-  // ── Packing progress ──────────────────────────────────────────────────────
-  const packCheckedAll = useMemo(() => {
-    try { return JSON.parse(localStorage.getItem("wardrobe_pack_checked_v1") || "{}"); } catch { return {}; }
-  }, []);
-
+  const packCheckedAll = useMemo(() => { try { return JSON.parse(localStorage.getItem("wardrobe_pack_checked_v1") || "{}"); } catch { return {}; } }, []);
   const getPackProgress = (lb) => {
     const lbOutfits = (lb.outfitIds || []).map(id => outfitsDb.rows.find(o => o.id === id)).filter(Boolean);
     const seen = {};
-    lbOutfits.forEach(o => (o.layers || o.itemIds || []).forEach(id => {
-      const item = allItems.find(i => i.id === id);
-      if (item) seen[id] = item;
-    }));
+    lbOutfits.forEach(o => (o.layers || o.itemIds || []).forEach(id => { const item = allItems.find(i => i.id === id); if (item) seen[id] = item; }));
     const items = Object.values(seen);
     const checked = packCheckedAll[lb.id] || {};
     return { total: items.length, packed: Object.keys(checked).filter(k => checked[k]).length };
   };
 
-  const heroCardStyle = {
-    background: "linear-gradient(135deg, #f6f1ea 0%, #efe6db 52%, #e7dccf 100%)",
-    borderRadius: 24,
-    border: "1px solid #e7ddd1",
-    padding: 24,
-    color: "#1a1a1a",
-    boxShadow: "0 10px 28px rgba(76,58,35,0.08)",
-    position: "relative",
-    overflow: "hidden",
-  };
-  const heroAccentStyle = {
-    position: "absolute",
-    inset: "auto -40px -60px auto",
-    width: 180,
-    height: 180,
-    borderRadius: "50%",
-    background: "radial-gradient(circle, rgba(168,140,106,0.18), rgba(255,255,255,0))",
-    pointerEvents: "none",
-  };
-
-  let primaryAction = {
-    title: "Plan today's outfit",
-    body: "Start with one look for today so Home has something to anchor the rest of the week around.",
-    cta: "Open Outfits",
-    onClick: () => setTab("outfits"),
-  };
-
-  if (todayOutfits.length > 0) {
-    primaryAction = {
-      title: todayOutfits.length > 1 ? "Today's looks are ready" : "Today's outfit is ready",
-      body: todayOutfits.length > 1
-        ? `${todayOutfits.length} outfits are planned for today. Open them to compare or make a final pick.`
-        : `You already planned ${todayOutfits[0].name || "a look"} for today. Open it to tweak details or log wear.`,
-      cta: "Open Today's Outfit",
-      onClick: () => setOutfitPopup(todayOutfits[0]),
-    };
-  } else if (upcomingTrips[0]) {
-    const trip = upcomingTrips[0];
-    primaryAction = {
-      title: trip.isActive ? `${trip.name} is happening now` : `${trip.name} is coming up`,
-      body: trip.isActive
-        ? "Your trip lookbook is active. Double-check outfits and packing progress before you head out."
-        : trip.daysUntil <= 3
-          ? `This trip starts ${trip.daysUntil === 0 ? "today" : trip.daysUntil === 1 ? "tomorrow" : `in ${trip.daysUntil} days`}.`
-          : "A trip is on the horizon, which is a good excuse to tighten your packing plan now.",
-      cta: "Open Trip Lookbook",
-      onClick: () => { setActiveLookbookView("editorial"); setActiveLookbook(trip); setTab("lookbooks"); },
-    };
-  } else if (weekLogged < 3) {
-    primaryAction = {
-      title: "Your week is still open",
-      body: `Only ${weekLogged} of 7 days have looks logged right now. Planning ahead here will make the rest of Home feel a lot smarter.`,
-      cta: "Fill This Week",
-      onClick: () => setTab("outfits"),
-    };
-  }
-
-  const focusStats = [
-    { label: "Week logged", value: `${weekLogged}/7` },
-    { label: "Closet items", value: closetItems.length },
-    { label: "Need attention", value: unwornCount + missingImageCount },
-  ];
-
-  const homeTasks = [
-    {
-      id: "unworn",
-      label: "Never worn",
-      value: unwornCount,
-      note: unwornCount === 0 ? "Everything has been worn at least once." : "Style or sell the pieces you still haven't reached for.",
-      tone: unwornCount === 0 ? "#3aaa6e" : "#a07000",
-      bg: unwornCount === 0 ? "#f2fbf6" : "#fbf6eb",
-      border: unwornCount === 0 ? "#cdebd8" : "#eadcb6",
-      onClick: () => setTab("stats"),
-    },
-    {
-      id: "photos",
-      label: "Missing photos",
-      value: missingImageCount,
-      note: missingImageCount === 0 ? "Every closet item has a photo." : "Photos make Home, search, and outfit building feel much richer.",
-      tone: missingImageCount === 0 ? "#3aaa6e" : "#2090c0",
-      bg: missingImageCount === 0 ? "#f2fbf6" : "#eef7fc",
-      border: missingImageCount === 0 ? "#cdebd8" : "#cde4ef",
-      onClick: () => setTab("closet"),
-    },
-    {
-      id: "wishlist",
-      label: "High-priority wishes",
-      value: highPriorityWishCount,
-      note: highPriorityWishCount === 0 ? "Nothing urgent on your wishlist." : "Keep only the pieces you still genuinely want to hunt down.",
-      tone: highPriorityWishCount === 0 ? "#3aaa6e" : "#e05555",
-      bg: highPriorityWishCount === 0 ? "#f2fbf6" : "#fff3f3",
-      border: highPriorityWishCount === 0 ? "#cdebd8" : "#f2caca",
-      onClick: () => setTab("wishlist"),
-    },
-  ];
-
-  const EditorialSectionHeader = ({ eyebrow, title, subtitle, action }) => (
-    <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 16, marginBottom: 16, flexWrap: "wrap" }}>
+  const EH = ({ eyebrow, title, action }) => (
+    <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 16, marginBottom: 16 }}>
       <div>
-        {eyebrow && (
-          <div style={{ fontSize: 10, fontWeight: 700, color: "#b8aea1", textTransform: "uppercase", letterSpacing: "0.14em", marginBottom: 4 }}>
-            {eyebrow}
-          </div>
-        )}
-        <div style={{ fontFamily: "'Cormorant Garamond', serif", fontStyle: "italic", fontWeight: 300, fontSize: 30, color: "#1a1a1a", lineHeight: 1 }}>
-          {title}
-        </div>
-        {subtitle && (
-          <div style={{ fontSize: 12, color: "#9f978b", marginTop: 6, lineHeight: 1.5 }}>
-            {subtitle}
-          </div>
-        )}
+        {eyebrow && <div style={{ fontSize: 10, fontWeight: 700, color: "#b8aea1", textTransform: "uppercase", letterSpacing: "0.14em", marginBottom: 4 }}>{eyebrow}</div>}
+        <div style={{ fontFamily: "’Cormorant Garamond’, serif", fontStyle: "italic", fontWeight: 300, fontSize: 26, color: "#1a1a1a", lineHeight: 1 }}>{title}</div>
       </div>
-      {action && (
-        <button onClick={action.onClick} style={{ fontSize: 12, fontWeight: 700, color: "#8f8679", background: "none", border: "none", cursor: "pointer", fontFamily: "'DM Sans', sans-serif", padding: 0, letterSpacing: "0.04em" }}>
-          {action.label}
-        </button>
-      )}
+      {action && <button onClick={action.onClick} style={{ fontSize: 11, color: "#9f978b", background: "none", border: "none", cursor: "pointer", fontFamily: "’DM Sans’, sans-serif", padding: 0, flexShrink: 0 }}>{action.label}</button>}
     </div>
   );
 
   return (
-    <div className="app-layout fade-up">
-      <div className="app-left-sidebar">
-        <div className="closet-sidebar" style={{ position: "sticky", top: 24, display: "flex", flexDirection: "column", gap: 14 }}>
-          <div className="right-card" style={{ borderRadius: 18, padding: "16px 14px" }}>
-            <div style={{ fontSize: 10, fontWeight: 700, color: "#b8aea1", textTransform: "uppercase", letterSpacing: "0.14em", marginBottom: 8 }}>Home</div>
-            <div style={{ fontFamily: "'Cormorant Garamond', serif", fontStyle: "italic", fontWeight: 300, fontSize: 28, color: "#1a1a1a", lineHeight: 1.05, marginBottom: 6 }}>
-              {greeting}
-            </div>
-            <div style={{ fontSize: 12, color: "#9f978b", lineHeight: 1.5 }}>{dayName}, {dateLabel}</div>
-            <div style={{ display: "grid", gap: 8, marginTop: 14, paddingTop: 12, borderTop: "1px solid #f1ece5" }}>
-              {focusStats.map(stat => (
-                <div key={stat.label} style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 8 }}>
-                  <span style={{ fontSize: 11, color: "#9f978b", fontWeight: 600 }}>{stat.label}</span>
-                  <span style={{ fontSize: 16, fontWeight: 800, color: "#1a1a1a" }}>{stat.value}</span>
-                </div>
-              ))}
-            </div>
-          </div>
+    <div className="fade-up" style={{ maxWidth: 900, margin: "0 auto", padding: "0 40px 80px" }}>
 
-          <div className="right-card" style={{ borderRadius: 18, padding: "14px" }}>
-            <div style={{ fontSize: 10, fontWeight: 700, color: "#b8aea1", textTransform: "uppercase", letterSpacing: "0.14em", marginBottom: 10 }}>Weather</div>
-            {homeWeather?.days && todayWx ? (
-              <>
-                <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
-                  <div style={{ fontSize: 24, lineHeight: 1 }}>{wxIcon(todayWx.code)}</div>
-                  <div>
-                    <div style={{ fontSize: 22, fontWeight: 800, color: "#1a1a1a", lineHeight: 1 }}>{todayWx.high}°</div>
-                    <div style={{ fontSize: 11, color: "#aaa", fontWeight: 600 }}>{todayWx.low}° low</div>
+      {/* ── Hero: greeting + weather ── */}
+      <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 24, marginBottom: 6, paddingTop: 4 }}>
+        <div>
+          <div style={{ fontFamily: "’Cormorant Garamond’, serif", fontStyle: "italic", fontWeight: 300, fontSize: 56, color: "#1a1a1a", lineHeight: 0.9, marginBottom: 12 }}>{greeting}</div>
+          <div style={{ fontSize: 13, color: "#9f978b", fontWeight: 500 }}>{dayName}, {dateLabel}</div>
+        </div>
+        <div style={{ flexShrink: 0, paddingTop: 10 }}>
+          {homeWeather?.days && todayWx ? (
+            <div style={{ textAlign: "right" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, justifyContent: "flex-end", marginBottom: 6 }}>
+                <span style={{ fontSize: 22 }}>{wxIcon(todayWx.code)}</span>
+                <span style={{ fontSize: 30, fontWeight: 800, color: "#1a1a1a", lineHeight: 1 }}>{todayWx.high}°</span>
+                <span style={{ fontSize: 13, color: "#bbb", fontWeight: 600 }}>{todayWx.low}°</span>
+              </div>
+              <div style={{ fontSize: 11, color: "#b8aea1", fontWeight: 600, marginBottom: 8 }}>{homeWeather.city}</div>
+              <div style={{ display: "flex", gap: 14, justifyContent: "flex-end" }}>
+                {homeWeather.days.slice(1, 4).map(d => (
+                  <div key={d.date} style={{ textAlign: "center" }}>
+                    <div style={{ fontSize: 9, color: "#ccc", fontWeight: 700 }}>{new Date(d.date + "T00:00:00").toLocaleDateString("en-US", { weekday: "short" })}</div>
+                    <div style={{ fontSize: 13 }}>{wxIcon(d.code)}</div>
+                    <div style={{ fontSize: 10, fontWeight: 700, color: "#aaa" }}>{d.high}°</div>
                   </div>
-                </div>
-                <div style={{ fontSize: 11, color: "#888", fontWeight: 600, marginBottom: 10 }}>{homeWeather.city}</div>
-                <div style={{ display: "grid", gap: 6 }}>
-                  {homeWeather.days.slice(1, 4).map(d => (
-                    <div key={d.date} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", fontSize: 11 }}>
-                      <span style={{ color: "#888", fontWeight: 700 }}>{new Date(d.date + "T00:00:00").toLocaleDateString("en-US", { weekday: "short" })}</span>
-                      <span style={{ color: "#666" }}>{wxIcon(d.code)} {d.high}°</span>
-                    </div>
-                  ))}
-                </div>
-              </>
-            ) : (
-              <form onSubmit={e => { e.preventDefault(); const c = homeCityInput.trim(); if (!c) return; setHomeCity(c); try { localStorage.setItem("wardrobe_home_city", c); } catch {} fetchHomeWeather(c); }} style={{ display: "grid", gap: 8 }}>
-                <input value={homeCityInput} onChange={e => setHomeCityInput(e.target.value)} placeholder="City for weather" style={{ width: "100%", padding: "9px 11px", borderRadius: 10, border: "1.5px solid #e8e4dc", fontSize: 12, fontFamily: "'DM Sans', sans-serif", background: "#fff", color: "#1a1a1a", outline: "none" }} />
-                <button type="submit" disabled={wxLoading} style={{ padding: "9px 12px", borderRadius: 10, background: "#1a1a1a", border: "none", color: "#fff", fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: "'DM Sans', sans-serif", opacity: wxLoading ? 0.6 : 1 }}>
-                  {wxLoading ? "Loading…" : "Set City"}
-                </button>
-              </form>
+                ))}
+              </div>
+            </div>
+          ) : (
+            <form onSubmit={e => { e.preventDefault(); const c = homeCityInput.trim(); if (!c) return; setHomeCity(c); try { localStorage.setItem("wardrobe_home_city", c); } catch {} fetchHomeWeather(c); }} style={{ display: "flex", gap: 8 }}>
+              <input value={homeCityInput} onChange={e => setHomeCityInput(e.target.value)} placeholder="Add your city for weather…" style={{ width: 200, padding: "8px 12px", borderRadius: 10, border: "1.5px solid #e8e4dc", fontSize: 12, fontFamily: "’DM Sans’, sans-serif", outline: "none" }} />
+              <button type="submit" disabled={wxLoading} style={{ padding: "8px 14px", borderRadius: 10, background: "#1a1a1a", border: "none", color: "#fff", fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: "’DM Sans’, sans-serif", opacity: wxLoading ? 0.6 : 1 }}>{wxLoading ? "…" : "Go"}</button>
+            </form>
+          )}
+        </div>
+      </div>
+
+      {/* ── Snapshot bar ── */}
+      <div style={{ display: "flex", alignItems: "center", gap: 0, paddingBottom: 28, borderBottom: "1px solid #f0ece4", marginBottom: 44 }}>
+        {[`${closetItems.length} items`, `$${totalValue.toFixed(0)} value`, `${wornPct}% worn`].map((s, i) => (
+          <span key={s} style={{ fontSize: 12, color: "#c0b8af", fontWeight: 500 }}>
+            {i > 0 && <span style={{ margin: "0 8px", color: "#e0dbd4" }}>·</span>}
+            {s}
+          </span>
+        ))}
+        <button onClick={() => setTab("stats")} style={{ marginLeft: "auto", fontSize: 11, color: "#9f978b", background: "none", border: "none", cursor: "pointer", fontFamily: "’DM Sans’, sans-serif", padding: 0 }}>View profile →</button>
+      </div>
+
+      {/* ── Trip countdown ── */}
+      {upcomingTrips[0] && (() => {
+        const trip = upcomingTrips[0];
+        const countdown = trip.isActive ? "Active now" : trip.daysUntil === 0 ? "Today" : trip.daysUntil === 1 ? "Tomorrow" : `in ${trip.daysUntil} days`;
+        const pack = getPackProgress(trip);
+        const packPct = pack.total > 0 ? Math.round(pack.packed / pack.total * 100) : 0;
+        return (
+          <div onClick={() => { setActiveLookbookView("editorial"); setActiveLookbook(trip); setTab("lookbooks"); }}
+            style={{ display: "flex", alignItems: "center", gap: 14, padding: "13px 18px", background: "#f8f5f0", borderRadius: 14, border: "1.5px solid #ece7de", cursor: "pointer", marginBottom: 44 }}>
+            <span style={{ fontSize: 16 }}>✈</span>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <span style={{ fontFamily: "’Cormorant Garamond’, serif", fontStyle: "italic", fontSize: 16, color: "#1a1a1a", fontWeight: 300 }}>{trip.name}</span>
+              <span style={{ fontSize: 12, color: "#9f978b", marginLeft: 10 }}>{countdown}</span>
+              {pack.total > 0 && <span style={{ fontSize: 11, color: "#c0b8af", marginLeft: 8 }}>· {pack.packed}/{pack.total} packed</span>}
+            </div>
+            {pack.total > 0 && (
+              <div style={{ width: 80, height: 3, borderRadius: 2, background: "#e0d9cf", flexShrink: 0, overflow: "hidden" }}>
+                <div style={{ height: "100%", borderRadius: 2, background: packPct === 100 ? "#3aaa6e" : "#1a1a1a", width: `${packPct}%` }} />
+              </div>
             )}
           </div>
-        </div>
-      </div>
+        );
+      })()}
 
-      <div className="app-main">
-        <div style={{ marginBottom: 28 }}>
-          <div style={heroCardStyle}>
-            <div style={heroAccentStyle} />
-            <div style={{ position: "relative" }}>
-              <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", color: "#a59584", marginBottom: 10 }}>
-                Today at a glance
-              </div>
-              <div style={{ fontFamily: "'Cormorant Garamond', serif", fontStyle: "italic", fontWeight: 300, fontSize: 42, lineHeight: 0.98, marginBottom: 10, color: "#1f1a17" }}>
-                {primaryAction.title}
-              </div>
-              <div style={{ maxWidth: 640, fontSize: 14, lineHeight: 1.7, color: "#6f6559", marginBottom: 18 }}>
-                {primaryAction.body}
-              </div>
-              <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-                <button onClick={primaryAction.onClick} style={{ padding: "11px 16px", borderRadius: 12, border: "1px solid #d8ccbd", background: "#fffaf5", color: "#1a1a1a", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "'DM Sans', sans-serif" }}>
-                  {primaryAction.cta}
-                </button>
-                <button onClick={() => setTab("closet")} style={{ padding: "11px 16px", borderRadius: 12, border: "1px solid #ddd2c5", background: "rgba(255,255,255,0.55)", color: "#6f6559", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "'DM Sans', sans-serif" }}>
-                  Browse Closet
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div style={{ marginBottom: 28 }}>
-          <EditorialSectionHeader eyebrow="Daily Dressing" title="Today's Outfit" subtitle="A focused place for the look that sets the tone for the rest of the day." />
-          {todayOutfits.length === 0 ? (
-            <div style={{ ...cardStyle, padding: "22px 20px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16, flexWrap: "wrap" }}>
-              <div>
-                <div style={{ fontSize: 14, fontWeight: 700, color: "#1a1a1a", marginBottom: 4 }}>No outfit planned today</div>
-                <div style={{ fontSize: 12, color: "#aaa" }}>What are you wearing?</div>
-              </div>
-              <button onClick={() => setTab("outfits")} style={{ fontSize: 13, fontWeight: 600, color: "#888", background: "#f5f3ef", border: "none", borderRadius: 10, padding: "8px 14px", cursor: "pointer", fontFamily: "'DM Sans', sans-serif" }}>
-                Plan one →
-              </button>
-            </div>
-          ) : (
-            <div style={{ display: "grid", gridTemplateColumns: todayOutfits.length > 1 ? "1.2fr 0.8fr" : "1fr", gap: 14 }}>
-              {todayOutfits.slice(0, 2).map((outfit, idx) => {
-                const layerIds = outfit.layers || outfit.itemIds || [];
-                const thumbItems = layerIds.slice(0, 4).map(id => allItems.find(x => x.id === id)).filter(Boolean);
-                const isHov = hoveredTodayId === outfit.id;
-                return (
-                  <div key={outfit.id} onClick={() => setOutfitPopup(outfit)}
-                    onMouseEnter={() => setHoveredTodayId(outfit.id)}
-                    onMouseLeave={() => setHoveredTodayId(null)}
-                    className="card"
-                    style={{ cursor: "pointer", borderRadius: 18, overflow: "hidden", border: "1.5px solid #e8e4dc", aspectRatio: idx === 0 ? "16/11" : "4/5", position: "relative", background: "#f5f3ef", boxShadow: "0 2px 12px rgba(0,0,0,0.04)" }}>
-                    {outfit.previewImage ? (
-                      <img src={outfit.previewImage} alt={outfit.name} style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
-                    ) : (
-                      <div style={{ position: "absolute", inset: 0, display: "grid", gridTemplateColumns: "1fr 1fr" }}>
-                        {[0,1,2,3].map(qi => {
-                          const it = thumbItems[qi];
-                          return (
-                            <div key={qi} style={{ background: it?.image ? `url(${it.image}) center/contain no-repeat #f5f3ef` : "#f5f3ef", display: "flex", alignItems: "center", justifyContent: "center", borderRight: qi%2===0 ? "1px solid #fff" : "none", borderBottom: qi<2 ? "1px solid #fff" : "none" }}>
-                              {!it?.image && <HangerIcon size={14} color="#ddd" />}
-                            </div>
-                          );
-                        })}
-                      </div>
-                    )}
-                    {/* Weather badge — top right, always */}
-                    {todayWx && (
-                      <div style={{ position: "absolute", top: 8, right: 8, zIndex: 10, background: "rgba(255,255,255,0.92)", borderRadius: 10, padding: "4px 8px", display: "flex", alignItems: "center", gap: 4, fontSize: 11, fontWeight: 700, color: "#1a1a1a", backdropFilter: "blur(4px)" }}>
-                        <span>{wxIcon(todayWx.code)}</span>
-                        <span>{todayWx.high}°</span>
-                      </div>
-                    )}
-                    {/* Name — hover only */}
-                    {(isHov || idx === 0) && (
-                      <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, zIndex: 10, background: "linear-gradient(to top, rgba(0,0,0,0.62) 0%, transparent 100%)", padding: idx === 0 ? "42px 16px 16px" : "24px 12px 12px" }}>
-                        <div style={{ fontSize: 10, fontWeight: 700, color: "rgba(255,255,255,0.72)", textTransform: "uppercase", letterSpacing: "0.12em", marginBottom: 4 }}>{idx === 0 ? "Featured look" : "Planned look"}</div>
-                        <div style={{ fontSize: 13, fontWeight: 700, color: "#fff", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontFamily: "'DM Sans', sans-serif" }}>{outfit.name || "Untitled Outfit"}</div>
-                        {(outfit.tags || []).length > 0 && (
-                          <div style={{ display: "flex", gap: 4, flexWrap: "wrap", marginTop: 6 }}>
-                            {(outfit.tags || []).slice(0, 2).map(tag => (
-                              <span key={tag} style={{ fontSize: 9, fontWeight: 700, padding: "2px 6px", background: "rgba(255,255,255,0.18)", borderRadius: 100, color: "#fff" }}>{tag}</span>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </div>
-
-        <div style={{ marginBottom: 28 }}>
-          <div style={{ background: "#fff", borderRadius: 20, border: "1.5px solid #e8e4dc", padding: "20px 22px 0", boxShadow: "0 2px 12px rgba(0,0,0,0.04)" }}>
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 18 }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                <div style={{ width: 34, height: 34, borderRadius: "50%", background: "#f6f1ea", border: "1px solid #ece2d6", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                  <SvgCalendar size={15} color="#7e7266" />
-                </div>
-                <div>
-                  <div style={{ fontSize: 10, fontWeight: 700, color: "#b8aea1", textTransform: "uppercase", letterSpacing: "0.14em", marginBottom: 2 }}>Wardrobe Rhythm</div>
-                  <div style={{ fontFamily: "'Cormorant Garamond', serif", fontStyle: "italic", fontWeight: 300, fontSize: 27, color: "#1a1a1a", lineHeight: 1 }}>This Week</div>
-                </div>
-              </div>
-              <span style={{ fontSize: 12, fontWeight: 700, color: "#9f978b", letterSpacing: "0.04em" }}>{weekLogged}<span style={{ color: "#d9d1c8" }}>/7</span> days logged</span>
-            </div>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 8, marginBottom: 0 }}>
-              {weekDays.map(day => {
-                const outfit = day.ids.length > 0 ? outfitsDb.rows.find(o => o.id === day.ids[0]) : null;
-                const dayShort = day.date.toLocaleDateString("en-US", { weekday: "short" }).toUpperCase();
-                const dateNum = day.date.getDate();
-                return (
-                  <div key={day.key} onClick={() => setTab("outfits")} style={{ cursor: "pointer", display: "flex", flexDirection: "column", alignItems: "center", gap: 6 }}>
-                    <div style={{ fontSize: 10, fontWeight: 700, color: day.isToday ? "#1a1a1a" : "#bbb", letterSpacing: "0.06em" }}>{dayShort}</div>
-                    <div style={{ width: "100%", aspectRatio: "3/4", borderRadius: 12, border: day.isToday ? "2px dashed #1a1a1a" : "1.5px solid #e8e4dc", background: outfit?.previewImage ? `url(${outfit.previewImage}) center/cover no-repeat` : day.isToday ? "#fafaf8" : "#f5f3ef", display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden", position: "relative", transition: "transform 0.12s" }} onMouseEnter={e => e.currentTarget.style.transform = "scale(1.03)"} onMouseLeave={e => e.currentTarget.style.transform = "scale(1)"}>
-                      {!outfit?.previewImage && (outfit ? <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#888" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg> : <div style={{ width: 6, height: 6, borderRadius: "50%", background: "#ddd" }} />)}
-                      {day.ids.length > 1 && <div style={{ position: "absolute", bottom: 3, right: 3, background: "rgba(255,255,255,0.92)", borderRadius: 5, padding: "1px 4px", fontSize: 8, fontWeight: 800, color: "#1a1a1a" }}>+{day.ids.length}</div>}
-                    </div>
-                    <div style={{ fontSize: 10, color: day.isToday ? "#1a1a1a" : "#bbb", fontWeight: day.isToday ? 800 : 500 }}>{day.isToday ? "Today" : dateNum}</div>
-                  </div>
-                );
-              })}
-            </div>
-            <div style={{ padding: "12px 0 16px", textAlign: "center" }}>
-              <span style={{ fontSize: 12, color: "#bbb" }}>
-                {weekLogged === 0
-                  ? <>Log your first outfit this week from <strong style={{ color: "#888", cursor: "pointer" }} onClick={() => setTab("outfits")}>Outfits → Calendar</strong></>
-                  : weekLogged === 7
-                    ? <span style={{ color: "#3aaa6e", fontWeight: 700 }}>Perfect week!</span>
-                    : <>{weekLogged} of 7 days logged this week</>
-                }
-              </span>
-            </div>
-          </div>
-        </div>
-
-        {upcomingTrips.length > 0 && (
-          <div style={{ marginBottom: 28 }}>
-            <EditorialSectionHeader eyebrow="Travel Wardrobe" title="Upcoming Trips" subtitle="Trips and packing plans belong in the main story because they shape what you wear next." action={{ label: "All lookbooks →", onClick: () => setTab("lookbooks") }} />
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: 14 }}>
-              {upcomingTrips.map((lb, idx) => {
-                const dateStr = [fmtDate(lb.dateStart), fmtDate(lb.dateEnd)].filter(Boolean).join(" – ");
-                const pack = getPackProgress(lb);
-                const packPct = pack.total > 0 ? Math.round(pack.packed / pack.total * 100) : 0;
-                const countdown = lb.isActive ? "Active now" : lb.daysUntil === 0 ? "Today" : lb.daysUntil === 1 ? "Tomorrow" : `in ${lb.daysUntil} days`;
-                return (
-                  <div key={lb.id} className="card" onClick={() => { setActiveLookbookView("editorial"); setActiveLookbook(lb); setTab("lookbooks"); }} style={{ background: "#fff", borderRadius: 18, border: "1.5px solid #e8e4dc", cursor: "pointer", boxShadow: "0 2px 12px rgba(0,0,0,0.04)", overflow: "hidden" }}>
-                    <div style={{ aspectRatio: idx === 0 ? "16/10" : "4/3", background: lb.coverImage ? `url(${lb.coverImage}) center/cover no-repeat` : "linear-gradient(135deg, #f4ede4, #ece2d4)", position: "relative" }}>
-                      <div style={{ position: "absolute", inset: 0, background: "linear-gradient(to top, rgba(30,24,20,0.42), rgba(30,24,20,0.05))" }} />
-                      <div style={{ position: "absolute", top: 12, right: 12, fontSize: 11, fontWeight: 700, color: "#fff", letterSpacing: "0.04em", background: "rgba(255,255,255,0.18)", borderRadius: 100, padding: "5px 9px", backdropFilter: "blur(4px)" }}>{countdown}</div>
-                      <div style={{ position: "absolute", left: 14, bottom: 14, right: 14 }}>
-                        <div style={{ fontSize: 10, fontWeight: 700, color: "rgba(255,255,255,0.72)", textTransform: "uppercase", letterSpacing: "0.12em", marginBottom: 4 }}>Travel Edit</div>
-                        <div style={{ fontSize: 20, fontWeight: 700, color: "#fff", lineHeight: 1.1 }}>{lb.name}</div>
-                        {dateStr && <div style={{ fontSize: 11, color: "rgba(255,255,255,0.76)", fontWeight: 600, marginTop: 4 }}>{dateStr}</div>}
-                      </div>
-                    </div>
-                    <div style={{ padding: "14px 16px 16px" }}>
-                      {pack.total > 0 && (
-                        <>
-                          <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 5 }}>
-                            <span style={{ fontSize: 10, fontWeight: 700, color: "#aaa", textTransform: "uppercase", letterSpacing: "0.06em" }}>Packing</span>
-                            <span style={{ fontSize: 10, fontWeight: 700, color: packPct === 100 ? "#3aaa6e" : "#888" }}>{pack.packed}/{pack.total}</span>
-                          </div>
-                          <div style={{ height: 4, borderRadius: 4, background: "#f0ece4", overflow: "hidden" }}>
-                            <div style={{ height: "100%", borderRadius: 4, background: packPct === 100 ? "#3aaa6e" : "#1a1a1a", width: `${packPct}%` }} />
-                          </div>
-                        </>
-                      )}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        )}
-
-        <div style={{ marginBottom: 28 }}>
-          <EditorialSectionHeader eyebrow="Closet Edit" title="Needs Attention" subtitle="Maintenance belongs in the middle when it’s actionable, not tucked away in a rail." />
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 12 }}>
-            {homeTasks.map(task => (
-              <button key={task.id} onClick={task.onClick} className="card" style={{ textAlign: "left", background: "#fff", borderRadius: 16, border: "1.5px solid #ece8e0", padding: "14px 14px 13px", cursor: "pointer", fontFamily: "'DM Sans', sans-serif", boxShadow: "0 2px 10px rgba(0,0,0,0.03)" }}>
-                <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 12, marginBottom: 8 }}>
-                  <div style={{ fontSize: 10, fontWeight: 800, letterSpacing: "0.08em", textTransform: "uppercase", color: "#b8aea1" }}>{task.label}</div>
-                  <div style={{ fontSize: 24, fontWeight: 800, color: task.tone, lineHeight: 1 }}>{task.value}</div>
-                </div>
-                <div style={{ fontSize: 12, color: "#8f8679", lineHeight: 1.5 }}>{task.note}</div>
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {newInItems.length > 0 && (
-          <div style={{ marginBottom: 36 }}>
-            <EditorialSectionHeader eyebrow="Recent Arrivals" title="New In" subtitle="Pieces added in the last 30 days, still fresh enough to shape your current style mood." action={{ label: "View all →", onClick: () => setTab("closet") }} />
-            <div style={{ display: "grid", gridTemplateColumns: "1.2fr 0.8fr 0.8fr", gap: 14 }}>
-              {newInItems.slice(0, 3).map((item, idx) => (
-                <div key={item.id} onClick={() => setTab("closet")} className="card" style={{ cursor: "pointer", borderRadius: 18, overflow: "hidden", border: "1.5px solid #e8e4dc", background: "#fff", boxShadow: "0 2px 12px rgba(0,0,0,0.04)" }}>
-                  <div style={{ aspectRatio: idx === 0 ? "16/12" : "4/5", background: item.image ? `url(${item.image}) center/cover no-repeat` : "#f0ece4", position: "relative", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                    {!item.image && <HangerIcon size={28} color="#ccc" />}
-                    {idx === 0 && (
-                      <>
-                        <div style={{ position: "absolute", inset: 0, background: "linear-gradient(to top, rgba(26,26,26,0.35), transparent)" }} />
-                        <div style={{ position: "absolute", left: 12, top: 12, background: "rgba(255,255,255,0.88)", color: "#6f6558", borderRadius: 100, padding: "5px 10px", fontSize: 10, fontWeight: 800, letterSpacing: "0.08em", textTransform: "uppercase" }}>Featured</div>
-                      </>
-                    )}
-                  </div>
-                  <div style={{ padding: idx === 0 ? "14px 14px 16px" : "12px 12px 14px" }}>
-                    <div style={{ fontSize: idx === 0 ? 16 : 12, fontWeight: 700, color: "#1a1a1a", lineHeight: 1.2 }}>{item.name || "Untitled"}</div>
-                    {item.brand && <div style={{ fontSize: 11, color: "#aaa", fontWeight: 500, marginTop: 4 }}>{item.brand}</div>}
-                    {item.price && <div style={{ fontSize: 11, fontWeight: 700, color: "#888", marginTop: 6 }}>{item.price}</div>}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-      </div>
-
-      <div className="app-right-panel" style={{ top: 24 }}>
-        <div className="right-card" style={{ borderRadius: 18, cursor: "pointer", padding: "14px 14px 12px" }} onClick={() => setTab("stats")}>
-          <SectionHeader title="Closet Health" />
-          <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12 }}>
-            <div style={{ width: 40, height: 40, borderRadius: "50%", border: `3px solid ${healthColor}`, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-              <span style={{ fontSize: 12, fontWeight: 800, color: healthColor }}>{healthScore}</span>
-            </div>
+      {/* ── Today’s Outfit ── */}
+      <div style={{ marginBottom: 44 }}>
+        <EH eyebrow="Daily Dressing" title="Today’s Outfit" action={{ label: "Outfits →", onClick: () => setTab("outfits") }} />
+        {todayOutfits.length === 0 ? (
+          <div style={{ ...cardStyle, padding: "22px 20px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16, flexWrap: "wrap" }}>
             <div>
-              <div style={{ fontSize: 13, fontWeight: 700, color: "#1a1a1a" }}>{healthLabel}</div>
-              <div style={{ fontSize: 11, color: "#aaa" }}>Style Profile</div>
+              <div style={{ fontSize: 14, fontWeight: 700, color: "#1a1a1a", marginBottom: 4 }}>No outfit planned today</div>
+              <div style={{ fontSize: 12, color: "#aaa" }}>What are you wearing?</div>
             </div>
+            <button onClick={() => setTab("outfits")} style={{ fontSize: 13, fontWeight: 600, color: "#888", background: "#f5f3ef", border: "none", borderRadius: 10, padding: "8px 14px", cursor: "pointer", fontFamily: "’DM Sans’, sans-serif" }}>Plan one →</button>
           </div>
-          <div style={{ display: "grid", gap: 8 }}>
-            {[{ label: "Total Value", value: `$${totalValue.toFixed(0)}` }, { label: "Items", value: closetItems.length }, { label: "Never Worn", value: unwornCount }].map(s => (
-              <div key={s.label} style={{ display: "flex", justifyContent: "space-between", fontSize: 12 }}>
-                <span style={{ color: "#9f978b" }}>{s.label}</span>
-                <strong style={{ color: "#1a1a1a" }}>{s.value}</strong>
+        ) : (
+          <div style={{ display: "grid", gridTemplateColumns: todayOutfits.length > 1 ? "1.4fr 0.8fr" : "1fr", gap: 14 }}>
+            {todayOutfits.slice(0, 2).map((outfit, idx) => {
+              const layerIds = outfit.layers || outfit.itemIds || [];
+              const thumbItems = layerIds.slice(0, 4).map(id => allItems.find(x => x.id === id)).filter(Boolean);
+              const isHov = hoveredTodayId === outfit.id;
+              return (
+                <div key={outfit.id} onClick={() => setOutfitPopup(outfit)}
+                  onMouseEnter={() => setHoveredTodayId(outfit.id)} onMouseLeave={() => setHoveredTodayId(null)}
+                  className="card" style={{ cursor: "pointer", borderRadius: 18, overflow: "hidden", border: "1.5px solid #e8e4dc", aspectRatio: idx === 0 ? "16/10" : "4/5", position: "relative", background: "#f5f3ef", boxShadow: "0 2px 12px rgba(0,0,0,0.04)" }}>
+                  {outfit.previewImage ? (
+                    <img src={outfit.previewImage} alt={outfit.name} style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
+                  ) : (
+                    <div style={{ position: "absolute", inset: 0, display: "grid", gridTemplateColumns: "1fr 1fr" }}>
+                      {[0,1,2,3].map(qi => {
+                        const it = thumbItems[qi];
+                        return (
+                          <div key={qi} style={{ background: it?.image ? `url(${it.image}) center/contain no-repeat #f5f3ef` : "#f5f3ef", display: "flex", alignItems: "center", justifyContent: "center", borderRight: qi%2===0 ? "1px solid #fff" : "none", borderBottom: qi<2 ? "1px solid #fff" : "none" }}>
+                            {!it?.image && <HangerIcon size={14} color="#ddd" />}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                  {todayWx && (
+                    <div style={{ position: "absolute", top: 10, right: 10, zIndex: 10, background: "rgba(255,255,255,0.92)", borderRadius: 10, padding: "4px 8px", display: "flex", alignItems: "center", gap: 4, fontSize: 11, fontWeight: 700, color: "#1a1a1a", backdropFilter: "blur(4px)" }}>
+                      <span>{wxIcon(todayWx.code)}</span><span>{todayWx.high}°</span>
+                    </div>
+                  )}
+                  {(isHov || idx === 0) && (
+                    <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, zIndex: 10, background: "linear-gradient(to top, rgba(0,0,0,0.62) 0%, transparent 100%)", padding: idx === 0 ? "40px 16px 16px" : "24px 12px 12px" }}>
+                      <div style={{ fontSize: 9, fontWeight: 700, color: "rgba(255,255,255,0.65)", textTransform: "uppercase", letterSpacing: "0.12em", marginBottom: 4 }}>{idx === 0 ? "Today’s look" : "Also planned"}</div>
+                      <div style={{ fontSize: 13, fontWeight: 700, color: "#fff", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{outfit.name || "Untitled Outfit"}</div>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      {/* ── This Week (compact) ── */}
+      <div style={{ marginBottom: 44 }}>
+        <EH eyebrow="Wardrobe Rhythm" title="This Week" action={{ label: "Calendar →", onClick: () => setTab("outfits") }} />
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 10 }}>
+          {weekDays.map(day => {
+            const outfit = day.ids.length > 0 ? outfitsDb.rows.find(o => o.id === day.ids[0]) : null;
+            const dayShort = day.date.toLocaleDateString("en-US", { weekday: "short" }).toUpperCase();
+            const dateNum = day.date.getDate();
+            return (
+              <div key={day.key} onClick={() => setTab("outfits")} style={{ cursor: "pointer", display: "flex", flexDirection: "column", alignItems: "center", gap: 5 }}>
+                <div style={{ fontSize: 9, fontWeight: 700, color: day.isToday ? "#1a1a1a" : "#ccc", letterSpacing: "0.06em" }}>{dayShort}</div>
+                <div style={{ width: "100%", aspectRatio: "3/4", borderRadius: 10, border: day.isToday ? "2px dashed #1a1a1a" : "1.5px solid #ece8e2", background: outfit?.previewImage ? `url(${outfit.previewImage}) center/cover no-repeat` : day.isToday ? "#fafaf8" : "#f8f6f2", display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden", position: "relative", transition: "transform 0.12s" }}
+                  onMouseEnter={e => e.currentTarget.style.transform = "scale(1.04)"} onMouseLeave={e => e.currentTarget.style.transform = "scale(1)"}>
+                  {!outfit?.previewImage && (outfit
+                    ? <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#bbb" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
+                    : <div style={{ width: 5, height: 5, borderRadius: "50%", background: "#e0dbd4" }} />)}
+                  {day.ids.length > 1 && <div style={{ position: "absolute", bottom: 2, right: 2, background: "rgba(255,255,255,0.92)", borderRadius: 4, padding: "1px 3px", fontSize: 7, fontWeight: 800, color: "#1a1a1a" }}>+{day.ids.length}</div>}
+                </div>
+                <div style={{ fontSize: 9, color: day.isToday ? "#1a1a1a" : "#ccc", fontWeight: day.isToday ? 800 : 500 }}>{day.isToday ? "Today" : dateNum}</div>
+              </div>
+            );
+          })}
+        </div>
+        {weekLogged === 0 && (
+          <div style={{ textAlign: "center", paddingTop: 10 }}>
+            <span style={{ fontSize: 11, color: "#ccc" }}>Log your first outfit this week from <strong style={{ color: "#aaa", cursor: "pointer" }} onClick={() => setTab("outfits")}>Outfits → Calendar</strong></span>
+          </div>
+        )}
+      </div>
+
+      {/* ── New In (horizontal scroll) ── */}
+      {newInItems.length > 0 && (
+        <div style={{ marginBottom: 44 }}>
+          <EH eyebrow="Recent Arrivals" title="New In" action={{ label: "View closet →", onClick: () => setTab("closet") }} />
+          <div style={{ display: "flex", gap: 14, overflowX: "auto", paddingBottom: 4, scrollbarWidth: "none", msOverflowStyle: "none" }}>
+            {newInItems.map((item, idx) => (
+              <div key={item.id} onClick={() => setTab("closet")} className="card" style={{ cursor: "pointer", borderRadius: 16, overflow: "hidden", border: "1.5px solid #e8e4dc", background: "#fff", flexShrink: 0, width: idx === 0 ? 200 : 150, boxShadow: "0 2px 12px rgba(0,0,0,0.04)" }}>
+                <div style={{ aspectRatio: "3/4", background: item.image ? `url(${item.image}) center/cover no-repeat` : "#f0ece4", display: "flex", alignItems: "center", justifyContent: "center", position: "relative" }}>
+                  {!item.image && <HangerIcon size={20} color="#ccc" />}
+                  {idx === 0 && <div style={{ position: "absolute", left: 8, top: 8, background: "rgba(255,255,255,0.9)", color: "#6f6558", borderRadius: 100, padding: "3px 8px", fontSize: 9, fontWeight: 800, letterSpacing: "0.08em", textTransform: "uppercase" }}>New</div>}
+                </div>
+                <div style={{ padding: "10px 12px 12px" }}>
+                  <div style={{ fontSize: 12, fontWeight: 700, color: "#1a1a1a", lineHeight: 1.2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{item.name || "Untitled"}</div>
+                  {item.price && <div style={{ fontSize: 11, color: "#aaa", marginTop: 3 }}>{item.price}</div>}
+                </div>
               </div>
             ))}
           </div>
         </div>
+      )}
 
-        <div className="right-card" style={{ borderRadius: 18, padding: "14px 14px 12px" }}>
-          <SectionHeader title="Pinned Lookbooks" action={{ label: "All →", onClick: () => setTab("lookbooks") }} />
-          {pinnedLookbooks.length === 0 ? (
-            <div style={{ fontSize: 12, color: "#aaa", lineHeight: 1.6 }}>Pin lookbooks from the Lookbooks tab.</div>
-          ) : (
-            <div style={{ display: "grid", gap: 10 }}>
-              {pinnedLookbooks.slice(0, 3).map(lb => {
-                const lbOutfits = (lb.outfitIds || []).map(id => outfitsDb.rows.find(o => o.id === id)).filter(Boolean);
-                return (
-                  <button key={lb.id} onClick={() => { setActiveLookbookView("editorial"); setActiveLookbook(lb); setTab("lookbooks"); }} className="card" style={{ textAlign: "left", padding: 0, border: "1px solid #ece8e0", background: "#fff", cursor: "pointer", fontFamily: "'DM Sans', sans-serif", borderRadius: 14, overflow: "hidden", boxShadow: "0 1px 6px rgba(0,0,0,0.03)" }}>
-                    <div style={{ width: "100%", aspectRatio: "4/3", background: lb.coverImage ? `url(${lb.coverImage}) center/cover no-repeat` : "#f5f3ef" }} />
-                    <div style={{ padding: "9px 10px 10px", borderTop: "1px solid #f5f2ee" }}>
-                      <div style={{ fontSize: 12, fontWeight: 700, color: "#1a1a1a" }}>{lb.name}</div>
-                      <div style={{ fontSize: 11, color: "#9f978b", marginTop: 2 }}>{lbOutfits.length} outfit{lbOutfits.length !== 1 ? "s" : ""}</div>
-                    </div>
-                  </button>
-                );
-              })}
-            </div>
-          )}
-        </div>
-
-        {highPriorityWish.length > 0 && (
-          <div className="right-card" style={{ borderRadius: 18, padding: "14px 14px 12px" }}>
-            <SectionHeader title="Wishlist Highlights" action={{ label: "All →", onClick: () => setTab("wishlist") }} />
-            <div style={{ display: "grid", gap: 10 }}>
-              {highPriorityWish.map(item => (
-                <div key={item.id} style={{ display: "flex", gap: 10, alignItems: "center" }}>
-                  <div style={{ width: 52, height: 60, borderRadius: 12, background: item.image ? `url(${item.image}) center/cover no-repeat` : "#f5f3ef", flexShrink: 0 }} />
-                  <div style={{ minWidth: 0 }}>
-                    <div style={{ fontSize: 12, fontWeight: 700, color: "#1a1a1a", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{item.name}</div>
-                    {item.price && <div style={{ fontSize: 11, color: "#888", marginTop: 3 }}>{item.price}</div>}
+      {/* ── Pinned Lookbooks ── */}
+      <div style={{ marginBottom: 44 }}>
+        <EH eyebrow="Collections" title="Pinned Lookbooks" action={{ label: "All lookbooks →", onClick: () => setTab("lookbooks") }} />
+        {pinnedLookbooks.length === 0 ? (
+          <div style={{ padding: "22px 20px", borderRadius: 14, border: "1.5px dashed #e0dbd2", textAlign: "center" }}>
+            <div style={{ fontSize: 12, color: "#ccc" }}>Pin lookbooks from the Lookbooks tab</div>
+          </div>
+        ) : (
+          <div style={{ display: "flex", gap: 14, overflowX: "auto", paddingBottom: 4, scrollbarWidth: "none", msOverflowStyle: "none" }}>
+            {pinnedLookbooks.map(lb => {
+              const lbOutfits = (lb.outfitIds || []).map(id => outfitsDb.rows.find(o => o.id === id)).filter(Boolean);
+              const dateStr = [fmtDate(lb.dateStart), fmtDate(lb.dateEnd)].filter(Boolean).join(" – ");
+              return (
+                <div key={lb.id} onClick={() => { setActiveLookbookView("editorial"); setActiveLookbook(lb); setTab("lookbooks"); }} className="card"
+                  style={{ cursor: "pointer", borderRadius: 16, overflow: "hidden", border: "1.5px solid #e8e4dc", background: "#fff", flexShrink: 0, width: 200, boxShadow: "0 2px 12px rgba(0,0,0,0.04)" }}>
+                  <div style={{ aspectRatio: "4/3", background: lb.coverImage ? `url(${lb.coverImage}) center/cover no-repeat` : "linear-gradient(135deg, #f4ede4, #ece2d4)", position: "relative" }}>
+                    <div style={{ position: "absolute", inset: 0, background: "linear-gradient(to top, rgba(26,26,26,0.3), transparent)" }} />
+                  </div>
+                  <div style={{ padding: "10px 12px 12px" }}>
+                    <div style={{ fontSize: 13, fontWeight: 700, color: "#1a1a1a", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{lb.name}</div>
+                    <div style={{ fontSize: 11, color: "#9f978b", marginTop: 3 }}>{lbOutfits.length} look{lbOutfits.length !== 1 ? "s" : ""}{dateStr && ` · ${dateStr}`}</div>
                   </div>
                 </div>
-              ))}
-            </div>
+              );
+            })}
           </div>
         )}
       </div>
+
+      {/* ── Wear Again ── */}
+      {wearAgainItem && (
+        <div style={{ marginBottom: 44 }}>
+          <EH eyebrow="Wardrobe Refresh" title="Wear Again" />
+          <div style={{ display: "flex", gap: 16, alignItems: "center", padding: "16px 18px", ...cardStyle, borderRadius: 16 }}>
+            <div style={{ width: 72, height: 88, borderRadius: 12, background: wearAgainItem.image ? `url(${wearAgainItem.image}) center/cover no-repeat` : "#f5f3ef", flexShrink: 0 }} />
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: 14, fontWeight: 700, color: "#1a1a1a", marginBottom: 2 }}>{wearAgainItem.name}</div>
+              <div style={{ fontSize: 11, color: "#9f978b", marginBottom: 10 }}>{wearAgainItem.category}{wearAgainItem.brand ? ` · ${wearAgainItem.brand}` : ""}</div>
+              <div style={{ display: "flex", gap: 8 }}>
+                <button onClick={() => setTab("outfits")} style={{ padding: "6px 12px", borderRadius: 8, border: "1.5px solid #e0dbd2", background: "#fff", fontSize: 11, fontWeight: 700, color: "#1a1a1a", cursor: "pointer", fontFamily: "’DM Sans’, sans-serif" }}>Wear it →</button>
+                <button onClick={() => setTab("seller")} style={{ padding: "6px 12px", borderRadius: 8, border: "none", background: "#f5f3ef", fontSize: 11, fontWeight: 700, color: "#888", cursor: "pointer", fontFamily: "’DM Sans’, sans-serif" }}>Sell it</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Seller ── */}
+      {hasSeller && (
+        <div style={{ marginBottom: 44 }}>
+          <EH eyebrow="Sales" title="Seller" action={{ label: "Go to Seller →", onClick: () => setTab("seller") }} />
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 10 }}>
+            {[
+              { label: "Listed", value: sellerListed, color: "#2090c0" },
+              { label: "Pending", value: sellerPending, color: "#a07000" },
+              { label: "Sold", value: sellerSold, color: "#3aaa6e" },
+              { label: "Earned", value: `$${sellerEarned.toFixed(0)}`, color: "#3aaa6e" },
+              { label: "Potential", value: `$${sellerPotential.toFixed(0)}`, color: "#888" },
+            ].map(s => (
+              <div key={s.label} onClick={() => setTab("seller")} className="card" style={{ ...cardStyle, borderRadius: 14, padding: "14px 12px", cursor: "pointer", textAlign: "center" }}>
+                <div style={{ fontSize: 20, fontWeight: 800, color: s.color, lineHeight: 1, marginBottom: 5 }}>{s.value}</div>
+                <div style={{ fontSize: 10, fontWeight: 700, color: "#b8aea1", textTransform: "uppercase", letterSpacing: "0.08em" }}>{s.label}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* ── Budget bar ── */}
+      {monthlyBudget > 0 && (
+        <div style={{ marginBottom: 44 }}>
+          <EH eyebrow="Spending" title="Monthly Budget" action={{ label: "Settings →", onClick: () => setTab("settings") }} />
+          <div style={{ ...cardStyle, borderRadius: 16, padding: "16px 20px" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 10 }}>
+              <span style={{ fontSize: 12, color: "#9f978b" }}>Spent this month</span>
+              <span style={{ fontSize: 13, fontWeight: 700, color: "#1a1a1a" }}>${monthlySpend.toFixed(0)} <span style={{ color: "#c0b8af", fontWeight: 400 }}>of ${monthlyBudget.toFixed(0)}</span></span>
+            </div>
+            <div style={{ height: 4, borderRadius: 3, background: "#f0ece4", overflow: "hidden" }}>
+              <div style={{ height: "100%", borderRadius: 3, background: monthlySpend > monthlyBudget ? "#e05555" : "#1a1a1a", width: `${Math.min(100, monthlySpend / monthlyBudget * 100)}%` }} />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Closet Health ── */}
+      <div style={{ marginBottom: 44 }}>
+        <EH eyebrow="Overview" title="Closet Health" action={{ label: "Full profile →", onClick: () => setTab("stats") }} />
+        <div onClick={() => setTab("stats")} className="card" style={{ ...cardStyle, borderRadius: 16, padding: "18px 20px", cursor: "pointer", display: "flex", alignItems: "center", gap: 20, flexWrap: "wrap" }}>
+          <div style={{ width: 50, height: 50, borderRadius: "50%", border: `3px solid ${healthColor}`, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+            <span style={{ fontSize: 13, fontWeight: 800, color: healthColor }}>{healthScore}</span>
+          </div>
+          <div style={{ flex: 1, minWidth: 100 }}>
+            <div style={{ fontSize: 15, fontWeight: 700, color: "#1a1a1a", marginBottom: 2 }}>{healthLabel}</div>
+            <div style={{ fontSize: 11, color: "#9f978b" }}>Based on wear, variety & value</div>
+          </div>
+          <div style={{ display: "flex", gap: 28 }}>
+            {[{ label: "Value", value: `$${totalValue.toFixed(0)}` }, { label: "Items", value: closetItems.length }, { label: "Unworn", value: unwornCount }].map(s => (
+              <div key={s.label} style={{ textAlign: "center" }}>
+                <div style={{ fontSize: 18, fontWeight: 800, color: "#1a1a1a" }}>{s.value}</div>
+                <div style={{ fontSize: 9, fontWeight: 700, color: "#c0b8af", textTransform: "uppercase", letterSpacing: "0.06em", marginTop: 2 }}>{s.label}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* ── Wishlist ── */}
+      {highPriorityWish.length > 0 && (
+        <div style={{ marginBottom: 44 }}>
+          <EH eyebrow="Wish List" title="On My Radar" action={{ label: "All →", onClick: () => setTab("wishlist") }} />
+          <div style={{ display: "flex", gap: 14, overflowX: "auto", paddingBottom: 4, scrollbarWidth: "none", msOverflowStyle: "none" }}>
+            {highPriorityWish.map(item => (
+              <div key={item.id} onClick={() => setTab("wishlist")} className="card" style={{ cursor: "pointer", borderRadius: 14, overflow: "hidden", border: "1.5px solid #e8e4dc", background: "#fff", flexShrink: 0, width: 140 }}>
+                <div style={{ aspectRatio: "3/4", background: item.image ? `url(${item.image}) center/cover no-repeat` : "#f5f3ef", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                  {!item.image && <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#ddd" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20.84 4.61a5.5 5.5 0 00-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 00-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 000-7.78z"/></svg>}
+                </div>
+                <div style={{ padding: "8px 10px 10px" }}>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: "#1a1a1a", lineHeight: 1.2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{item.name}</div>
+                  {item.price && <div style={{ fontSize: 10, color: "#aaa", marginTop: 2 }}>{item.price}</div>}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }

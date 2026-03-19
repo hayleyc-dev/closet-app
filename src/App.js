@@ -6432,55 +6432,6 @@ function SellerDashboard({ itemsDb, allClosetItems, onViewItem }) {
         </span>
         <input className="closet-search" value={search} onChange={e => setSearch(e.target.value)} placeholder="Search listings…" />
       </div>
-      {/* Status filters */}
-      <div className="right-card" style={{ padding: "14px 12px" }}>
-        <div className="right-card-title">Status</div>
-        {[["all", "All"], ...SALE_STATUSES.map(s => [s, SALE_STATUS_META[s].label])].map(([val, lbl]) => (
-          <button key={val} className={"sidebar-btn" + (statusFilter === val ? " active" : "")} onClick={() => setStatusFilter(val)}>{lbl}</button>
-        ))}
-      </div>
-      {/* Sort + View */}
-      <div className="right-card" style={{ padding: "14px 12px" }}>
-        <div className="right-card-title">Sort & View</div>
-        <select value={sortBy} onChange={e => setSortBy(e.target.value)}
-          style={{ width: "100%", padding: "7px 28px 7px 10px", border: "1.5px solid #e8e4dc", borderRadius: 10, fontFamily: "'DM Sans', sans-serif", fontSize: 12, background: "#faf9f6", outline: "none", cursor: "pointer", marginBottom: 8 }}>
-          <option value="dateAdded">Date Added</option>
-          <option value="days">Days Listed</option>
-          <option value="price">Price ↓</option>
-          <option value="status">Status</option>
-        </select>
-        <div style={{ display: "flex", background: "#f5f2ed", borderRadius: 10, padding: 3, gap: 2 }}>
-          {[
-            ["list", <svg key="l" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>],
-            ["grid", <svg key="g" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>],
-          ].map(([mode, icon]) => (
-            <button key={mode} onClick={() => setViewMode(mode)} style={{ flex: 1, padding: "5px 8px", border: "none", borderRadius: 8, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", background: viewMode === mode ? "#fff" : "transparent", color: viewMode === mode ? "#1a1a1a" : "#bbb", boxShadow: viewMode === mode ? "0 1px 4px rgba(0,0,0,0.08)" : "none" }}>{icon}</button>
-          ))}
-        </div>
-      </div>
-      {/* Bulk Actions dropdown */}
-      <div style={{ position: "relative" }}>
-        {showBulkMenu && <div style={{ position: "fixed", inset: 0, zIndex: 99 }} onClick={() => setShowBulkMenu(false)} />}
-        <button onClick={() => setShowBulkMenu(v => !v)}
-          style={{ width: "100%", padding: "9px 14px", background: "#f5f3ef", border: "1.5px solid #e8e4dc", borderRadius: 10, cursor: "pointer", fontFamily: "'DM Sans', sans-serif", fontSize: 12, fontWeight: 700, color: "#555", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-          <span>Bulk Actions</span>
-          <span style={{ fontSize: 10, opacity: 0.5 }}>▾</span>
-        </button>
-        {showBulkMenu && (
-          <div style={{ position: "absolute", top: "100%", left: 0, right: 0, marginTop: 4, background: "#fff", border: "1.5px solid #e8e4dc", borderRadius: 10, overflow: "hidden", boxShadow: "0 4px 16px rgba(0,0,0,0.08)", zIndex: 100 }}>
-            <button onClick={() => { setShowBulkModal(true); setShowBulkMenu(false); }}
-              style={{ display: "block", width: "100%", padding: "10px 14px", background: "none", border: "none", cursor: "pointer", fontFamily: "'DM Sans', sans-serif", fontSize: 12, fontWeight: 600, color: "#1a1a1a", textAlign: "left" }}>
-              List from Closet
-            </button>
-            {activePriceItems.length > 0 && (
-              <button onClick={() => { setShowBulkPriceModal(true); setShowBulkMenu(false); }}
-                style={{ display: "block", width: "100%", padding: "10px 14px", background: "none", border: "none", borderTop: "1px solid #f0ece4", cursor: "pointer", fontFamily: "'DM Sans', sans-serif", fontSize: 12, fontWeight: 600, color: "#1a1a1a", textAlign: "left" }}>
-                Adjust Prices
-              </button>
-            )}
-          </div>
-        )}
-      </div>
       {/* Stats cards */}
       {forSaleItems.length > 0 && (<>
         <div className="right-card">
@@ -6539,10 +6490,69 @@ function SellerDashboard({ itemsDb, allClosetItems, onViewItem }) {
     </div>
   );
 
+  // ── Top toolbar ──
+  const topBar = (
+    <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 16, flexWrap: "wrap" }}>
+      {/* Status filter pills */}
+      <div style={{ display: "flex", gap: 5, flexWrap: "wrap", flex: 1 }}>
+        {[["all", "All"], ...SALE_STATUSES.map(s => [s, SALE_STATUS_META[s].label])].map(([val, lbl]) => (
+          <button key={val} onClick={() => setStatusFilter(val)}
+            style={{ padding: "5px 13px", border: "1.5px solid", borderRadius: 20, cursor: "pointer", fontSize: 12, fontWeight: 700, fontFamily: "'DM Sans', sans-serif", transition: "all 0.12s",
+              background: statusFilter === val ? "#1a1a1a" : "#f5f3ef",
+              borderColor: statusFilter === val ? "#1a1a1a" : "#e8e4dc",
+              color: statusFilter === val ? "#fff" : "#777" }}>
+            {lbl}
+          </button>
+        ))}
+      </div>
+      {/* Sort */}
+      <select value={sortBy} onChange={e => setSortBy(e.target.value)}
+        style={{ padding: "6px 28px 6px 10px", border: "1.5px solid #e8e4dc", borderRadius: 10, fontFamily: "'DM Sans', sans-serif", fontSize: 12, background: "#faf9f6", outline: "none", cursor: "pointer", color: "#555" }}>
+        <option value="dateAdded">Date Added</option>
+        <option value="days">Days Listed</option>
+        <option value="price">Price ↓</option>
+        <option value="status">Status</option>
+      </select>
+      {/* View toggle */}
+      <div style={{ display: "flex", background: "#f5f2ed", borderRadius: 10, padding: 3, gap: 2 }}>
+        {[
+          ["list", <svg key="l" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>],
+          ["grid", <svg key="g" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>],
+        ].map(([mode, icon]) => (
+          <button key={mode} onClick={() => setViewMode(mode)} style={{ padding: "5px 8px", border: "none", borderRadius: 8, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", background: viewMode === mode ? "#fff" : "transparent", color: viewMode === mode ? "#1a1a1a" : "#bbb", boxShadow: viewMode === mode ? "0 1px 4px rgba(0,0,0,0.08)" : "none" }}>{icon}</button>
+        ))}
+      </div>
+      {/* Bulk Actions */}
+      <div style={{ position: "relative" }}>
+        {showBulkMenu && <div style={{ position: "fixed", inset: 0, zIndex: 99 }} onClick={() => setShowBulkMenu(false)} />}
+        <button onClick={() => setShowBulkMenu(v => !v)}
+          style={{ padding: "6px 13px", background: "#f5f3ef", border: "1.5px solid #e8e4dc", borderRadius: 10, cursor: "pointer", fontFamily: "'DM Sans', sans-serif", fontSize: 12, fontWeight: 700, color: "#555", display: "flex", alignItems: "center", gap: 6 }}>
+          <span>Bulk Actions</span>
+          <span style={{ fontSize: 10, opacity: 0.5 }}>▾</span>
+        </button>
+        {showBulkMenu && (
+          <div style={{ position: "absolute", top: "100%", right: 0, marginTop: 4, background: "#fff", border: "1.5px solid #e8e4dc", borderRadius: 10, overflow: "hidden", boxShadow: "0 4px 16px rgba(0,0,0,0.08)", zIndex: 100, minWidth: 150 }}>
+            <button onClick={() => { setShowBulkModal(true); setShowBulkMenu(false); }}
+              style={{ display: "block", width: "100%", padding: "10px 14px", background: "none", border: "none", cursor: "pointer", fontFamily: "'DM Sans', sans-serif", fontSize: 12, fontWeight: 600, color: "#1a1a1a", textAlign: "left" }}>
+              List from Closet
+            </button>
+            {activePriceItems.length > 0 && (
+              <button onClick={() => { setShowBulkPriceModal(true); setShowBulkMenu(false); }}
+                style={{ display: "block", width: "100%", padding: "10px 14px", background: "none", border: "none", borderTop: "1px solid #f0ece4", cursor: "pointer", fontFamily: "'DM Sans', sans-serif", fontSize: 12, fontWeight: 600, color: "#1a1a1a", textAlign: "left" }}>
+                Adjust Prices
+              </button>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+
   return (
     <div className="fade-up" style={{ display: "flex", gap: 24, alignItems: "flex-start" }}>
       {leftPanel}
       <div style={{ flex: 1, minWidth: 0 }}>
+        {topBar}
         {/* Item list / grid */}
         {forSaleItems.length === 0 ? (
           <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "80px 0 40px", gap: 14 }}>

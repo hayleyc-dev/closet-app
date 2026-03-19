@@ -6848,7 +6848,7 @@ function BulkPriceModal({ items, selected, setSelected, discountPct, setDiscount
 function MoodboardPreviewChip({ board, onClick, compact = false, showOpenButton = true }) {
   const previewItems = (board?.items || []).filter(Boolean).slice(-4).reverse();
   const metaTone = compact ? "#aaa" : "#9a9388";
-  const surface = compact ? "#fff" : "#fffdf9";
+  const surface = "#fff";
 
   return (
     <button
@@ -6874,7 +6874,7 @@ function MoodboardPreviewChip({ board, onClick, compact = false, showOpenButton 
         e.currentTarget.style.boxShadow = compact ? "0 2px 10px rgba(0,0,0,0.04)" : "0 8px 28px rgba(0,0,0,0.05)";
       }}
     >
-      <div style={{ position: "relative", aspectRatio: compact ? "1.35 / 1" : "1.15 / 1", background: board?.bg || "#ffffff", padding: compact ? 10 : 14 }}>
+      <div style={{ position: "relative", aspectRatio: compact ? "1.2 / 1" : "4 / 5", background: board?.bg || "#ffffff", padding: compact ? 10 : 12 }}>
         {board?.pinned && (
           <div style={{ position: "absolute", top: 10, right: 12, zIndex: 3, fontSize: 13, color: "#f0c840" }}>★</div>
         )}
@@ -6911,7 +6911,7 @@ function MoodboardPreviewChip({ board, onClick, compact = false, showOpenButton 
         )}
       </div>
 
-      <div style={{ padding: compact ? "10px 12px 12px" : "14px 15px 15px" }}>
+      <div style={{ padding: compact ? "10px 12px 12px" : "12px 14px 14px" }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, marginBottom: 6 }}>
           <div style={{ fontSize: compact ? 12 : 14, fontWeight: 800, color: "#1a1a1a", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
             {board?.name || "Untitled Board"}
@@ -7434,6 +7434,8 @@ function Moodboard({ closetItems = [], activeIdx, setActiveIdx, boards: boardsPr
   const [editingTextVal, setEditingTextVal] = useState("");
   const [editingBoardName, setEditingBoardName] = useState(false);
   const [boardNameVal, setBoardNameVal] = useState("");
+  const [mbSort, setMbSort] = useState("pinned");
+  const [mbZoom, setMbZoom] = useState(250);
   const [zoom, setZoom] = useState(1.0);
   const [multiSelectedIds, setMultiSelectedIds] = useState(new Set());
   const [cropState, setCropState] = useState(null); // {id, origSrc, displayW, displayH, cropRect: {x,y,w,h}}
@@ -7705,55 +7707,76 @@ function Moodboard({ closetItems = [], activeIdx, setActiveIdx, boards: boardsPr
   if (!isEditing) {
     const allTags = [...new Set(boards.flatMap(b => b.tags || []).filter(Boolean))];
     const sorted = [...boards.map((b,i)=>({b,i}))].sort((a,z) => {
-      if ((z.b.pinned ? 1 : 0) !== (a.b.pinned ? 1 : 0)) return (z.b.pinned ? 1 : 0) - (a.b.pinned ? 1 : 0);
       const aTime = a.b.updatedAt || a.b.createdAt || a.b.id || "";
       const zTime = z.b.updatedAt || z.b.createdAt || z.b.id || "";
+      if (mbSort === "az") return (a.b.name || "").localeCompare(z.b.name || "");
+      if (mbSort === "items") return (z.b.items?.length || 0) - (a.b.items?.length || 0);
+      if (mbSort === "newest") return String(zTime).localeCompare(String(aTime));
+      if ((z.b.pinned ? 1 : 0) !== (a.b.pinned ? 1 : 0)) return (z.b.pinned ? 1 : 0) - (a.b.pinned ? 1 : 0);
       return String(zTime).localeCompare(String(aTime));
     });
     const featured = sorted[0];
     return (
-      <div style={{display:"flex",flexDirection:"column",gap:18,padding:"0 4px 24px"}}>
-        <div style={{display:"grid",gridTemplateColumns:"minmax(280px,1.2fr) minmax(240px,0.8fr)",gap:16}}>
-          <div style={{background:"linear-gradient(135deg, #fffdf9 0%, #f6f1ea 100%)",border:"1.5px solid #ece8e0",borderRadius:24,padding:"24px 24px 22px",display:"flex",flexDirection:"column",justifyContent:"space-between",minHeight:220}}>
-            <div>
-              <div style={{fontSize:10,fontWeight:700,color:"#b0a898",textTransform:"uppercase",letterSpacing:"0.14em",marginBottom:8}}>Moodboard Library</div>
-              <div style={{fontFamily:"'Cormorant Garamond',serif",fontSize:34,fontWeight:300,fontStyle:"italic",color:"#1a1a1a",lineHeight:1.05,marginBottom:10}}>Browse board previews first, then open one when you're ready to design.</div>
-              <div style={{fontSize:13,color:"#8c857a",lineHeight:1.7,maxWidth:480}}>This tab now works like a creative library: preview chips here, full canvas only when you intentionally step into a board.</div>
-            </div>
-            <div style={{display:"flex",alignItems:"center",gap:10,flexWrap:"wrap",marginTop:18}}>
-              <button onClick={addBoard} style={{padding:"11px 18px",background:"#1a1a1a",color:"#fff",border:"none",borderRadius:12,cursor:"pointer",fontFamily:"'DM Sans',sans-serif",fontSize:12,fontWeight:700}}>+ New Board</button>
-              {featured && (
-                <button onClick={() => { setActiveIdx(featured.i); setIsEditing && setIsEditing(true); }} style={{padding:"11px 18px",background:"#f5f3ef",color:"#555",border:"none",borderRadius:12,cursor:"pointer",fontFamily:"'DM Sans',sans-serif",fontSize:12,fontWeight:700}}>
-                  Continue with {featured.b.name || "latest board"}
-                </button>
-              )}
-            </div>
-          </div>
-
-          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}>
-            {[
-              { label:"Total boards", value:boards.length },
-              { label:"Pinned", value:boards.filter(b => b.pinned).length },
-              { label:"Linked lookbooks", value:boards.filter(b => b.linkedLb).length },
-              { label:"Saved items", value:boards.reduce((sum, b) => sum + (b.items?.length || 0), 0) },
-            ].map(stat => (
-              <div key={stat.label} style={{background:"#fff",border:"1.5px solid #ece8e0",borderRadius:20,padding:"18px 16px"}}>
-                <div style={{fontSize:24,fontWeight:800,color:"#1a1a1a",marginBottom:4}}>{stat.value}</div>
-                <div style={{fontSize:10,fontWeight:700,color:"#b0a898",textTransform:"uppercase",letterSpacing:"0.1em"}}>{stat.label}</div>
+      <div className="fade-up">
+        <div style={{ display:"flex", gap:10, marginBottom:18, alignItems:"center", justifyContent:"space-between", flexWrap:"wrap" }}>
+          <div style={{ display:"flex", gap:8, flexWrap:"wrap", alignItems:"center" }}>
+            <select value={mbSort} onChange={e => setMbSort(e.target.value)} className="pill-select">
+              <option value="pinned">Sort: Pinned First</option>
+              <option value="newest">Sort: Recently Updated</option>
+              <option value="az">Sort: A - Z</option>
+              <option value="items">Sort: Most Items</option>
+            </select>
+            {allTags.length > 0 && (
+              <div style={{ display:"flex", gap:6, flexWrap:"wrap" }}>
+                {allTags.slice(0, 4).map(tag => (
+                  <div key={tag} style={{ padding:"7px 13px", borderRadius:100, border:"1px solid #e0dbd2", background:"#fff", fontFamily:"'DM Sans', sans-serif", fontSize:12, fontWeight:600, color:"#666" }}>
+                    {tag}
+                  </div>
+                ))}
               </div>
-            ))}
+            )}
+          </div>
+          <div style={{ display:"flex", alignItems:"center", gap:10, marginLeft:"auto" }}>
+            <button onClick={addBoard} style={{ padding:"10px 18px", background:"#1a1a1a", color:"#fff", border:"none", borderRadius:14, cursor:"pointer", fontSize:13, fontWeight:700, fontFamily:"'DM Sans', sans-serif" }}>+ New Board</button>
+            <div style={{ display:"flex", alignItems:"center", gap:8 }}>
+              <SvgBox size={11} color="#bbb" />
+              <input type="range" min={210} max={320} step={10} value={mbZoom} onChange={e => setMbZoom(Number(e.target.value))}
+                style={{ width:72, accentColor:"#1a1a1a", cursor:"pointer" }} />
+              <SvgBox size={16} color="#bbb" />
+            </div>
           </div>
         </div>
-        {allTags.length > 0 && (
-          <div style={{display:"flex",flexWrap:"wrap",gap:8}}>
-            {allTags.map(tag => (
-              <div key={tag} style={{padding:"6px 11px",borderRadius:999,background:"#f5f3ef",border:"1px solid #e0dbd2",fontSize:11,fontWeight:700,color:"#777"}}>
-                {tag}
+
+        {featured && (
+          <div style={{ background:"#fff", borderRadius:20, border:"1.5px solid #e8e4dc", padding:"16px 18px", marginBottom:16, display:"flex", alignItems:"center", justifyContent:"space-between", gap:14, flexWrap:"wrap" }}>
+            <div>
+              <div style={{ fontSize:10, fontWeight:700, color:"#b0a898", textTransform:"uppercase", letterSpacing:"0.1em", marginBottom:5 }}>Continue Designing</div>
+              <div style={{ fontSize:16, fontWeight:800, color:"#1a1a1a", marginBottom:4 }}>{featured.b.name || "Untitled Board"}</div>
+              <div style={{ fontSize:12, color:"#8f887d" }}>
+                {(featured.b.items?.length || 0)} item{(featured.b.items?.length || 0) !== 1 ? "s" : ""} • {boards.length} total board{boards.length !== 1 ? "s" : ""}
               </div>
-            ))}
+            </div>
+            <div style={{ display:"flex", gap:8, alignItems:"center", flexWrap:"wrap" }}>
+              <button onClick={() => { setActiveIdx(featured.i); setIsEditing && setIsEditing(true); }} style={{ padding:"9px 16px", background:"#1a1a1a", color:"#fff", border:"none", borderRadius:12, cursor:"pointer", fontSize:12, fontWeight:700, fontFamily:"'DM Sans', sans-serif" }}>
+                Open Board
+              </button>
+              <div style={{ display:"flex", gap:8, flexWrap:"wrap" }}>
+                {[
+                  { label:"Boards", value:boards.length },
+                  { label:"Pinned", value:boards.filter(b => b.pinned).length },
+                  { label:"Linked", value:boards.filter(b => b.linkedLb).length },
+                ].map(stat => (
+                  <div key={stat.label} style={{ padding:"8px 10px", borderRadius:12, background:"#f8f6f2", border:"1px solid #ece8e0", minWidth:72 }}>
+                    <div style={{ fontSize:14, fontWeight:800, color:"#1a1a1a" }}>{stat.value}</div>
+                    <div style={{ fontSize:9, fontWeight:700, color:"#aaa", textTransform:"uppercase", letterSpacing:"0.08em" }}>{stat.label}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
           </div>
         )}
-        <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(260px,1fr))",gap:16}}>
+
+        <div style={{ display:"grid", gridTemplateColumns:`repeat(auto-fill, minmax(${mbZoom}px, 1fr))`, gap:16 }}>
           {sorted.map(({b,i})=>(
             <MoodboardPreviewChip key={b.id} board={b} onClick={() => { setActiveIdx(i); setIsEditing && setIsEditing(true); }} />
           ))}

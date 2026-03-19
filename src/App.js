@@ -6845,8 +6845,112 @@ function BulkPriceModal({ items, selected, setSelected, discountPct, setDiscount
 }
 
 // ── Moodboard ─────────────────────────────────────────────────────────────────
+function MoodboardPreviewChip({ board, onClick, compact = false, showOpenButton = true }) {
+  const previewItems = (board?.items || []).filter(Boolean).slice(-4).reverse();
+  const metaTone = compact ? "#aaa" : "#9a9388";
+  const surface = compact ? "#fff" : "#fffdf9";
+
+  return (
+    <button
+      onClick={onClick}
+      style={{
+        width: "100%",
+        border: "1.5px solid #e8e4dc",
+        borderRadius: compact ? 16 : 20,
+        background: surface,
+        cursor: "pointer",
+        overflow: "hidden",
+        textAlign: "left",
+        padding: 0,
+        boxShadow: compact ? "0 2px 10px rgba(0,0,0,0.04)" : "0 8px 28px rgba(0,0,0,0.05)",
+        transition: "transform 0.15s ease, box-shadow 0.15s ease",
+      }}
+      onMouseEnter={e => {
+        e.currentTarget.style.transform = "translateY(-2px)";
+        e.currentTarget.style.boxShadow = compact ? "0 8px 20px rgba(0,0,0,0.08)" : "0 14px 34px rgba(0,0,0,0.08)";
+      }}
+      onMouseLeave={e => {
+        e.currentTarget.style.transform = "translateY(0)";
+        e.currentTarget.style.boxShadow = compact ? "0 2px 10px rgba(0,0,0,0.04)" : "0 8px 28px rgba(0,0,0,0.05)";
+      }}
+    >
+      <div style={{ position: "relative", aspectRatio: compact ? "1.35 / 1" : "1.15 / 1", background: board?.bg || "#ffffff", padding: compact ? 10 : 14 }}>
+        {board?.pinned && (
+          <div style={{ position: "absolute", top: 10, right: 12, zIndex: 3, fontSize: 13, color: "#f0c840" }}>★</div>
+        )}
+        {previewItems.length === 0 ? (
+          <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column", gap: 8, color: "#cfc7bc" }}>
+            <SvgSparkle size={compact ? 20 : 24} color="#d8d0c4" />
+            <div style={{ fontSize: compact ? 10 : 11, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase" }}>Blank Board</div>
+          </div>
+        ) : (
+          <div style={{ display: "grid", gridTemplateColumns: "1.25fr 1fr", gridTemplateRows: "1fr 1fr", gap: compact ? 8 : 10, height: "100%" }}>
+            {previewItems.slice(0, 1).map((item, idx) => (
+              <div key={item.id || idx} style={{ gridRow: "1 / 3", borderRadius: compact ? 12 : 14, overflow: "hidden", background: "#f5f2ed", border: "1px solid rgba(0,0,0,0.04)" }}>
+                {item.type === "text" ? (
+                  <div style={{ width: "100%", height: "100%", padding: compact ? "10px 9px" : "12px 10px", background: item.transparentBg ? "#f5f2ed" : (item.bg || "#fff9e6"), color: item.color || "#1a1a1a", fontSize: compact ? 10 : 11, fontWeight: item.bold ? 800 : 700, lineHeight: 1.35, overflow: "hidden" }}>
+                    {(item.text || "Text note").slice(0, compact ? 40 : 60)}
+                  </div>
+                ) : (
+                  <img src={item.src} alt="" style={{ width: "100%", height: "100%", objectFit: item.transparent ? "contain" : "cover", display: "block", background: item.transparent ? "transparent" : undefined }} />
+                )}
+              </div>
+            ))}
+            {previewItems.slice(1, 4).map((item, idx) => (
+              <div key={item.id || idx} style={{ borderRadius: compact ? 12 : 14, overflow: "hidden", background: "#f6f3ef", border: "1px solid rgba(0,0,0,0.04)", minHeight: 0 }}>
+                {item.type === "text" ? (
+                  <div style={{ width: "100%", height: "100%", padding: compact ? "8px 8px" : "10px 9px", background: item.transparentBg ? "#f6f3ef" : (item.bg || "#fff9e6"), color: item.color || "#1a1a1a", fontSize: compact ? 9 : 10, fontWeight: item.bold ? 800 : 700, lineHeight: 1.3, overflow: "hidden" }}>
+                    {(item.text || "Note").slice(0, compact ? 22 : 30)}
+                  </div>
+                ) : (
+                  <img src={item.src} alt="" style={{ width: "100%", height: "100%", objectFit: item.transparent ? "contain" : "cover", display: "block", background: item.transparent ? "transparent" : undefined }} />
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      <div style={{ padding: compact ? "10px 12px 12px" : "14px 15px 15px" }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, marginBottom: 6 }}>
+          <div style={{ fontSize: compact ? 12 : 14, fontWeight: 800, color: "#1a1a1a", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+            {board?.name || "Untitled Board"}
+          </div>
+          {board?.linkedLb && <div style={{ fontSize: 10, fontWeight: 700, color: "#2d6a3f", background: "#f0faf4", border: "1px solid #b6e8c8", borderRadius: 999, padding: "2px 7px", flexShrink: 0 }}>Lookbook</div>}
+        </div>
+
+        {!compact && board?.notes && (
+          <div style={{ fontSize: 12, color: "#8c857a", lineHeight: 1.55, minHeight: 36, marginBottom: 8, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>
+            {board.notes}
+          </div>
+        )}
+
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 5, marginBottom: compact ? 8 : 10 }}>
+          {(board?.tags || []).slice(0, compact ? 2 : 3).map(tag => (
+            <span key={tag} style={{ fontSize: 9, fontWeight: 700, padding: "2px 7px", borderRadius: 999, background: "#f5f3ef", color: "#888" }}>
+              {tag}
+            </span>
+          ))}
+        </div>
+
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+          <div style={{ fontSize: 11, color: metaTone, fontWeight: 600 }}>
+            {(board?.items || []).length} item{(board?.items || []).length !== 1 ? "s" : ""}
+            {board?.palette?.length ? ` • ${board.palette.length} colors` : ""}
+          </div>
+          {showOpenButton && (
+            <span style={{ fontSize: 11, fontWeight: 800, color: "#1a1a1a" }}>
+              Open Board →
+            </span>
+          )}
+        </div>
+      </div>
+    </button>
+  );
+}
+
 // ── MoodboardInfoPanel — reads active board from Moodboard via localStorage ──
-function MoodboardInfoPanel({ activeIdx, setActiveIdx, boards: boardsProp, updateBoards, updateBoardById, removeBoardById, lookbooksDb, createLookbook, addMoodboardToLookbook, onGoToLookbook, closetItems }) {
+function MoodboardInfoPanel({ activeIdx, setActiveIdx, boards: boardsProp, updateBoards, updateBoardById, removeBoardById, lookbooksDb, createLookbook, addMoodboardToLookbook, onGoToLookbook, closetItems, isEditing, setIsEditing }) {
   const ARCHIVE_KEY = "wardrobe_moodboards_archived_v1";
 
   const data = boardsProp || [];
@@ -6958,6 +7062,7 @@ function MoodboardInfoPanel({ activeIdx, setActiveIdx, boards: boardsProp, updat
     if (removeBoardById) removeBoardById(board.id);
     else save(data.filter((_,i) => i !== activeIdx));
     setActiveIdx(Math.max(0, activeIdx - 1));
+    if (setIsEditing) setIsEditing(false);
     setConfirmArchive(false);
   };
 
@@ -6981,11 +7086,67 @@ function MoodboardInfoPanel({ activeIdx, setActiveIdx, boards: boardsProp, updat
       <div className="right-card-title">Boards</div>
       <div style={{fontSize:12,color:"#bbb",textAlign:"center",padding:"12px 0"}}>No boards yet</div>
       <button onClick={() => {
-        const updated = [{ id: uid(), name: "Board 1", items: [], bg: "#ffffff" }];
-        save(updated); setActiveIdx(0);
+        const now = new Date().toISOString();
+        const updated = [{ id: uid(), name: "Board 1", items: [], bg: "#ffffff", createdAt: now, updatedAt: now }];
+        save(updated); setActiveIdx(0); if (setIsEditing) setIsEditing(true);
       }} style={{width:"100%",padding:"9px 0",background:"#1a1a1a",color:"#fff",border:"none",borderRadius:10,cursor:"pointer",fontFamily:"'DM Sans',sans-serif",fontSize:12,fontWeight:700}}>+ Create Board</button>
     </div>
   );
+
+  if (!isEditing) {
+    const pinnedCount = data.filter(b => b.pinned).length;
+    const linkedCount = data.filter(b => b.linkedLb).length;
+    const recentBoards = [...data].slice().sort((a, b) => {
+      const aTime = a.updatedAt || a.createdAt || a.id || "";
+      const bTime = b.updatedAt || b.createdAt || b.id || "";
+      return String(bTime).localeCompare(String(aTime));
+    }).slice(0, 4);
+
+    return (
+      <>
+        <div className="right-card">
+          <div className="right-card-title">Board Library</div>
+          <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:10, marginBottom:12 }}>
+            {[
+              { label:"Boards", value:data.length },
+              { label:"Pinned", value:pinnedCount },
+              { label:"Linked", value:linkedCount },
+              { label:"Colors", value:data.reduce((sum, b) => sum + (b.palette?.length || 0), 0) },
+            ].map(stat => (
+              <div key={stat.label} style={{ padding:"10px 12px", borderRadius:14, background:"#faf8f4", border:"1px solid #ece8e0" }}>
+                <div style={{ fontSize:18, fontWeight:800, color:"#1a1a1a" }}>{stat.value}</div>
+                <div style={{ fontSize:10, fontWeight:700, color:"#aaa", textTransform:"uppercase", letterSpacing:"0.08em" }}>{stat.label}</div>
+              </div>
+            ))}
+          </div>
+          <button onClick={() => {
+            const now = new Date().toISOString();
+            const updated = [...data, { id: uid(), name: `Board ${data.length + 1}`, items: [], bg: "#ffffff", pinned: false, tags: [], createdAt: now, updatedAt: now }];
+            save(updated);
+            setActiveIdx(updated.length - 1);
+            if (setIsEditing) setIsEditing(true);
+          }} style={{width:"100%",padding:"10px 0",background:"#1a1a1a",color:"#fff",border:"none",borderRadius:12,cursor:"pointer",fontFamily:"'DM Sans',sans-serif",fontSize:12,fontWeight:700}}>+ Create Board</button>
+        </div>
+
+        <div className="right-card" style={{marginTop:12}}>
+          <div className="right-card-title">Continue Designing</div>
+          <div style={{display:"flex",flexDirection:"column",gap:10}}>
+            {recentBoards.map(b => {
+              const idx = data.findIndex(x => x.id === b.id);
+              return (
+                <MoodboardPreviewChip
+                  key={b.id}
+                  board={b}
+                  compact
+                  onClick={() => { setActiveIdx(idx); if (setIsEditing) setIsEditing(true); }}
+                />
+              );
+            })}
+          </div>
+        </div>
+      </>
+    );
+  }
 
   return (
     <>
@@ -6998,9 +7159,11 @@ function MoodboardInfoPanel({ activeIdx, setActiveIdx, boards: boardsProp, updat
             style={{padding:"4px 8px",background:"none",border:"1px solid #e0dbd2",borderRadius:8,cursor:"pointer",fontSize:14,lineHeight:1,color:board?.pinned?"#f0c840":"#ccc",fontFamily:"'DM Sans',sans-serif"}}>
             {board?.pinned?"★":"☆"}
           </button>
+          <button onClick={() => setIsEditing && setIsEditing(false)} style={{padding:"4px 10px",background:"#f5f3ef",color:"#666",border:"none",borderRadius:8,cursor:"pointer",fontSize:11,fontWeight:700,fontFamily:"'DM Sans',sans-serif"}}>Library</button>
           <button onClick={() => {
-            const updated = [...data, {id:uid(), name:`Board ${data.length+1}`, items:[], bg:"#ffffff", pinned:false, tags:[]}];
-            save(updated); setActiveIdx(updated.length-1);
+            const now = new Date().toISOString();
+            const updated = [...data, {id:uid(), name:`Board ${data.length+1}`, items:[], bg:"#ffffff", pinned:false, tags:[], createdAt: now, updatedAt: now}];
+            save(updated); setActiveIdx(updated.length-1); if (setIsEditing) setIsEditing(true);
           }} style={{padding:"4px 10px",background:"#1a1a1a",color:"#fff",border:"none",borderRadius:8,cursor:"pointer",fontSize:11,fontWeight:700,fontFamily:"'DM Sans',sans-serif"}}>+ New</button>
         </div>
       </div>
@@ -7239,7 +7402,7 @@ function MoodboardInfoPanel({ activeIdx, setActiveIdx, boards: boardsProp, updat
 }
 
 
-function Moodboard({ closetItems = [], activeIdx, setActiveIdx, boards: boardsProp, updateBoards, removeBoardById }) {
+function Moodboard({ closetItems = [], activeIdx, setActiveIdx, boards: boardsProp, updateBoards, removeBoardById, isEditing, setIsEditing }) {
   const closetItemsForMoodboard = closetItems;
   // Use prop-based boards (Supabase-backed) if provided, else fall back to localStorage
   const STORAGE_KEY = "wardrobe_moodboards_v1";
@@ -7271,7 +7434,6 @@ function Moodboard({ closetItems = [], activeIdx, setActiveIdx, boards: boardsPr
   const [editingTextVal, setEditingTextVal] = useState("");
   const [editingBoardName, setEditingBoardName] = useState(false);
   const [boardNameVal, setBoardNameVal] = useState("");
-  const [mbView, setMbView] = useState("canvas"); // "canvas" | "grid"
   const [zoom, setZoom] = useState(1.0);
   const [multiSelectedIds, setMultiSelectedIds] = useState(new Set());
   const [cropState, setCropState] = useState(null); // {id, origSrc, displayW, displayH, cropRect: {x,y,w,h}}
@@ -7315,18 +7477,19 @@ function Moodboard({ closetItems = [], activeIdx, setActiveIdx, boards: boardsPr
       if (i !== activeIdx) return b;
       const newItems = typeof updater === "function" ? updater(b.items || []) : updater;
       pushHistory(newItems);
-      return {...b, items: newItems};
+      return {...b, items: newItems, updatedAt: new Date().toISOString()};
     }));
   };
 
   const updateBoardMeta = (patch) => {
-    setBoards(bs => bs.map((b,i) => i===activeIdx ? {...b, ...patch} : b));
+    setBoards(bs => bs.map((b,i) => i===activeIdx ? {...b, ...patch, updatedAt: new Date().toISOString()} : b));
   };
 
   const addBoard = () => {
     const name = `Board ${boards.length + 1}`;
-    setBoards(bs => [...bs, {id:uid(), name, items:[], bg:"#ffffff"}]);
+    setBoards(bs => [...bs, {id:uid(), name, items:[], bg:"#ffffff", createdAt: new Date().toISOString(), updatedAt: new Date().toISOString()}]);
     setActiveIdx(boards.length);
+    if (setIsEditing) setIsEditing(true);
     setSelectedId(null);
   };
 
@@ -7539,45 +7702,67 @@ function Moodboard({ closetItems = [], activeIdx, setActiveIdx, boards: boardsPr
     </div>
   );
 
-  // Board grid view
-  if (mbView === "grid") {
-    const sorted = [...boards.map((b,i)=>({b,i}))].sort((a,z)=>(z.b.pinned?1:0)-(a.b.pinned?1:0));
+  if (!isEditing) {
+    const allTags = [...new Set(boards.flatMap(b => b.tags || []).filter(Boolean))];
+    const sorted = [...boards.map((b,i)=>({b,i}))].sort((a,z) => {
+      if ((z.b.pinned ? 1 : 0) !== (a.b.pinned ? 1 : 0)) return (z.b.pinned ? 1 : 0) - (a.b.pinned ? 1 : 0);
+      const aTime = a.b.updatedAt || a.b.createdAt || a.b.id || "";
+      const zTime = z.b.updatedAt || z.b.createdAt || z.b.id || "";
+      return String(zTime).localeCompare(String(aTime));
+    });
+    const featured = sorted[0];
     return (
-      <div style={{display:"flex",flexDirection:"column",height:"calc(100vh - 160px)",padding:"0 4px"}}>
-        <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:16}}>
-          <div style={{fontFamily:"'Cormorant Garamond',serif",fontSize:20,fontWeight:300,fontStyle:"italic",color:"#888"}}>All Boards</div>
-          <button onClick={()=>setMbView("canvas")} style={{padding:"7px 14px",background:"#f5f3ef",border:"none",borderRadius:10,cursor:"pointer",fontSize:11,fontWeight:700,color:"#666",fontFamily:"'DM Sans',sans-serif",display:"flex",alignItems:"center",gap:6}}>
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="9" y1="21" x2="9" y2="9"/></svg>
-            Canvas
-          </button>
-        </div>
-        <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:12,overflowY:"auto",paddingBottom:8}}>
-          {sorted.map(({b,i})=>(
-            <div key={b.id} onClick={()=>{setActiveIdx(i);setMbView("canvas");}} style={{borderRadius:16,overflow:"hidden",cursor:"pointer",border:"1.5px solid #e8e4dc",background:"#fff",transition:"box-shadow 0.15s",boxShadow:"0 2px 8px rgba(0,0,0,0.06)"}}
-              onMouseEnter={e=>e.currentTarget.style.boxShadow="0 6px 20px rgba(0,0,0,0.14)"}
-              onMouseLeave={e=>e.currentTarget.style.boxShadow="0 2px 8px rgba(0,0,0,0.06)"}>
-              <div style={{height:90,background:b.bg||"#ffffff",display:"flex",alignItems:"center",justifyContent:"center",position:"relative"}}>
-                {b.pinned&&<span style={{position:"absolute",top:6,right:8,color:"#f0c840",fontSize:14}}>★</span>}
-                <div style={{fontSize:11,color:"#ccc",opacity:(b.items||[]).length>0?0:1}}>
-                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#ddd" strokeWidth="1.5" strokeLinecap="round"><path d="M12 2l1.5 4h4l-3 3 1.5 4L12 11l-4 2 1.5-4-3-3h4z"/></svg>
-                </div>
-                {(b.items||[]).length>0&&<div style={{fontSize:10,fontWeight:700,color:"rgba(0,0,0,0.3)"}}>{(b.items||[]).length} item{(b.items||[]).length!==1?"s":""}</div>}
-              </div>
-              <div style={{padding:"10px 12px"}}>
-                <div style={{fontSize:12,fontWeight:800,color:"#1a1a1a",marginBottom:4,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{b.name||"Untitled"}</div>
-                {(b.tags||[]).length>0&&(
-                  <div style={{display:"flex",flexWrap:"wrap",gap:3}}>
-                    {(b.tags||[]).map(t=><span key={t} style={{fontSize:9,fontWeight:700,padding:"1px 5px",borderRadius:20,background:"#f5f3ef",color:"#888"}}>{t}</span>)}
-                  </div>
-                )}
-              </div>
+      <div style={{display:"flex",flexDirection:"column",gap:18,padding:"0 4px 24px"}}>
+        <div style={{display:"grid",gridTemplateColumns:"minmax(280px,1.2fr) minmax(240px,0.8fr)",gap:16}}>
+          <div style={{background:"linear-gradient(135deg, #fffdf9 0%, #f6f1ea 100%)",border:"1.5px solid #ece8e0",borderRadius:24,padding:"24px 24px 22px",display:"flex",flexDirection:"column",justifyContent:"space-between",minHeight:220}}>
+            <div>
+              <div style={{fontSize:10,fontWeight:700,color:"#b0a898",textTransform:"uppercase",letterSpacing:"0.14em",marginBottom:8}}>Moodboard Library</div>
+              <div style={{fontFamily:"'Cormorant Garamond',serif",fontSize:34,fontWeight:300,fontStyle:"italic",color:"#1a1a1a",lineHeight:1.05,marginBottom:10}}>Browse board previews first, then open one when you're ready to design.</div>
+              <div style={{fontSize:13,color:"#8c857a",lineHeight:1.7,maxWidth:480}}>This tab now works like a creative library: preview chips here, full canvas only when you intentionally step into a board.</div>
             </div>
+            <div style={{display:"flex",alignItems:"center",gap:10,flexWrap:"wrap",marginTop:18}}>
+              <button onClick={addBoard} style={{padding:"11px 18px",background:"#1a1a1a",color:"#fff",border:"none",borderRadius:12,cursor:"pointer",fontFamily:"'DM Sans',sans-serif",fontSize:12,fontWeight:700}}>+ New Board</button>
+              {featured && (
+                <button onClick={() => { setActiveIdx(featured.i); setIsEditing && setIsEditing(true); }} style={{padding:"11px 18px",background:"#f5f3ef",color:"#555",border:"none",borderRadius:12,cursor:"pointer",fontFamily:"'DM Sans',sans-serif",fontSize:12,fontWeight:700}}>
+                  Continue with {featured.b.name || "latest board"}
+                </button>
+              )}
+            </div>
+          </div>
+
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}>
+            {[
+              { label:"Total boards", value:boards.length },
+              { label:"Pinned", value:boards.filter(b => b.pinned).length },
+              { label:"Linked lookbooks", value:boards.filter(b => b.linkedLb).length },
+              { label:"Saved items", value:boards.reduce((sum, b) => sum + (b.items?.length || 0), 0) },
+            ].map(stat => (
+              <div key={stat.label} style={{background:"#fff",border:"1.5px solid #ece8e0",borderRadius:20,padding:"18px 16px"}}>
+                <div style={{fontSize:24,fontWeight:800,color:"#1a1a1a",marginBottom:4}}>{stat.value}</div>
+                <div style={{fontSize:10,fontWeight:700,color:"#b0a898",textTransform:"uppercase",letterSpacing:"0.1em"}}>{stat.label}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+        {allTags.length > 0 && (
+          <div style={{display:"flex",flexWrap:"wrap",gap:8}}>
+            {allTags.map(tag => (
+              <div key={tag} style={{padding:"6px 11px",borderRadius:999,background:"#f5f3ef",border:"1px solid #e0dbd2",fontSize:11,fontWeight:700,color:"#777"}}>
+                {tag}
+              </div>
+            ))}
+          </div>
+        )}
+        <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(260px,1fr))",gap:16}}>
+          {sorted.map(({b,i})=>(
+            <MoodboardPreviewChip key={b.id} board={b} onClick={() => { setActiveIdx(i); setIsEditing && setIsEditing(true); }} />
           ))}
-          <div onClick={()=>{const updated=[...boards,{id:uid(),name:`Board ${boards.length+1}`,items:[],bg:"#ffffff",pinned:false,tags:[]}];setBoards(updated);setActiveIdx(updated.length-1);setMbView("canvas");}} style={{borderRadius:16,border:"1.5px dashed #d0cac0",background:"#fafaf8",cursor:"pointer",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:8,padding:"24px 12px",minHeight:120,transition:"background 0.12s"}}
+          <div onClick={()=>{const updated=[...boards,{id:uid(),name:`Board ${boards.length+1}`,items:[],bg:"#ffffff",pinned:false,tags:[],createdAt:new Date().toISOString(),updatedAt:new Date().toISOString()}];setBoards(updated);setActiveIdx(updated.length-1);setIsEditing && setIsEditing(true);}} style={{borderRadius:20,border:"1.5px dashed #d0cac0",background:"#fafaf8",cursor:"pointer",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:10,padding:"24px 12px",minHeight:180,transition:"background 0.12s"}}
             onMouseEnter={e=>e.currentTarget.style.background="#f0ece4"}
             onMouseLeave={e=>e.currentTarget.style.background="#fafaf8"}>
             <div style={{fontSize:24,color:"#ccc",lineHeight:1}}>+</div>
-            <div style={{fontSize:11,fontWeight:700,color:"#bbb",fontFamily:"'DM Sans',sans-serif"}}>New Board</div>
+            <div style={{fontSize:12,fontWeight:700,color:"#bbb",fontFamily:"'DM Sans',sans-serif"}}>New Board</div>
+            <div style={{fontSize:11,color:"#c0b8b0",textAlign:"center",maxWidth:160,lineHeight:1.5}}>Start a fresh collage, palette, or planning board.</div>
           </div>
         </div>
       </div>
@@ -7614,14 +7799,12 @@ function Moodboard({ closetItems = [], activeIdx, setActiveIdx, boards: boardsPr
       {/* Toolbar */}
       <div style={{display:"flex",gap:8,marginBottom:10,flexWrap:"wrap",alignItems:"center"}}>
         <input ref={fileRef} type="file" accept="image/*" multiple style={{display:"none"}} onChange={e=>{importImages(e.target.files);e.target.value="";}} />
+        <button onClick={() => setIsEditing && setIsEditing(false)} style={{padding:"8px 14px",background:"#f5f3ef",border:"none",borderRadius:10,cursor:"pointer",fontFamily:"'DM Sans',sans-serif",fontSize:12,fontWeight:700,color:"#666",display:"flex",alignItems:"center",gap:8}}><SvgArrowL size={13} color="#666" />All Boards</button>
         <button onClick={()=>fileRef.current.click()} style={{padding:"8px 16px",background:"#1a1a1a",color:"#fff",border:"none",borderRadius:10,cursor:"pointer",fontFamily:"'DM Sans',sans-serif",fontSize:12,fontWeight:700,display:"flex",alignItems:"center",gap:8}}><SvgCamera size={13} color="#fff" />Import Images</button>
         <button onClick={addTextNote} style={{padding:"8px 16px",background:"#fff9e6",border:"1.5px solid #f0e0a0",borderRadius:10,cursor:"pointer",fontFamily:"'DM Sans',sans-serif",fontSize:12,fontWeight:700,color:"#7a6000",display:"flex",alignItems:"center",gap:8}}><SvgEdit size={13} color="#7a6000" />Add Text</button>
         <button onClick={()=>setShowUrlImport(u=>!u)} style={{padding:"8px 14px",background:showUrlImport?"#f0f4ff":"#f5f3ef",border:showUrlImport?"1.5px solid #a0b4f0":"none",borderRadius:10,cursor:"pointer",fontFamily:"'DM Sans',sans-serif",fontSize:12,fontWeight:700,color:showUrlImport?"#3a5fe0":"#666",display:"flex",alignItems:"center",gap:8}}><SvgLink size={13} color="currentColor" />URL</button>
         <button onClick={()=>setShowClosetPicker(p=>!p)} style={{padding:"8px 14px",background:showClosetPicker?"#f0faf4":"#f5f3ef",border:showClosetPicker?"1.5px solid #b6e8c8":"none",borderRadius:10,cursor:"pointer",fontFamily:"'DM Sans',sans-serif",fontSize:12,fontWeight:700,color:showClosetPicker?"#2d6a3f":"#666",display:"flex",alignItems:"center",gap:8}}><SvgHanger size={13} color="currentColor" />From Closet</button>
         <div style={{display:"flex",gap:6,marginLeft:"auto",alignItems:"center"}}>
-          <button onClick={()=>setMbView("grid")} title="Board grid" style={{padding:"7px 10px",background:"#f5f3ef",border:"none",borderRadius:8,cursor:"pointer",fontSize:11,fontWeight:700,color:"#666",fontFamily:"'DM Sans',sans-serif",display:"flex",alignItems:"center",gap:5}}>
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
-          </button>
           <div style={{display:"flex",alignItems:"center",gap:2,background:"#f5f3ef",borderRadius:8,padding:"2px 4px"}}>
             <button onClick={()=>setZoom(z=>Math.max(0.25,z-0.25))} style={{width:22,height:22,border:"none",background:"none",cursor:"pointer",fontSize:14,color:"#666",display:"flex",alignItems:"center",justifyContent:"center",fontFamily:"'DM Sans',sans-serif"}}>−</button>
             <span style={{fontSize:10,fontWeight:700,color:"#888",minWidth:30,textAlign:"center"}}>{Math.round(zoom*100)}%</span>
@@ -7648,6 +7831,7 @@ function Moodboard({ closetItems = [], activeIdx, setActiveIdx, boards: boardsPr
                 setBoards(bs => bs.filter((_, i) => i !== activeIdx));
               }
               if (setActiveIdx) setActiveIdx(Math.max(0, activeIdx - 1));
+              if (setIsEditing) setIsEditing(false);
             }
           }} title="Archive this board" style={{padding:"7px 10px",background:"#f5f3ef",border:"none",borderRadius:8,cursor:"pointer",fontSize:11,color:"#777",fontFamily:"'DM Sans',sans-serif",display:"flex",alignItems:"center",gap:5}}>
             <SvgArrowDn size={13} color="#777" />
@@ -7661,6 +7845,7 @@ function Moodboard({ closetItems = [], activeIdx, setActiveIdx, boards: boardsPr
                 setBoards(bs => bs.filter((_, i) => i !== activeIdx));
               }
               if (setActiveIdx) setActiveIdx(Math.max(0, activeIdx - 1));
+              if (setIsEditing) setIsEditing(false);
             }
           }} title="Delete this board" style={{padding:"7px 10px",background:"#fef2f2",border:"none",borderRadius:8,cursor:"pointer",fontSize:11,color:"#e05555",fontFamily:"'DM Sans',sans-serif",display:"flex",alignItems:"center",gap:5}}>
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 011-1h4a1 1 0 011 1v2"/></svg>
@@ -10975,6 +11160,7 @@ export default function App() {
   const [activeLookbook, setActiveLookbook] = useState(null);
   const [activeLookbookView, setActiveLookbookView] = useState("editorial");
   const [moodboardActiveIdx, setMoodboardActiveIdx] = useState(0);
+  const [isMoodboardEditing, setIsMoodboardEditing] = useState(false);
   const LOOKBOOK_TYPES = ["trip", "event", "season", "capsule", "inspiration"];
   const LOOKBOOK_OCCASIONS = ["All", "WFH", "Disney", "Universal", "Date Night", "Travel", "Sport", "Weekend", "Event"];
   const LOOKBOOK_OCCASION_ALIASES = {
@@ -11006,6 +11192,17 @@ export default function App() {
   const [newLbDateStart, setNewLbDateStart] = useState("");
   const [newLbTags, setNewLbTags] = useState([]);
   const [newLbType, setNewLbType] = useState("trip");
+
+  useEffect(() => {
+    if ((moodboardsDb.boards || []).length === 0) {
+      setMoodboardActiveIdx(0);
+      setIsMoodboardEditing(false);
+      return;
+    }
+    if (moodboardActiveIdx >= moodboardsDb.boards.length) {
+      setMoodboardActiveIdx(Math.max(0, moodboardsDb.boards.length - 1));
+    }
+  }, [moodboardsDb.boards, moodboardActiveIdx]);
   const [newLbCity, setNewLbCity] = useState("");
   const [newLbDateEnd, setNewLbDateEnd] = useState("");
   const [newLbSelected, setNewLbSelected] = useState([]);
@@ -12028,7 +12225,16 @@ export default function App() {
             {tab === "seller" && <SellerDashboard itemsDb={itemsDb} allClosetItems={itemsDb.rows.filter(i => !i.forSale)} onViewItem={(item) => setItemDetail(item)} />}
 
             {/* MOODBOARD */}
-            {tab === "moodboard" && <Moodboard closetItems={itemsDb.rows.filter(i => !i.forSale)} activeIdx={moodboardActiveIdx} setActiveIdx={setMoodboardActiveIdx} boards={moodboardsDb.boards} updateBoards={moodboardsDb.updateBoards} removeBoardById={moodboardsDb.removeBoardById} />}
+            {tab === "moodboard" && <Moodboard
+              closetItems={itemsDb.rows.filter(i => !i.forSale)}
+              activeIdx={moodboardActiveIdx}
+              setActiveIdx={setMoodboardActiveIdx}
+              boards={moodboardsDb.boards}
+              updateBoards={moodboardsDb.updateBoards}
+              removeBoardById={moodboardsDb.removeBoardById}
+              isEditing={isMoodboardEditing}
+              setIsEditing={setIsMoodboardEditing}
+            />}
 
             {/* SETTINGS */}
             {tab === "settings" && <SettingsTab
@@ -12106,6 +12312,8 @@ export default function App() {
             activeIdx={moodboardActiveIdx} setActiveIdx={setMoodboardActiveIdx}
             boards={moodboardsDb.boards} updateBoards={moodboardsDb.updateBoards} updateBoardById={moodboardsDb.updateBoardById} removeBoardById={moodboardsDb.removeBoardById}
             closetItems={itemsDb.rows}
+            isEditing={isMoodboardEditing}
+            setIsEditing={setIsMoodboardEditing}
             lookbooksDb={lookbooksDb.rows}
             createLookbook={async ({id: newId, name, moodboardId}) => {
               const lbId = newId || uid();

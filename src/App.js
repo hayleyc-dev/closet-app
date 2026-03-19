@@ -3309,27 +3309,33 @@ function LookbookViewer({ lookbook, outfits, allItems, closetItems, onClose, onU
         <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
 
           {view === "moodboard" ? (
-            /* ── MOODBOARD VIEW — always show, regardless of looks count ── */
-            <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden", background: "#faf9f6" }}>
-              {linkedMoodboardIdx >= 0 && moodboards[linkedMoodboardIdx] ? (
-                <div style={{ flex: 1, overflow: "auto" }}>
-                  <Moodboard
-                    closetItems={closetItems || []}
-                    activeIdx={linkedMoodboardIdx}
-                    setActiveIdx={setLinkedMoodboardIdx}
-                    boards={moodboardsProp}
-                    updateBoards={moodboardsUpdateBoards}
-                  />
+            /* ── MOODBOARD VIEW ── */
+            linkedMoodboardIdx >= 0 && moodboards[linkedMoodboardIdx] ? (
+              <Moodboard
+                closetItems={closetItems || []}
+                activeIdx={linkedMoodboardIdx}
+                setActiveIdx={setLinkedMoodboardIdx}
+                boards={moodboardsProp}
+                updateBoards={moodboardsUpdateBoards}
+              />
+            ) : (
+              <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 14, background: "#faf9f6" }}>
+                <SvgSparkle size={40} color="#ddd" />
+                <div style={{ fontSize: 15, fontWeight: 800, color: "#1a1a1a" }}>No moodboard yet</div>
+                <div style={{ fontSize: 13, color: "#aaa", textAlign: "center", maxWidth: 260 }}>Start a new board or link an existing one to this lookbook.</div>
+                <div style={{ display: "flex", gap: 8, flexWrap: "wrap", justifyContent: "center" }}>
+                  <button onClick={() => {
+                    const newId = uid();
+                    const newBoard = { id: newId, name: lbName || "Moodboard", items: [], bg: "#ffffff" };
+                    try { if (moodboardsUpdateBoards) moodboardsUpdateBoards(bs => [...(bs || []), newBoard]); } catch(e) { console.error(e); }
+                    setLinkedMoodboardId(newId);
+                  }} style={{ ...btnBase, padding: "10px 22px", background: "#1a1a1a", color: "#fff", fontSize: 13 }}>+ New Moodboard</button>
+                  {moodboards.length > 0 && (
+                    <button onClick={() => setShowLinkModal(true)} style={{ ...btnBase, padding: "10px 22px", background: "#f5f3ef", color: "#555", fontSize: 13 }}>Link Existing</button>
+                  )}
                 </div>
-              ) : (
-                <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 14 }}>
-                  <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#ddd" strokeWidth="1.5" strokeLinecap="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>
-                  <div style={{ fontSize: 15, fontWeight: 800, color: "#1a1a1a" }}>No moodboard linked</div>
-                  <div style={{ fontSize: 13, color: "#aaa" }}>Use the Link Moodboard button above to connect one.</div>
-                  <button onClick={() => setShowLinkModal(true)} style={{ ...btnBase, padding: "10px 22px", background: "#1a1a1a", color: "#fff", fontSize: 13 }}>+ Link Moodboard</button>
-                </div>
-              )}
-            </div>
+              </div>
+            )
 
           ) : looks.length === 0 ? (
             <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", color: "#ccc", gap: 12 }}>

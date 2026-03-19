@@ -281,7 +281,7 @@ const globalStyles = `
   .mb-card { background: #fff; border-radius: 18px; border: 1.5px solid #e8e4dc; overflow: hidden; cursor: pointer; box-shadow: 0 2px 10px rgba(0,0,0,0.05); transition: transform 0.15s, box-shadow 0.15s; }
   .mb-card:hover { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(0,0,0,0.10); }
   .mb-card-actions { max-height: 0; overflow: hidden; padding: 0; border-top: none; transition: max-height 0.2s ease, padding 0.2s ease; }
-  .mb-card:hover .mb-card-actions { max-height: 60px; padding: 8px 12px 10px; border-top: 1px solid #f5f2ee; }
+  .mb-card:hover .mb-card-actions { max-height: 90px; padding: 10px 12px 10px; border-top: 1px solid #f5f2ee; }
 
   /* Right rail cards */
   .right-card { background: #fff; border-radius: 16px; border: 1px solid #ece8e0; padding: 18px 16px; }
@@ -7169,14 +7169,13 @@ function MoodboardGridCard({ board, onPreview, onEdit, onArchive, onDelete }) {
         ))}
         {imgItems.length===0&&<div style={{position:"absolute",inset:0,display:"flex",alignItems:"center",justifyContent:"center"}}><SvgSparkle size={28} color="rgba(0,0,0,0.12)" /></div>}
       </div>
-      {/* Always-visible name row */}
-      <div style={{padding:"10px 12px 0",display:"flex",alignItems:"center",gap:6}}>
-        <div style={{fontSize:13,fontWeight:700,color:"#1a1a1a",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",flex:1}}>{board?.name||"Untitled"}</div>
-        {board?.pinned&&<span style={{color:"#f0c840",fontSize:11,flexShrink:0}}>★</span>}
-        {board?.linkedLb&&<span style={{fontSize:9,fontWeight:700,color:"#2d6a3f",background:"#f0faf4",border:"1px solid #b6e8c8",borderRadius:20,padding:"2px 6px",flexShrink:0}}>Lookbook</span>}
-      </div>
-      {/* Hover-reveal action buttons */}
+      {/* Hover-reveal: name + action buttons */}
       <div className="mb-card-actions">
+        <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:6}}>
+          <div style={{fontSize:13,fontWeight:700,color:"#1a1a1a",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",flex:1}}>{board?.name||"Untitled"}</div>
+          {board?.pinned&&<span style={{color:"#f0c840",fontSize:11,flexShrink:0}}>★</span>}
+          {board?.linkedLb&&<span style={{fontSize:9,fontWeight:700,color:"#2d6a3f",background:"#f0faf4",border:"1px solid #b6e8c8",borderRadius:20,padding:"2px 6px",flexShrink:0}}>Lookbook</span>}
+        </div>
         <div style={{display:"flex",gap:6,alignItems:"center"}}>
           <button onClick={e=>{e.stopPropagation();onEdit&&onEdit();}} title="Edit board"
             style={{width:30,height:30,borderRadius:8,background:"#f5f3ef",border:"none",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>

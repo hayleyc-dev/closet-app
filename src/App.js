@@ -2793,8 +2793,18 @@ function LookbookViewer({ lookbook, outfits, allItems, closetItems, onClose, onU
     hotel: "", activities: [], notes: ""
   });
   const [newActivity, setNewActivity] = useState("");
+  const [eventDetails, setEventDetails] = useState(lookbook.eventDetails || { eventDate: "", venue: "", dressCode: "" });
+  const [seasonInfo, setSeasonInfo] = useState(lookbook.seasonInfo || { season: "", year: new Date().getFullYear().toString() });
   const [plannedSlots, setPlannedSlots] = useState(() => lookbook.plannedSlots || []);
-  const [openAccordions, setOpenAccordions] = useState({ overview: true, trip: false, notes: false, looks: true });
+  const [openAccordions, setOpenAccordions] = useState(() => {
+    const t = lookbook.type || "trip";
+    if (t === "trip")        return { overview: true, trip: false, notes: false, looks: true };
+    if (t === "event")       return { overview: true, event: false, notes: false, looks: true };
+    if (t === "season")      return { overview: true, season: false, colorStory: false, notes: false, looks: true };
+    if (t === "capsule")     return { overview: true, capsuleStats: false, pieces: false, notes: false, looks: true };
+    if (t === "inspiration") return { overview: true, vibe: true, notes: false, looks: true };
+    return { overview: true, notes: false, looks: true };
+  });
   const toggleAccordion = (key) => setOpenAccordions(a => ({ ...a, [key]: !a[key] }));
   const [editingSlotId, setEditingSlotId] = useState(null);
   const [slotDragIdx, setSlotDragIdx] = useState(null);
@@ -2832,7 +2842,7 @@ function LookbookViewer({ lookbook, outfits, allItems, closetItems, onClose, onU
       onUpdate({
         ...lookbook, name: lbName, notes, outfitIds: lookIds, lookMeta,
         tags: lbTags, city: lbCity, coverImage, moodboardId: linkedMoodboardId,
-        tripDetails, dateStart: lbDateStart, dateEnd: lbDateEnd, plannedSlots, ...overrides
+        tripDetails, eventDetails, seasonInfo, dateStart: lbDateStart, dateEnd: lbDateEnd, plannedSlots, ...overrides
       });
     } catch(e) { console.error("save error:", e); }
   };
@@ -3011,6 +3021,35 @@ function LookbookViewer({ lookbook, outfits, allItems, closetItems, onClose, onU
     });
   });
   const repeatCount = Object.values(itemUsageCount).filter(c => c > 1).length;
+  // Type helpers
+  const lbType = lookbook.type || "trip";
+  const showPlannedSlots = ["trip", "event"].includes(lbType);
+
+  // Color story — dominant colors across all look items
+  const colorStory = (() => {
+    const freq = {};
+    looks.forEach(l => (l.layers || l.itemIds || []).forEach(id => {
+      const item = allItems.find(x => x.id === id);
+      if (!item) return;
+      (item.colors || (item.color ? [item.color] : [])).forEach(c => { freq[c] = (freq[c] || 0) + 1; });
+    }));
+    return Object.entries(freq).sort((a, b) => b[1] - a[1]).slice(0, 12).map(([c]) => c);
+  })();
+
+  // Capsule stats
+  const possibleCombos = looks.length <= 1 ? looks.length
+    : Math.min(looks.length * (looks.length - 1) / 2 + looks.length, 99);
+  const totalWorn = looks.reduce((s, l) => s + (l.wornDates || []).length, 0);
+  const costPerWear = totalWorn > 0 && totalVal > 0
+    ? "$" + (totalVal / totalWorn).toFixed(2) : "\u2014";
+
+  // Category breakdown (capsule)
+  const categoryBreakdown = (() => {
+    const cats = {};
+    packItems.forEach(item => { const c = item.category || "Other"; cats[c] = (cats[c] || 0) + 1; });
+    return Object.entries(cats).sort((a, b) => b[1] - a[1]);
+  })();
+
   const statTileStyle = { background: "#faf9f6", borderRadius: 10, padding: "10px 8px", textAlign: "center" };
   const acHdrStyle = { width: "100%", display: "flex", justifyContent: "space-between", alignItems: "center", background: "none", border: "none", borderBottom: "1.5px solid #f0ece4", cursor: "pointer", padding: "10px 16px", fontFamily: "'DM Sans', sans-serif" };
 
@@ -3147,46 +3186,122 @@ function LookbookViewer({ lookbook, outfits, allItems, closetItems, onClose, onU
         </div>
       </div>
 
-      {/* ── HERO HEADER ── */}
-      {(lbCity || dateStr || lbTags.length > 0 || lbWeather?.days) && (
-        <div style={{ background: "#fff", borderBottom: "1.5px solid #f0ece4", padding: "10px 20px", display: "flex", alignItems: "center", gap: 10, flexShrink: 0, flexWrap: "wrap" }}>
-          {lbCity && (
-            <div style={{ display: "flex", alignItems: "center", gap: 5, padding: "4px 12px", background: "#f5f3ef", borderRadius: 20 }}>
-              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#888" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/></svg>
-              <span style={{ fontSize: 12, fontWeight: 700, color: "#555" }}>{lbCity}</span>
-            </div>
-          )}
-          {(lbDateStart || lbDateEnd) && (
-            <div style={{ display: "flex", alignItems: "center", gap: 5, padding: "4px 12px", background: "#f5f3ef", borderRadius: 20 }}>
-              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#888" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
-              <span style={{ fontSize: 12, fontWeight: 700, color: "#555" }}>
-                {[fmtDate(lbDateStart), fmtDate(lbDateEnd)].filter(Boolean).join(" \u2013 ")}
-                {tripDays ? ` \u00B7 ${tripDays}d ${tripNights}n` : ""}
-              </span>
-            </div>
-          )}
-          {lbTags.map(t => (
-            <div key={t} style={{ padding: "4px 10px", background: "#1a1a1a", borderRadius: 20, fontSize: 11, fontWeight: 700, color: "#fff" }}>{t}</div>
-          ))}
-          {lbWeather?.days && (() => {
-            const wxDays = lbWeather.days.filter(d => {
-              if (!lbDateStart && !lbDateEnd) return true;
-              return d.date >= (lbDateStart || "0") && d.date <= (lbDateEnd || "9999");
-            }).slice(0, 6);
-            return wxDays.length > 0 ? (
-              <div style={{ display: "flex", gap: 4, marginLeft: "auto" }}>
-                {wxDays.map(d => (
-                  <div key={d.date} style={{ display: "flex", flexDirection: "column", alignItems: "center", padding: "3px 8px", background: "#faf9f6", borderRadius: 10, gap: 1, minWidth: 38 }}>
-                    <span style={{ fontSize: 14 }}>{wxIcon(d.code)}</span>
-                    <span style={{ fontSize: 9, fontWeight: 700, color: "#666" }}>{new Date(d.date + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" })}</span>
-                    <span style={{ fontSize: 9, color: "#888" }}>{d.high}\u00B0/{d.low}\u00B0</span>
+      {/* ── HERO HEADER (per type) ── */}
+      {(() => {
+        const heroPill = (content, bg = "#f5f3ef", color = "#555") => (
+          <div style={{ display: "flex", alignItems: "center", gap: 5, padding: "4px 12px", background: bg, borderRadius: 20 }}>
+            <span style={{ fontSize: 12, fontWeight: 700, color }}>{content}</span>
+          </div>
+        );
+        if (lbType === "trip") {
+          const hasContent = lbCity || lbDateStart || lbDateEnd || lbTags.length > 0 || lbWeather?.days;
+          if (!hasContent) return null;
+          return (
+            <div style={{ background: "#fff", borderBottom: "1.5px solid #f0ece4", padding: "10px 20px", display: "flex", alignItems: "center", gap: 10, flexShrink: 0, flexWrap: "wrap" }}>
+              {lbCity && (
+                <div style={{ display: "flex", alignItems: "center", gap: 5, padding: "4px 12px", background: "#f5f3ef", borderRadius: 20 }}>
+                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#888" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/></svg>
+                  <span style={{ fontSize: 12, fontWeight: 700, color: "#555" }}>{lbCity}</span>
+                </div>
+              )}
+              {(lbDateStart || lbDateEnd) && (
+                <div style={{ display: "flex", alignItems: "center", gap: 5, padding: "4px 12px", background: "#f5f3ef", borderRadius: 20 }}>
+                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#888" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+                  <span style={{ fontSize: 12, fontWeight: 700, color: "#555" }}>
+                    {[fmtDate(lbDateStart), fmtDate(lbDateEnd)].filter(Boolean).join(" \u2013 ")}
+                    {tripDays ? ` \u00B7 ${tripDays}d ${tripNights}n` : ""}
+                  </span>
+                </div>
+              )}
+              {lbWeather?.days && (() => {
+                const wxDays = lbWeather.days.filter(d => {
+                  if (!lbDateStart && !lbDateEnd) return true;
+                  return d.date >= (lbDateStart || "0") && d.date <= (lbDateEnd || "9999");
+                }).slice(0, 6);
+                return wxDays.length > 0 ? (
+                  <div style={{ display: "flex", gap: 4, marginLeft: "auto" }}>
+                    {wxDays.map(d => (
+                      <div key={d.date} style={{ display: "flex", flexDirection: "column", alignItems: "center", padding: "3px 8px", background: "#faf9f6", borderRadius: 10, gap: 1, minWidth: 38 }}>
+                        <span style={{ fontSize: 14 }}>{wxIcon(d.code)}</span>
+                        <span style={{ fontSize: 9, fontWeight: 700, color: "#666" }}>{new Date(d.date + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" })}</span>
+                        <span style={{ fontSize: 9, color: "#888" }}>{d.high}\u00B0/{d.low}\u00B0</span>
+                      </div>
+                    ))}
                   </div>
-                ))}
-              </div>
-            ) : null;
-          })()}
-        </div>
-      )}
+                ) : null;
+              })()}
+            </div>
+          );
+        }
+        if (lbType === "event") {
+          const hasContent = eventDetails.eventDate || eventDetails.venue || lbTags.length > 0;
+          if (!hasContent) return null;
+          return (
+            <div style={{ background: "#fff", borderBottom: "1.5px solid #f0ece4", padding: "10px 20px", display: "flex", alignItems: "center", gap: 10, flexShrink: 0, flexWrap: "wrap" }}>
+              {heroPill("Event", "#f0ece4", "#888")}
+              {eventDetails.eventDate && (
+                <div style={{ display: "flex", alignItems: "center", gap: 5, padding: "4px 12px", background: "#f5f3ef", borderRadius: 20 }}>
+                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#888" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+                  <span style={{ fontSize: 12, fontWeight: 700, color: "#555" }}>{fmtDate(eventDetails.eventDate)}</span>
+                </div>
+              )}
+              {eventDetails.venue && (
+                <div style={{ display: "flex", alignItems: "center", gap: 5, padding: "4px 12px", background: "#f5f3ef", borderRadius: 20 }}>
+                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#888" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/></svg>
+                  <span style={{ fontSize: 12, fontWeight: 700, color: "#555" }}>{eventDetails.venue}</span>
+                </div>
+              )}
+              {eventDetails.dressCode && heroPill(eventDetails.dressCode)}
+            </div>
+          );
+        }
+        if (lbType === "season") {
+          const seasonLabel = [seasonInfo.season, seasonInfo.year].filter(Boolean).join(" ");
+          const hasContent = seasonLabel || looks.length > 0;
+          if (!hasContent) return null;
+          return (
+            <div style={{ background: "#fff", borderBottom: "1.5px solid #f0ece4", padding: "10px 20px", display: "flex", alignItems: "center", gap: 10, flexShrink: 0, flexWrap: "wrap" }}>
+              {seasonLabel && heroPill("\u2726 " + seasonLabel)}
+              {heroPill(looks.length + " look" + (looks.length !== 1 ? "s" : ""), "#faf9f6", "#888")}
+              {colorStory.length > 0 && (
+                <div style={{ display: "flex", gap: 4, marginLeft: 4 }}>
+                  {colorStory.slice(0, 8).map(c => (
+                    <div key={c} title={c} style={{ width: 18, height: 18, borderRadius: "50%", background: c, border: "1.5px solid rgba(0,0,0,0.08)" }} />
+                  ))}
+                </div>
+              )}
+            </div>
+          );
+        }
+        if (lbType === "capsule") {
+          return (
+            <div style={{ background: "#fff", borderBottom: "1.5px solid #f0ece4", padding: "10px 20px", display: "flex", alignItems: "center", gap: 10, flexShrink: 0, flexWrap: "wrap" }}>
+              {heroPill(packItems.length + " piece" + (packItems.length !== 1 ? "s" : ""))}
+              {heroPill(looks.length + " outfit" + (looks.length !== 1 ? "s" : ""), "#faf9f6", "#888")}
+              {totalVal > 0 && heroPill("$" + Math.round(totalVal).toLocaleString() + " total", "#faf9f6", "#888")}
+            </div>
+          );
+        }
+        if (lbType === "inspiration") {
+          const hasContent = lbTags.length > 0 || linkedMoodboardId;
+          if (!hasContent) return null;
+          const linkedBoard = linkedMoodboardId ? moodboards.find(b => b.id === linkedMoodboardId) : null;
+          return (
+            <div style={{ background: "#fff", borderBottom: "1.5px solid #f0ece4", padding: "10px 20px", display: "flex", alignItems: "center", gap: 10, flexShrink: 0, flexWrap: "wrap" }}>
+              {lbTags.map(t => (
+                <div key={t} style={{ padding: "4px 10px", background: "#1a1a1a", borderRadius: 20, fontSize: 11, fontWeight: 700, color: "#fff" }}>{t}</div>
+              ))}
+              {linkedBoard && (
+                <div style={{ display: "flex", alignItems: "center", gap: 5, padding: "4px 12px", background: "#f5f3ef", borderRadius: 20 }}>
+                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#888" strokeWidth="2" strokeLinecap="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>
+                  <span style={{ fontSize: 12, fontWeight: 700, color: "#555" }}>{linkedBoard.name || "Board"}</span>
+                </div>
+              )}
+            </div>
+          );
+        }
+        return null;
+      })()}
 
       <div style={{ display: "flex", flex: 1, overflow: "hidden" }}>
         {/* ── MAIN CONTENT ── */}
@@ -3445,130 +3560,378 @@ function LookbookViewer({ lookbook, outfits, allItems, closetItems, onClose, onU
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#ccc" strokeWidth="2.5" strokeLinecap="round" style={{ transform: openAccordions.overview ? "rotate(180deg)" : "none", transition: "transform 0.2s" }}><polyline points="6 9 12 15 18 9"/></svg>
           </button>
           {openAccordions.overview && (
-            <div style={{ padding: "12px 16px 14px", display: "flex", flexDirection: "column", gap: 12 }}>
-              {/* Stats grid */}
+            <div style={{ padding: "12px 16px 14px" }}>
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 7 }}>
-                <div style={statTileStyle}>
-                  <div style={{ fontSize: 15, fontWeight: 800, color: "#1a1a1a", lineHeight: 1.2 }}>
-                    {looks.length}<span style={{ fontSize: 11, fontWeight: 600, color: "#bbb" }}> / {looks.length + plannedSlots.length}</span>
-                  </div>
-                  <div style={{ fontSize: 9, color: "#aaa", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", marginTop: 3 }}>Planned Looks</div>
-                </div>
-                <div style={statTileStyle}>
-                  <div style={{ fontSize: 15, fontWeight: 800, color: "#1a1a1a", lineHeight: 1.2 }}>{packItems.length}</div>
-                  <div style={{ fontSize: 9, color: "#aaa", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", marginTop: 3 }}>Packed Pieces</div>
-                </div>
-                {repeatCount > 0 && (
-                  <div style={statTileStyle}>
-                    <div style={{ fontSize: 15, fontWeight: 800, color: "#1a1a1a", lineHeight: 1.2 }}>{repeatCount}</div>
-                    <div style={{ fontSize: 9, color: "#aaa", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", marginTop: 3 }}>Repeats</div>
-                  </div>
-                )}
-                {tripDays && (
+                {lbType === "trip" && (<>
                   <div style={statTileStyle}>
                     <div style={{ fontSize: 15, fontWeight: 800, color: "#1a1a1a", lineHeight: 1.2 }}>
-                      {tripDays}<span style={{ fontSize: 10, color: "#bbb", fontWeight: 600 }}>d</span> {tripNights}<span style={{ fontSize: 10, color: "#bbb", fontWeight: 600 }}>n</span>
+                      {looks.length}<span style={{ fontSize: 11, fontWeight: 600, color: "#bbb" }}> / {looks.length + plannedSlots.length}</span>
                     </div>
-                    <div style={{ fontSize: 9, color: "#aaa", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", marginTop: 3 }}>Duration</div>
+                    <div style={{ fontSize: 9, color: "#aaa", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", marginTop: 3 }}>Planned Looks</div>
                   </div>
-                )}
+                  <div style={statTileStyle}>
+                    <div style={{ fontSize: 15, fontWeight: 800, color: "#1a1a1a", lineHeight: 1.2 }}>{packItems.length}</div>
+                    <div style={{ fontSize: 9, color: "#aaa", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", marginTop: 3 }}>Packed Pieces</div>
+                  </div>
+                  {repeatCount > 0 && (
+                    <div style={statTileStyle}>
+                      <div style={{ fontSize: 15, fontWeight: 800, color: "#1a1a1a", lineHeight: 1.2 }}>{repeatCount}</div>
+                      <div style={{ fontSize: 9, color: "#aaa", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", marginTop: 3 }}>Repeats</div>
+                    </div>
+                  )}
+                  {tripDays > 0 && (
+                    <div style={statTileStyle}>
+                      <div style={{ fontSize: 15, fontWeight: 800, color: "#1a1a1a", lineHeight: 1.2 }}>
+                        {tripDays}<span style={{ fontSize: 10, color: "#bbb", fontWeight: 600 }}>d</span> {tripNights}<span style={{ fontSize: 10, color: "#bbb", fontWeight: 600 }}>n</span>
+                      </div>
+                      <div style={{ fontSize: 9, color: "#aaa", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", marginTop: 3 }}>Duration</div>
+                    </div>
+                  )}
+                </>)}
+                {lbType === "event" && (<>
+                  <div style={statTileStyle}>
+                    <div style={{ fontSize: 15, fontWeight: 800, color: "#1a1a1a", lineHeight: 1.2 }}>{looks.length}</div>
+                    <div style={{ fontSize: 9, color: "#aaa", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", marginTop: 3 }}>Looks</div>
+                  </div>
+                  <div style={statTileStyle}>
+                    <div style={{ fontSize: 15, fontWeight: 800, color: "#1a1a1a", lineHeight: 1.2 }}>{totalVal > 0 ? "$" + totalVal.toLocaleString() : "\u2014"}</div>
+                    <div style={{ fontSize: 9, color: "#aaa", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", marginTop: 3 }}>Total Value</div>
+                  </div>
+                </>)}
+                {lbType === "season" && (<>
+                  <div style={statTileStyle}>
+                    <div style={{ fontSize: 15, fontWeight: 800, color: "#1a1a1a", lineHeight: 1.2 }}>{looks.length}</div>
+                    <div style={{ fontSize: 9, color: "#aaa", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", marginTop: 3 }}>Looks</div>
+                  </div>
+                  <div style={statTileStyle}>
+                    <div style={{ fontSize: 15, fontWeight: 800, color: "#1a1a1a", lineHeight: 1.2 }}>{packItems.length}</div>
+                    <div style={{ fontSize: 9, color: "#aaa", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", marginTop: 3 }}>Pieces</div>
+                  </div>
+                  <div style={{ ...statTileStyle, gridColumn: "1 / -1" }}>
+                    <div style={{ fontSize: 15, fontWeight: 800, color: "#1a1a1a", lineHeight: 1.2 }}>{totalVal > 0 ? "$" + totalVal.toLocaleString() : "\u2014"}</div>
+                    <div style={{ fontSize: 9, color: "#aaa", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", marginTop: 3 }}>Total Value</div>
+                  </div>
+                </>)}
+                {lbType === "capsule" && (<>
+                  <div style={statTileStyle}>
+                    <div style={{ fontSize: 15, fontWeight: 800, color: "#1a1a1a", lineHeight: 1.2 }}>{looks.length}</div>
+                    <div style={{ fontSize: 9, color: "#aaa", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", marginTop: 3 }}>Outfits</div>
+                  </div>
+                  <div style={statTileStyle}>
+                    <div style={{ fontSize: 15, fontWeight: 800, color: "#1a1a1a", lineHeight: 1.2 }}>{packItems.length}</div>
+                    <div style={{ fontSize: 9, color: "#aaa", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", marginTop: 3 }}>Pieces</div>
+                  </div>
+                  <div style={statTileStyle}>
+                    <div style={{ fontSize: 15, fontWeight: 800, color: "#1a1a1a", lineHeight: 1.2 }}>{possibleCombos}{possibleCombos >= 99 ? "+" : ""}</div>
+                    <div style={{ fontSize: 9, color: "#aaa", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", marginTop: 3 }}>Combos</div>
+                  </div>
+                  <div style={statTileStyle}>
+                    <div style={{ fontSize: 15, fontWeight: 800, color: "#1a1a1a", lineHeight: 1.2 }}>{costPerWear}</div>
+                    <div style={{ fontSize: 9, color: "#aaa", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", marginTop: 3 }}>Avg Cost/Wear</div>
+                  </div>
+                </>)}
+                {lbType === "inspiration" && (<>
+                  <div style={statTileStyle}>
+                    <div style={{ fontSize: 15, fontWeight: 800, color: "#1a1a1a", lineHeight: 1.2 }}>{looks.length}</div>
+                    <div style={{ fontSize: 9, color: "#aaa", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", marginTop: 3 }}>Looks</div>
+                  </div>
+                  <div style={statTileStyle}>
+                    <div style={{ fontSize: 15, fontWeight: 800, color: "#1a1a1a", lineHeight: 1.2 }}>{linkedMoodboardId ? "\u2713" : "\u2014"}</div>
+                    <div style={{ fontSize: 9, color: "#aaa", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", marginTop: 3 }}>Moodboard</div>
+                  </div>
+                </>)}
               </div>
             </div>
           )}
 
-          {/* ── TRIP ── */}
-          <button onClick={() => toggleAccordion("trip")} style={{ ...acHdrStyle }}>
-            <span style={{ fontSize: 10, fontWeight: 700, color: "#aaa", textTransform: "uppercase", letterSpacing: "0.1em" }}>Trip</span>
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#ccc" strokeWidth="2.5" strokeLinecap="round" style={{ transform: openAccordions.trip ? "rotate(180deg)" : "none", transition: "transform 0.2s" }}><polyline points="6 9 12 15 18 9"/></svg>
-          </button>
-          {openAccordions.trip && (
-            <div style={{ padding: "12px 16px 14px", display: "flex", flexDirection: "column", gap: 10 }}>
-              {/* Name */}
-              <div>
-                <div style={{ fontSize: 9, fontWeight: 700, color: "#bbb", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 4 }}>Name</div>
-                <input value={lbName} onChange={e => setLbName(e.target.value)} onBlur={() => save()}
-                  style={{ width: "100%", padding: "6px 10px", border: "1.5px solid #e8e4dc", borderRadius: 8, fontFamily: "'DM Sans', sans-serif", fontSize: 12, outline: "none", boxSizing: "border-box" }} />
-              </div>
-              {/* Dates */}
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 7 }}>
+          {/* ── TRIP ACCORDION ── */}
+          {lbType === "trip" && (<>
+            <button onClick={() => toggleAccordion("trip")} style={{ ...acHdrStyle }}>
+              <span style={{ fontSize: 10, fontWeight: 700, color: "#aaa", textTransform: "uppercase", letterSpacing: "0.1em" }}>Trip</span>
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#ccc" strokeWidth="2.5" strokeLinecap="round" style={{ transform: openAccordions.trip ? "rotate(180deg)" : "none", transition: "transform 0.2s" }}><polyline points="6 9 12 15 18 9"/></svg>
+            </button>
+            {openAccordions.trip && (
+              <div style={{ padding: "12px 16px 14px", display: "flex", flexDirection: "column", gap: 10 }}>
                 <div>
-                  <div style={{ fontSize: 9, fontWeight: 700, color: "#bbb", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 4 }}>Start</div>
-                  <input type="date" value={lbDateStart} onChange={e => setLbDateStart(e.target.value)} onBlur={() => save()}
-                    style={{ width: "100%", padding: "6px 6px", border: "1.5px solid #e8e4dc", borderRadius: 8, fontFamily: "'DM Sans', sans-serif", fontSize: 10, outline: "none", boxSizing: "border-box" }} />
+                  <div style={{ fontSize: 9, fontWeight: 700, color: "#bbb", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 4 }}>Name</div>
+                  <input value={lbName} onChange={e => setLbName(e.target.value)} onBlur={() => save()}
+                    style={{ width: "100%", padding: "6px 10px", border: "1.5px solid #e8e4dc", borderRadius: 8, fontFamily: "'DM Sans', sans-serif", fontSize: 12, outline: "none", boxSizing: "border-box" }} />
+                </div>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 7 }}>
+                  <div>
+                    <div style={{ fontSize: 9, fontWeight: 700, color: "#bbb", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 4 }}>Start</div>
+                    <input type="date" value={lbDateStart} onChange={e => setLbDateStart(e.target.value)} onBlur={() => save()}
+                      style={{ width: "100%", padding: "6px 6px", border: "1.5px solid #e8e4dc", borderRadius: 8, fontFamily: "'DM Sans', sans-serif", fontSize: 10, outline: "none", boxSizing: "border-box" }} />
+                  </div>
+                  <div>
+                    <div style={{ fontSize: 9, fontWeight: 700, color: "#bbb", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 4 }}>End</div>
+                    <input type="date" value={lbDateEnd} onChange={e => setLbDateEnd(e.target.value)} onBlur={() => save()}
+                      style={{ width: "100%", padding: "6px 6px", border: "1.5px solid #e8e4dc", borderRadius: 8, fontFamily: "'DM Sans', sans-serif", fontSize: 10, outline: "none", boxSizing: "border-box" }} />
+                  </div>
                 </div>
                 <div>
-                  <div style={{ fontSize: 9, fontWeight: 700, color: "#bbb", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 4 }}>End</div>
-                  <input type="date" value={lbDateEnd} onChange={e => setLbDateEnd(e.target.value)} onBlur={() => save()}
-                    style={{ width: "100%", padding: "6px 6px", border: "1.5px solid #e8e4dc", borderRadius: 8, fontFamily: "'DM Sans', sans-serif", fontSize: 10, outline: "none", boxSizing: "border-box" }} />
+                  <div style={{ fontSize: 9, fontWeight: 700, color: "#bbb", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 4 }}>Destination</div>
+                  <div style={{ display: "flex", gap: 6 }}>
+                    <input value={lbCity} onChange={e => setLbCity(e.target.value)} placeholder="City (e.g. Orlando, FL)"
+                      onKeyDown={e => { if (e.key === "Enter") fetchWeather(); }}
+                      style={{ flex: 1, padding: "6px 10px", border: "1.5px solid #e8e4dc", borderRadius: 8, fontFamily: "'DM Sans', sans-serif", fontSize: 12, outline: "none" }} />
+                    <button onClick={fetchWeather} disabled={wxLoading || !lbCity.trim()} style={{ ...btnBase, padding: "6px 10px", background: "#f5f3ef", color: "#555", fontSize: 12, border: "none", flexShrink: 0 }}>
+                      {wxLoading ? "\u2026" : "\u26C5"}
+                    </button>
+                  </div>
+                  {lbWeather?.error && <div style={{ fontSize: 11, color: "#e05555", marginTop: 4 }}>{lbWeather.error}</div>}
+                  {lbWeather?.days && lbWeather.days.length > 0 && (
+                    <div style={{ marginTop: 6, maxHeight: 140, overflowY: "auto", display: "flex", flexDirection: "column", gap: 3 }}>
+                      {lbWeather.days.filter(d => {
+                        if (!lbDateStart && !lbDateEnd) return true;
+                        return d.date >= (lbDateStart || "0") && d.date <= (lbDateEnd || "9999");
+                      }).slice(0, 14).map(d => (
+                        <div key={d.date} style={{ display: "flex", alignItems: "center", gap: 8, padding: "3px 6px", borderRadius: 7, background: "#faf9f6" }}>
+                          <span style={{ fontSize: 13 }}>{wxIcon(d.code)}</span>
+                          <span style={{ fontSize: 11, fontWeight: 700, color: "#555", flex: 1 }}>{new Date(d.date + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" })}</span>
+                          <span style={{ fontSize: 11, color: "#1a1a1a", fontWeight: 700 }}>{d.high}\u00B0</span>
+                          <span style={{ fontSize: 10, color: "#bbb" }}>{d.low}\u00B0</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
-              </div>
-              {/* Destination + Weather */}
-              <div>
-                <div style={{ fontSize: 9, fontWeight: 700, color: "#bbb", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 4 }}>Destination</div>
-                <div style={{ display: "flex", gap: 6 }}>
-                  <input value={lbCity} onChange={e => setLbCity(e.target.value)} placeholder="City (e.g. Orlando, FL)"
-                    onKeyDown={e => { if (e.key === "Enter") fetchWeather(); }}
-                    style={{ flex: 1, padding: "6px 10px", border: "1.5px solid #e8e4dc", borderRadius: 8, fontFamily: "'DM Sans', sans-serif", fontSize: 12, outline: "none" }} />
-                  <button onClick={fetchWeather} disabled={wxLoading || !lbCity.trim()} style={{ ...btnBase, padding: "6px 10px", background: "#f5f3ef", color: "#555", fontSize: 12, border: "none", flexShrink: 0 }}>
-                    {wxLoading ? "\u2026" : "\u26C5"}
-                  </button>
+                <div>
+                  <div style={{ fontSize: 9, fontWeight: 700, color: "#bbb", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 4 }}>Hotel</div>
+                  <input value={tripDetails.hotel || ""} onChange={e => setTripDetails(d => ({ ...d, hotel: e.target.value }))} onBlur={() => saveTripDetails({})}
+                    placeholder="Hotel name\u2026"
+                    style={{ width: "100%", padding: "6px 10px", border: "1.5px solid #e8e4dc", borderRadius: 8, fontFamily: "'DM Sans', sans-serif", fontSize: 12, outline: "none", boxSizing: "border-box" }} />
                 </div>
-                {lbWeather?.error && <div style={{ fontSize: 11, color: "#e05555", marginTop: 4 }}>{lbWeather.error}</div>}
-                {lbWeather?.days && lbWeather.days.length > 0 && (
-                  <div style={{ marginTop: 6, maxHeight: 140, overflowY: "auto", display: "flex", flexDirection: "column", gap: 3 }}>
-                    {lbWeather.days.filter(d => {
-                      if (!lookbook.dateStart && !lookbook.dateEnd) return true;
-                      return d.date >= (lookbook.dateStart || "0") && d.date <= (lookbook.dateEnd || "9999");
-                    }).slice(0, 14).map(d => (
-                      <div key={d.date} style={{ display: "flex", alignItems: "center", gap: 8, padding: "3px 6px", borderRadius: 7, background: "#faf9f6" }}>
-                        <span style={{ fontSize: 13 }}>{wxIcon(d.code)}</span>
-                        <span style={{ fontSize: 11, fontWeight: 700, color: "#555", flex: 1 }}>{new Date(d.date + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" })}</span>
-                        <span style={{ fontSize: 11, color: "#1a1a1a", fontWeight: 700 }}>{d.high}\u00B0</span>
-                        <span style={{ fontSize: 10, color: "#bbb" }}>{d.low}\u00B0</span>
+                <div>
+                  <div style={{ fontSize: 9, fontWeight: 700, color: "#bbb", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 4 }}>Activities</div>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 3, marginBottom: 5 }}>
+                    {(tripDetails.activities || []).map((act, i) => (
+                      <div key={i} style={{ display: "flex", alignItems: "center", gap: 6, padding: "5px 8px", background: "#faf9f6", borderRadius: 7, border: "1px solid #e8e4dc" }}>
+                        <span style={{ flex: 1, fontSize: 12, color: "#444", fontWeight: 600 }}>{act}</span>
+                        <button onClick={() => { const next = (tripDetails.activities || []).filter((_, j) => j !== i); saveTripDetails({ activities: next }); }}
+                          style={{ background: "none", border: "none", cursor: "pointer", color: "#ccc", fontSize: 14, lineHeight: 1, padding: "0 2px" }}
+                          onMouseEnter={e => e.currentTarget.style.color = "#e05555"}
+                          onMouseLeave={e => e.currentTarget.style.color = "#ccc"}>\u00D7</button>
                       </div>
                     ))}
                   </div>
+                  <div style={{ display: "flex", gap: 5 }}>
+                    <input value={newActivity} onChange={e => setNewActivity(e.target.value)}
+                      onKeyDown={e => { if (e.key === "Enter" && newActivity.trim()) { saveTripDetails({ activities: [...(tripDetails.activities || []), newActivity.trim()] }); setNewActivity(""); } }}
+                      placeholder="Add activity\u2026"
+                      style={{ flex: 1, padding: "5px 8px", border: "1.5px solid #e8e4dc", borderRadius: 8, fontFamily: "'DM Sans', sans-serif", fontSize: 12, outline: "none" }} />
+                    <button onClick={() => { if (newActivity.trim()) { saveTripDetails({ activities: [...(tripDetails.activities || []), newActivity.trim()] }); setNewActivity(""); } }}
+                      style={{ padding: "5px 10px", background: "#1a1a1a", color: "#fff", border: "none", borderRadius: 8, cursor: "pointer", fontSize: 13, fontWeight: 700, fontFamily: "'DM Sans', sans-serif" }}>+</button>
+                  </div>
+                </div>
+                <div>
+                  <div style={{ fontSize: 9, fontWeight: 700, color: "#bbb", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 4 }}>Other Notes</div>
+                  <textarea value={tripDetails.notes || ""} onChange={e => setTripDetails(d => ({ ...d, notes: e.target.value }))} onBlur={() => saveTripDetails({})}
+                    placeholder="Reservations, dress codes, reminders\u2026"
+                    style={{ width: "100%", padding: "6px 10px", border: "1.5px solid #e8e4dc", borderRadius: 8, fontFamily: "'DM Sans', sans-serif", fontSize: 12, outline: "none", resize: "vertical", minHeight: 56, boxSizing: "border-box" }} />
+                </div>
+              </div>
+            )}
+          </>)}
+
+          {/* ── EVENT DETAILS ACCORDION ── */}
+          {lbType === "event" && (<>
+            <button onClick={() => toggleAccordion("event")} style={{ ...acHdrStyle }}>
+              <span style={{ fontSize: 10, fontWeight: 700, color: "#aaa", textTransform: "uppercase", letterSpacing: "0.1em" }}>Event Details</span>
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#ccc" strokeWidth="2.5" strokeLinecap="round" style={{ transform: openAccordions.event ? "rotate(180deg)" : "none", transition: "transform 0.2s" }}><polyline points="6 9 12 15 18 9"/></svg>
+            </button>
+            {openAccordions.event && (
+              <div style={{ padding: "12px 16px 14px", display: "flex", flexDirection: "column", gap: 10 }}>
+                <div>
+                  <div style={{ fontSize: 9, fontWeight: 700, color: "#bbb", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 4 }}>Name</div>
+                  <input value={lbName} onChange={e => setLbName(e.target.value)} onBlur={() => save()}
+                    style={{ width: "100%", padding: "6px 10px", border: "1.5px solid #e8e4dc", borderRadius: 8, fontFamily: "'DM Sans', sans-serif", fontSize: 12, outline: "none", boxSizing: "border-box" }} />
+                </div>
+                <div>
+                  <div style={{ fontSize: 9, fontWeight: 700, color: "#bbb", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 4 }}>Event Date</div>
+                  <input type="date" value={eventDetails.eventDate} onChange={e => setEventDetails(d => ({ ...d, eventDate: e.target.value }))} onBlur={() => save()}
+                    style={{ width: "100%", padding: "6px 8px", border: "1.5px solid #e8e4dc", borderRadius: 8, fontFamily: "'DM Sans', sans-serif", fontSize: 12, outline: "none", boxSizing: "border-box" }} />
+                </div>
+                <div>
+                  <div style={{ fontSize: 9, fontWeight: 700, color: "#bbb", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 4 }}>Venue / Location</div>
+                  <input value={eventDetails.venue} onChange={e => setEventDetails(d => ({ ...d, venue: e.target.value }))} onBlur={() => save()}
+                    placeholder="Venue name or address\u2026"
+                    style={{ width: "100%", padding: "6px 10px", border: "1.5px solid #e8e4dc", borderRadius: 8, fontFamily: "'DM Sans', sans-serif", fontSize: 12, outline: "none", boxSizing: "border-box" }} />
+                </div>
+                <div>
+                  <div style={{ fontSize: 9, fontWeight: 700, color: "#bbb", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 4 }}>Dress Code</div>
+                  <input value={eventDetails.dressCode} onChange={e => setEventDetails(d => ({ ...d, dressCode: e.target.value }))} onBlur={() => save()}
+                    placeholder="e.g. Black tie, Cocktail\u2026"
+                    style={{ width: "100%", padding: "6px 10px", border: "1.5px solid #e8e4dc", borderRadius: 8, fontFamily: "'DM Sans', sans-serif", fontSize: 12, outline: "none", boxSizing: "border-box" }} />
+                </div>
+              </div>
+            )}
+          </>)}
+
+          {/* ── SEASON + COLOR STORY ACCORDIONS ── */}
+          {lbType === "season" && (<>
+            <button onClick={() => toggleAccordion("season")} style={{ ...acHdrStyle }}>
+              <span style={{ fontSize: 10, fontWeight: 700, color: "#aaa", textTransform: "uppercase", letterSpacing: "0.1em" }}>Season</span>
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#ccc" strokeWidth="2.5" strokeLinecap="round" style={{ transform: openAccordions.season ? "rotate(180deg)" : "none", transition: "transform 0.2s" }}><polyline points="6 9 12 15 18 9"/></svg>
+            </button>
+            {openAccordions.season && (
+              <div style={{ padding: "12px 16px 14px", display: "flex", flexDirection: "column", gap: 10 }}>
+                <div>
+                  <div style={{ fontSize: 9, fontWeight: 700, color: "#bbb", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 4 }}>Name</div>
+                  <input value={lbName} onChange={e => setLbName(e.target.value)} onBlur={() => save()}
+                    style={{ width: "100%", padding: "6px 10px", border: "1.5px solid #e8e4dc", borderRadius: 8, fontFamily: "'DM Sans', sans-serif", fontSize: 12, outline: "none", boxSizing: "border-box" }} />
+                </div>
+                <div>
+                  <div style={{ fontSize: 9, fontWeight: 700, color: "#bbb", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 6 }}>Season</div>
+                  <div style={{ display: "flex", gap: 5, flexWrap: "wrap" }}>
+                    {["Spring", "Summer", "Fall", "Winter"].map(s => (
+                      <button key={s} onClick={() => { const next = { ...seasonInfo, season: s }; setSeasonInfo(next); save({ seasonInfo: next }); }}
+                        style={{ padding: "5px 12px", borderRadius: 20, border: "1.5px solid", borderColor: seasonInfo.season === s ? "#1a1a1a" : "#e8e4dc", background: seasonInfo.season === s ? "#1a1a1a" : "#fff", color: seasonInfo.season === s ? "#fff" : "#666", fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: "'DM Sans', sans-serif" }}>
+                        {s}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <div>
+                  <div style={{ fontSize: 9, fontWeight: 700, color: "#bbb", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 4 }}>Year</div>
+                  <input value={seasonInfo.year} onChange={e => setSeasonInfo(d => ({ ...d, year: e.target.value }))} onBlur={() => save()}
+                    placeholder="2026"
+                    style={{ width: "100%", padding: "6px 10px", border: "1.5px solid #e8e4dc", borderRadius: 8, fontFamily: "'DM Sans', sans-serif", fontSize: 12, outline: "none", boxSizing: "border-box" }} />
+                </div>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 7 }}>
+                  <div>
+                    <div style={{ fontSize: 9, fontWeight: 700, color: "#bbb", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 4 }}>Start</div>
+                    <input type="date" value={lbDateStart} onChange={e => setLbDateStart(e.target.value)} onBlur={() => save()}
+                      style={{ width: "100%", padding: "6px 6px", border: "1.5px solid #e8e4dc", borderRadius: 8, fontFamily: "'DM Sans', sans-serif", fontSize: 10, outline: "none", boxSizing: "border-box" }} />
+                  </div>
+                  <div>
+                    <div style={{ fontSize: 9, fontWeight: 700, color: "#bbb", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 4 }}>End</div>
+                    <input type="date" value={lbDateEnd} onChange={e => setLbDateEnd(e.target.value)} onBlur={() => save()}
+                      style={{ width: "100%", padding: "6px 6px", border: "1.5px solid #e8e4dc", borderRadius: 8, fontFamily: "'DM Sans', sans-serif", fontSize: 10, outline: "none", boxSizing: "border-box" }} />
+                  </div>
+                </div>
+              </div>
+            )}
+            <button onClick={() => toggleAccordion("colorStory")} style={{ ...acHdrStyle }}>
+              <span style={{ fontSize: 10, fontWeight: 700, color: "#aaa", textTransform: "uppercase", letterSpacing: "0.1em" }}>Color Story</span>
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#ccc" strokeWidth="2.5" strokeLinecap="round" style={{ transform: openAccordions.colorStory ? "rotate(180deg)" : "none", transition: "transform 0.2s" }}><polyline points="6 9 12 15 18 9"/></svg>
+            </button>
+            {openAccordions.colorStory && (
+              <div style={{ padding: "12px 16px 14px" }}>
+                {colorStory.length > 0 ? (
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 7 }}>
+                    {colorStory.map((c, i) => (
+                      <div key={i} title={c} style={{ width: 26, height: 26, borderRadius: "50%", background: c, border: "2px solid rgba(0,0,0,0.08)", flexShrink: 0 }} />
+                    ))}
+                  </div>
+                ) : (
+                  <div style={{ fontSize: 12, color: "#bbb", fontStyle: "italic" }}>Add outfits to see your color palette.</div>
                 )}
               </div>
-              {/* Hotel */}
-              <div>
-                <div style={{ fontSize: 9, fontWeight: 700, color: "#bbb", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 4 }}>Hotel</div>
-                <input value={tripDetails.hotel || ""} onChange={e => setTripDetails(d => ({ ...d, hotel: e.target.value }))} onBlur={() => saveTripDetails({})}
-                  placeholder="Hotel name\u2026"
-                  style={{ width: "100%", padding: "6px 10px", border: "1.5px solid #e8e4dc", borderRadius: 8, fontFamily: "'DM Sans', sans-serif", fontSize: 12, outline: "none", boxSizing: "border-box" }} />
-              </div>
-              {/* Activities */}
-              <div>
-                <div style={{ fontSize: 9, fontWeight: 700, color: "#bbb", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 4 }}>Activities</div>
-                <div style={{ display: "flex", flexDirection: "column", gap: 3, marginBottom: 5 }}>
-                  {(tripDetails.activities || []).map((act, i) => (
-                    <div key={i} style={{ display: "flex", alignItems: "center", gap: 6, padding: "5px 8px", background: "#faf9f6", borderRadius: 7, border: "1px solid #e8e4dc" }}>
-                      <span style={{ flex: 1, fontSize: 12, color: "#444", fontWeight: 600 }}>{act}</span>
-                      <button onClick={() => { const next = (tripDetails.activities || []).filter((_, j) => j !== i); saveTripDetails({ activities: next }); }}
-                        style={{ background: "none", border: "none", cursor: "pointer", color: "#ccc", fontSize: 14, lineHeight: 1, padding: "0 2px" }}
-                        onMouseEnter={e => e.currentTarget.style.color = "#e05555"}
-                        onMouseLeave={e => e.currentTarget.style.color = "#ccc"}>×</button>
+            )}
+          </>)}
+
+          {/* ── CAPSULE STATS + PIECES ACCORDIONS ── */}
+          {lbType === "capsule" && (<>
+            <button onClick={() => toggleAccordion("capsuleStats")} style={{ ...acHdrStyle }}>
+              <span style={{ fontSize: 10, fontWeight: 700, color: "#aaa", textTransform: "uppercase", letterSpacing: "0.1em" }}>Capsule Details</span>
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#ccc" strokeWidth="2.5" strokeLinecap="round" style={{ transform: openAccordions.capsuleStats ? "rotate(180deg)" : "none", transition: "transform 0.2s" }}><polyline points="6 9 12 15 18 9"/></svg>
+            </button>
+            {openAccordions.capsuleStats && (
+              <div style={{ padding: "12px 16px 14px", display: "flex", flexDirection: "column", gap: 10 }}>
+                <div>
+                  <div style={{ fontSize: 9, fontWeight: 700, color: "#bbb", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 4 }}>Name</div>
+                  <input value={lbName} onChange={e => setLbName(e.target.value)} onBlur={() => save()}
+                    style={{ width: "100%", padding: "6px 10px", border: "1.5px solid #e8e4dc", borderRadius: 8, fontFamily: "'DM Sans', sans-serif", fontSize: 12, outline: "none", boxSizing: "border-box" }} />
+                </div>
+                {categoryBreakdown.length > 0 && (
+                  <div>
+                    <div style={{ fontSize: 9, fontWeight: 700, color: "#bbb", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 6 }}>Categories</div>
+                    <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                      {categoryBreakdown.map(([cat, count]) => (
+                        <div key={cat} style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                          <div style={{ flex: 1, fontSize: 12, color: "#444", fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{cat}</div>
+                          <div style={{ fontSize: 12, fontWeight: 700, color: "#888", flexShrink: 0 }}>{count}</div>
+                          <div style={{ width: 50, height: 4, borderRadius: 3, background: "#f0ece4", overflow: "hidden", flexShrink: 0 }}>
+                            <div style={{ height: "100%", borderRadius: 3, background: "#1a1a1a", width: (packItems.length > 0 ? count / packItems.length * 100 : 0) + "%" }} />
+                          </div>
+                        </div>
+                      ))}
                     </div>
-                  ))}
-                </div>
-                <div style={{ display: "flex", gap: 5 }}>
-                  <input value={newActivity} onChange={e => setNewActivity(e.target.value)}
-                    onKeyDown={e => { if (e.key === "Enter" && newActivity.trim()) { saveTripDetails({ activities: [...(tripDetails.activities || []), newActivity.trim()] }); setNewActivity(""); } }}
-                    placeholder="Add activity\u2026"
-                    style={{ flex: 1, padding: "5px 8px", border: "1.5px solid #e8e4dc", borderRadius: 8, fontFamily: "'DM Sans', sans-serif", fontSize: 12, outline: "none" }} />
-                  <button onClick={() => { if (newActivity.trim()) { saveTripDetails({ activities: [...(tripDetails.activities || []), newActivity.trim()] }); setNewActivity(""); } }}
-                    style={{ padding: "5px 10px", background: "#1a1a1a", color: "#fff", border: "none", borderRadius: 8, cursor: "pointer", fontSize: 13, fontWeight: 700, fontFamily: "'DM Sans', sans-serif" }}>+</button>
+                  </div>
+                )}
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 0", borderTop: "1px solid #f0ece4" }}>
+                  <span style={{ fontSize: 12, fontWeight: 700, color: "#555" }}>Total Cost</span>
+                  <span style={{ fontSize: 13, fontWeight: 800, color: "#1a1a1a" }}>{totalVal > 0 ? "$" + totalVal.toLocaleString() : "\u2014"}</span>
                 </div>
               </div>
-              {/* Other notes */}
-              <div>
-                <div style={{ fontSize: 9, fontWeight: 700, color: "#bbb", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 4 }}>Other Notes</div>
-                <textarea value={tripDetails.notes || ""} onChange={e => setTripDetails(d => ({ ...d, notes: e.target.value }))} onBlur={() => saveTripDetails({})}
-                  placeholder="Reservations, dress codes, reminders\u2026"
-                  style={{ width: "100%", padding: "6px 10px", border: "1.5px solid #e8e4dc", borderRadius: 8, fontFamily: "'DM Sans', sans-serif", fontSize: 12, outline: "none", resize: "vertical", minHeight: 56, boxSizing: "border-box" }} />
+            )}
+            <button onClick={() => toggleAccordion("pieces")} style={{ ...acHdrStyle }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                <span style={{ fontSize: 10, fontWeight: 700, color: "#aaa", textTransform: "uppercase", letterSpacing: "0.1em" }}>Pieces</span>
+                {packItems.length > 0 && <span style={{ fontSize: 9, fontWeight: 700, color: "#fff", background: "#1a1a1a", borderRadius: 20, padding: "1px 7px" }}>{packItems.length}</span>}
               </div>
-            </div>
-          )}
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#ccc" strokeWidth="2.5" strokeLinecap="round" style={{ transform: openAccordions.pieces ? "rotate(180deg)" : "none", transition: "transform 0.2s" }}><polyline points="6 9 12 15 18 9"/></svg>
+            </button>
+            {openAccordions.pieces && (
+              <div style={{ padding: "8px 16px 12px", display: "flex", flexDirection: "column", gap: 4 }}>
+                {packItems.length === 0 ? (
+                  <div style={{ fontSize: 12, color: "#bbb", fontStyle: "italic", padding: "8px 0" }}>Add outfits to see pieces.</div>
+                ) : packItems.map(item => (
+                  <div key={item.id} style={{ display: "flex", alignItems: "center", gap: 8, padding: "5px 8px", background: "#fafaf8", borderRadius: 9, border: "1.5px solid #e8e4dc" }}>
+                    {item.image ? (
+                      <img src={item.image} alt={item.name} style={{ width: 28, height: 28, objectFit: "contain", borderRadius: 5, flexShrink: 0, background: "#f5f3ef" }} />
+                    ) : (
+                      <div style={{ width: 28, height: 28, borderRadius: 5, background: "#f0ece4", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                        <HangerIcon size={14} color="#ccc" />
+                      </div>
+                    )}
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: 11, fontWeight: 700, color: "#1a1a1a", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{item.name}</div>
+                      {item.category && <div style={{ fontSize: 9, color: "#aaa", marginTop: 1 }}>{item.category}</div>}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </>)}
+
+          {/* ── INSPIRATION VIBE ACCORDION ── */}
+          {lbType === "inspiration" && (<>
+            <button onClick={() => toggleAccordion("vibe")} style={{ ...acHdrStyle }}>
+              <span style={{ fontSize: 10, fontWeight: 700, color: "#aaa", textTransform: "uppercase", letterSpacing: "0.1em" }}>Vibe</span>
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#ccc" strokeWidth="2.5" strokeLinecap="round" style={{ transform: openAccordions.vibe ? "rotate(180deg)" : "none", transition: "transform 0.2s" }}><polyline points="6 9 12 15 18 9"/></svg>
+            </button>
+            {openAccordions.vibe && (
+              <div style={{ padding: "12px 16px 14px", display: "flex", flexDirection: "column", gap: 10 }}>
+                <div>
+                  <div style={{ fontSize: 9, fontWeight: 700, color: "#bbb", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 4 }}>Name</div>
+                  <input value={lbName} onChange={e => setLbName(e.target.value)} onBlur={() => save()}
+                    style={{ width: "100%", padding: "6px 10px", border: "1.5px solid #e8e4dc", borderRadius: 8, fontFamily: "'DM Sans', sans-serif", fontSize: 12, outline: "none", boxSizing: "border-box" }} />
+                </div>
+                <div>
+                  <div style={{ fontSize: 9, fontWeight: 700, color: "#bbb", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 4 }}>Linked Moodboard</div>
+                  <select value={linkedMoodboardId || ""} onChange={e => { const mbId = e.target.value; save({ moodboardId: mbId || null }); }}
+                    style={{ width: "100%", padding: "6px 10px", border: "1.5px solid #e8e4dc", borderRadius: 8, fontFamily: "'DM Sans', sans-serif", fontSize: 12, outline: "none", background: "#fff", boxSizing: "border-box" }}>
+                    <option value="">— None —</option>
+                    {(moodboardsProp || []).map(mb => (
+                      <option key={mb.id} value={mb.id}>{mb.name || "Untitled Board"}</option>
+                    ))}
+                  </select>
+                </div>
+                {colorStory.length > 0 && (
+                  <div>
+                    <div style={{ fontSize: 9, fontWeight: 700, color: "#bbb", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 6 }}>Color Palette</div>
+                    <div style={{ display: "flex", flexWrap: "wrap", gap: 7 }}>
+                      {colorStory.map((c, i) => (
+                        <div key={i} title={c} style={{ width: 26, height: 26, borderRadius: "50%", background: c, border: "2px solid rgba(0,0,0,0.08)", flexShrink: 0 }} />
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+          </>)}
 
           {/* ── NOTES ── */}
           <button onClick={() => toggleAccordion("notes")} style={{ ...acHdrStyle }}>
@@ -3587,16 +3950,18 @@ function LookbookViewer({ lookbook, outfits, allItems, closetItems, onClose, onU
           <button onClick={() => toggleAccordion("looks")} style={{ ...acHdrStyle }}>
             <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
               <span style={{ fontSize: 10, fontWeight: 700, color: "#aaa", textTransform: "uppercase", letterSpacing: "0.1em" }}>Looks</span>
-              {(looks.length + plannedSlots.length) > 0 && (
-                <span style={{ fontSize: 9, fontWeight: 700, color: "#fff", background: "#1a1a1a", borderRadius: 20, padding: "1px 7px" }}>{looks.length}/{looks.length + plannedSlots.length}</span>
+              {(looks.length + (showPlannedSlots ? plannedSlots.length : 0)) > 0 && (
+                <span style={{ fontSize: 9, fontWeight: 700, color: "#fff", background: "#1a1a1a", borderRadius: 20, padding: "1px 7px" }}>
+                  {looks.length}{showPlannedSlots && plannedSlots.length > 0 ? "/" + (looks.length + plannedSlots.length) : ""}
+                </span>
               )}
             </div>
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#ccc" strokeWidth="2.5" strokeLinecap="round" style={{ transform: openAccordions.looks ? "rotate(180deg)" : "none", transition: "transform 0.2s" }}><polyline points="6 9 12 15 18 9"/></svg>
           </button>
           {openAccordions.looks && (
             <div style={{ padding: "8px 16px 12px", display: "flex", flexDirection: "column", gap: 4 }}>
-              {/* Packing list toggle */}
-              {looks.length > 0 && (
+              {/* Packing list toggle — trip only */}
+              {lbType === "trip" && looks.length > 0 && (
                 <>
                   <button onClick={() => setShowPackList(p => !p)} style={{ width: "100%", padding: "6px 10px", background: showPackList ? "#f0faf4" : "#f5f3ef", border: showPackList ? "1.5px solid #b6e8c8" : "none", borderRadius: 9, cursor: "pointer", fontSize: 11, fontWeight: 700, color: showPackList ? "#2d6a3f" : "#666", fontFamily: "'DM Sans', sans-serif", textAlign: "left", marginBottom: 2 }}>
                     <SvgLuggage size={12} color="currentColor" style={{ marginRight: 5 }} />Packing List ({packItems.length})
@@ -3647,8 +4012,8 @@ function LookbookViewer({ lookbook, outfits, allItems, closetItems, onClose, onU
                 );
               })}
 
-              {/* Planned slot rows */}
-              {plannedSlots.map((slot, si) => {
+              {/* Planned slot rows — trip + event only */}
+              {showPlannedSlots && plannedSlots.map((slot, si) => {
                 const slotDateLabel = slot.date ? new Date(slot.date + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" }) : null;
                 const slotWxRow = slot.date ? getWxForDate(slot.date) : null;
                 return (
@@ -3673,8 +4038,10 @@ function LookbookViewer({ lookbook, outfits, allItems, closetItems, onClose, onU
 
               {/* Action buttons */}
               <button onClick={() => setShowAddLooks(true)} style={{ width: "100%", padding: "7px", background: "#f5f3ef", border: "none", borderRadius: 9, cursor: "pointer", fontSize: 11, fontWeight: 700, color: "#666", fontFamily: "'DM Sans', sans-serif", marginTop: 2 }}>+ Add Outfit</button>
-              <button onClick={() => { const next = [...plannedSlots, { id: Date.now() + "_" + Math.random().toString(36).slice(2), name: "", date: "" }]; setPlannedSlots(next); save({ plannedSlots: next }); }}
-                style={{ width: "100%", padding: "7px", background: "transparent", border: "1.5px dashed #d0cbc3", borderRadius: 9, cursor: "pointer", fontSize: 11, fontWeight: 700, color: "#bbb", fontFamily: "'DM Sans', sans-serif" }}>+ Plan a Slot</button>
+              {showPlannedSlots && (
+                <button onClick={() => { const next = [...plannedSlots, { id: Date.now() + "_" + Math.random().toString(36).slice(2), name: "", date: "" }]; setPlannedSlots(next); save({ plannedSlots: next }); }}
+                  style={{ width: "100%", padding: "7px", background: "transparent", border: "1.5px dashed #d0cbc3", borderRadius: 9, cursor: "pointer", fontSize: 11, fontWeight: 700, color: "#bbb", fontFamily: "'DM Sans', sans-serif" }}>+ Plan a Slot</button>
+              )}
             </div>
           )}
 

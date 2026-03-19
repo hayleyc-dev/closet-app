@@ -6098,6 +6098,14 @@ const PLATFORM_FEE_LABELS = {
   "Vinted": "Buyer pays fee", "Instagram": "5%", "Other": "—",
 };
 
+const CONDITION_BADGE = {
+  "New with tags": { bg: "#f0faf4", color: "#2d6a3f", border: "#b6e8c8" },
+  "Like new":      { bg: "#f5f0ff", color: "#7c6fe0", border: "#c4b0f0" },
+  "Good":          { bg: "#fff8ee", color: "#a07000", border: "#f5c842" },
+  "Fair":          { bg: "#fef2f2", color: "#e05555", border: "#fca5a5" },
+  "Poor":          { bg: "#f5f3ef", color: "#aaa",    border: "#e0dbd0" },
+};
+
 const getDaysListed = (item) => {
   if (!item.listedDate) return null;
   return Math.floor((Date.now() - new Date(item.listedDate + "T00:00:00")) / 86400000);
@@ -6124,12 +6132,17 @@ function SellerDashboard({ itemsDb, allClosetItems, onViewItem }) {
   const [bulkPlatform, setBulkPlatform] = useState("");
   const [bulkCondition, setBulkCondition] = useState("");
   const [bulkPrice, setBulkPrice] = useState("");
+  // Bulk price edit
+  const [showBulkPriceModal, setShowBulkPriceModal] = useState(false);
+  const [bulkPriceSelected, setBulkPriceSelected] = useState(new Set());
+  const [bulkDiscountPct, setBulkDiscountPct] = useState(10);
   // Sold confirmation modal
   const [soldConfirmItem, setSoldConfirmItem] = useState(null);
   const [soldPrice, setSoldPrice] = useState("");
   const [soldPlatform, setSoldPlatform] = useState("");
   const [soldShipping, setSoldShipping] = useState("");
   const [soldDate, setSoldDate] = useState(new Date().toISOString().slice(0, 10));
+  const [soldRemoveFromCloset, setSoldRemoveFromCloset] = useState(true);
 
   const updateItem = (item, patch) => itemsDb.update({ ...item, ...patch });
 
@@ -6143,6 +6156,7 @@ function SellerDashboard({ itemsDb, allClosetItems, onViewItem }) {
     setSoldPlatform(item.salePlatform || "");
     setSoldShipping("");
     setSoldDate(new Date().toISOString().slice(0, 10));
+    setSoldRemoveFromCloset(true);
   };
 
   const confirmSold = () => {
@@ -6158,6 +6172,7 @@ function SellerDashboard({ itemsDb, allClosetItems, onViewItem }) {
       salePlatform: soldPlatform,
       shippingCost: soldShipping,
       netRevenue: String(spNum - shipNum - platformFee),
+      ...(soldRemoveFromCloset ? { forSale: false } : {}),
     });
     setSoldConfirmItem(null);
   };
@@ -6225,6 +6240,23 @@ function SellerDashboard({ itemsDb, allClosetItems, onViewItem }) {
     setShowBulkModal(false); setBulkSelectedLocal(new Set()); setBulkSearch(""); setBulkPlatform(""); setBulkCondition(""); setBulkPrice("");
   };
 
+  const applyBulkPrice = () => {
+    if (bulkPriceSelected.size === 0) return;
+    const factor = 1 - (bulkDiscountPct / 100);
+    bulkPriceSelected.forEach(id => {
+      const item = forSaleItems.find(i => i.id === id);
+      if (!item) return;
+      const current = parseFloat((item.salePrice || "").replace(/[^0-9.]/g, "")) || 0;
+      if (current > 0) {
+        const newPrice = Math.round(current * factor);
+        itemsDb.update({ ...item, salePrice: String(newPrice) });
+      }
+    });
+    setShowBulkPriceModal(false); setBulkPriceSelected(new Set()); setBulkDiscountPct(10);
+  };
+
+  const activePriceItems = forSaleItems.filter(i => (i.saleStatus === "listed" || i.saleStatus === "pending") && parseFloat((i.salePrice || "").replace(/[^0-9.]/g, "")) > 0);
+
   if (forSaleItems.length === 0) return (
     <div className="fade-up">
       <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "60px 0 40px", gap: 14 }}>
@@ -6280,6 +6312,9 @@ function SellerDashboard({ itemsDb, allClosetItems, onViewItem }) {
           ))}
         </div>
         <button onClick={() => setShowBulkModal(true)} style={{ padding: "8px 14px", background: "#fff8ee", border: "1.5px solid #f5c842", borderRadius: 10, cursor: "pointer", fontFamily: "'DM Sans', sans-serif", fontSize: 12, fontWeight: 700, color: "#a07000", whiteSpace: "nowrap" }}>+ Bulk List</button>
+        {activePriceItems.length > 0 && (
+          <button onClick={() => setShowBulkPriceModal(true)} style={{ padding: "8px 14px", background: "#f5f0ff", border: "1.5px solid #c4b0f0", borderRadius: 10, cursor: "pointer", fontFamily: "'DM Sans', sans-serif", fontSize: 12, fontWeight: 700, color: "#7c6fe0", whiteSpace: "nowrap" }}>✦ Bulk Price</button>
+        )}
       </div>
 
       {/* Listings */}
@@ -6310,9 +6345,13 @@ function SellerDashboard({ itemsDb, allClosetItems, onViewItem }) {
                     {salePrice > 0 ? <span style={{ fontSize: 13, fontWeight: 800, color: "#2d6a3f" }}>${salePrice.toFixed(0)}</span> : <span style={{ fontSize: 11, color: "#ccc" }}>No price</span>}
                     {item.salePlatform && <span style={{ fontSize: 9, background: "#f5f2ed", borderRadius: 6, padding: "1px 6px", color: "#777", fontWeight: 600 }}>{item.salePlatform}</span>}
                   </div>
+                  {item.saleCondition && CONDITION_BADGE[item.saleCondition] && (() => {
+                    const cb = CONDITION_BADGE[item.saleCondition];
+                    return <div style={{ marginTop: 5, display: "inline-block", background: cb.bg, border: `1px solid ${cb.border}`, borderRadius: 8, padding: "2px 7px", fontSize: 9, fontWeight: 700, color: cb.color }}>{item.saleCondition}</div>;
+                  })()}
                   {!isEditing && (
                     <div style={{ display: "flex", gap: 4, marginTop: 8 }}>
-                      <button onClick={() => startEdit(item)} style={{ flex: 1, padding: "4px 0", background: "#f5f2ed", border: "none", borderRadius: 6, cursor: "pointer", fontSize: 10, fontWeight: 700, color: "#555", fontFamily: "'DM Sans', sans-serif" }}>Edit</button>
+                      <button onClick={() => { setViewMode("list"); startEdit(item); }} style={{ flex: 1, padding: "4px 0", background: "#f5f2ed", border: "none", borderRadius: 6, cursor: "pointer", fontSize: 10, fontWeight: 700, color: "#555", fontFamily: "'DM Sans', sans-serif" }}>Edit</button>
                       {status !== "sold" && <button onClick={() => openSoldConfirm(item)} style={{ flex: 1, padding: "4px 0", background: "#f5f0ff", border: "none", borderRadius: 6, cursor: "pointer", fontSize: 10, fontWeight: 700, color: "#7c6fe0", fontFamily: "'DM Sans', sans-serif" }}>Sold</button>}
                     </div>
                   )}
@@ -6361,6 +6400,10 @@ function SellerDashboard({ itemsDb, allClosetItems, onViewItem }) {
                     )}
                     {item.shippingCost && <span style={{ fontSize: 11, color: "#aaa" }}>ship: ${item.shippingCost}</span>}
                     {showDays && <span style={{ fontSize: 11, fontWeight: 700, color: dayStyle.color, background: dayStyle.bg, borderRadius: 8, padding: "2px 8px" }}>{days}d listed</span>}
+                    {item.saleCondition && CONDITION_BADGE[item.saleCondition] && (() => {
+                      const cb = CONDITION_BADGE[item.saleCondition];
+                      return <span style={{ fontSize: 11, fontWeight: 700, color: cb.color, background: cb.bg, border: `1px solid ${cb.border}`, borderRadius: 8, padding: "2px 8px" }}>{item.saleCondition}</span>;
+                    })()}
                   </div>
                   {/* Edit form */}
                   {isEditing ? (
@@ -6424,6 +6467,8 @@ function SellerDashboard({ itemsDb, allClosetItems, onViewItem }) {
 
       {/* Bulk List Modal */}
       {showBulkModal && <BulkListModal items={bulkFiltered} search={bulkSearch} setSearch={setBulkSearch} selected={bulkSelected} setSelected={setBulkSelectedLocal} platform={bulkPlatform} setPlatform={setBulkPlatform} condition={bulkCondition} setCondition={setBulkCondition} price={bulkPrice} setPrice={setBulkPrice} platforms={PLATFORMS} onApply={applyBulkList} onClose={() => setShowBulkModal(false)} />}
+      {/* Bulk Price Modal */}
+      {showBulkPriceModal && <BulkPriceModal items={activePriceItems} selected={bulkPriceSelected} setSelected={setBulkPriceSelected} discountPct={bulkDiscountPct} setDiscountPct={setBulkDiscountPct} onApply={applyBulkPrice} onClose={() => { setShowBulkPriceModal(false); setBulkPriceSelected(new Set()); setBulkDiscountPct(10); }} />}
 
       {/* Sold Confirmation Modal */}
       {soldConfirmItem && (() => {
@@ -6485,6 +6530,11 @@ function SellerDashboard({ itemsDb, allClosetItems, onViewItem }) {
                   </div>
                 )}
               </div>
+              <label style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 14, cursor: "pointer" }}>
+                <input type="checkbox" checked={soldRemoveFromCloset} onChange={e => setSoldRemoveFromCloset(e.target.checked)}
+                  style={{ width: 15, height: 15, accentColor: "#7c6fe0", cursor: "pointer" }} />
+                <span style={{ fontSize: 12, color: "#555", fontWeight: 600 }}>Remove from my active closet</span>
+              </label>
               <div style={{ display: "flex", gap: 8 }}>
                 <button onClick={confirmSold} style={{ flex: 1, padding: "11px", background: "#7c6fe0", color: "#fff", border: "none", borderRadius: 12, cursor: "pointer", fontSize: 13, fontWeight: 700 }}>Confirm Sale</button>
                 <button onClick={() => setSoldConfirmItem(null)} style={{ padding: "11px 18px", background: "#f5f3ef", color: "#888", border: "none", borderRadius: 12, cursor: "pointer", fontSize: 13, fontWeight: 700 }}>Cancel</button>
@@ -6504,7 +6554,7 @@ function BulkListModal({ items, search, setSearch, selected, setSelected, platfo
     setSelected(next);
   };
   return (
-    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", zIndex: 99999, display: "flex", alignItems: "center", justifyContent: "center" }}
+    <div style={{ position: "fixed", inset: 0, zIndex: 99999, display: "flex", alignItems: "center", justifyContent: "center" }}
       onClick={onClose}>
       <div onClick={e => e.stopPropagation()} style={{ background: "#fff", borderRadius: 22, width: "min(720px, 95vw)", maxHeight: "86vh", display: "flex", flexDirection: "column", boxShadow: "0 20px 60px rgba(0,0,0,0.2)", fontFamily: "'DM Sans', sans-serif" }}>
         {/* Header */}
@@ -6560,6 +6610,71 @@ function BulkListModal({ items, search, setSearch, selected, setSelected, platfo
               List {selected.size > 0 ? selected.size : ""} Item{selected.size !== 1 ? "s" : ""}
             </button>
           </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function BulkPriceModal({ items, selected, setSelected, discountPct, setDiscountPct, onApply, onClose }) {
+  const toggle = (id) => {
+    const next = new Set(selected);
+    if (next.has(id)) next.delete(id); else next.add(id);
+    setSelected(next);
+  };
+  const toggleAll = () => {
+    if (selected.size === items.length) setSelected(new Set());
+    else setSelected(new Set(items.map(i => i.id)));
+  };
+  return (
+    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", zIndex: 99999, display: "flex", alignItems: "center", justifyContent: "center" }}
+      onClick={onClose}>
+      <div onClick={e => e.stopPropagation()} style={{ background: "#fff", borderRadius: 22, width: "min(560px, 95vw)", maxHeight: "82vh", display: "flex", flexDirection: "column", boxShadow: "0 20px 60px rgba(0,0,0,0.2)", fontFamily: "'DM Sans', sans-serif" }}>
+        {/* Header */}
+        <div style={{ padding: "22px 24px 16px", borderBottom: "1px solid #e8e4dc" }}>
+          <div style={{ fontSize: 17, fontWeight: 800, marginBottom: 2 }}>Bulk Price Editor</div>
+          <div style={{ fontSize: 13, color: "#aaa", marginBottom: 14 }}>Drop prices on selected listings by a percentage.</div>
+          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+            <label style={{ fontSize: 12, fontWeight: 700, color: "#555" }}>Discount %</label>
+            <input type="number" min={1} max={90} value={discountPct} onChange={e => setDiscountPct(Math.min(90, Math.max(1, parseInt(e.target.value) || 1)))}
+              style={{ width: 70, padding: "7px 10px", border: "1.5px solid #e8e4dc", borderRadius: 10, fontFamily: "'DM Sans', sans-serif", fontSize: 14, fontWeight: 700, outline: "none", textAlign: "center" }} />
+            <span style={{ fontSize: 13, color: "#888" }}>off current price</span>
+            <button onClick={toggleAll} style={{ marginLeft: "auto", padding: "5px 12px", background: "#f5f2ed", border: "none", borderRadius: 8, cursor: "pointer", fontSize: 11, fontWeight: 700, color: "#555", fontFamily: "'DM Sans', sans-serif" }}>
+              {selected.size === items.length ? "Deselect All" : "Select All"}
+            </button>
+          </div>
+        </div>
+        {/* Items list */}
+        <div style={{ flex: 1, overflowY: "auto", padding: "14px 24px", display: "flex", flexDirection: "column", gap: 8 }}>
+          {items.map(item => {
+            const isSelected = selected.has(item.id);
+            const currentPrice = parseFloat((item.salePrice || "").replace(/[^0-9.]/g, "")) || 0;
+            const newPrice = Math.round(currentPrice * (1 - discountPct / 100));
+            return (
+              <div key={item.id} onClick={() => toggle(item.id)} style={{ display: "flex", alignItems: "center", gap: 10, padding: "9px 12px", border: `1.5px solid ${isSelected ? "#7c6fe0" : "#e8e4dc"}`, borderRadius: 12, cursor: "pointer", background: isSelected ? "#f5f0ff" : "#fff", transition: "all 0.1s" }}>
+                <div style={{ width: 36, height: 36, borderRadius: 8, background: item.image ? `url(${item.image}) center/contain no-repeat #f8f6f2` : "#f8f6f2", flexShrink: 0, border: "1px solid #e8e4dc" }} />
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 12, fontWeight: 700, color: "#1a1a1a", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{item.name}</div>
+                  {item.salePlatform && <div style={{ fontSize: 10, color: "#aaa" }}>{item.salePlatform}</div>}
+                </div>
+                <div style={{ textAlign: "right", flexShrink: 0 }}>
+                  <div style={{ fontSize: 13, color: "#bbb", textDecoration: "line-through", fontWeight: 600 }}>${currentPrice.toFixed(0)}</div>
+                  {isSelected && <div style={{ fontSize: 14, fontWeight: 800, color: "#2d6a3f" }}>${newPrice.toFixed(0)}</div>}
+                </div>
+                <div style={{ width: 20, height: 20, borderRadius: "50%", border: `2px solid ${isSelected ? "#7c6fe0" : "#ddd"}`, background: isSelected ? "#7c6fe0" : "#fff", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                  {isSelected && <SvgCheck size={10} color="#fff" />}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+        {/* Footer */}
+        <div style={{ padding: "14px 24px", borderTop: "1px solid #e8e4dc", display: "flex", gap: 8, alignItems: "center" }}>
+          <span style={{ fontSize: 13, color: "#888", flex: 1 }}>{selected.size} item{selected.size !== 1 ? "s" : ""} selected</span>
+          <button onClick={onClose} style={{ padding: "9px 18px", background: "#f5f3ef", border: "none", borderRadius: 10, cursor: "pointer", fontSize: 13, fontWeight: 700, color: "#888" }}>Cancel</button>
+          <button onClick={onApply} disabled={selected.size === 0} style={{ padding: "9px 22px", background: selected.size > 0 ? "#7c6fe0" : "#e0dbd2", color: "#fff", border: "none", borderRadius: 10, cursor: selected.size > 0 ? "pointer" : "not-allowed", fontSize: 13, fontWeight: 700 }}>
+            Apply -{discountPct}%
+          </button>
         </div>
       </div>
     </div>
@@ -12026,9 +12141,62 @@ export default function App() {
           });
           const months = Object.keys(byMonth).sort().slice(-6);
           const maxRev = Math.max(...months.map(m => byMonth[m].revenue), 1);
-          if (forSaleItems.length === 0) return null;
+          // Sell candidates: non-listed closet items unworn or not worn in 12+ months
+          const twelveMonthsAgo = new Date();
+          twelveMonthsAgo.setFullYear(twelveMonthsAgo.getFullYear() - 1);
+          const sellCandidates = itemsDb.rows.filter(i => {
+            if (i.forSale) return false;
+            if ((i.wornCount || 0) === 0) return true;
+            if (i.lastWorn && new Date(i.lastWorn) < twelveMonthsAgo) return true;
+            if (!i.lastWorn && i.purchaseDate && new Date(i.purchaseDate) < twelveMonthsAgo) return true;
+            return false;
+          }).sort((a, b) => (a.wornCount || 0) - (b.wornCount || 0)).slice(0, 6);
+          // Best category analytics
+          const soldCats = {};
+          forSaleItems.filter(i => i.saleStatus === "sold" && i.category).forEach(i => {
+            const cat = i.category;
+            if (!soldCats[cat]) soldCats[cat] = { totalDays: 0, count: 0, pctSum: 0, pctCount: 0 };
+            if (i.listedDate && i.soldDate) {
+              soldCats[cat].totalDays += Math.max(0, (new Date(i.soldDate) - new Date(i.listedDate)) / 86400000);
+              soldCats[cat].count++;
+            }
+            const orig = parseFloat((i.price || "").replace(/[^0-9.]/g, "")) || 0;
+            const sale = parseFloat((i.salePrice || "").replace(/[^0-9.]/g, "")) || 0;
+            if (orig > 0 && sale > 0) { soldCats[cat].pctSum += (sale / orig) * 100; soldCats[cat].pctCount++; }
+          });
+          const topCats = Object.entries(soldCats).filter(([, d]) => d.count > 0)
+            .map(([cat, d]) => ({ cat, avgDays: Math.round(d.totalDays / d.count), avgPct: d.pctCount > 0 ? Math.round(d.pctSum / d.pctCount) : null }))
+            .sort((a, b) => a.avgDays - b.avgDays).slice(0, 3);
+          if (forSaleItems.length === 0 && sellCandidates.length === 0) return null;
           return (
             <div className="app-right-panel" style={{ top: 24 }}>
+              {/* Sell Candidates */}
+              {sellCandidates.length > 0 && (
+                <div className="right-card">
+                  <div className="right-card-title">Sell Candidates</div>
+                  <div style={{ fontSize: 11, color: "#aaa", marginBottom: 10 }}>Unworn or not worn in 12+ months</div>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                    {sellCandidates.map(item => {
+                      const origPrice = parseFloat((item.price || "").replace(/[^0-9.]/g, "")) || 0;
+                      const suggestedPrice = origPrice > 0 ? Math.round(origPrice * 0.4) : null;
+                      const today = new Date().toISOString().slice(0, 10);
+                      return (
+                        <div key={item.id} style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                          <div style={{ width: 40, height: 40, borderRadius: 8, background: item.image ? `url(${item.image}) center/contain no-repeat #f8f6f2` : "#f8f6f2", flexShrink: 0, border: "1px solid #e8e4dc" }} />
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{ fontSize: 11, fontWeight: 700, color: "#1a1a1a", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{item.name}</div>
+                            <div style={{ fontSize: 10, color: "#aaa" }}>{item.category}{suggestedPrice ? ` · suggest $${suggestedPrice}` : ""}</div>
+                          </div>
+                          <button onClick={() => itemsDb.update({ ...item, forSale: true, saleStatus: "listed", listedDate: today, ...(suggestedPrice ? { salePrice: String(suggestedPrice) } : {}) })}
+                            style={{ padding: "4px 9px", background: "#f0faf4", border: "1.5px solid #b6e8c8", borderRadius: 8, cursor: "pointer", fontSize: 10, fontWeight: 700, color: "#2d6a3f", fontFamily: "'DM Sans', sans-serif", whiteSpace: "nowrap", flexShrink: 0 }}>
+                            List →
+                          </button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
               {/* Listings stats */}
               <div className="right-card">
                 <div className="right-card-title">Listings</div>
@@ -12073,6 +12241,26 @@ export default function App() {
                   </div>
                 )}
               </div>
+              {/* Best Category */}
+              {topCats.length > 0 && (
+                <div className="right-card">
+                  <div className="right-card-title">Best Category</div>
+                  <div style={{ fontSize: 11, color: "#aaa", marginBottom: 10 }}>Fastest-selling categories</div>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                    {topCats.map(({ cat, avgDays, avgPct }, idx) => (
+                      <div key={cat} style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                        <div style={{ width: 18, height: 18, borderRadius: "50%", background: idx === 0 ? "#fff8ee" : "#f5f3ef", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                          <span style={{ fontSize: 9, fontWeight: 800, color: idx === 0 ? "#a07000" : "#aaa" }}>#{idx + 1}</span>
+                        </div>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ fontSize: 12, fontWeight: 700, color: "#1a1a1a", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{cat}</div>
+                          <div style={{ fontSize: 10, color: "#aaa" }}>avg {avgDays}d to sell{avgPct !== null ? ` · ${avgPct}% of asking` : ""}</div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
               {/* Wardrobe Payback */}
               {totalSpent > 0 && (
                 <div className="right-card">

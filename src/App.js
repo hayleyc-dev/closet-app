@@ -6363,7 +6363,7 @@ function SellerDashboard({ itemsDb, allClosetItems, onViewItem }) {
                   })()}
                   {!isEditing && (
                     <div style={{ display: "flex", gap: 4, marginTop: 8 }}>
-                      <button onClick={() => startEdit(item)} style={{ flex: 1, padding: "4px 0", background: "#f5f2ed", border: "none", borderRadius: 6, cursor: "pointer", fontSize: 10, fontWeight: 700, color: "#555", fontFamily: "'DM Sans', sans-serif" }}>Edit</button>
+                      <button onClick={() => { setViewMode("list"); startEdit(item); }} style={{ flex: 1, padding: "4px 0", background: "#f5f2ed", border: "none", borderRadius: 6, cursor: "pointer", fontSize: 10, fontWeight: 700, color: "#555", fontFamily: "'DM Sans', sans-serif" }}>Edit</button>
                       {status !== "sold" && <button onClick={() => openSoldConfirm(item)} style={{ flex: 1, padding: "4px 0", background: "#f5f0ff", border: "none", borderRadius: 6, cursor: "pointer", fontSize: 10, fontWeight: 700, color: "#7c6fe0", fontFamily: "'DM Sans', sans-serif" }}>Sold</button>}
                     </div>
                   )}

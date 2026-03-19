@@ -7257,7 +7257,6 @@ function MoodboardPreviewPopup({ board, onClose, onEdit, onGoToLookbook }) {
             </div>
           )}
         </div>
-        </div>
         {/* Canvas preview */}
         <div style={{overflow:"auto",flex:1}}>
           <div style={{position:"relative",width:contentW*scale,height:contentH*scale,flexShrink:0}}>

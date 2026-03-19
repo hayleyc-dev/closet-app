@@ -6730,7 +6730,7 @@ function MoodboardInfoPanel({ activeIdx, setActiveIdx, boards: boardsProp, updat
 }
 
 
-function Moodboard({ closetItems = [], activeIdx, setActiveIdx, boards: boardsProp, updateBoards, removeBoardById }) {
+function Moodboard({ closetItems = [], activeIdx, setActiveIdx, boards: boardsProp, updateBoards, removeBoardById, mbSearch = "", mbTagFilter = "All", lookbooksDb = [] }) {
   const closetItemsForMoodboard = closetItems;
   // Use prop-based boards (Supabase-backed) if provided, else fall back to localStorage
   const STORAGE_KEY = "wardrobe_moodboards_v1";
@@ -7032,7 +7032,13 @@ function Moodboard({ closetItems = [], activeIdx, setActiveIdx, boards: boardsPr
 
   // Board grid view
   if (mbView === "grid") {
-    const sorted = [...boards.map((b,i)=>({b,i}))].sort((a,z)=>(z.b.pinned?1:0)-(a.b.pinned?1:0));
+    const q = mbSearch.trim().toLowerCase();
+    const filteredBoards = boards.map((b,i)=>({b,i})).filter(({b}) => {
+      if (q && !b.name?.toLowerCase().includes(q)) return false;
+      if (mbTagFilter !== "All" && !(b.tags||[]).includes(mbTagFilter)) return false;
+      return true;
+    });
+    const sorted = [...filteredBoards].sort((a,z)=>(z.b.pinned?1:0)-(a.b.pinned?1:0));
     return (
       <div style={{display:"flex",flexDirection:"column",height:"calc(100vh - 160px)",padding:"0 4px"}}>
         <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:16}}>
@@ -7043,28 +7049,42 @@ function Moodboard({ closetItems = [], activeIdx, setActiveIdx, boards: boardsPr
           </button>
         </div>
         <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:12,overflowY:"auto",paddingBottom:8}}>
-          {sorted.map(({b,i})=>(
-            <div key={b.id} onClick={()=>{setActiveIdx(i);setMbView("canvas");}} style={{borderRadius:16,overflow:"hidden",cursor:"pointer",border:"1.5px solid #e8e4dc",background:"#fff",transition:"box-shadow 0.15s",boxShadow:"0 2px 8px rgba(0,0,0,0.06)"}}
-              onMouseEnter={e=>e.currentTarget.style.boxShadow="0 6px 20px rgba(0,0,0,0.14)"}
-              onMouseLeave={e=>e.currentTarget.style.boxShadow="0 2px 8px rgba(0,0,0,0.06)"}>
-              <div style={{height:90,background:b.bg||"#ffffff",display:"flex",alignItems:"center",justifyContent:"center",position:"relative"}}>
-                {b.pinned&&<span style={{position:"absolute",top:6,right:8,color:"#f0c840",fontSize:14}}>★</span>}
-                <div style={{fontSize:11,color:"#ccc",opacity:(b.items||[]).length>0?0:1}}>
-                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#ddd" strokeWidth="1.5" strokeLinecap="round"><path d="M12 2l1.5 4h4l-3 3 1.5 4L12 11l-4 2 1.5-4-3-3h4z"/></svg>
+          {sorted.map(({b,i})=>{
+            const linkedLb = lookbooksDb.find(lb=>lb.id===b.linkedLb?.id||lb.moodboardId===b.id);
+            return (
+            <div key={b.id} onClick={()=>{setActiveIdx(i);setMbView("canvas");}}
+              style={{borderRadius:16,overflow:"hidden",cursor:"pointer",border:"1.5px solid #e8e4dc",background:b.bg||"#f5f3ef",transition:"box-shadow 0.15s",boxShadow:"0 2px 8px rgba(0,0,0,0.06)",position:"relative",aspectRatio:"4/3"}}
+              onMouseEnter={e=>{e.currentTarget.style.boxShadow="0 6px 20px rgba(0,0,0,0.14)";e.currentTarget.querySelector(".mb-card-overlay").style.opacity="1";}}
+              onMouseLeave={e=>{e.currentTarget.style.boxShadow="0 2px 8px rgba(0,0,0,0.06)";e.currentTarget.querySelector(".mb-card-overlay").style.opacity="0";}}>
+              {/* Thumbnail images */}
+              {(b.items||[]).filter(it=>it.src).slice(0,4).map((it,idx)=>(
+                <img key={it.id} src={it.src} alt="" style={{position:"absolute",objectFit:"cover",borderRadius:8,
+                  ...(idx===0?{top:8,left:8,width:"55%",height:"80%"}:
+                     idx===1?{top:8,right:8,width:"38%",height:"37%"}:
+                     idx===2?{bottom:8,right:8,width:"38%",height:"37%"}:
+                     {bottom:8,left:8,width:"38%",height:"37%"})}} />
+              ))}
+              {(b.items||[]).filter(it=>it.src).length===0 && (
+                <div style={{position:"absolute",inset:0,display:"flex",alignItems:"center",justifyContent:"center"}}>
+                  <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="rgba(0,0,0,0.15)" strokeWidth="1.5" strokeLinecap="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>
                 </div>
-                {(b.items||[]).length>0&&<div style={{fontSize:10,fontWeight:700,color:"rgba(0,0,0,0.3)"}}>{(b.items||[]).length} item{(b.items||[]).length!==1?"s":""}</div>}
-              </div>
-              <div style={{padding:"10px 12px"}}>
-                <div style={{fontSize:12,fontWeight:800,color:"#1a1a1a",marginBottom:4,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{b.name||"Untitled"}</div>
-                {(b.tags||[]).length>0&&(
-                  <div style={{display:"flex",flexWrap:"wrap",gap:3}}>
-                    {(b.tags||[]).map(t=><span key={t} style={{fontSize:9,fontWeight:700,padding:"1px 5px",borderRadius:20,background:"#f5f3ef",color:"#888"}}>{t}</span>)}
-                  </div>
-                )}
+              )}
+              {/* Hover overlay */}
+              <div className="mb-card-overlay" style={{position:"absolute",inset:0,background:"rgba(0,0,0,0.54)",borderRadius:14,opacity:0,transition:"opacity 0.18s",display:"flex",flexDirection:"column",justifyContent:"space-between",padding:"12px 14px"}}>
+                <div style={{display:"flex",alignItems:"flex-start",justifyContent:"space-between",gap:6}}>
+                  <div style={{fontSize:13,fontWeight:800,color:"#fff",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",flex:1}}>{b.name||"Untitled"}</div>
+                  {linkedLb && <div style={{flexShrink:0,background:"rgba(58,170,110,0.9)",color:"#fff",borderRadius:20,padding:"2px 8px",fontSize:10,fontWeight:700}}>Lookbook</div>}
+                  {b.pinned && <span style={{flexShrink:0,color:"#f0c840",fontSize:13}}>★</span>}
+                </div>
+                <div style={{display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+                  <div style={{fontSize:11,color:"rgba(255,255,255,0.7)"}}>{(b.items||[]).length} item{(b.items||[]).length!==1?"s":""}</div>
+                  <div style={{fontSize:11,fontWeight:700,color:"#fff"}}>Open Board →</div>
+                </div>
               </div>
             </div>
-          ))}
-          <div onClick={()=>{const updated=[...boards,{id:uid(),name:`Board ${boards.length+1}`,items:[],bg:"#ffffff",pinned:false,tags:[]}];setBoards(updated);setActiveIdx(updated.length-1);setMbView("canvas");}} style={{borderRadius:16,border:"1.5px dashed #d0cac0",background:"#fafaf8",cursor:"pointer",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:8,padding:"24px 12px",minHeight:120,transition:"background 0.12s"}}
+            );
+          })}
+          <div onClick={()=>{const updated=[...boards,{id:uid(),name:`Board ${boards.length+1}`,items:[],bg:"#ffffff",pinned:false,tags:[]}];setBoards(updated);setActiveIdx(updated.length-1);setMbView("canvas");}} style={{borderRadius:16,border:"1.5px dashed #d0cac0",background:"#fafaf8",cursor:"pointer",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:8,padding:"24px 12px",minHeight:120,aspectRatio:"4/3",transition:"background 0.12s"}}
             onMouseEnter={e=>e.currentTarget.style.background="#f0ece4"}
             onMouseLeave={e=>e.currentTarget.style.background="#fafaf8"}>
             <div style={{fontSize:24,color:"#ccc",lineHeight:1}}>+</div>
@@ -10474,6 +10494,8 @@ export default function App() {
   };
   const [lbSearch, setLbSearch] = useState("");
   const [lbSort, setLbSort] = useState("newest");
+  const [mbSearch, setMbSearch] = useState("");
+  const [mbTagFilter, setMbTagFilter] = useState("All");
   const [lbZoom, setLbZoom] = useState(210);
   const [lbTagFilter, setLbTagFilter] = useState("All");
   const [lbTypeFilter, setLbTypeFilter] = useState("All");
@@ -10777,7 +10799,7 @@ export default function App() {
     outfits: ["My Outfits", ""],
     lookbooks: ["Lookbooks", "Curated collections"],
     stats: ["Style Profile", "Your wardrobe in focus"],
-    moodboard: ["Moodboard", "Inspire yourself"],
+    moodboard: ["Moodboard", ""],
     seller: ["Seller Dashboard", "What's for sale"],
     wishlist: ["Wishlist", ""],
     settings: ["Settings", "Customize your wardrobe"],
@@ -10969,8 +10991,8 @@ export default function App() {
           {/* Content — 2-column layout (left sidebar + main) */}
           {tab !== "home" && <div className="app-layout">
 
-        {/* ── LEFT SIDEBAR (closet + outfits + lookbooks) ── */}
-        {(tab === "closet" || tab === "outfits" || tab === "lookbooks") && (
+        {/* ── LEFT SIDEBAR (closet + outfits + lookbooks + moodboard) ── */}
+        {(tab === "closet" || tab === "outfits" || tab === "lookbooks" || tab === "moodboard") && (
           <div className="app-left-sidebar">
             <div className="closet-sidebar" style={{ position: "sticky", top: 80 }}>
               {tab === "closet" && (<>
@@ -11022,6 +11044,23 @@ export default function App() {
                   <div className="sidebar-label">Occasion</div>
                   {LOOKBOOK_OCCASIONS.map(tag => (
                     <button key={tag} className={"sidebar-btn" + (lbTagFilter === tag ? " active" : "")} onClick={() => setLbTagFilter(tag)}>{tag}</button>
+                  ))}
+                </div>
+              </>)}
+              {tab === "moodboard" && (<>
+                <div className="sidebar-section">
+                  <div style={{ position: "relative" }}>
+                    <span style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)", pointerEvents: "none", display:"flex" }}><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#bbb" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{pointerEvents:"none"}}><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg></span>
+                    <input className="closet-search" value={mbSearch} onChange={e => setMbSearch(e.target.value)} placeholder="Search boards…" />
+                  </div>
+                </div>
+                <div className="right-card" style={{ marginBottom: 12 }}>
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
+                    <div className="right-card-title" style={{ marginBottom: 0 }}>Tag</div>
+                    {mbTagFilter !== "All" && <button onClick={() => setMbTagFilter("All")} style={{ fontSize: 10, color: "#aaa", background: "none", border: "none", cursor: "pointer", fontFamily: "'DM Sans', sans-serif", fontWeight: 600 }}>Clear</button>}
+                  </div>
+                  {["All", "Inspiration", "Planning", "Travel", "Seasonal", "Wishlist", "Archive"].map(tag => (
+                    <button key={tag} className={"sidebar-btn" + (mbTagFilter === tag ? " active" : "")} onClick={() => setMbTagFilter(tag)}>{tag}</button>
                   ))}
                 </div>
               </>)}
@@ -11508,7 +11547,7 @@ export default function App() {
             {tab === "seller" && <SellerDashboard itemsDb={itemsDb} allClosetItems={itemsDb.rows.filter(i => !i.forSale)} onViewItem={(item) => setItemDetail(item)} />}
 
             {/* MOODBOARD */}
-            {tab === "moodboard" && <Moodboard closetItems={itemsDb.rows.filter(i => !i.forSale)} activeIdx={moodboardActiveIdx} setActiveIdx={setMoodboardActiveIdx} boards={moodboardsDb.boards} updateBoards={moodboardsDb.updateBoards} removeBoardById={moodboardsDb.removeBoardById} />}
+            {tab === "moodboard" && <Moodboard closetItems={itemsDb.rows.filter(i => !i.forSale)} activeIdx={moodboardActiveIdx} setActiveIdx={setMoodboardActiveIdx} boards={moodboardsDb.boards} updateBoards={moodboardsDb.updateBoards} removeBoardById={moodboardsDb.removeBoardById} mbSearch={mbSearch} mbTagFilter={mbTagFilter} lookbooksDb={lookbooksDb.rows} />}
 
             {/* SETTINGS */}
             {tab === "settings" && <SettingsTab
@@ -11576,41 +11615,8 @@ export default function App() {
           )}
         </div>
 
-        {/* ── RIGHT PANEL (closet / outfits / moodboard only) ── */}
-        {["closet","outfits","moodboard"].includes(tab) && <div className="app-right-panel" style={{ top: 24 }}>
-
-          {/* Sort moved to top toolbar for closet/outfits */}
-
-          {/* Moodboard board info */}
-          {tab === "moodboard" && <MoodboardInfoPanel
-            activeIdx={moodboardActiveIdx} setActiveIdx={setMoodboardActiveIdx}
-            boards={moodboardsDb.boards} updateBoards={moodboardsDb.updateBoards} updateBoardById={moodboardsDb.updateBoardById} removeBoardById={moodboardsDb.removeBoardById}
-            closetItems={itemsDb.rows}
-            lookbooksDb={lookbooksDb.rows}
-            createLookbook={async ({id: newId, name, moodboardId}) => {
-              const lbId = newId || uid();
-              const newLb = { id: lbId, name, notes: "", coverImage: "", dateStart: "", dateEnd: "", outfitIds: [], lookMeta: {}, moodboardId };
-              let { error } = await supabase.from("lookbooks").insert({ id: lbId, data: newLb });
-              if (error) ({ error } = await supabase.from("lookbooks").insert(newLb));
-              await lookbooksDb.refresh();
-            }}
-            addMoodboardToLookbook={async (lookbookId, board) => {
-              const lb = lookbooksDb.rows.find(l => l.id === lookbookId);
-              if (!lb) return;
-              const updated = { ...lb, moodboardId: board.id };
-              await lookbooksDb.update(updated);
-              // Set immediately — don't wait for refresh
-              setActiveLookbook(updated);
-            }}
-            onGoToLookbook={(lb) => {
-              // lb already has moodboardId set by setLinkedLb
-              const fresh = lookbooksDb.rows.find(r => r.id === lb.id);
-              const withMb = { ...(fresh || lb), moodboardId: lb.moodboardId || fresh?.moodboardId };
-              setActiveLookbookView("moodboard");
-              setTab("lookbooks");
-              setActiveLookbook(withMb);
-            }}
-          />}
+        {/* ── RIGHT PANEL (closet / outfits only) ── */}
+        {["closet","outfits"].includes(tab) && <div className="app-right-panel" style={{ top: 24 }}>
 
           {tab === "outfits" && (() => {
             const todayKey = new Date().toISOString().slice(0, 10);

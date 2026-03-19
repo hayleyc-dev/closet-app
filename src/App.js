@@ -7333,6 +7333,7 @@ function Moodboard({ closetItems = [], activeIdx, setActiveIdx, boards: boardsPr
   const [editingTextVal, setEditingTextVal] = useState("");
   const [mbPreviewBoard, setMbPreviewBoard] = useState(null);
   const [mbSort, setMbSort] = useState("pinned");
+  const [mbGridZoom, setMbGridZoom] = useState(220);
 
   // ── Undo/redo history ──
   const history = useRef([]);   // array of board item snapshots
@@ -7598,8 +7599,14 @@ function Moodboard({ closetItems = [], activeIdx, setActiveIdx, boards: boardsPr
                 <option value="newest">Newest</option>
                 <option value="oldest">Oldest</option>
               </select>
+              <div style={{display:"flex",alignItems:"center",gap:6}}>
+                <SvgBox size={11} color="#bbb" />
+                <input type="range" min={160} max={340} step={10} value={mbGridZoom} onChange={e=>setMbGridZoom(Number(e.target.value))}
+                  style={{width:72,accentColor:"#1a1a1a",cursor:"pointer"}} />
+                <SvgBox size={16} color="#bbb" />
+              </div>
             </div>
-            <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(220px,1fr))",gap:14}}>
+            <div style={{display:"grid",gridTemplateColumns:`repeat(auto-fill,minmax(${mbGridZoom}px,1fr))`,gap:14}}>
               {filteredBoards.map(({b,i})=>(
                 <MoodboardGridCard key={b.id} board={b}
                   onPreview={()=>setMbPreviewBoard(b)}

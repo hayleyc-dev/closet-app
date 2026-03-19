@@ -7592,7 +7592,7 @@ function Moodboard({ closetItems = [], activeIdx, setActiveIdx, boards: boardsPr
         ) : (
           <>
             <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:16}}>
-              <select value={mbSort} onChange={e=>setMbSort(e.target.value)} style={{padding:"7px 32px 7px 12px",border:"1.5px solid #e0dbd2",borderRadius:10,background:"#fff",fontSize:12,fontWeight:600,color:"#555",fontFamily:"'DM Sans',sans-serif",cursor:"pointer",outline:"none"}}>
+              <select value={mbSort} onChange={e=>setMbSort(e.target.value)} className="pill-select">
                 <option value="pinned">Pinned First</option>
                 <option value="nameAZ">Name A–Z</option>
                 <option value="nameZA">Name Z–A</option>

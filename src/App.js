@@ -6829,7 +6829,7 @@ function BulkPriceModal({ items, selected, setSelected, discountPct, setDiscount
 
 // ── Moodboard ─────────────────────────────────────────────────────────────────
 // ── MoodboardInfoPanel — reads active board from Moodboard via localStorage ──
-function MoodboardInfoPanel({ activeIdx, setActiveIdx, boards: boardsProp, updateBoards, updateBoardById, removeBoardById, lookbooksDb, createLookbook, addMoodboardToLookbook, onGoToLookbook }) {
+function MoodboardInfoPanel({ activeIdx, setActiveIdx, boards: boardsProp, updateBoards, updateBoardById, removeBoardById, lookbooksDb, createLookbook, addMoodboardToLookbook, onGoToLookbook, closetItems }) {
   const ARCHIVE_KEY = "wardrobe_moodboards_archived_v1";
 
   const data = boardsProp || [];
@@ -6865,6 +6865,69 @@ function MoodboardInfoPanel({ activeIdx, setActiveIdx, boards: boardsProp, updat
     if(clean.length===6) return "#"+clean;
     return null;
   };
+
+  const generatePalette = () => {
+    if (!board) return;
+    const imageItems = (board.items||[]).filter(i=>i.type!=="text"&&i.src);
+    if (imageItems.length===0) return;
+    const buckets = {};
+    let pending = imageItems.length;
+    const finish = () => {
+      if (--pending > 0) return;
+      const sorted = Object.entries(buckets).sort((a,b)=>b[1]-a[1]);
+      const colors = sorted.slice(0,6).map(([hex])=>hex);
+      if (colors.length > 0) save(data.map((b,i)=>i===activeIdx?{...b,palette:colors}:b));
+    };
+    imageItems.forEach(item => {
+      try {
+        const img = new Image();
+        img.crossOrigin = "anonymous";
+        img.onload = () => {
+          try {
+            const c = document.createElement("canvas"); c.width=40; c.height=40;
+            const ctx = c.getContext("2d"); ctx.drawImage(img,0,0,40,40);
+            const data2 = ctx.getImageData(0,0,40,40).data;
+            for (let p=0;p<data2.length;p+=16) {
+              const r=Math.round(data2[p]/32)*32, g=Math.round(data2[p+1]/32)*32, b=Math.round(data2[p+2]/32)*32, a=data2[p+3];
+              if (a<128) continue;
+              if (r>220&&g>220&&b>220) continue;
+              if (r<20&&g<20&&b<20) continue;
+              const hex=`#${r.toString(16).padStart(2,"0")}${g.toString(16).padStart(2,"0")}${b.toString(16).padStart(2,"0")}`;
+              buckets[hex]=(buckets[hex]||0)+1;
+            }
+          } catch {}
+          finish();
+        };
+        img.onerror = finish;
+        img.src = item.src;
+      } catch { finish(); }
+    });
+  };
+
+  const closetSuggestions = (() => {
+    if (!board?.palette?.length || !(closetItems||[]).length) return [];
+    const paletteHexes = board.palette.map(h=>h.toLowerCase());
+    const colorNameToHues = {
+      "black":["#000","#1a1a1a","#202020"],"white":["#fff","#ffffff","#f0f0f0"],
+      "red":["#c00","#e00","#c80"],"pink":["#f080a0","#e06080","#e0a0b0"],
+      "orange":["#e06000","#e08000","#f0a000"],"yellow":["#e0e000","#f0c000","#e0c000"],
+      "green":["#008000","#406040","#608060","#204020"],"blue":["#0060c0","#2060c0","#4080e0"],
+      "navy":["#002060","#002040","#203060"],"purple":["#800080","#6040a0","#8060c0"],
+      "brown":["#604020","#805040","#a06040"],"beige":["#e0d0a0","#d0c080","#c0b060"],
+      "gray":["#808080","#a0a0a0","#606060"],"grey":["#808080","#a0a0a0","#606060"],
+      "cream":["#f0e8c0","#e8dca0","#e0d080"],"tan":["#c0a060","#d0b060","#c0a040"],
+    };
+    return (closetItems||[]).filter(item=>{
+      if (!item.image||!item.color) return false;
+      const colorKey = item.color.toLowerCase();
+      const hues = colorNameToHues[colorKey]||[];
+      return paletteHexes.some(ph=>hues.some(h=>{
+        const r1=parseInt(ph.slice(1,3)||"00",16),g1=parseInt(ph.slice(3,5)||"00",16),b1=parseInt(ph.slice(5,7)||"00",16);
+        const r2=parseInt(h.slice(1,3)||"00",16),g2=parseInt(h.slice(3,5)||"00",16),b2=parseInt(h.slice(5,7)||"00",16);
+        return Math.abs(r1-r2)+Math.abs(g1-g2)+Math.abs(b1-b2)<120;
+      }));
+    }).slice(0,8);
+  })();
 
   const archiveBoard = () => {
     if (!board) return;
@@ -6907,26 +6970,6 @@ function MoodboardInfoPanel({ activeIdx, setActiveIdx, boards: boardsProp, updat
 
   return (
     <>
-    {/* ── Board selector (dropdown) ── */}
-    <div className="right-card">
-      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:10}}>
-        <div className="right-card-title" style={{marginBottom:0}}>Board</div>
-        <button onClick={() => {
-          const updated = [...data, {id:uid(), name:`Board ${data.length+1}`, items:[], bg:"#ffffff"}];
-          save(updated); setActiveIdx(updated.length-1);
-        }} style={{padding:"4px 10px",background:"#1a1a1a",color:"#fff",border:"none",borderRadius:8,cursor:"pointer",fontSize:11,fontWeight:700,fontFamily:"'DM Sans',sans-serif"}}>+ New</button>
-      </div>
-      <select
-        value={activeIdx}
-        onChange={e => setActiveIdx(Number(e.target.value))}
-        style={{width:"100%",padding:"8px 32px 8px 12px",border:"1.5px solid #e0dbd2",borderRadius:10,fontFamily:"'DM Sans',sans-serif",fontSize:13,fontWeight:700,background:"#fafaf8",color:"#1a1a1a",outline:"none",cursor:"pointer",appearance:"auto",boxSizing:"border-box"}}
-      >
-        {data.map((b,i) => (
-          <option key={b.id} value={i}>{b.name}</option>
-        ))}
-      </select>
-    </div>
-
     {board && (<>
 
     {/* ── Board Info ── */}
@@ -6950,7 +6993,13 @@ function MoodboardInfoPanel({ activeIdx, setActiveIdx, boards: boardsProp, updat
 
     {/* ── Color Palette ── */}
     <div className="right-card" style={{marginTop:12}}>
-      <div className="right-card-title">Color Palette</div>
+      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:8}}>
+        <div className="right-card-title" style={{marginBottom:0}}>Color Palette</div>
+        <button onClick={generatePalette} title="Generate palette from board images"
+          style={{padding:"3px 8px",background:"#f5f3ef",border:"1px solid #e0dbd2",borderRadius:8,cursor:"pointer",fontSize:10,fontWeight:700,color:"#666",fontFamily:"'DM Sans',sans-serif",display:"flex",alignItems:"center",gap:4}}>
+          Generate
+        </button>
+      </div>
       <div style={{display:"grid",gridTemplateColumns:"repeat(4,52px)",rowGap:6,columnGap:6,marginBottom:12}}>
         {palette.map((color,idx) => (
           <div key={idx} style={{position:"relative",width:52,height:52,lineHeight:0,flexShrink:0}}>
@@ -6990,7 +7039,25 @@ function MoodboardInfoPanel({ activeIdx, setActiveIdx, boards: boardsProp, updat
           />
         </div>
       )}
-      {palette.length===0 && <div style={{fontSize:11,color:"#ccc",textAlign:"center",padding:"8px 0"}}>Tap + to build your palette</div>}
+      {palette.length===0 && <div style={{fontSize:11,color:"#ccc",textAlign:"center",padding:"8px 0"}}>Tap + to build your palette · or Generate from images</div>}
+    </div>
+
+    {/* ── Closet Suggestions ── */}
+    <div className="right-card" style={{marginTop:12}}>
+      <div className="right-card-title">From Your Closet</div>
+      {closetSuggestions.length === 0 ? (
+        <div style={{fontSize:11,color:"#ccc",textAlign:"center",padding:"8px 0",lineHeight:1.6}}>
+          {palette.length===0 ? "Build a color palette to see matching pieces" : "No closet items match this palette yet"}
+        </div>
+      ) : (
+        <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
+          {closetSuggestions.map(item=>(
+            <div key={item.id} title={item.name} style={{width:48,height:60,borderRadius:10,overflow:"hidden",background:"#fff",border:"1.5px solid #e8e4dc",flexShrink:0}}>
+              <img src={item.image} alt={item.name} style={{width:"100%",height:"100%",objectFit:"contain"}} />
+            </div>
+          ))}
+        </div>
+      )}
     </div>
 
     {/* ── Lookbooks ── */}
@@ -7072,32 +7139,6 @@ function MoodboardInfoPanel({ activeIdx, setActiveIdx, boards: boardsProp, updat
             </div>
           )}
         </>
-      )}
-    </div>
-
-    {/* ── Archive ── */}
-    <div style={{marginTop:16,paddingTop:4}}>
-      {confirmArchive ? (
-        <div style={{padding:"14px 16px",background:"#fff8f8",borderRadius:14,border:"1.5px solid #ffd0d0"}}>
-          <div style={{fontSize:13,fontWeight:700,color:"#1a1a1a",marginBottom:4}}>Archive this board?</div>
-          <div style={{fontSize:11,color:"#aaa",marginBottom:12,lineHeight:1.5}}>It'll be removed from here but you can restore it from Settings → Data.</div>
-          <div style={{display:"flex",gap:8}}>
-            <button onClick={() => setConfirmArchive(false)} style={{flex:1,padding:"8px 0",background:"#f5f3ef",border:"none",borderRadius:10,cursor:"pointer",fontFamily:"'DM Sans',sans-serif",fontSize:12,fontWeight:600,color:"#888"}}>Cancel</button>
-            <button onClick={archiveBoard} style={{flex:1,padding:"8px 0",background:"#e05555",border:"none",borderRadius:10,cursor:"pointer",fontFamily:"'DM Sans',sans-serif",fontSize:12,fontWeight:700,color:"#fff"}}>Archive</button>
-          </div>
-        </div>
-      ) : (
-        <button onClick={() => setConfirmArchive(true)} style={{
-          width:"100%",padding:"9px 12px",background:"transparent",border:"1.5px solid #ece8e0",
-          borderRadius:12,cursor:"pointer",fontFamily:"'DM Sans',sans-serif",fontSize:12,fontWeight:600,color:"#bbb",
-          display:"flex",alignItems:"center",gap:8,
-        }}
-          onMouseEnter={e=>{e.currentTarget.style.borderColor="#ffd0d0";e.currentTarget.style.color="#e05555";}}
-          onMouseLeave={e=>{e.currentTarget.style.borderColor="#ece8e0";e.currentTarget.style.color="#bbb";}}
-        >
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><polyline points="21 8 21 21 3 21 3 8"/><rect x="1" y="3" width="22" height="5"/><line x1="10" y1="12" x2="14" y2="12"/></svg>
-          Archive Board
-        </button>
       )}
     </div>
 
@@ -7423,17 +7464,19 @@ function Moodboard({ closetItems = [], activeIdx, setActiveIdx, boards: boardsPr
         <input ref={fileRef} type="file" accept="image/*" multiple style={{display:"none"}} onChange={e=>{importImages(e.target.files);e.target.value="";}} />
         {setMbView && <button onClick={()=>setMbView("grid")} style={{padding:"8px 12px",background:"#f5f3ef",border:"none",borderRadius:10,cursor:"pointer",fontFamily:"'DM Sans',sans-serif",fontSize:12,fontWeight:700,color:"#666",display:"flex",alignItems:"center",gap:6}}>← All Boards</button>}
         <button onClick={()=>fileRef.current.click()} style={{padding:"8px 16px",background:"#1a1a1a",color:"#fff",border:"none",borderRadius:10,cursor:"pointer",fontFamily:"'DM Sans',sans-serif",fontSize:12,fontWeight:700,display:"flex",alignItems:"center",gap:8}}><SvgCamera size={13} color="#fff" />Import Images</button>
-        <button onClick={addTextNote} style={{padding:"8px 16px",background:"#fff9e6",border:"1.5px solid #f0e0a0",borderRadius:10,cursor:"pointer",fontFamily:"'DM Sans',sans-serif",fontSize:12,fontWeight:700,color:"#7a6000",display:"flex",alignItems:"center",gap:8}}><SvgEdit size={13} color="#7a6000" />Add Text</button>
-        <button onClick={()=>setShowUrlImport(u=>!u)} style={{padding:"8px 14px",background:showUrlImport?"#f0f4ff":"#f5f3ef",border:showUrlImport?"1.5px solid #a0b4f0":"none",borderRadius:10,cursor:"pointer",fontFamily:"'DM Sans',sans-serif",fontSize:12,fontWeight:700,color:showUrlImport?"#3a5fe0":"#666",display:"flex",alignItems:"center",gap:8}}><SvgLink size={13} color="currentColor" />URL</button>
-        <button onClick={()=>setShowClosetPicker(p=>!p)} style={{padding:"8px 14px",background:showClosetPicker?"#f0faf4":"#f5f3ef",border:showClosetPicker?"1.5px solid #b6e8c8":"none",borderRadius:10,cursor:"pointer",fontFamily:"'DM Sans',sans-serif",fontSize:12,fontWeight:700,color:showClosetPicker?"#2d6a3f":"#666",display:"flex",alignItems:"center",gap:8}}><SvgHanger size={13} color="currentColor" />From Closet</button>
+        <button onClick={addTextNote} style={{padding:"8px 16px",background:"#f5f3ef",border:"1px solid #e0dbd2",borderRadius:10,cursor:"pointer",fontFamily:"'DM Sans',sans-serif",fontSize:12,fontWeight:700,color:"#666",display:"flex",alignItems:"center",gap:8}}><SvgEdit size={13} color="#666" />Add Text</button>
+        <button onClick={()=>setShowUrlImport(u=>!u)} style={{padding:"8px 14px",background:showUrlImport?"#f0f4ff":"#f5f3ef",border:showUrlImport?"1.5px solid #a0b4f0":"1px solid #e0dbd2",borderRadius:10,cursor:"pointer",fontFamily:"'DM Sans',sans-serif",fontSize:12,fontWeight:700,color:showUrlImport?"#3a5fe0":"#666",display:"flex",alignItems:"center",gap:8}}><SvgLink size={13} color="currentColor" />URL</button>
+        <button onClick={()=>setShowClosetPicker(p=>!p)} style={{padding:"8px 14px",background:showClosetPicker?"#f0faf4":"#f5f3ef",border:showClosetPicker?"1.5px solid #b6e8c8":"1px solid #e0dbd2",borderRadius:10,cursor:"pointer",fontFamily:"'DM Sans',sans-serif",fontSize:12,fontWeight:700,color:showClosetPicker?"#2d6a3f":"#666",display:"flex",alignItems:"center",gap:8}}><SvgHanger size={13} color="currentColor" />From Closet</button>
         <div style={{display:"flex",gap:6,marginLeft:"auto",alignItems:"center"}}>
-          <button onClick={undo} title="Undo (⌘Z)" style={{padding:"7px 10px",background:"#f5f3ef",border:"none",borderRadius:8,cursor:"pointer",fontSize:11,fontWeight:700,color:"#666",fontFamily:"'DM Sans',sans-serif",display:"flex",alignItems:"center",gap:5}}>
+          <button onClick={undo} title="Undo (⌘Z)" style={{padding:"7px 10px",background:"#f5f3ef",border:"1px solid #e0dbd2",borderRadius:8,cursor:"pointer",fontSize:11,fontWeight:700,color:"#666",fontFamily:"'DM Sans',sans-serif",display:"flex",alignItems:"center",gap:5}}>
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><path d="M3 7v6h6"/><path d="M21 17a9 9 0 00-9-9 9 9 0 00-6 2.3L3 13"/></svg>
           </button>
-          <button onClick={redo} title="Redo (⌘⇧Z)" style={{padding:"7px 10px",background:"#f5f3ef",border:"none",borderRadius:8,cursor:"pointer",fontSize:11,fontWeight:700,color:"#666",fontFamily:"'DM Sans',sans-serif",display:"flex",alignItems:"center",gap:5}}>
+          <button onClick={redo} title="Redo (⌘⇧Z)" style={{padding:"7px 10px",background:"#f5f3ef",border:"1px solid #e0dbd2",borderRadius:8,cursor:"pointer",fontSize:11,fontWeight:700,color:"#666",fontFamily:"'DM Sans',sans-serif",display:"flex",alignItems:"center",gap:5}}>
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><path d="M21 7v6h-6"/><path d="M3 17a9 9 0 019-9 9 9 0 016 2.3l3 2.7"/></svg>
           </button>
-          <button onClick={exportCanvas} style={{padding:"8px 14px",background:"#f5f2ed",border:"none",borderRadius:10,cursor:"pointer",fontFamily:"'DM Sans',sans-serif",fontSize:12,fontWeight:700,color:"#666",display:"flex",alignItems:"center",gap:8}}><SvgDownload size={13} color="#666" />Export JPG</button>
+          <button onClick={exportCanvas} title="Export as JPG" style={{padding:"7px 10px",background:"#f5f3ef",border:"1px solid #e0dbd2",borderRadius:8,cursor:"pointer",fontSize:11,color:"#777",fontFamily:"'DM Sans',sans-serif",display:"flex",alignItems:"center",gap:5}}>
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+          </button>
           <button onClick={() => {
             if (!board) return;
             if (window.confirm(`Archive "${board.name || "this board"}"? Restore from Settings → Data.`)) {
@@ -7449,8 +7492,8 @@ function Moodboard({ closetItems = [], activeIdx, setActiveIdx, boards: boardsPr
               }
               if (setActiveIdx) setActiveIdx(Math.max(0, activeIdx - 1));
             }
-          }} title="Archive this board" style={{padding:"7px 10px",background:"#f5f3ef",border:"none",borderRadius:8,cursor:"pointer",fontSize:11,color:"#777",fontFamily:"'DM Sans',sans-serif",display:"flex",alignItems:"center",gap:5}}>
-            <SvgArrowDn size={13} color="#777" />
+          }} title="Archive this board" style={{padding:"7px 10px",background:"#f5f3ef",border:"1px solid #e0dbd2",borderRadius:8,cursor:"pointer",fontSize:11,color:"#777",fontFamily:"'DM Sans',sans-serif",display:"flex",alignItems:"center",gap:5}}>
+            <SvgDownload size={13} color="#777" />
           </button>
           <button onClick={() => {
             if (!board) return;
@@ -11853,6 +11896,7 @@ export default function App() {
           {tab === "moodboard" && <MoodboardInfoPanel
             activeIdx={moodboardActiveIdx} setActiveIdx={setMoodboardActiveIdx}
             boards={moodboardsDb.boards} updateBoards={moodboardsDb.updateBoards} updateBoardById={moodboardsDb.updateBoardById} removeBoardById={moodboardsDb.removeBoardById}
+            closetItems={itemsDb.rows.filter(i => !i.forSale)}
             lookbooksDb={lookbooksDb.rows}
             createLookbook={async ({id: newId, name, moodboardId}) => {
               const lbId = newId || uid();

@@ -2714,7 +2714,7 @@ function OutfitDetailPopup({ outfit, allItems, wishlistIds = new Set(), allOutfi
 }
 
 // ── Lookbook Viewer ──────────────────────────────────────────────────────────
-function LookbookViewer({ lookbook, outfits, allItems, closetItems, onClose, onUpdate, onArchive, onOpenOutfit, markOutfitWorn, moodboardsProp, moodboardsUpdateBoards, initialView }) {
+function LookbookViewer({ lookbook, outfits, allItems, closetItems, onClose, onUpdate, onArchive, onOpenOutfit, markOutfitWorn, moodboardsProp, moodboardsUpdateBoards, moodboardsUpdateBoardById, moodboardsRemoveBoardById, initialView }) {
   const LB_TAGS = ["Travel","Work Week","Event","Disney","Sport","Weekend","Vacation"];
   const [view, setView] = useState(initialView || "editorial"); // "editorial" | "grid"
   const [idx, setIdx] = useState(0);
@@ -3311,13 +3311,28 @@ function LookbookViewer({ lookbook, outfits, allItems, closetItems, onClose, onU
           {view === "moodboard" ? (
             /* ── MOODBOARD VIEW ── */
             linkedMoodboardIdx >= 0 && moodboards[linkedMoodboardIdx] ? (
-              <Moodboard
-                closetItems={closetItems || []}
-                activeIdx={linkedMoodboardIdx}
-                setActiveIdx={setLinkedMoodboardIdx}
-                boards={moodboards}
-                updateBoards={moodboardsUpdateBoards}
-              />
+              <div style={{ display: "flex", flex: 1, overflow: "hidden" }}>
+                <Moodboard
+                  closetItems={closetItems || []}
+                  activeIdx={linkedMoodboardIdx}
+                  setActiveIdx={setLinkedMoodboardIdx}
+                  boards={moodboards}
+                  updateBoards={moodboardsUpdateBoards}
+                  removeBoardById={moodboardsRemoveBoardById}
+                />
+                <MoodboardInfoPanel
+                  activeIdx={linkedMoodboardIdx}
+                  setActiveIdx={setLinkedMoodboardIdx}
+                  boards={moodboards}
+                  updateBoards={moodboardsUpdateBoards}
+                  updateBoardById={moodboardsUpdateBoardById}
+                  removeBoardById={moodboardsRemoveBoardById}
+                  lookbooksDb={[lookbook]}
+                  createLookbook={async () => {}}
+                  addMoodboardToLookbook={async () => {}}
+                  onGoToLookbook={() => {}}
+                />
+              </div>
             ) : (
               <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 14, background: "#faf9f6" }}>
                 <SvgSparkle size={40} color="#ddd" />
@@ -13652,6 +13667,8 @@ export default function App() {
           closetItems={itemsDb.rows}
           moodboardsProp={moodboardsDb.boards}
           moodboardsUpdateBoards={moodboardsDb.updateBoards}
+          moodboardsUpdateBoardById={moodboardsDb.updateBoardById}
+          moodboardsRemoveBoardById={moodboardsDb.removeBoardById}
           initialView={activeLookbookView}
           onClose={(finalLb) => closeAndSaveLookbook(finalLb)}
           onArchive={(finalLb) => archiveLookbook(finalLb)}

@@ -7332,6 +7332,7 @@ function Moodboard({ closetItems = [], activeIdx, setActiveIdx, boards: boardsPr
   const [editingTextId, setEditingTextId] = useState(null);
   const [editingTextVal, setEditingTextVal] = useState("");
   const [mbPreviewBoard, setMbPreviewBoard] = useState(null);
+  const [mbSort, setMbSort] = useState("pinned");
 
   // ── Undo/redo history ──
   const history = useRef([]);   // array of board item snapshots
@@ -7548,7 +7549,14 @@ function Moodboard({ closetItems = [], activeIdx, setActiveIdx, boards: boardsPr
       if (q && !b.name?.toLowerCase().includes(q)) return false;
       if (mbTagFilter !== "All" && !(b.tags||[]).includes(mbTagFilter)) return false;
       return true;
-    }).sort((a,z)=>(z.b.pinned?1:0)-(a.b.pinned?1:0));
+    }).sort((a,z)=>{
+      if (mbSort === "pinned") return (z.b.pinned?1:0)-(a.b.pinned?1:0);
+      if (mbSort === "nameAZ") return (a.b.name||"").localeCompare(z.b.name||"");
+      if (mbSort === "nameZA") return (z.b.name||"").localeCompare(a.b.name||"");
+      if (mbSort === "newest") return z.i - a.i;
+      if (mbSort === "oldest") return a.i - z.i;
+      return 0;
+    });
     const archiveBoardFromGrid = (b) => {
       if (!window.confirm(`Archive "${b.name||"this board"}"? Restore from Settings → Data.`)) return;
       try {
@@ -7583,8 +7591,13 @@ function Moodboard({ closetItems = [], activeIdx, setActiveIdx, boards: boardsPr
         ) : (
           <>
             <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:16}}>
-              <div style={{fontFamily:"'Cormorant Garamond',serif",fontSize:20,fontWeight:300,fontStyle:"italic",color:"#888"}}>All Boards</div>
-              <button onClick={()=>{addBoard();setMbView&&setMbView("canvas");}} style={{padding:"7px 14px",background:"#1a1a1a",color:"#fff",border:"none",borderRadius:10,cursor:"pointer",fontSize:11,fontWeight:700,fontFamily:"'DM Sans',sans-serif"}}>+ New Board</button>
+              <select value={mbSort} onChange={e=>setMbSort(e.target.value)} style={{padding:"7px 12px",border:"1.5px solid #e0dbd2",borderRadius:10,background:"#fff",fontSize:12,fontWeight:600,color:"#555",fontFamily:"'DM Sans',sans-serif",cursor:"pointer",outline:"none"}}>
+                <option value="pinned">Pinned First</option>
+                <option value="nameAZ">Name A–Z</option>
+                <option value="nameZA">Name Z–A</option>
+                <option value="newest">Newest</option>
+                <option value="oldest">Oldest</option>
+              </select>
             </div>
             <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(220px,1fr))",gap:14}}>
               {filteredBoards.map(({b,i})=>(
@@ -11370,6 +11383,18 @@ export default function App() {
                   color: outfitSelectMode ? "#1a1a1a" : "#666",
                   fontFamily: "'DM Sans', sans-serif",
                 }}>{outfitSelectMode ? "Cancel" : "Select"}</button>
+              )}
+              {tab === "moodboard" && moodboardView === "grid" && (
+                <button className="btn-primary" onClick={() => {
+                  const newBoard = {id: Date.now().toString(36) + Math.random().toString(36).slice(2), name: `Board ${(moodboardsDb.boards||[]).length + 1}`, items: [], bg: "#ffffff"};
+                  moodboardsDb.updateBoards(bs => { const next = [...bs, newBoard]; setMoodboardActiveIdx(next.length - 1); return next; });
+                  setMoodboardView("canvas");
+                }} style={{
+                  padding: "10px 20px", borderRadius: 14, background: "#1a1a1a",
+                  border: "none", cursor: "pointer", fontSize: 13, fontWeight: 600, color: "#fff",
+                  display: "flex", alignItems: "center", gap: 6, fontFamily: "'DM Sans', sans-serif",
+                  boxShadow: "0 4px 14px rgba(0,0,0,0.15)"
+                }}>+ Add</button>
               )}
               {tab !== "stats" && tab !== "moodboard" && tab !== "home" && tab !== "settings" && (
                 <button className="btn-primary" onClick={() => {

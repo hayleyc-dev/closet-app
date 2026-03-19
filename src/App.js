@@ -6879,7 +6879,39 @@ function MoodboardInfoPanel({ activeIdx, setActiveIdx, boards: boardsProp, updat
 }
 
 
-function Moodboard({ closetItems = [], activeIdx, setActiveIdx, boards: boardsProp, updateBoards, removeBoardById }) {
+function MoodboardGridCard({ board, onClick }) {
+  const [hovered, setHovered] = useState(false);
+  const imgItems = (board?.items||[]).filter(it=>it.src);
+  return (
+    <button onClick={onClick} style={{width:"100%",border:"1.5px solid #e8e4dc",borderRadius:18,background:board?.bg||"#f5f3ef",cursor:"pointer",overflow:"hidden",padding:0,position:"relative",aspectRatio:"4/3",boxShadow:"0 2px 10px rgba(0,0,0,0.05)",transition:"transform 0.15s,box-shadow 0.15s"}}
+      onMouseEnter={e=>{setHovered(true);e.currentTarget.style.transform="translateY(-2px)";e.currentTarget.style.boxShadow="0 10px 28px rgba(0,0,0,0.12)";}}
+      onMouseLeave={e=>{setHovered(false);e.currentTarget.style.transform="translateY(0)";e.currentTarget.style.boxShadow="0 2px 10px rgba(0,0,0,0.05)";}}>
+      {/* Thumbnail collage */}
+      {imgItems.slice(0,4).map((it,idx)=>(
+        <img key={it.id} src={it.src} alt="" style={{position:"absolute",objectFit:"cover",borderRadius:6,
+          ...(idx===0?{top:"8%",left:"6%",width:"56%",height:"82%"}:
+             idx===1?{top:"8%",right:"6%",width:"36%",height:"39%"}:
+             idx===2?{bottom:"8%",right:"6%",width:"36%",height:"39%"}:
+             {bottom:"8%",left:"6%",width:"36%",height:"39%"})}} />
+      ))}
+      {imgItems.length===0&&<div style={{position:"absolute",inset:0,display:"flex",alignItems:"center",justifyContent:"center"}}><SvgSparkle size={28} color="rgba(0,0,0,0.12)" /></div>}
+      {/* Hover overlay */}
+      <div style={{position:"absolute",inset:0,background:"rgba(0,0,0,0.52)",opacity:hovered?1:0,transition:"opacity 0.18s",display:"flex",flexDirection:"column",justifyContent:"space-between",padding:"12px 14px",pointerEvents:"none"}}>
+        <div style={{display:"flex",alignItems:"flex-start",justifyContent:"space-between",gap:6}}>
+          <div style={{fontSize:13,fontWeight:800,color:"#fff",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",flex:1}}>{board?.name||"Untitled"}</div>
+          {board?.linkedLb&&<div style={{flexShrink:0,background:"rgba(58,170,110,0.9)",color:"#fff",borderRadius:20,padding:"2px 8px",fontSize:10,fontWeight:700}}>Lookbook</div>}
+          {board?.pinned&&<span style={{flexShrink:0,color:"#f0c840",fontSize:13}}>★</span>}
+        </div>
+        <div style={{display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+          <div style={{fontSize:11,color:"rgba(255,255,255,0.7)"}}>{(board?.items||[]).length} item{(board?.items||[]).length!==1?"s":""}</div>
+          <div style={{fontSize:11,fontWeight:700,color:"#fff"}}>Open Board →</div>
+        </div>
+      </div>
+    </button>
+  );
+}
+
+function Moodboard({ closetItems = [], activeIdx, setActiveIdx, boards: boardsProp, updateBoards, removeBoardById, mbView = "grid", setMbView, mbSearch = "", mbTagFilter = "All" }) {
   const closetItemsForMoodboard = closetItems;
   // Use prop-based boards (Supabase-backed) if provided, else fall back to localStorage
   const STORAGE_KEY = "wardrobe_moodboards_v1";
@@ -7119,14 +7151,39 @@ function Moodboard({ closetItems = [], activeIdx, setActiveIdx, boards: boardsPr
     setUrlLoading(false);
   };
 
-  if (boards.length === 0) return (
-    <div style={{display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",height:"60vh",gap:16}}>
-      <div><SvgSparkle size={40} color="#ddd" /></div>
-      <div style={{fontSize:18,fontWeight:800,color:"#1a1a1a"}}>No moodboards yet</div>
-      <div style={{fontSize:13,color:"#aaa"}}>Create a board in the right panel and start arranging inspiration</div>
-      <button onClick={addBoard} style={{padding:"12px 28px",background:"#1a1a1a",color:"#fff",border:"none",borderRadius:14,cursor:"pointer",fontFamily:"'DM Sans',sans-serif",fontSize:14,fontWeight:700}}>+ Create Moodboard</button>
-    </div>
-  );
+  if (boards.length === 0 || mbView === "grid") {
+    const q = mbSearch.trim().toLowerCase();
+    const filteredBoards = boards.map((b,i)=>({b,i})).filter(({b}) => {
+      if (q && !b.name?.toLowerCase().includes(q)) return false;
+      if (mbTagFilter !== "All" && !(b.tags||[]).includes(mbTagFilter)) return false;
+      return true;
+    }).sort((a,z)=>(z.b.pinned?1:0)-(a.b.pinned?1:0));
+    return (
+      <div style={{display:"flex",flexDirection:"column",padding:"0 4px"}}>
+        {boards.length === 0 ? (
+          <div style={{display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",height:"60vh",gap:16}}>
+            <div><SvgSparkle size={40} color="#ddd" /></div>
+            <div style={{fontSize:18,fontWeight:800,color:"#1a1a1a"}}>No moodboards yet</div>
+            <button onClick={()=>{addBoard();setMbView&&setMbView("canvas");}} style={{padding:"12px 28px",background:"#1a1a1a",color:"#fff",border:"none",borderRadius:14,cursor:"pointer",fontFamily:"'DM Sans',sans-serif",fontSize:14,fontWeight:700}}>+ Create Board</button>
+          </div>
+        ) : (
+          <>
+            <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:16}}>
+              <div style={{fontFamily:"'Cormorant Garamond',serif",fontSize:20,fontWeight:300,fontStyle:"italic",color:"#888"}}>All Boards</div>
+              <button onClick={()=>{addBoard();setMbView&&setMbView("canvas");}} style={{padding:"7px 14px",background:"#1a1a1a",color:"#fff",border:"none",borderRadius:10,cursor:"pointer",fontSize:11,fontWeight:700,fontFamily:"'DM Sans',sans-serif"}}>+ New Board</button>
+            </div>
+            <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(220px,1fr))",gap:14}}>
+              {filteredBoards.map(({b,i})=>{
+                return (
+                  <MoodboardGridCard key={b.id} board={b} onClick={()=>{setActiveIdx(i);setMbView&&setMbView("canvas");}} />
+                );
+              })}
+            </div>
+          </>
+        )}
+      </div>
+    );
+  }
 
   return (
     <div style={{display:"flex",flexDirection:"column",height:"calc(100vh - 160px)",userSelect:"none",padding:"0 4px"}}>
@@ -7134,6 +7191,7 @@ function Moodboard({ closetItems = [], activeIdx, setActiveIdx, boards: boardsPr
       {/* Toolbar */}
       <div style={{display:"flex",gap:8,marginBottom:10,flexWrap:"wrap",alignItems:"center"}}>
         <input ref={fileRef} type="file" accept="image/*" multiple style={{display:"none"}} onChange={e=>{importImages(e.target.files);e.target.value="";}} />
+        {setMbView && <button onClick={()=>setMbView("grid")} style={{padding:"8px 12px",background:"#f5f3ef",border:"none",borderRadius:10,cursor:"pointer",fontFamily:"'DM Sans',sans-serif",fontSize:12,fontWeight:700,color:"#666",display:"flex",alignItems:"center",gap:6}}>← All Boards</button>}
         <button onClick={()=>fileRef.current.click()} style={{padding:"8px 16px",background:"#1a1a1a",color:"#fff",border:"none",borderRadius:10,cursor:"pointer",fontFamily:"'DM Sans',sans-serif",fontSize:12,fontWeight:700,display:"flex",alignItems:"center",gap:8}}><SvgCamera size={13} color="#fff" />Import Images</button>
         <button onClick={addTextNote} style={{padding:"8px 16px",background:"#fff9e6",border:"1.5px solid #f0e0a0",borderRadius:10,cursor:"pointer",fontFamily:"'DM Sans',sans-serif",fontSize:12,fontWeight:700,color:"#7a6000",display:"flex",alignItems:"center",gap:8}}><SvgEdit size={13} color="#7a6000" />Add Text</button>
         <button onClick={()=>setShowUrlImport(u=>!u)} style={{padding:"8px 14px",background:showUrlImport?"#f0f4ff":"#f5f3ef",border:showUrlImport?"1.5px solid #a0b4f0":"none",borderRadius:10,cursor:"pointer",fontFamily:"'DM Sans',sans-serif",fontSize:12,fontWeight:700,color:showUrlImport?"#3a5fe0":"#666",display:"flex",alignItems:"center",gap:8}}><SvgLink size={13} color="currentColor" />URL</button>
@@ -10412,6 +10470,9 @@ export default function App() {
   const [activeLookbook, setActiveLookbook] = useState(null);
   const [activeLookbookView, setActiveLookbookView] = useState("editorial");
   const [moodboardActiveIdx, setMoodboardActiveIdx] = useState(0);
+  const [moodboardView, setMoodboardView] = useState("grid"); // "grid" | "canvas"
+  const [moodboardSearch, setMoodboardSearch] = useState("");
+  const [moodboardTagFilter, setMoodboardTagFilter] = useState("All");
   const LOOKBOOK_TYPES = ["trip", "event", "season", "capsule", "inspiration"];
   const LOOKBOOK_OCCASIONS = ["All", "WFH", "Disney", "Universal", "Date Night", "Travel", "Sport", "Weekend", "Event"];
   const LOOKBOOK_OCCASION_ALIASES = {
@@ -10730,7 +10791,7 @@ export default function App() {
     outfits: ["My Outfits", ""],
     lookbooks: ["Lookbooks", ""],
     stats: ["Style Profile", "Your wardrobe in focus"],
-    moodboard: ["Moodboard", "Inspire yourself"],
+    moodboard: ["Moodboard", ""],
     seller: ["Seller Dashboard", "What's for sale"],
     wishlist: ["Wishlist", ""],
     settings: ["Settings", "Customize your wardrobe"],
@@ -10922,8 +10983,8 @@ export default function App() {
           {/* Content — 2-column layout (left sidebar + main) */}
           {tab !== "home" && <div className="app-layout">
 
-        {/* ── LEFT SIDEBAR (closet + outfits + lookbooks) ── */}
-        {(tab === "closet" || tab === "outfits" || tab === "lookbooks") && (
+        {/* ── LEFT SIDEBAR (closet + outfits + lookbooks + moodboard grid) ── */}
+        {(tab === "closet" || tab === "outfits" || tab === "lookbooks" || (tab === "moodboard" && moodboardView === "grid")) && (
           <div className="app-left-sidebar">
             <div className="closet-sidebar" style={{ position: "sticky", top: 80 }}>
               {tab === "closet" && (<>
@@ -10975,6 +11036,20 @@ export default function App() {
                   <div style={{ fontSize: 10, fontWeight: 700, color: "#c0b8b0", textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 10 }}>Type</div>
                   {["All", ...LOOKBOOK_TYPES.map(t => t[0].toUpperCase() + t.slice(1))].map(typeLabel => (
                     <button key={typeLabel} className={"sidebar-btn" + (lbTypeFilter === typeLabel ? " active" : "")} onClick={() => setLbTypeFilter(typeLabel)}>{typeLabel}</button>
+                  ))}
+                </div>
+              </>)}
+              {tab === "moodboard" && (<>
+                <div className="sidebar-section">
+                  <div style={{ position: "relative" }}>
+                    <span style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)", pointerEvents: "none", display:"flex" }}><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#bbb" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{pointerEvents:"none"}}><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg></span>
+                    <input className="closet-search" value={moodboardSearch} onChange={e => setMoodboardSearch(e.target.value)} placeholder="Search boards…" />
+                  </div>
+                </div>
+                <div className="right-card" style={{ marginBottom: 12 }}>
+                  <div style={{ fontSize: 10, fontWeight: 700, color: "#c0b8b0", textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 10 }}>Tag</div>
+                  {["All", "Inspiration", "Planning", "Travel", "Seasonal", "Wishlist", "Archive"].map(tag => (
+                    <button key={tag} className={"sidebar-btn" + (moodboardTagFilter === tag ? " active" : "")} onClick={() => setMoodboardTagFilter(tag)}>{tag}</button>
                   ))}
                 </div>
               </>)}
@@ -11465,7 +11540,7 @@ export default function App() {
             {tab === "seller" && <SellerDashboard itemsDb={itemsDb} allClosetItems={itemsDb.rows.filter(i => !i.forSale)} onViewItem={(item) => setItemDetail(item)} />}
 
             {/* MOODBOARD */}
-            {tab === "moodboard" && <Moodboard closetItems={itemsDb.rows.filter(i => !i.forSale)} activeIdx={moodboardActiveIdx} setActiveIdx={setMoodboardActiveIdx} boards={moodboardsDb.boards} updateBoards={moodboardsDb.updateBoards} removeBoardById={moodboardsDb.removeBoardById} />}
+            {tab === "moodboard" && <Moodboard closetItems={itemsDb.rows.filter(i => !i.forSale)} activeIdx={moodboardActiveIdx} setActiveIdx={setMoodboardActiveIdx} boards={moodboardsDb.boards} updateBoards={moodboardsDb.updateBoards} removeBoardById={moodboardsDb.removeBoardById} mbView={moodboardView} setMbView={setMoodboardView} mbSearch={moodboardSearch} mbTagFilter={moodboardTagFilter} />}
 
             {/* SETTINGS */}
             {tab === "settings" && <SettingsTab
@@ -11533,8 +11608,8 @@ export default function App() {
           )}
         </div>
 
-        {/* ── RIGHT PANEL (closet / outfits / moodboard only) ── */}
-        {["closet","outfits","moodboard"].includes(tab) && <div className="app-right-panel" style={{ top: 24 }}>
+        {/* ── RIGHT PANEL (closet / outfits / moodboard canvas only) ── */}
+        {(["closet","outfits"].includes(tab) || (tab === "moodboard" && moodboardView === "canvas")) && <div className="app-right-panel" style={{ top: 24 }}>
 
           {/* Sort moved to top toolbar for closet/outfits */}
 

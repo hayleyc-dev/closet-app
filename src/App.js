@@ -6989,8 +6989,7 @@ function MoodboardPreviewSurface({ board, compact = false }) {
 }
 
 function MoodboardPreviewChip({ board, onClick, compact = false, showOpenButton = true }) {
-  const metaTone = compact ? "#aaa" : "#9a9388";
-  const surface = "#fff";
+  const [hovered, setHovered] = useState(false);
 
   return (
     <button
@@ -6999,62 +6998,51 @@ function MoodboardPreviewChip({ board, onClick, compact = false, showOpenButton 
         width: "100%",
         border: "1.5px solid #e8e4dc",
         borderRadius: compact ? 16 : 20,
-        background: surface,
+        background: board?.bg || "#f5f3ef",
         cursor: "pointer",
         overflow: "hidden",
         textAlign: "left",
         padding: 0,
         boxShadow: compact ? "0 2px 10px rgba(0,0,0,0.04)" : "0 8px 28px rgba(0,0,0,0.05)",
         transition: "transform 0.15s ease, box-shadow 0.15s ease",
+        position: "relative",
       }}
       onMouseEnter={e => {
+        setHovered(true);
         e.currentTarget.style.transform = "translateY(-2px)";
-        e.currentTarget.style.boxShadow = compact ? "0 8px 20px rgba(0,0,0,0.08)" : "0 14px 34px rgba(0,0,0,0.08)";
+        e.currentTarget.style.boxShadow = compact ? "0 8px 20px rgba(0,0,0,0.10)" : "0 14px 34px rgba(0,0,0,0.12)";
       }}
       onMouseLeave={e => {
+        setHovered(false);
         e.currentTarget.style.transform = "translateY(0)";
         e.currentTarget.style.boxShadow = compact ? "0 2px 10px rgba(0,0,0,0.04)" : "0 8px 28px rgba(0,0,0,0.05)";
       }}
     >
-      <div style={{ position: "relative", aspectRatio: compact ? "16 / 10" : "17 / 10", background: board?.bg || "#ffffff" }}>
-        {board?.pinned && (
-          <div style={{ position: "absolute", top: 10, right: 12, zIndex: 3, fontSize: 13, color: "#f0c840" }}>★</div>
-        )}
+      <div style={{ position: "relative", aspectRatio: compact ? "16 / 10" : "17 / 10", background: board?.bg || "#f5f3ef" }}>
         <MoodboardPreviewSurface board={board} compact={compact} />
-      </div>
-
-      <div style={{ padding: compact ? "10px 12px 12px" : "12px 14px 14px" }}>
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, marginBottom: 6 }}>
-          <div style={{ fontSize: compact ? 12 : 14, fontWeight: 800, color: "#1a1a1a", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-            {board?.name || "Untitled Board"}
+        {/* Hover overlay */}
+        <div style={{
+          position: "absolute", inset: 0,
+          background: "rgba(0,0,0,0.52)",
+          opacity: hovered ? 1 : 0,
+          transition: "opacity 0.18s",
+          display: "flex", flexDirection: "column", justifyContent: "space-between",
+          padding: "12px 14px",
+          pointerEvents: "none",
+        }}>
+          <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 6 }}>
+            <div style={{ fontSize: compact ? 12 : 13, fontWeight: 800, color: "#fff", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1 }}>
+              {board?.name || "Untitled Board"}
+            </div>
+            {board?.linkedLb && <div style={{ flexShrink: 0, background: "rgba(58,170,110,0.9)", color: "#fff", borderRadius: 20, padding: "2px 8px", fontSize: 10, fontWeight: 700 }}>Lookbook</div>}
+            {board?.pinned && <span style={{ flexShrink: 0, color: "#f0c840", fontSize: 13 }}>★</span>}
           </div>
-          {board?.linkedLb && <div style={{ fontSize: 10, fontWeight: 700, color: "#2d6a3f", background: "#f0faf4", border: "1px solid #b6e8c8", borderRadius: 999, padding: "2px 7px", flexShrink: 0 }}>Lookbook</div>}
-        </div>
-
-        {!compact && board?.notes && (
-          <div style={{ fontSize: 12, color: "#8c857a", lineHeight: 1.55, minHeight: 36, marginBottom: 8, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>
-            {board.notes}
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+            <div style={{ fontSize: 11, color: "rgba(255,255,255,0.7)" }}>
+              {(board?.items || []).length} item{(board?.items || []).length !== 1 ? "s" : ""}
+            </div>
+            {showOpenButton && <div style={{ fontSize: 11, fontWeight: 700, color: "#fff" }}>Open Board →</div>}
           </div>
-        )}
-
-        <div style={{ display: "flex", flexWrap: "wrap", gap: 5, marginBottom: compact ? 8 : 10 }}>
-          {(board?.tags || []).slice(0, compact ? 2 : 3).map(tag => (
-            <span key={tag} style={{ fontSize: 9, fontWeight: 700, padding: "2px 7px", borderRadius: 999, background: "#f5f3ef", color: "#888" }}>
-              {tag}
-            </span>
-          ))}
-        </div>
-
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
-          <div style={{ fontSize: 11, color: metaTone, fontWeight: 600 }}>
-            {(board?.items || []).length} item{(board?.items || []).length !== 1 ? "s" : ""}
-            {board?.palette?.length ? ` • ${board.palette.length} colors` : ""}
-          </div>
-          {showOpenButton && (
-            <span style={{ fontSize: 11, fontWeight: 800, color: "#1a1a1a" }}>
-              Open Board →
-            </span>
-          )}
         </div>
       </div>
     </button>
@@ -11561,7 +11549,7 @@ export default function App() {
     outfits: ["My Outfits", ""],
     lookbooks: ["Lookbooks", ""],
     stats: ["Style Profile", "Your wardrobe in focus"],
-    moodboard: ["Moodboard", "Inspire yourself"],
+    moodboard: ["Moodboard", ""],
     seller: ["Seller Dashboard", ""],
     wishlist: ["Wishlist", ""],
     settings: ["Settings", "Customize your wardrobe"],
@@ -12421,43 +12409,8 @@ export default function App() {
           )}
         </div>
 
-        {/* ── RIGHT PANEL (closet / outfits / moodboard only) ── */}
-        {["closet","outfits","moodboard"].includes(tab) && <div className="app-right-panel" style={{ top: 24 }}>
-
-          {/* Sort moved to top toolbar for closet/outfits */}
-
-          {/* Moodboard board info */}
-          {tab === "moodboard" && <MoodboardInfoPanel
-            activeIdx={moodboardActiveIdx} setActiveIdx={setMoodboardActiveIdx}
-            boards={moodboardsDb.boards} updateBoards={moodboardsDb.updateBoards} updateBoardById={moodboardsDb.updateBoardById} removeBoardById={moodboardsDb.removeBoardById}
-            closetItems={itemsDb.rows}
-            isEditing={isMoodboardEditing}
-            setIsEditing={setIsMoodboardEditing}
-            lookbooksDb={lookbooksDb.rows}
-            createLookbook={async ({id: newId, name, moodboardId}) => {
-              const lbId = newId || uid();
-              const newLb = { id: lbId, name, notes: "", coverImage: "", dateStart: "", dateEnd: "", outfitIds: [], lookMeta: {}, moodboardId, type: "inspiration" };
-              let { error } = await supabase.from("lookbooks").insert({ id: lbId, data: newLb });
-              if (error) ({ error } = await supabase.from("lookbooks").insert(newLb));
-              await lookbooksDb.refresh();
-            }}
-            addMoodboardToLookbook={async (lookbookId, board) => {
-              const lb = lookbooksDb.rows.find(l => l.id === lookbookId);
-              if (!lb) return;
-              const updated = { ...lb, moodboardId: board.id };
-              await lookbooksDb.update(updated);
-              // Set immediately — don't wait for refresh
-              setActiveLookbook(updated);
-            }}
-            onGoToLookbook={(lb) => {
-              // lb already has moodboardId set by setLinkedLb
-              const fresh = lookbooksDb.rows.find(r => r.id === lb.id);
-              const withMb = { ...(fresh || lb), moodboardId: lb.moodboardId || fresh?.moodboardId };
-              setActiveLookbookView("moodboard");
-              setTab("lookbooks");
-              setActiveLookbook(withMb);
-            }}
-          />}
+        {/* ── RIGHT PANEL (closet / outfits only) ── */}
+        {["closet","outfits"].includes(tab) && <div className="app-right-panel" style={{ top: 24 }}>
 
           {tab === "outfits" && (() => {
             const todayKey = new Date().toISOString().slice(0, 10);

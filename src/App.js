@@ -3372,14 +3372,22 @@ function LookbookViewer({ lookbook, outfits, allItems, closetItems, onClose, onU
               </div>
             )
 
-          ) : looks.length === 0 ? (
+          ) : looks.length === 0 && plannedSlots.length === 0 ? (
             <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", color: "#ccc", gap: 12 }}>
               <SvgGrid size={36} color="#ddd" />
               <div style={{ fontSize: 14, fontWeight: 600 }}>No looks yet</div>
-              <button onClick={() => setShowAddLooks(true)} style={{ ...btnBase, padding: "10px 22px", background: "#1a1a1a", color: "#fff", fontSize: 13 }}>+ Add Outfits</button>
+              <div style={{ display: "flex", gap: 8 }}>
+                <button onClick={() => setShowAddLooks(true)} style={{ ...btnBase, padding: "10px 22px", background: "#1a1a1a", color: "#fff", fontSize: 13 }}>+ Add Outfits</button>
+                <button onClick={() => {
+                  const next = [...plannedSlots, { id: Date.now() + "_" + Math.random().toString(36).slice(2), name: "", date: "" }];
+                  setPlannedSlots(next);
+                  save({ plannedSlots: next });
+                  setView("grid");
+                }} style={{ ...btnBase, padding: "10px 22px", background: "#f5f3ef", color: "#555", fontSize: 13, border: "1.5px dashed #d0cbc3" }}>+ Plan a Look</button>
+              </div>
             </div>
 
-          ) : view === "editorial" ? (
+          ) : view === "editorial" && looks.length > 0 ? (
             /* ── EDITORIAL / MAGAZINE VIEW ── */
             <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
               {/* Large hero image */}

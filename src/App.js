@@ -9698,7 +9698,7 @@ function HomeTab({
 
   const EH = ({ title, action }) => (
     <div style={{ display: "flex", alignItems: "center", gap: 16, marginBottom: 18 }}>
-      <div style={{ fontFamily: "'Cormorant Garamond', serif", fontStyle: "italic", fontWeight: 300, fontSize: 32, color: "#241b15", lineHeight: 0.95, whiteSpace: "nowrap" }}>{title}</div>
+      <div style={{ fontFamily: "'DM Sans', sans-serif", fontWeight: 300, fontSize: 22, color: "#241b15", letterSpacing: "0.01em", whiteSpace: "nowrap" }}>{title}</div>
       <div style={{ flex: 1, height: 1, background: "#e7dfd4" }} />
       {action && <button onClick={action.onClick} style={{ fontSize: 11, color: "#8e7d6a", background: "none", border: "none", cursor: "pointer", fontFamily: "'DM Sans', sans-serif", padding: 0, whiteSpace: "nowrap" }}>{action.label}</button>}
     </div>
@@ -9714,8 +9714,8 @@ function HomeTab({
 
   return (
     <div className="fade-up" style={{ padding: "0 40px 96px" }}>
-      {/* ── Hero Banner (A2 crisp white + B2 stacked) ── */}
-      <div style={{ background: "#fff", border: "2px solid #1f1915", borderRadius: 22, padding: "32px 36px 24px", marginBottom: 28 }}>
+      {/* ── Hero Banner (F2 flush + B2 stacked) ── */}
+      <div style={{ padding: "32px 0 28px", marginBottom: 28, borderBottom: "1px solid rgba(31,25,21,0.14)" }}>
         {/* Greeting row */}
         <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 24, marginBottom: 22 }}>
           <div>
@@ -9803,7 +9803,7 @@ function HomeTab({
                 <div style={{ textAlign: "center", fontSize: 9, fontWeight: 700, color: day.isToday ? "#1f1915" : "#b6a795", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 6 }}>
                   {day.date.toLocaleDateString("en-US", { weekday: "short" })}
                 </div>
-                <div style={{ width: "100%", aspectRatio: "3/4", borderRadius: 16, border: day.isToday ? "2px solid #1f1915" : "1px solid #ece2d6", background: outfit?.previewImage ? `url(${outfit.previewImage}) center/cover no-repeat` : "#faf6f1", position: "relative", overflow: "hidden" }}>
+                <div style={{ width: "100%", aspectRatio: "3/4", borderRadius: 16, border: day.isToday ? "2px solid #1f1915" : "1px solid #ece2d6", background: outfit?.previewImage ? `url(${outfit.previewImage}) center/cover no-repeat` : "#fff", position: "relative", overflow: "hidden" }}>
                   {!outfit?.previewImage && outfit && thumbItems.length > 0 && (
                     <div style={{ position: "absolute", inset: 0, display: "grid", gridTemplateColumns: "1fr 1fr" }}>
                       {[0, 1, 2, 3].map(qi => {
@@ -9835,41 +9835,32 @@ function HomeTab({
         {/* Row 1, Col 1: Planning */}
         <div>
           <EH title="Planning" action={{ label: "Outfits →", onClick: () => setTab("outfits") }} />
-          <div style={{ ...cardStyle, padding: 20, marginBottom: 16 }}>
+          <div>
             {planningRows.length === 0 ? (
-              <div style={{ fontSize: 13, color: "#a89582" }}>No upcoming plans yet. Add events in the outfit calendar to start building around them.</div>
-            ) : (
-              <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-                {planningRows.map(entry => {
-                  const badge = planBadge(entry);
-                  const dateText = [fmtDate(entry.startDate), entry.endDate && entry.endDate !== entry.startDate ? fmtDate(entry.endDate) : null].filter(Boolean).join(" – ");
-                  const isLookbookRow = entry.kind === "lookbook" && entry.lookbook;
-                  const lbCover = isLookbookRow ? entry.lookbook.coverImage : null;
-                  const content = (
-                    <div key={entry.id} onClick={() => {
-                      if (entry.lookbook) openLookbook(entry.lookbook);
-                      else setTab("outfits");
-                    }} style={{ display: "flex", alignItems: "center", gap: 12, padding: isLookbookRow ? "10px 14px 10px 10px" : "12px 14px", borderRadius: 16, background: "#faf6f1", border: "1px solid #f0e6da", cursor: entry.lookbook ? "pointer" : "default" }}>
-                      {isLookbookRow && (
-                        <div style={{ width: 44, height: 52, borderRadius: 10, flexShrink: 0, background: lbCover ? `url(${lbCover}) center/cover no-repeat` : "linear-gradient(135deg, #eadfce, #f7f1e9)", border: "1px solid #e8ddd0" }} />
-                      )}
-                      {!isLookbookRow && (
-                        <div style={{ minWidth: 58 }}>
-                          <div style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", padding: "4px 8px", borderRadius: 999, background: badge.bg, color: badge.color, fontSize: 10, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase" }}>{badge.label}</div>
-                        </div>
-                      )}
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        {isLookbookRow && <div style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", padding: "3px 7px", borderRadius: 999, background: badge.bg, color: badge.color, fontSize: 10, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 5 }}>{badge.label}</div>}
-                        <div style={{ fontSize: 13, fontWeight: 700, color: "#2a211b", lineHeight: 1.25 }}>{entry.label || entry.name}</div>
-                        <div style={{ fontSize: 11, color: "#9b8a78", marginTop: 3 }}>{dateText}</div>
-                      </div>
-                      {entry.lookbook && <div style={{ fontSize: 11, color: "#8e7d6a", fontWeight: 700 }}>Open</div>}
-                    </div>
-                  );
-                  return content;
-                })}
-              </div>
-            )}
+              <div style={{ fontSize: 13, color: "#a89582", paddingTop: 4 }}>No upcoming plans yet. Add events in the outfit calendar to start building around them.</div>
+            ) : planningRows.map((entry, entryIdx) => {
+              const badge = planBadge(entry);
+              const dateText = [fmtDate(entry.startDate), entry.endDate && entry.endDate !== entry.startDate ? fmtDate(entry.endDate) : null].filter(Boolean).join(" – ");
+              const isLookbookRow = entry.kind === "lookbook" && entry.lookbook;
+              const lbCover = isLookbookRow ? entry.lookbook.coverImage : null;
+              return (
+                <div key={entry.id} onClick={() => { if (entry.lookbook) openLookbook(entry.lookbook); else setTab("outfits"); }}
+                  style={{ display: "flex", alignItems: "center", gap: 12, padding: "11px 0", borderBottom: entryIdx < planningRows.length - 1 ? "1px solid rgba(31,25,21,0.07)" : "none", cursor: entry.lookbook ? "pointer" : "default" }}>
+                  {isLookbookRow && (
+                    <div style={{ width: 40, height: 48, borderRadius: 8, flexShrink: 0, background: lbCover ? `url(${lbCover}) center/cover no-repeat` : "linear-gradient(135deg, #eadfce, #f7f1e9)", border: "1px solid #e8ddd0" }} />
+                  )}
+                  {!isLookbookRow && (
+                    <div style={{ display: "inline-flex", padding: "3px 7px", borderRadius: 999, background: badge.bg, color: badge.color, fontSize: 9, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase" }}>{badge.label}</div>
+                  )}
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    {isLookbookRow && <div style={{ display: "inline-flex", padding: "2px 6px", borderRadius: 999, background: badge.bg, color: badge.color, fontSize: 9, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 4 }}>{badge.label}</div>}
+                    <div style={{ fontSize: 13, fontWeight: 600, color: "#2a211b", lineHeight: 1.25 }}>{entry.label || entry.name}</div>
+                    <div style={{ fontSize: 11, color: "#9b8a78", marginTop: 2 }}>{dateText}</div>
+                  </div>
+                  {entry.lookbook && <div style={{ fontSize: 13, color: "#c0b0a0" }}>→</div>}
+                </div>
+              );
+            })}
           </div>
 
         </div>
@@ -9878,11 +9869,13 @@ function HomeTab({
         <div>
           <EH title="New In" action={{ label: "Closet →", onClick: () => setTab("closet") }} />
           {newInItems.length === 0 ? (
-            <div style={{ ...cardStyle, padding: "22px 20px", color: "#a89582", fontSize: 13 }}>Items added in the past 3 months will appear here.</div>
+            <div style={{ fontSize: 13, color: "#a89582", paddingTop: 4 }}>Items added in the past 3 months will appear here.</div>
           ) : (
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-              {newInItems.slice(0, 6).map(item => (
-                <ItemCard key={item.id} item={item} onClick={() => setItemDetail && setItemDetail(item)} onCreateLook={() => setTab("outfits")} />
+            <div style={{ display: "flex", gap: 12, overflowX: "auto", paddingBottom: 4 }}>
+              {newInItems.map(item => (
+                <div key={item.id} style={{ flexShrink: 0, width: 148 }}>
+                  <ItemCard item={item} onClick={() => setItemDetail && setItemDetail(item)} onCreateLook={() => setTab("outfits")} />
+                </div>
               ))}
             </div>
           )}
@@ -9891,18 +9884,18 @@ function HomeTab({
         {/* Row 1, Col 3: Keep Working */}
         <div>
           <EH title="Keep Working" />
-          <div style={{ ...cardStyle, padding: 20 }}>
+          <div>
             {keepWorkingLookbooks.length === 0 ? (
               <div style={{ fontSize: 13, color: "#a89582" }}>Date-linked lookbooks will appear here for the next month, or 3 months for trips.</div>
             ) : (
-              <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-                {keepWorkingLookbooks.map(lb => {
+              <div style={{ display: "flex", flexDirection: "column" }}>
+                {keepWorkingLookbooks.map((lb, lbIdx) => {
                   const pack = getPackProgress(lb);
                   const packPct = pack.total > 0 ? Math.round(pack.packed / pack.total * 100) : 0;
                   const countdown = lb.isActive ? "Active now" : lb.daysUntil === 0 ? "Today" : lb.daysUntil === 1 ? "Tomorrow" : `In ${lb.daysUntil} days`;
                   return (
-                    <div key={lb.id} onClick={() => openLookbook(lb)} style={{ cursor: "pointer", borderRadius: 16, overflow: "hidden", border: "1px solid #efe4d8", background: "#faf6f1" }}>
-                      <div style={{ display: "grid", gridTemplateColumns: "80px minmax(0, 1fr)", gap: 10, padding: 10, alignItems: "center" }}>
+                    <div key={lb.id} onClick={() => openLookbook(lb)} style={{ cursor: "pointer", borderBottom: lbIdx < keepWorkingLookbooks.length - 1 ? "1px solid rgba(31,25,19,0.07)" : "none" }}>
+                      <div style={{ display: "grid", gridTemplateColumns: "80px minmax(0, 1fr)", gap: 10, padding: "10px 0", alignItems: "center" }}>
                         <div style={{ height: 96, borderRadius: 12, background: lb.coverImage ? `url(${lb.coverImage}) center/cover no-repeat` : "linear-gradient(135deg, #eadfce, #f7f1e9)" }} />
                         <div style={{ minWidth: 0 }}>
                           <div style={{ fontSize: 9, fontWeight: 700, color: "#ab9b88", textTransform: "uppercase", letterSpacing: "0.12em", marginBottom: 4 }}>{countdown}</div>
@@ -9930,7 +9923,7 @@ function HomeTab({
         <div style={{ gridColumn: "span 2" }}>
           <EH title="Pinned Lookbooks" action={{ label: "All lookbooks →", onClick: () => setTab("lookbooks") }} />
           {pinnedLookbooks.length === 0 ? (
-            <div style={{ ...cardStyle, padding: "22px 20px", textAlign: "center", color: "#b4a491" }}>Pin lookbooks from the Lookbooks tab to keep them here.</div>
+            <div style={{ fontSize: 13, color: "#a89582", paddingTop: 4 }}>Pin lookbooks from the Lookbooks tab to keep them here.</div>
           ) : (
             <div style={{ display: "flex", gap: 14, overflowX: "auto", paddingBottom: 4 }}>
               {pinnedLookbooks.slice(0, 6).map(lb => {
@@ -9962,7 +9955,7 @@ function HomeTab({
 
         <div>
           <EH title="Featured Board" action={{ label: "All boards →", onClick: () => setTab("moodboard") }} />
-          <div style={{ ...cardStyle, padding: 20 }}>
+          <div>
             {moodboardsDb?.length > 0 ? (
               <>
                 <div style={{ display: "flex", gap: 10, alignItems: "center", marginBottom: 16, flexWrap: "wrap" }}>
@@ -10004,7 +9997,7 @@ function HomeTab({
         {/* Row 3: Closet Health (col 1) | Seller Snapshot (span 2) */}
         <div>
           <EH title="Closet Health" action={{ label: "Profile →", onClick: () => setTab("stats") }} />
-          <div onClick={() => setTab("stats")} style={{ ...cardStyle, padding: "22px 22px 20px", cursor: "pointer" }}>
+          <div onClick={() => setTab("stats")} style={{ cursor: "pointer" }}>
             <div style={{ display: "flex", alignItems: "center", gap: 16, marginBottom: 18 }}>
               <div style={{ width: 58, height: 58, borderRadius: "50%", border: `3px solid ${healthColor}`, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
                 <span style={{ fontSize: 16, fontWeight: 800, color: healthColor }}>{healthScore}</span>
@@ -10016,7 +10009,7 @@ function HomeTab({
             </div>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 10 }}>
               {[{ label: "Value", value: `$${totalValue.toFixed(0)}` }, { label: "Items", value: closetItems.length }, { label: "Unworn", value: unwornCount }].map(stat => (
-                <div key={stat.label} style={{ background: "#faf6f1", borderRadius: 14, padding: "12px 10px", textAlign: "center" }}>
+                <div key={stat.label} style={{ textAlign: "center", padding: "10px 0" }}>
                   <div style={{ fontSize: 18, fontWeight: 800, color: "#241b15" }}>{stat.value}</div>
                   <div style={{ fontSize: 10, fontWeight: 700, color: "#ab9b88", textTransform: "uppercase", letterSpacing: "0.08em", marginTop: 4 }}>{stat.label}</div>
                 </div>
@@ -10037,14 +10030,14 @@ function HomeTab({
                 { label: "Potential", value: `$${sellerPotential.toFixed(0)}`, color: "#7d7468" },
                 { label: "To Review", value: sellerItems.length, color: "#1f1915" },
               ].map(stat => (
-                <div key={stat.label} onClick={() => setTab("seller")} style={{ ...cardStyle, padding: "18px 16px", cursor: "pointer" }}>
-                  <div style={{ fontSize: 24, fontWeight: 800, color: stat.color, lineHeight: 1, marginBottom: 8 }}>{stat.value}</div>
+                <div key={stat.label} onClick={() => setTab("seller")} style={{ cursor: "pointer", padding: "10px 0", borderBottom: "1px solid rgba(31,25,19,0.07)" }}>
+                  <div style={{ fontSize: 24, fontWeight: 800, color: stat.color, lineHeight: 1, marginBottom: 6 }}>{stat.value}</div>
                   <div style={{ fontSize: 10, fontWeight: 700, color: "#ab9b88", textTransform: "uppercase", letterSpacing: "0.1em" }}>{stat.label}</div>
                 </div>
               ))}
             </div>
           ) : (
-            <div style={{ ...cardStyle, padding: "22px 20px", color: "#a89582" }}>No selling activity yet. Mark pieces for sale to see your seller rollup here.</div>
+            <div style={{ fontSize: 13, color: "#a89582", paddingTop: 4 }}>No selling activity yet. Mark pieces for sale to see your seller rollup here.</div>
           )}
         </div>
       </div>

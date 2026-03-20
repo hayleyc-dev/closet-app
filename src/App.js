@@ -3336,6 +3336,7 @@ function LookbookViewer({ lookbook, outfits, allItems, closetItems, onClose, onU
                     boards={moodboards}
                     updateBoards={moodboardsUpdateBoards}
                     removeBoardById={moodboardsRemoveBoardById}
+                    mbView="canvas"
                     fitParent={true}
                   />
                 </div>

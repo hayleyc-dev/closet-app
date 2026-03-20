@@ -9722,23 +9722,9 @@ function HomeTab({
             <div>
               <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.18em", textTransform: "uppercase", color: "#8b7762", marginBottom: 10 }}>{dayName}</div>
               <div style={{ fontFamily: "'Cormorant Garamond', serif", fontStyle: "italic", fontWeight: 300, fontSize: 68, color: "#201814", lineHeight: 0.88, marginBottom: 12 }}>{greeting}</div>
-              <div style={{ fontSize: 15, color: "#6f6154", maxWidth: 520, lineHeight: 1.7 }}>
-                {fullDateLabel}. Home is now a rollup of what to wear, what is coming up, and what deserves your attention next.
+              <div style={{ fontSize: 12, color: "#a08e7a", marginTop: 2 }}>
+                {closetItems.length} items · ${closetItems.reduce((s, i) => s + (parseFloat(i.price) || 0), 0).toLocaleString("en-US", { maximumFractionDigits: 0 })} value · {wornPct}% worn
               </div>
-            </div>
-
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 12 }}>
-              {[
-                { label: "Closet", value: `${closetItems.length} pieces`, sub: `${wornPct}% worn` },
-                { label: "This Week", value: `${weekLogged}/7 logged`, sub: weekLogged > 0 ? "Calendar in motion" : "Start planning" },
-                { label: "New In", value: `${newInItems.length} recent`, sub: "Last 3 months" },
-              ].map(stat => (
-                <div key={stat.label} style={{ background: "rgba(255,255,255,0.66)", border: "1px solid rgba(107,81,54,0.08)", borderRadius: 16, padding: "14px 16px" }}>
-                  <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", color: "#a08e7a", marginBottom: 8 }}>{stat.label}</div>
-                  <div style={{ fontSize: 22, fontWeight: 800, color: "#1f1915", lineHeight: 1, marginBottom: 4 }}>{stat.value}</div>
-                  <div style={{ fontSize: 11, color: "#7e6f61" }}>{stat.sub}</div>
-                </div>
-              ))}
             </div>
           </div>
 
@@ -9750,8 +9736,8 @@ function HomeTab({
               </div>
               {todayWx ? (
                 <div style={{ textAlign: "right" }}>
-                  <div style={{ fontSize: 28, fontWeight: 800, color: "#1f1915", lineHeight: 1, display: "flex", alignItems: "center", gap: 6, justifyContent: "flex-end" }}>
-                    <span style={{ fontSize: 20 }}>{wxIcon(todayWx.code)}</span>
+                  <div style={{ fontSize: 36, fontWeight: 800, color: "#1f1915", lineHeight: 1, display: "flex", alignItems: "center", gap: 8, justifyContent: "flex-end" }}>
+                    <span style={{ fontSize: 28 }}>{wxIcon(todayWx.code)}</span>
                     <span>{todayWx.high}°</span>
                   </div>
                   <div style={{ fontSize: 11, color: "#7e6f61", marginTop: 4 }}>{homeWeather?.city || homeCity}</div>
@@ -9765,19 +9751,26 @@ function HomeTab({
             </div>
 
             <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 16 }}>
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, paddingBottom: 10, borderBottom: "1px solid #efe6dc" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 12, paddingBottom: 10, borderBottom: "1px solid #efe6dc" }}>
                 <div>
                   <div style={{ fontSize: 11, fontWeight: 700, color: "#a08e7a", textTransform: "uppercase", letterSpacing: "0.12em", marginBottom: 4 }}>Weather</div>
                   <div style={{ fontSize: 13, color: "#362d26" }}>{todayWx ? `${wxIcon(todayWx.code)} ${todayWx.high}° / ${todayWx.low}°` : "Add a city to load forecast"}</div>
                 </div>
-                <button onClick={() => setTab("settings")} style={{ background: "none", border: "none", padding: 0, cursor: "pointer", fontSize: 11, color: "#8e7d6a", fontFamily: "'DM Sans', sans-serif" }}>Forecast settings</button>
               </div>
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, paddingBottom: 10, borderBottom: "1px solid #efe6dc" }}>
-                <div>
-                  <div style={{ fontSize: 11, fontWeight: 700, color: "#a08e7a", textTransform: "uppercase", letterSpacing: "0.12em", marginBottom: 4 }}>Plans</div>
-                  <div style={{ fontSize: 13, color: "#362d26" }}>{todayPlans.length > 0 ? todayPlans.map(ev => ev.name).join(" · ") : "No events scheduled today"}</div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: "#a08e7a", textTransform: "uppercase", letterSpacing: "0.12em", marginBottom: 6 }}>Plans</div>
+                  {todayPlans.length > 0 ? (
+                    <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                      {todayPlans.map((ev, i) => (
+                        <span key={i} style={{ display: "inline-flex", alignItems: "center", padding: "3px 9px", borderRadius: 999, background: "#f0e8df", color: "#6c5040", fontSize: 11, fontWeight: 600 }}>{ev.name}</span>
+                      ))}
+                    </div>
+                  ) : (
+                    <div style={{ fontSize: 13, color: "#362d26" }}>No events today</div>
+                  )}
                 </div>
-                <button onClick={() => setTab("outfits")} style={{ background: "none", border: "none", padding: 0, cursor: "pointer", fontSize: 11, color: "#8e7d6a", fontFamily: "'DM Sans', sans-serif" }}>Calendar</button>
+                <button onClick={() => setTab("outfits")} style={{ background: "none", border: "none", padding: 0, cursor: "pointer", fontSize: 11, color: "#8e7d6a", fontFamily: "'DM Sans', sans-serif", flexShrink: 0 }}>Calendar</button>
               </div>
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
                 <div>
@@ -9876,15 +9869,23 @@ function HomeTab({
                 {planningRows.map(entry => {
                   const badge = planBadge(entry);
                   const dateText = [fmtDate(entry.startDate), entry.endDate && entry.endDate !== entry.startDate ? fmtDate(entry.endDate) : null].filter(Boolean).join(" – ");
+                  const isLookbookRow = entry.kind === "lookbook" && entry.lookbook;
+                  const lbCover = isLookbookRow ? entry.lookbook.coverImage : null;
                   const content = (
                     <div key={entry.id} onClick={() => {
                       if (entry.lookbook) openLookbook(entry.lookbook);
                       else setTab("outfits");
-                    }} style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 14px", borderRadius: 16, background: "#faf6f1", border: "1px solid #f0e6da", cursor: entry.lookbook ? "pointer" : "default" }}>
-                      <div style={{ minWidth: 58 }}>
-                        <div style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", padding: "4px 8px", borderRadius: 999, background: badge.bg, color: badge.color, fontSize: 10, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase" }}>{badge.label}</div>
-                      </div>
+                    }} style={{ display: "flex", alignItems: "center", gap: 12, padding: isLookbookRow ? "10px 14px 10px 10px" : "12px 14px", borderRadius: 16, background: "#faf6f1", border: "1px solid #f0e6da", cursor: entry.lookbook ? "pointer" : "default" }}>
+                      {isLookbookRow && (
+                        <div style={{ width: 44, height: 52, borderRadius: 10, flexShrink: 0, background: lbCover ? `url(${lbCover}) center/cover no-repeat` : "linear-gradient(135deg, #eadfce, #f7f1e9)", border: "1px solid #e8ddd0" }} />
+                      )}
+                      {!isLookbookRow && (
+                        <div style={{ minWidth: 58 }}>
+                          <div style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", padding: "4px 8px", borderRadius: 999, background: badge.bg, color: badge.color, fontSize: 10, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase" }}>{badge.label}</div>
+                        </div>
+                      )}
                       <div style={{ flex: 1, minWidth: 0 }}>
+                        {isLookbookRow && <div style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", padding: "3px 7px", borderRadius: 999, background: badge.bg, color: badge.color, fontSize: 10, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 5 }}>{badge.label}</div>}
                         <div style={{ fontSize: 13, fontWeight: 700, color: "#2a211b", lineHeight: 1.25 }}>{entry.label || entry.name}</div>
                         <div style={{ fontSize: 11, color: "#9b8a78", marginTop: 3 }}>{dateText}</div>
                       </div>
@@ -9941,7 +9942,7 @@ function HomeTab({
       {newInItems.length > 0 && (
         <div style={{ marginBottom: 34 }}>
           <EH eyebrow="Recent Arrivals" title="New In" action={{ label: "View closet →", onClick: () => setTab("closet") }} />
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 14 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))", gap: 14 }}>
             {newInItems.map(item => (
               <ItemCard
                 key={item.id}
@@ -9960,15 +9961,26 @@ function HomeTab({
           {pinnedLookbooks.length === 0 ? (
             <div style={{ ...cardStyle, padding: "22px 20px", textAlign: "center", color: "#b4a491" }}>Pin lookbooks from the Lookbooks tab to keep them here.</div>
           ) : (
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 14 }}>
-              {pinnedLookbooks.slice(0, 4).map(lb => {
+            <div style={{ display: "flex", gap: 14, overflowX: "auto", paddingBottom: 4 }}>
+              {pinnedLookbooks.slice(0, 6).map(lb => {
                 const lbOutfits = (lb.outfitIds || []).map(id => outfitsDb.rows.find(o => o.id === id)).filter(Boolean);
+                const thumbItems = lbOutfits.flatMap(o => (o.layers || o.itemIds || []).slice(0, 1).map(id => allItems.find(x => x.id === id)).filter(Boolean)).slice(0, 4);
                 return (
-                  <div key={lb.id} onClick={() => openLookbook(lb)} style={{ ...cardStyle, cursor: "pointer" }}>
-                    <div style={{ aspectRatio: "4/3", background: lb.coverImage ? `url(${lb.coverImage}) center/cover no-repeat` : "linear-gradient(135deg, #eadfce, #f7f1e9)" }} />
-                    <div style={{ padding: "14px 16px 16px" }}>
-                      <div style={{ fontSize: 15, fontWeight: 700, color: "#241b15", lineHeight: 1.25 }}>{lb.name}</div>
-                      <div style={{ fontSize: 11, color: "#9b8a78", marginTop: 5 }}>{lbOutfits.length} look{lbOutfits.length !== 1 ? "s" : ""}{lb.dateStart || lb.dateEnd ? ` · ${[fmtDate(lb.dateStart), fmtDate(lb.dateEnd)].filter(Boolean).join(" – ")}` : ""}</div>
+                  <div key={lb.id} onClick={() => openLookbook(lb)} style={{ flexShrink: 0, width: 180, borderRadius: 18, overflow: "hidden", border: "1px solid #e7dfd4", cursor: "pointer", background: "#fff", boxShadow: "0 4px 14px rgba(48,33,19,0.06)" }}>
+                    <div style={{ aspectRatio: "4/5", position: "relative", background: "linear-gradient(135deg, #eadfce, #f7f1e9)" }}>
+                      {lb.coverImage ? (
+                        <img src={lb.coverImage} alt={lb.name} style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
+                      ) : thumbItems.length >= 2 ? (
+                        <div style={{ position: "absolute", inset: 0, display: "grid", gridTemplateColumns: "1fr 1fr", gap: 2 }}>
+                          {[0, 1, 2, 3].map(i => (
+                            <div key={i} style={{ background: thumbItems[i]?.image ? `url(${thumbItems[i].image}) center/cover no-repeat` : "#f0e8df" }} />
+                          ))}
+                        </div>
+                      ) : null}
+                    </div>
+                    <div style={{ padding: "12px 14px 14px" }}>
+                      <div style={{ fontSize: 13, fontWeight: 700, color: "#241b15", lineHeight: 1.25, marginBottom: 4 }}>{lb.name}</div>
+                      <div style={{ fontSize: 11, color: "#9b8a78" }}>{lbOutfits.length} look{lbOutfits.length !== 1 ? "s" : ""}{lb.dateStart || lb.dateEnd ? ` · ${[fmtDate(lb.dateStart), fmtDate(lb.dateEnd)].filter(Boolean).join(" – ")}` : ""}</div>
                     </div>
                   </div>
                 );
@@ -10067,72 +10079,6 @@ function HomeTab({
         </div>
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: monthlyBudget > 0 ? "minmax(0, 0.9fr) minmax(0, 1.1fr) minmax(0, 1fr)" : "minmax(0, 1.1fr) minmax(0, 1fr)", gap: 24 }}>
-        {monthlyBudget > 0 && (
-          <div>
-            <EH eyebrow="Spending" title="Monthly Budget" action={{ label: "Settings →", onClick: () => setTab("settings") }} />
-            <div style={{ ...cardStyle, padding: 20 }}>
-              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 12 }}>
-                <span style={{ fontSize: 12, color: "#9b8a78" }}>Spent this month</span>
-                <span style={{ fontSize: 13, fontWeight: 700, color: "#241b15" }}>${monthlySpend.toFixed(0)} <span style={{ color: "#bcae9d", fontWeight: 400 }}>of ${monthlyBudget.toFixed(0)}</span></span>
-              </div>
-              <div style={{ height: 6, borderRadius: 999, background: "#efe4d8", overflow: "hidden", marginBottom: 10 }}>
-                <div style={{ width: `${Math.min(100, monthlySpend / monthlyBudget * 100)}%`, height: "100%", borderRadius: 999, background: monthlySpend > monthlyBudget ? "#e05555" : "#1f1915" }} />
-              </div>
-              <div style={{ fontSize: 11, color: "#9b8a78" }}>{monthlySpend > monthlyBudget ? "You are over budget this month." : "You are within budget."}</div>
-            </div>
-          </div>
-        )}
-
-        {wearAgainItem && (
-          <div>
-            <EH eyebrow="Wardrobe Refresh" title="Wear Again" />
-            <div style={{ ...cardStyle, padding: 18, display: "flex", gap: 14, alignItems: "center" }}>
-              <div style={{ width: 88, height: 112, borderRadius: 16, background: wearAgainItem.image ? `url(${wearAgainItem.image}) center/cover no-repeat` : "#f5f0e8", flexShrink: 0 }} />
-              <div style={{ minWidth: 0 }}>
-                <div style={{ fontSize: 15, fontWeight: 700, color: "#241b15" }}>{wearAgainItem.name}</div>
-                <div style={{ fontSize: 11, color: "#9b8a78", marginTop: 4 }}>{[wearAgainItem.brand, wearAgainItem.category].filter(Boolean).join(" · ")}</div>
-                <div style={{ display: "flex", gap: 8, marginTop: 14 }}>
-                  <button onClick={() => setTab("outfits")} style={{ padding: "7px 12px", borderRadius: 999, border: "1px solid #d9ccbe", background: "#fff", fontSize: 11, fontWeight: 700, color: "#241b15", cursor: "pointer", fontFamily: "'DM Sans', sans-serif" }}>Style it</button>
-                  <button onClick={() => setTab("seller")} style={{ padding: "7px 12px", borderRadius: 999, border: "none", background: "#f4ede5", fontSize: 11, fontWeight: 700, color: "#7e6f61", cursor: "pointer", fontFamily: "'DM Sans', sans-serif" }}>Sell instead</button>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {highPriorityWish.length > 0 && (
-          <div>
-            <EH eyebrow="Wishlist" title="On My Radar" action={{ label: "All →", onClick: () => setTab("wishlist") }} />
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(110px, 1fr))", gap: 12 }}>
-              {highPriorityWish.map(item => (
-                <div key={item.id} onClick={() => setTab("wishlist")} style={{ ...cardStyle, cursor: "pointer" }}>
-                  <div style={{ aspectRatio: "3/4", background: item.image ? `url(${item.image}) center/cover no-repeat` : "#f5f0e8", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                    {!item.image && <SvgHeart size={18} color="#d6c8b8" />}
-                  </div>
-                  <div style={{ padding: "10px 12px 12px" }}>
-                    <div style={{ fontSize: 11, fontWeight: 700, color: "#241b15", lineHeight: 1.25 }}>{item.name}</div>
-                    {item.price && <div style={{ fontSize: 10, color: "#9b8a78", marginTop: 4 }}>{item.price}</div>}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-      </div>
-
-      {upcomingTrip && (
-        <div style={{ marginTop: 28, padding: "14px 18px", borderRadius: 16, background: "#f8f4ee", border: "1px solid #ebe1d5", display: "flex", alignItems: "center", gap: 12, cursor: "pointer" }} onClick={() => openLookbook(upcomingTrip)}>
-          <div style={{ width: 34, height: 34, borderRadius: "50%", background: "#fff", display: "flex", alignItems: "center", justifyContent: "center", color: "#6c5d4f", fontSize: 14 }}>✦</div>
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontSize: 13, fontWeight: 700, color: "#241b15" }}>{upcomingTrip.name}</div>
-            <div style={{ fontSize: 11, color: "#9b8a78", marginTop: 2 }}>
-              {upcomingTrip.isActive ? "Open your active lookbook." : `Coming up ${upcomingTrip.daysUntil === 0 ? "today" : upcomingTrip.daysUntil === 1 ? "tomorrow" : `in ${upcomingTrip.daysUntil} days`}.`} Keep working from Home.
-            </div>
-          </div>
-          <div style={{ fontSize: 11, fontWeight: 700, color: "#8e7d6a" }}>Open →</div>
-        </div>
-      )}
     </div>
   );
 }

@@ -2758,6 +2758,7 @@ function LookbookViewer({ lookbook, outfits, allItems, closetItems, onClose, onU
   const [lbWeather, setLbWeather] = useState(null);
   const [wxLoading, setWxLoading] = useState(false);
   const [coverImage, setCoverImage] = useState(lookbook.coverImage || "");
+  const coverInputRef = useRef(null);
   const [wornToast, setWornToast] = useState("");
   // Moodboard — use prop from App (Supabase-backed), fall back to localStorage poll
   const MOODBOARD_KEY = "wardrobe_moodboards_v1";
@@ -3120,12 +3121,27 @@ function LookbookViewer({ lookbook, outfits, allItems, closetItems, onClose, onU
 
       {/* Top bar */}
       <div className="lookbook-topbar">
+        {/* Hidden cover photo file input */}
+        <input ref={coverInputRef} type="file" accept="image/*" style={{ display: "none" }} onChange={e => {
+          const file = e.target.files?.[0];
+          if (!file) return;
+          const reader = new FileReader();
+          reader.onload = ev => { setCoverImage(ev.target.result); save({ coverImage: ev.target.result }); };
+          reader.readAsDataURL(file);
+          e.target.value = "";
+        }} />
         <button onClick={() => {
           const finalLb = { ...lookbook, name: lbName, notes, outfitIds: lookIds, lookMeta, tags: lbTags, city: lbCity, coverImage, moodboardId: linkedMoodboardId, tripDetails, dateStart: lbDateStart, dateEnd: lbDateEnd };
           onClose(finalLb);
         }} style={{ background: "none", border: "none", cursor: "pointer", display: "flex", alignItems: "center", gap: 6, color: "#aaa" }}>
           <SvgArrowL size={18} color="#aaa" />
         </button>
+        {/* Cover photo thumbnail / upload button */}
+        <div onClick={() => coverInputRef.current?.click()} title={coverImage ? "Change cover photo" : "Add cover photo"} style={{ width: 36, height: 36, borderRadius: 10, overflow: "hidden", flexShrink: 0, cursor: "pointer", background: coverImage ? `url(${coverImage}) center/cover no-repeat` : "#f0ece4", border: "1.5px solid #e0dbd2", display: "flex", alignItems: "center", justifyContent: "center", marginLeft: 8, transition: "opacity 0.15s" }}
+          onMouseEnter={e => e.currentTarget.style.opacity = "0.75"}
+          onMouseLeave={e => e.currentTarget.style.opacity = "1"}>
+          {!coverImage && <SvgCamera size={14} color="#bbb" />}
+        </div>
         <div style={{ flex: 1, display: "flex", flexDirection: "column", paddingLeft: 10 }}>
           {editingName ? (
             <input autoFocus value={lbName} onChange={e => setLbName(e.target.value)}

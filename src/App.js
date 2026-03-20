@@ -3312,26 +3312,30 @@ function LookbookViewer({ lookbook, outfits, allItems, closetItems, onClose, onU
             /* ── MOODBOARD VIEW ── */
             linkedMoodboardIdx >= 0 && moodboards[linkedMoodboardIdx] ? (
               <div style={{ display: "flex", flex: 1, overflow: "hidden" }}>
-                <Moodboard
-                  closetItems={closetItems || []}
-                  activeIdx={linkedMoodboardIdx}
-                  setActiveIdx={setLinkedMoodboardIdx}
-                  boards={moodboards}
-                  updateBoards={moodboardsUpdateBoards}
-                  removeBoardById={moodboardsRemoveBoardById}
-                />
-                <MoodboardInfoPanel
-                  activeIdx={linkedMoodboardIdx}
-                  setActiveIdx={setLinkedMoodboardIdx}
-                  boards={moodboards}
-                  updateBoards={moodboardsUpdateBoards}
-                  updateBoardById={moodboardsUpdateBoardById}
-                  removeBoardById={moodboardsRemoveBoardById}
-                  lookbooksDb={[lookbook]}
-                  createLookbook={async () => {}}
-                  addMoodboardToLookbook={async () => {}}
-                  onGoToLookbook={() => {}}
-                />
+                <div style={{ flex: 1, minWidth: 0, overflow: "hidden", display: "flex", flexDirection: "column" }}>
+                  <Moodboard
+                    closetItems={closetItems || []}
+                    activeIdx={linkedMoodboardIdx}
+                    setActiveIdx={setLinkedMoodboardIdx}
+                    boards={moodboards}
+                    updateBoards={moodboardsUpdateBoards}
+                    removeBoardById={moodboardsRemoveBoardById}
+                  />
+                </div>
+                <div style={{ width: 272, flexShrink: 0, background: "#fff", borderLeft: "1.5px solid #e8e4dc", overflowY: "auto", display: "flex", flexDirection: "column", gap: 14, padding: "16px 12px" }}>
+                  <MoodboardInfoPanel
+                    activeIdx={linkedMoodboardIdx}
+                    setActiveIdx={setLinkedMoodboardIdx}
+                    boards={moodboards}
+                    updateBoards={moodboardsUpdateBoards}
+                    updateBoardById={moodboardsUpdateBoardById}
+                    removeBoardById={moodboardsRemoveBoardById}
+                    lookbooksDb={[lookbook]}
+                    createLookbook={async () => {}}
+                    addMoodboardToLookbook={async () => {}}
+                    onGoToLookbook={() => {}}
+                  />
+                </div>
               </div>
             ) : (
               <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 14, background: "#faf9f6" }}>

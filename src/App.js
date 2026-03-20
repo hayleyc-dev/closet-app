@@ -3336,6 +3336,7 @@ function LookbookViewer({ lookbook, outfits, allItems, closetItems, onClose, onU
                     boards={moodboards}
                     updateBoards={moodboardsUpdateBoards}
                     removeBoardById={moodboardsRemoveBoardById}
+                    fitParent={true}
                   />
                 </div>
                 <div style={{ width: 272, flexShrink: 0, background: "#fff", borderLeft: "1.5px solid #e8e4dc", overflowY: "auto", display: "flex", flexDirection: "column", gap: 14, padding: "16px 12px" }}>
@@ -7774,7 +7775,7 @@ function MoodboardPreviewPopup({ board, onClose, onEdit, onGoToLookbook }) {
   );
 }
 
-function Moodboard({ closetItems = [], activeIdx, setActiveIdx, boards: boardsProp, updateBoards, removeBoardById, mbView = "grid", setMbView, mbSearch = "", mbTagFilter = "All", onGoToLookbook }) {
+function Moodboard({ closetItems = [], activeIdx, setActiveIdx, boards: boardsProp, updateBoards, removeBoardById, mbView = "grid", setMbView, mbSearch = "", mbTagFilter = "All", onGoToLookbook, fitParent = false }) {
   const closetItemsForMoodboard = closetItems;
   // Use prop-based boards (Supabase-backed) if provided, else fall back to localStorage
   const STORAGE_KEY = "wardrobe_moodboards_v1";
@@ -8096,7 +8097,7 @@ function Moodboard({ closetItems = [], activeIdx, setActiveIdx, boards: boardsPr
   }
 
   return (
-    <div style={{display:"flex",flexDirection:"column",height:"calc(100vh - 160px)",userSelect:"none",padding:"0 4px"}}>
+    <div style={{display:"flex",flexDirection:"column",flex:fitParent?1:undefined,minHeight:fitParent?0:undefined,height:fitParent?undefined:"calc(100vh - 160px)",userSelect:"none",padding:"0 4px"}}>
 
       {/* Toolbar */}
       <div style={{display:"flex",gap:8,marginBottom:10,flexWrap:"wrap",alignItems:"center"}}>

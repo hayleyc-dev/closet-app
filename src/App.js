@@ -601,6 +601,28 @@ function removeBgCanvas(dataUrl) {
   });
 }
 
+// Upload a file or base64 data URL to Cloudinary; returns the secure CDN URL.
+async function uploadToCloudinary(fileOrDataUrl) {
+  const CLOUD_NAME = "dfboya5nx";
+  const UPLOAD_PRESET = "closet-app";
+  const fd = new FormData();
+  if (typeof fileOrDataUrl === "string" && fileOrDataUrl.startsWith("data:")) {
+    const res = await fetch(fileOrDataUrl);
+    const blob = await res.blob();
+    fd.append("file", blob, "image.png");
+  } else {
+    fd.append("file", fileOrDataUrl);
+  }
+  fd.append("upload_preset", UPLOAD_PRESET);
+  const res = await fetch(`https://api.cloudinary.com/v1_1/${CLOUD_NAME}/image/upload`, {
+    method: "POST",
+    body: fd,
+  });
+  if (!res.ok) throw new Error("Cloudinary upload failed");
+  const json = await res.json();
+  return json.secure_url;
+}
+
 // Fetch an external image and return base64 data URL.
 // Tries direct fetch first (works for CORS-enabled hosts like Supabase Storage),
 // then falls back to CORS proxies for retailer sites that block direct requests.
@@ -1204,6 +1226,7 @@ function ImageUploadField({ value, onChange, style: outerStyle }) {
   const [fetchError, setFetchError] = useState("");
   const [showCropTool, setShowCropTool] = useState(false);
   const [showMaskEditor, setShowMaskEditor] = useState(false);
+  const [uploading, setUploading] = useState(false);
   // Keep original (pre-removal) image so restore brush has something to paint back
   const [originalSrc, setOriginalSrc] = useState(null);
 
@@ -1220,7 +1243,8 @@ function ImageUploadField({ value, onChange, style: outerStyle }) {
     setFetchError("");
     try {
       const dataUrl = await fetchImageAsDataUrl(url);
-      handleNewImage(dataUrl);
+      const cdnUrl = await uploadToCloudinary(dataUrl);
+      handleNewImage(cdnUrl);
       setUrlInput("");
     } catch (e) {
       setFetchError(e.message || "Failed to load image.");
@@ -1233,11 +1257,10 @@ function ImageUploadField({ value, onChange, style: outerStyle }) {
     if (!value) return;
     setRemoving(true);
     try {
-      // If it's an external URL, fetch as data URL first to avoid canvas taint
       const src = value.startsWith("data:") ? value : await fetchImageAsDataUrl(value);
       const result = await removeBgCanvas(src);
-      // Don't reset originalSrc — keep the pre-removal version for restore brush
-      onChange(result);
+      const cdnUrl = await uploadToCloudinary(result);
+      onChange(cdnUrl);
     } catch {
       alert("Background removal failed — try a cleaner image.");
     } finally {
@@ -1249,10 +1272,10 @@ function ImageUploadField({ value, onChange, style: outerStyle }) {
     if (!value) return;
     setAutoCropping(true);
     try {
-      // If it's an external URL, fetch as data URL first to avoid canvas taint
       const src = value.startsWith("data:") ? value : await fetchImageAsDataUrl(value);
       const result = await autoCropCanvas(src);
-      onChange(result);
+      const cdnUrl = await uploadToCloudinary(result);
+      onChange(cdnUrl);
     } catch {
       alert("Auto-crop failed.");
     } finally {
@@ -1263,13 +1286,13 @@ function ImageUploadField({ value, onChange, style: outerStyle }) {
   return (
     <div style={{ marginBottom: 14, ...outerStyle }}>
       {showCropTool && (
-        <CropTool src={value} onDone={dataUrl => { onChange(dataUrl); setShowCropTool(false); }} onCancel={() => setShowCropTool(false)} />
+        <CropTool src={value} onDone={async dataUrl => { try { const u = await uploadToCloudinary(dataUrl); onChange(u); } catch { onChange(dataUrl); } setShowCropTool(false); }} onCancel={() => setShowCropTool(false)} />
       )}
       {showMaskEditor && (
         <MaskEditor
           current={value}
           original={originalSrc || value}
-          onDone={dataUrl => { onChange(dataUrl); setShowMaskEditor(false); }}
+          onDone={async dataUrl => { try { const u = await uploadToCloudinary(dataUrl); onChange(u); } catch { onChange(dataUrl); } setShowMaskEditor(false); }}
           onCancel={() => setShowMaskEditor(false)}
         />
       )}
@@ -1294,13 +1317,21 @@ function ImageUploadField({ value, onChange, style: outerStyle }) {
       {tab === "upload" && (
         <label style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 14px", border: "1.5px dashed #e0dbd0", borderRadius: 12, cursor: "pointer", background: "#faf9f6" }}>
           <SvgCamera size={16} color="#aaa" />
-          <span style={{ fontSize: 13, color: "#888", fontWeight: 600 }}>{value ? "Change photo" : "Choose file…"}</span>
-          <input type="file" accept="image/*" style={{ display: "none" }} onChange={e => {
+          <span style={{ fontSize: 13, color: "#888", fontWeight: 600 }}>{uploading ? "Uploading…" : value ? "Change photo" : "Choose file…"}</span>
+          <input type="file" accept="image/*" style={{ display: "none" }} onChange={async e => {
             const file = e.target.files?.[0];
             if (!file) return;
-            const reader = new FileReader();
-            reader.onload = ev => handleNewImage(ev.target.result);
-            reader.readAsDataURL(file);
+            setUploading(true);
+            try {
+              const url = await uploadToCloudinary(file);
+              handleNewImage(url);
+            } catch {
+              const reader = new FileReader();
+              reader.onload = ev => handleNewImage(ev.target.result);
+              reader.readAsDataURL(file);
+            } finally {
+              setUploading(false);
+            }
           }} />
         </label>
       )}
@@ -3122,12 +3153,17 @@ function LookbookViewer({ lookbook, outfits, allItems, closetItems, onClose, onU
       {/* Top bar */}
       <div className="lookbook-topbar">
         {/* Hidden cover photo file input */}
-        <input ref={coverInputRef} type="file" accept="image/*" style={{ display: "none" }} onChange={e => {
+        <input ref={coverInputRef} type="file" accept="image/*" style={{ display: "none" }} onChange={async e => {
           const file = e.target.files?.[0];
           if (!file) return;
-          const reader = new FileReader();
-          reader.onload = ev => { setCoverImage(ev.target.result); save({ coverImage: ev.target.result }); };
-          reader.readAsDataURL(file);
+          try {
+            const url = await uploadToCloudinary(file);
+            setCoverImage(url); save({ coverImage: url });
+          } catch {
+            const reader = new FileReader();
+            reader.onload = ev => { setCoverImage(ev.target.result); save({ coverImage: ev.target.result }); };
+            reader.readAsDataURL(file);
+          }
           e.target.value = "";
         }} />
         <button onClick={() => {
@@ -7865,9 +7901,8 @@ function Moodboard({ closetItems = [], activeIdx, setActiveIdx, boards: boardsPr
   };
 
   const importImages = (files) => {
-    Array.from(files).forEach(file => {
-      const reader = new FileReader();
-      reader.onload = (e) => {
+    Array.from(files).forEach(async file => {
+      const addItem = (src) => {
         const img = new Image();
         img.onload = () => {
           const maxW=260; const maxH=220;
@@ -7876,13 +7911,20 @@ function Moodboard({ closetItems = [], activeIdx, setActiveIdx, boards: boardsPr
           const canvas=canvasRef.current;
           const cx=canvas?canvas.offsetWidth/2-w/2+(Math.random()-0.5)*80:100;
           const cy=canvas?canvas.offsetHeight/2-h/2+(Math.random()-0.5)*80:100;
-          const newItem={id:uid(),src:e.target.result,x:Math.max(0,cx),y:Math.max(0,cy),w:Math.round(w),h:Math.round(h),rotation:(Math.random()-0.5)*6,zIndex:Math.floor(Date.now()/1000000),opacity:1,label:"",showLabel:false,flipH:false};
+          const newItem={id:uid(),src,x:Math.max(0,cx),y:Math.max(0,cy),w:Math.round(w),h:Math.round(h),rotation:(Math.random()-0.5)*6,zIndex:Math.floor(Date.now()/1000000),opacity:1,label:"",showLabel:false,flipH:false};
           updateBoard(items => [...items, newItem]);
           setSelectedId(newItem.id);
         };
-        img.src = e.target.result;
+        img.src = src;
       };
-      reader.readAsDataURL(file);
+      try {
+        const url = await uploadToCloudinary(file);
+        addItem(url);
+      } catch {
+        const reader = new FileReader();
+        reader.onload = (e) => addItem(e.target.result);
+        reader.readAsDataURL(file);
+      }
     });
   };
 
@@ -12865,12 +12907,17 @@ export default function App() {
             <label style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 14px", border: "1.5px dashed #e0dbd0", borderRadius: 12, cursor: "pointer", background: "#faf9f6" }}>
               <SvgCamera size={16} color="currentColor" />
               <span style={{ fontSize: 13, color: "#888", fontWeight: 600 }}>{newLbCover ? "Change cover image" : "Upload cover image"}</span>
-              <input type="file" accept="image/*" style={{ display: "none" }} onChange={e => {
+              <input type="file" accept="image/*" style={{ display: "none" }} onChange={async e => {
                 const file = e.target.files?.[0];
                 if (!file) return;
-                const reader = new FileReader();
-                reader.onload = ev => setNewLbCover(ev.target.result);
-                reader.readAsDataURL(file);
+                try {
+                  const url = await uploadToCloudinary(file);
+                  setNewLbCover(url);
+                } catch {
+                  const reader = new FileReader();
+                  reader.onload = ev => setNewLbCover(ev.target.result);
+                  reader.readAsDataURL(file);
+                }
               }} />
             </label>
             {newLbCover && (

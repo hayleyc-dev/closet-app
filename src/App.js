@@ -8235,6 +8235,9 @@ function Moodboard({ closetItems = [], activeIdx, setActiveIdx, boards: boardsPr
           {selectedItem.type !== "text" && (
             <>
               <button onClick={()=>updateItem(selectedId,{flipH:!selectedItem.flipH})} style={{padding:"5px 10px",fontSize:11,background:selectedItem.flipH?"#1a1a1a":"#f5f2ed",border:"none",borderRadius:8,cursor:"pointer",fontWeight:700,color:selectedItem.flipH?"#fff":"#555",fontFamily:"'DM Sans',sans-serif"}}>⇆ Flip</button>
+              <button onClick={()=>updateItem(selectedId,{rotation:((selectedItem.rotation||0)-15+360)%360})} title="Rotate left 15°" style={{padding:"5px 9px",fontSize:13,background:"#f5f2ed",border:"none",borderRadius:8,cursor:"pointer",fontWeight:700,color:"#555",lineHeight:1}}>↺</button>
+              <button onClick={()=>updateItem(selectedId,{rotation:((selectedItem.rotation||0)+15)%360})} title="Rotate right 15°" style={{padding:"5px 9px",fontSize:13,background:"#f5f2ed",border:"none",borderRadius:8,cursor:"pointer",fontWeight:700,color:"#555",lineHeight:1}}>↻</button>
+              <button onClick={()=>updateItem(selectedId,{rotation:0})} title="Reset rotation" style={{padding:"5px 9px",fontSize:10,background:"#f5f2ed",border:"none",borderRadius:8,cursor:"pointer",fontWeight:700,color:"#888",fontFamily:"'DM Sans',sans-serif"}}>0°</button>
               <label style={{fontSize:10,fontWeight:700,color:"#aaa",flexShrink:0}}>Opacity</label>
               <input type="range" min="0.1" max="1" step="0.05" value={selectedItem.opacity??1}
                 onChange={e=>updateItem(selectedId,{opacity:parseFloat(e.target.value)})}

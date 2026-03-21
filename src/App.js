@@ -8366,26 +8366,32 @@ function Moodboard({ closetItems = [], activeIdx, setActiveIdx, boards: boardsPr
                 transform:`rotate(${item.rotation||0}deg)`,
                 zIndex:item.zIndex||1,
                 cursor:"move",
-                outline:isSelected?"2px solid #2d6a3f":"2px solid transparent",
-                outlineOffset:3,
                 opacity:item.opacity??1,
-                boxShadow:isSelected?"0 4px 24px rgba(0,0,0,0.18)":"0 2px 10px rgba(0,0,0,0.08)",
-                borderRadius:4,
-                overflow:item.transparent?"visible":"hidden",
+                overflow:"visible",
               }}
             >
-              <img src={item.src} alt="" draggable={false}
-                style={{width:"100%",height:"100%",objectFit:item.transparent?"contain":"cover",display:"block",pointerEvents:"none",background:item.transparent?"transparent":undefined,transform:item.flipH?"scaleX(-1)":"none"}} />
+              {/* Image clipping wrapper — keeps image contained while outer div allows handle overflow */}
+              <div style={{
+                position:"absolute",inset:0,
+                borderRadius:4,
+                overflow:item.transparent?"visible":"hidden",
+                outline:isSelected?"2px solid #2d6a3f":"2px solid transparent",
+                outlineOffset:3,
+                boxShadow:isSelected?"0 4px 24px rgba(0,0,0,0.18)":"0 2px 10px rgba(0,0,0,0.08)",
+              }}>
+                <img src={item.src} alt="" draggable={false}
+                  style={{width:"100%",height:"100%",objectFit:item.transparent?"contain":"cover",display:"block",pointerEvents:"none",background:item.transparent?"transparent":undefined,transform:item.flipH?"scaleX(-1)":"none"}} />
+              </div>
               {isSelected&&(
                 <>
                   {/* Resize handle */}
                   <div onMouseDown={e=>onMouseDown(e,item.id,"resize")} onTouchStart={e=>onTouchStart(e,item.id,"resize")}
-                    style={{position:"absolute",bottom:0,right:0,width:22,height:22,cursor:"se-resize",background:"rgba(45,106,63,0.85)",display:"flex",alignItems:"center",justifyContent:"center",borderRadius:"4px 0 4px 0"}}>
+                    style={{position:"absolute",bottom:0,right:0,width:22,height:22,cursor:"se-resize",background:"rgba(45,106,63,0.85)",display:"flex",alignItems:"center",justifyContent:"center",borderRadius:"4px 0 4px 0",zIndex:1}}>
                     <div style={{width:8,height:8,borderRight:"2px solid #fff",borderBottom:"2px solid #fff",borderRadius:1}} />
                   </div>
                   {/* Rotation handle — top center */}
                   <div onMouseDown={e=>onMouseDown(e,item.id,"rotate")} onTouchStart={e=>onTouchStart(e,item.id,"rotate")}
-                    style={{position:"absolute",top:-22,left:"50%",transform:"translateX(-50%)",width:18,height:18,borderRadius:"50%",background:"#2d6a3f",cursor:"grab",display:"flex",alignItems:"center",justifyContent:"center",boxShadow:"0 1px 4px rgba(0,0,0,0.2)"}}>
+                    style={{position:"absolute",top:-22,left:"50%",transform:"translateX(-50%)",width:18,height:18,borderRadius:"50%",background:"#2d6a3f",cursor:"grab",display:"flex",alignItems:"center",justifyContent:"center",boxShadow:"0 1px 4px rgba(0,0,0,0.2)",zIndex:1}}>
                     <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3" strokeLinecap="round"><path d="M21 7v6h-6"/><path d="M3 17a9 9 0 019-9 9 9 0 016 2.3l3 2.7"/></svg>
                   </div>
                 </>

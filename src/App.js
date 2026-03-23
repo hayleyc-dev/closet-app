@@ -11729,10 +11729,10 @@ export default function App() {
     setNewLbDateStart(""); setNewLbDateEnd(""); setNewLbSelected([]); setNewLbTags([]); setNewLbType("trip"); setNewLbCity("");
     setNewLbMoodboardId(""); setNewLbCalEventId("");
     // Try wrapped {id, data} schema first, fall back to flat insert
-    let { error } = await supabase.from("lookbooks").insert({ id: newLb.id, data: newLb });
+    let { error } = await supabase.from("lookbooks").insert({ id: newLb.id, data: newLb, ...(user?.id ? { user_id: user.id } : {}) });
     if (error) {
       console.warn("[lookbooks] wrapped insert failed, trying flat:", error.message);
-      ({ error } = await supabase.from("lookbooks").insert(newLb));
+      ({ error } = await supabase.from("lookbooks").insert({ ...newLb, ...(user?.id ? { user_id: user.id } : {}) }));
     }
     if (error) console.error("[lookbooks] create failed:", error.message, error.details, error.hint);
     await lookbooksDb.refresh();
@@ -12742,8 +12742,8 @@ export default function App() {
                 onSignOut={async () => { await supabase.auth.signOut(); }}
                 restoreLookbook={async (lb) => {
                   try {
-                    let { error } = await supabase.from("lookbooks").insert({ id: lb.id, data: lb });
-                    if (error) ({ error } = await supabase.from("lookbooks").insert(lb));
+                    let { error } = await supabase.from("lookbooks").insert({ id: lb.id, data: lb, ...(user?.id ? { user_id: user.id } : {}) });
+                    if (error) ({ error } = await supabase.from("lookbooks").insert({ ...lb, ...(user?.id ? { user_id: user.id } : {}) }));
                     await lookbooksDb.refresh();
                   } catch(e) { console.error("restore lookbook error", e); }
                 }}
@@ -12797,8 +12797,8 @@ export default function App() {
             createLookbook={async ({id: newId, name, moodboardId}) => {
               const lbId = newId || uid();
               const newLb = { id: lbId, name, notes: "", coverImage: "", dateStart: "", dateEnd: "", outfitIds: [], lookMeta: {}, moodboardId };
-              let { error } = await supabase.from("lookbooks").insert({ id: lbId, data: newLb });
-              if (error) ({ error } = await supabase.from("lookbooks").insert(newLb));
+              let { error } = await supabase.from("lookbooks").insert({ id: lbId, data: newLb, ...(user?.id ? { user_id: user.id } : {}) });
+              if (error) ({ error } = await supabase.from("lookbooks").insert({ ...newLb, ...(user?.id ? { user_id: user.id } : {}) }));
               await lookbooksDb.refresh();
             }}
             addMoodboardToLookbook={async (lookbookId, board) => {

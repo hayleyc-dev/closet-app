@@ -411,6 +411,7 @@ function useSupabaseTable(table, userId) {
 function useMoodboardsDb(userId) {
   const TABLE = "moodboards";
   const LS_KEY = "wardrobe_moodboards_v1";
+  const DELETED_KEY = "wardrobe_moodboards_deleted_v1";
 
   const [boards, setBoards] = useState(() => {
     try { return JSON.parse(localStorage.getItem(LS_KEY) || "[]"); } catch { return []; }
@@ -434,7 +435,8 @@ function useMoodboardsDb(userId) {
         // Merge: add any localStorage boards not yet in Supabase
         const remoteIds = new Set(remote.map(b => b.id));
         const lsBoards = (() => { try { return JSON.parse(localStorage.getItem(LS_KEY) || "[]"); } catch { return []; } })();
-        const localOnly = lsBoards.filter(b => b.id && !remoteIds.has(b.id));
+        const deletedIds = (() => { try { return new Set(JSON.parse(localStorage.getItem(DELETED_KEY) || "[]")); } catch { return new Set(); } })();
+        const localOnly = lsBoards.filter(b => b.id && !remoteIds.has(b.id) && !deletedIds.has(b.id));
         // Upload local-only boards to Supabase
         for (const b of localOnly) {
           const row = { id: b.id, data: b };
@@ -506,6 +508,11 @@ function useMoodboardsDb(userId) {
   const removeBoardById = (id) => {
     setBoards(prev => prev.filter(b => b.id !== id));
     deleteBoard(id);
+    // Record tombstone so this board is never re-merged from localStorage cache
+    try {
+      const deleted = JSON.parse(localStorage.getItem(DELETED_KEY) || "[]");
+      if (!deleted.includes(id)) { deleted.push(id); localStorage.setItem(DELETED_KEY, JSON.stringify(deleted)); }
+    } catch {}
   };
 
   return { boards, updateBoards, updateBoardById, removeBoardById, loaded };

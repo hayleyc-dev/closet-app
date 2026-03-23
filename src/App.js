@@ -319,17 +319,42 @@ const globalStyles = `
 
   .item-detail-overlay { position: fixed; inset: 0; z-index: 500; background: rgba(0,0,0,0.4); display: flex; align-items: center; justify-content: center; padding: 20px; backdrop-filter: blur(8px); }
   .stats-bar { display: flex; gap: 0; border-radius: 16px; overflow: hidden; height: 10px; }
+
+  /* ── Auth screen ── */
+  .auth-screen-wrap { min-height: 100vh; display: flex; align-items: center; justify-content: center; background: #f9f7f4; padding: 24px; font-family: 'DM Sans', sans-serif; }
+  .auth-screen-card { background: #fff; border-radius: 24px; box-shadow: 0 4px 32px rgba(0,0,0,0.08); padding: 40px 40px 36px; width: 100%; max-width: 400px; display: flex; flex-direction: column; align-items: center; }
+  .auth-screen-logo { margin-bottom: 20px; }
+  .auth-screen-title { font-family: 'Cormorant Garamond', serif; font-style: italic; font-weight: 300; font-size: 32px; color: #1a1a1a; margin: 0 0 6px; text-align: center; }
+  .auth-screen-sub { font-size: 13px; color: #aaa; margin: 0 0 24px; text-align: center; font-weight: 500; }
+  .auth-google-btn { display: flex; align-items: center; justify-content: center; gap: 10px; width: 100%; padding: 12px 20px; border-radius: 14px; border: 1.5px solid #e0dbd2; background: #fafaf8; color: #1a1a1a; font-family: 'DM Sans', sans-serif; font-size: 14px; font-weight: 600; cursor: pointer; transition: border-color 0.2s, box-shadow 0.2s; }
+  .auth-google-btn:hover { border-color: #bbb; box-shadow: 0 2px 8px rgba(0,0,0,0.06); }
+  .auth-divider { width: 100%; display: flex; align-items: center; gap: 12px; margin: 18px 0; color: #ccc; font-size: 12px; font-weight: 600; }
+  .auth-divider::before, .auth-divider::after { content: ''; flex: 1; height: 1px; background: #ece8e2; }
+  .auth-form { width: 100%; display: flex; flex-direction: column; gap: 14px; }
+  .auth-field { display: flex; flex-direction: column; gap: 6px; }
+  .auth-label { font-size: 11px; font-weight: 700; color: #888; text-transform: uppercase; letter-spacing: 0.08em; }
+  .auth-input { padding: 11px 14px; border: 1.5px solid #e4dfd6; border-radius: 12px; background: #fafaf8; color: #1a1a1a; font-family: 'DM Sans', sans-serif; font-size: 14px; outline: none; transition: border-color 0.2s; }
+  .auth-input:focus { border-color: var(--accent, #c8a882); }
+  .auth-error { background: #fef2f2; color: #dc2626; border-radius: 10px; padding: 10px 14px; font-size: 13px; font-weight: 500; }
+  .auth-message { background: #f0faf4; color: #2d6a3f; border-radius: 10px; padding: 10px 14px; font-size: 13px; font-weight: 500; }
+  .auth-submit-btn { padding: 13px; border-radius: 14px; border: none; background: var(--accent, #c8a882); color: #fff; font-family: 'DM Sans', sans-serif; font-size: 14px; font-weight: 700; cursor: pointer; transition: opacity 0.2s; margin-top: 2px; }
+  .auth-submit-btn:hover { opacity: 0.88; }
+  .auth-submit-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+  .auth-footer-links { display: flex; align-items: center; gap: 8px; margin-top: 20px; flex-wrap: wrap; justify-content: center; }
+  .auth-link-btn { background: none; border: none; color: #888; font-family: 'DM Sans', sans-serif; font-size: 13px; font-weight: 600; cursor: pointer; padding: 0; text-decoration: underline; text-underline-offset: 3px; }
+  .auth-link-btn:hover { color: #1a1a1a; }
+  .auth-link-sep { color: #ccc; font-size: 13px; }
 `
 
 // ── Supabase hook ────────────────────────────────────────────────────────────
 const isGuestMode = () => { try { return localStorage.getItem("wardrobe_guest_mode_v1") === "1"; } catch { return false; } };
 
-function useSupabaseTable(table) {
+function useSupabaseTable(table, userId) {
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
   const parseRows = (data) => data.map(r => {
     if (r.data && typeof r.data === "object") return { ...r.data, id: r.id };
-    const { id, created_at, ...rest } = r;
+    const { id, created_at, user_id, ...rest } = r;
     return { ...rest, id };
   }).filter(r => r.id);
   const fetchRows = async (setter) => {
@@ -341,11 +366,18 @@ function useSupabaseTable(table) {
   };
   useEffect(() => {
     fetchRows(setRows).then(() => setLoading(false));
-  }, [table]);
+  }, [table, userId]); // re-fetch when user changes
   const add = async (item) => {
     if (!isGuestMode()) {
-      const { error } = await supabase.from(table).insert({ id: item.id, data: item });
-      if (error) console.error("[" + table + "] add:", error.message);
+      const row = { id: item.id, data: item };
+      if (userId) row.user_id = userId;
+      const { error } = await supabase.from(table).insert(row);
+      if (error) {
+        // flat schema fallback
+        const flatRow = { ...item };
+        if (userId) flatRow.user_id = userId;
+        await supabase.from(table).insert(flatRow);
+      }
     }
     setRows(r => [...r, item]);
   };
@@ -376,7 +408,7 @@ function useSupabaseTable(table) {
 }
 
 // ── Moodboards — Supabase + localStorage mirror ───────────────────────────────
-function useMoodboardsDb() {
+function useMoodboardsDb(userId) {
   const TABLE = "moodboards";
   const LS_KEY = "wardrobe_moodboards_v1";
 
@@ -405,8 +437,10 @@ function useMoodboardsDb() {
         const localOnly = lsBoards.filter(b => b.id && !remoteIds.has(b.id));
         // Upload local-only boards to Supabase
         for (const b of localOnly) {
-          await supabase.from(TABLE).insert({ id: b.id, data: b }).then(({ error: e }) => {
-            if (e) supabase.from(TABLE).insert(b);
+          const row = { id: b.id, data: b };
+          if (userId) row.user_id = userId;
+          await supabase.from(TABLE).insert(row).then(({ error: e }) => {
+            if (e) supabase.from(TABLE).insert({ ...b, ...(userId ? { user_id: userId } : {}) });
           });
         }
         setBoards([...remote, ...localOnly]);
@@ -414,9 +448,13 @@ function useMoodboardsDb() {
         // Table exists but empty — upload any localStorage boards
         const lsBoards = (() => { try { return JSON.parse(localStorage.getItem(LS_KEY) || "[]"); } catch { return []; } })();
         for (const b of lsBoards) {
-          if (b.id) await supabase.from(TABLE).insert({ id: b.id, data: b }).then(({ error: e }) => {
-            if (e) supabase.from(TABLE).insert(b);
-          });
+          if (b.id) {
+            const row = { id: b.id, data: b };
+            if (userId) row.user_id = userId;
+            await supabase.from(TABLE).insert(row).then(({ error: e }) => {
+              if (e) supabase.from(TABLE).insert({ ...b, ...(userId ? { user_id: userId } : {}) });
+            });
+          }
         }
       }
       setLoaded(true);
@@ -429,8 +467,14 @@ function useMoodboardsDb() {
 
   const saveBoard = async (board) => {
     // Upsert to Supabase
-    const { error } = await supabase.from(TABLE).upsert({ id: board.id, data: board });
-    if (error) await supabase.from(TABLE).upsert(board);
+    const row = { id: board.id, data: board };
+    if (userId) row.user_id = userId;
+    const { error } = await supabase.from(TABLE).upsert(row);
+    if (error) {
+      const flatRow = { ...board };
+      if (userId) flatRow.user_id = userId;
+      await supabase.from(TABLE).upsert(flatRow);
+    }
   };
 
   const deleteBoard = async (id) => {
@@ -8502,6 +8546,8 @@ function SettingsTab({
   deleteOutfit,
   supabaseArchivedOutfits = [],
   homeCity, setHomeCity,
+  user,
+  onSignOut,
 }) {
   const [settingsTab, setSettingsTab] = useState("appearance");
   const [themeId, setThemeId] = useState(() => { try { return localStorage.getItem(THEME_KEY) || "parchment"; } catch { return "parchment"; } });
@@ -9405,9 +9451,52 @@ function SettingsTab({
       {/* ════════════ ACCOUNT ════════════ */}
       {settingsTab === "account" && (<>
 
+        {/* Profile */}
+        <Card>
+          <SectionLabel>Profile</SectionLabel>
+          <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+              <div style={{ width: 44, height: 44, borderRadius: "50%", background: "var(--accent)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                <span style={{ fontSize: 18, fontWeight: 800, color: "#fff", fontFamily: "'DM Sans', sans-serif" }}>
+                  {(user?.email || "?")[0].toUpperCase()}
+                </span>
+              </div>
+              <div>
+                <div style={{ fontSize: 14, fontWeight: 700, color: "#1a1a1a" }}>{user?.email || "—"}</div>
+                <div style={{ fontSize: 11, color: "#aaa", marginTop: 2 }}>Logged in</div>
+              </div>
+            </div>
+            <button
+              onClick={onSignOut}
+              style={{
+                alignSelf: "flex-start", padding: "9px 20px", borderRadius: 12,
+                border: "1.5px solid #e0dbd2", background: "#fafaf8",
+                color: "#555", fontSize: 13, fontWeight: 700,
+                cursor: "pointer", fontFamily: "'DM Sans', sans-serif"
+              }}
+            >
+              Sign out
+            </button>
+          </div>
+        </Card>
+
         <Card>
           <SectionLabel>Sync</SectionLabel>
           <div style={{ display:"flex", flexDirection:"column", gap:12 }}>
+            <div style={{ display:"flex", alignItems:"center", gap:12, padding:"12px 14px", background:"#f7f5f2", borderRadius:12, border:"1px solid #e8e4de" }}>
+              <div style={{ width:38, height:38, borderRadius:"50%", background:"var(--accent,#b5a99a)", display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}>
+                <span style={{ fontSize:16, fontWeight:800, color:"#fff", fontFamily:"'DM Sans',sans-serif" }}>
+                  {(user?.email || "?")[0].toUpperCase()}
+                </span>
+              </div>
+              <div style={{ flex:1, minWidth:0 }}>
+                <div style={{ fontSize:13, fontWeight:700, color:"#1a1a1a", overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{user?.email || "—"}</div>
+                <div style={{ fontSize:11, color:"#aaa", marginTop:1 }}>Logged in</div>
+              </div>
+              <button onClick={onSignOut} style={{ flexShrink:0, padding:"7px 16px", borderRadius:10, border:"1.5px solid #e0dbd2", background:"#fff", color:"#555", fontSize:12, fontWeight:700, cursor:"pointer", fontFamily:"'DM Sans',sans-serif" }}>
+                Sign out
+              </button>
+            </div>
             <div style={{ display:"flex", alignItems:"center", gap:10, padding:"12px 14px", background: guestMode ? "#fff8e8" : "#f0faf4", borderRadius:12, border: guestMode ? "1px solid #f0d888" : "1px solid #c8e8d0" }}>
               <div style={{ width:10, height:10, borderRadius:"50%", background: guestMode ? "#d39b1b" : "#3aaa6e", flexShrink:0, boxShadow: guestMode ? "0 0 6px rgba(211,155,27,0.35)" : "0 0 6px #3aaa6e" }} />
               <div style={{ flex:1 }}>
@@ -11193,13 +11282,193 @@ function BrandIcon({ size = 40, radius = 12, style = {} }) {
   );
 }
 
+// ── Auth Screen ───────────────────────────────────────────────────────────────
+const authScreenStyles = `
+  @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@1,300&family=DM+Sans:wght@400;500;600;700;800&display=swap');
+  .auth-screen-wrap { min-height: 100vh; display: flex; align-items: center; justify-content: center; background: #f9f7f4; padding: 24px; font-family: 'DM Sans', sans-serif; }
+  .auth-screen-card { background: #fff; border-radius: 24px; box-shadow: 0 4px 32px rgba(0,0,0,0.08); padding: 40px 40px 36px; width: 100%; max-width: 400px; display: flex; flex-direction: column; align-items: center; }
+  .auth-screen-logo { margin-bottom: 20px; }
+  .auth-screen-title { font-family: 'Cormorant Garamond', serif; font-style: italic; font-weight: 300; font-size: 32px; color: #1a1a1a; margin: 0 0 6px; text-align: center; }
+  .auth-screen-sub { font-size: 13px; color: #aaa; margin: 0 0 24px; text-align: center; font-weight: 500; }
+  .auth-google-btn { display: flex; align-items: center; justify-content: center; gap: 10px; width: 100%; padding: 12px 20px; border-radius: 14px; border: 1.5px solid #e0dbd2; background: #fafaf8; color: #1a1a1a; font-family: 'DM Sans', sans-serif; font-size: 14px; font-weight: 600; cursor: pointer; transition: border-color 0.2s, box-shadow 0.2s; }
+  .auth-google-btn:hover { border-color: #bbb; box-shadow: 0 2px 8px rgba(0,0,0,0.06); }
+  .auth-divider { width: 100%; display: flex; align-items: center; gap: 12px; margin: 18px 0; color: #ccc; font-size: 12px; font-weight: 600; }
+  .auth-divider::before, .auth-divider::after { content: ''; flex: 1; height: 1px; background: #ece8e2; }
+  .auth-form { width: 100%; display: flex; flex-direction: column; gap: 14px; }
+  .auth-field { display: flex; flex-direction: column; gap: 6px; }
+  .auth-label { font-size: 11px; font-weight: 700; color: #888; text-transform: uppercase; letter-spacing: 0.08em; }
+  .auth-input { padding: 11px 14px; border: 1.5px solid #e4dfd6; border-radius: 12px; background: #fafaf8; color: #1a1a1a; font-family: 'DM Sans', sans-serif; font-size: 14px; outline: none; transition: border-color 0.2s; }
+  .auth-input:focus { border-color: #c8a882; }
+  .auth-error { background: #fef2f2; color: #dc2626; border-radius: 10px; padding: 10px 14px; font-size: 13px; font-weight: 500; }
+  .auth-message { background: #f0faf4; color: #2d6a3f; border-radius: 10px; padding: 10px 14px; font-size: 13px; font-weight: 500; }
+  .auth-submit-btn { padding: 13px; border-radius: 14px; border: none; background: #c8a882; color: #fff; font-family: 'DM Sans', sans-serif; font-size: 14px; font-weight: 700; cursor: pointer; transition: opacity 0.2s; margin-top: 2px; }
+  .auth-submit-btn:hover { opacity: 0.88; }
+  .auth-submit-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+  .auth-footer-links { display: flex; align-items: center; gap: 8px; margin-top: 20px; flex-wrap: wrap; justify-content: center; }
+  .auth-link-btn { background: none; border: none; color: #888; font-family: 'DM Sans', sans-serif; font-size: 13px; font-weight: 600; cursor: pointer; padding: 0; text-decoration: underline; text-underline-offset: 3px; }
+  .auth-link-btn:hover { color: #1a1a1a; }
+  .auth-link-sep { color: #ccc; font-size: 13px; }
+`;
+
+function AuthScreen() {
+  const [mode, setMode] = useState("login"); // "login" | "signup" | "reset"
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState(null);
+  const [message, setMessage] = useState(null);
+  const [loading, setLoading] = useState(false);
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setError(null);
+    setMessage(null);
+    setLoading(true);
+    try {
+      if (mode === "signup") {
+        const { error } = await supabase.auth.signUp({ email, password });
+        if (error) setError(error.message);
+        else setMessage("Account created! Check your email to confirm, or log in now if confirmation is disabled.");
+      } else if (mode === "reset") {
+        const { error } = await supabase.auth.resetPasswordForEmail(email, {
+          redirectTo: window.location.origin,
+        });
+        if (error) setError(error.message);
+        else setMessage("Password reset email sent — check your inbox.");
+      } else {
+        const { error } = await supabase.auth.signInWithPassword({ email, password });
+        if (error) setError(error.message);
+      }
+    } catch(e) {
+      setError("Something went wrong. Please try again.");
+    }
+    setLoading(false);
+  };
+
+  const handleGoogle = async () => {
+    setError(null);
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: "google",
+      options: { redirectTo: window.location.origin },
+    });
+    if (error) setError(error.message);
+  };
+
+  return (
+    <div className="auth-screen-wrap">
+      <style>{authScreenStyles}</style>
+      <div className="auth-screen-card">
+        <div className="auth-screen-logo">
+          <BrandIcon size={52} radius={14} />
+        </div>
+        <h1 className="auth-screen-title">
+          {mode === "reset" ? "Reset password" : mode === "signup" ? "Create account" : "Welcome back"}
+        </h1>
+        <p className="auth-screen-sub">
+          {mode === "reset"
+            ? "Enter your email and we'll send a reset link."
+            : mode === "signup"
+            ? "Sign up to start building your wardrobe."
+            : "Sign in to your wardrobe."}
+        </p>
+
+        {mode !== "reset" && (
+          <button className="auth-google-btn" onClick={handleGoogle} disabled={loading}>
+            <svg width="18" height="18" viewBox="0 0 24 24" style={{ flexShrink: 0 }}>
+              <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+              <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+              <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z"/>
+              <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+            </svg>
+            Continue with Google
+          </button>
+        )}
+
+        {mode !== "reset" && (
+          <div className="auth-divider"><span>or</span></div>
+        )}
+
+        <form onSubmit={handleSubmit} className="auth-form">
+          <div className="auth-field">
+            <label className="auth-label">Email</label>
+            <input
+              className="auth-input"
+              type="email"
+              value={email}
+              onChange={e => setEmail(e.target.value)}
+              placeholder="you@example.com"
+              required
+              autoComplete="email"
+            />
+          </div>
+          {mode !== "reset" && (
+            <div className="auth-field">
+              <label className="auth-label">Password</label>
+              <input
+                className="auth-input"
+                type="password"
+                value={password}
+                onChange={e => setPassword(e.target.value)}
+                placeholder={mode === "signup" ? "At least 6 characters" : "Your password"}
+                required
+                autoComplete={mode === "signup" ? "new-password" : "current-password"}
+              />
+            </div>
+          )}
+          {error && <div className="auth-error">{error}</div>}
+          {message && <div className="auth-message">{message}</div>}
+          <button type="submit" className="auth-submit-btn" disabled={loading}>
+            {loading ? "Please wait…" : mode === "signup" ? "Create account" : mode === "reset" ? "Send reset email" : "Log in"}
+          </button>
+        </form>
+
+        <div className="auth-footer-links">
+          {mode === "login" && (<>
+            <button className="auth-link-btn" onClick={() => { setMode("signup"); setError(null); setMessage(null); }}>
+              Create an account
+            </button>
+            <span className="auth-link-sep">·</span>
+            <button className="auth-link-btn" onClick={() => { setMode("reset"); setError(null); setMessage(null); }}>
+              Forgot password?
+            </button>
+          </>)}
+          {mode === "signup" && (
+            <button className="auth-link-btn" onClick={() => { setMode("login"); setError(null); setMessage(null); }}>
+              Already have an account? Log in
+            </button>
+          )}
+          {mode === "reset" && (
+            <button className="auth-link-btn" onClick={() => { setMode("login"); setError(null); setMessage(null); }}>
+              Back to log in
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function App() {
   const [activeTheme, setActiveTheme] = useState(() => getTheme());
-  const itemsDb = useSupabaseTable("items");
-  const wishlistDb = useSupabaseTable("wishlist");
-  const outfitsDb = useSupabaseTable("outfits");
-  const lookbooksDb = useSupabaseTable("lookbooks");
-  const moodboardsDb = useMoodboardsDb();
+
+  // ── Auth state ──
+  const [user, setUser] = useState(null);
+  const [authLoading, setAuthLoading] = useState(true);
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setUser(session?.user ?? null);
+      setAuthLoading(false);
+    });
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUser(session?.user ?? null);
+    });
+    return () => subscription.unsubscribe();
+  }, []);
+
+  const itemsDb = useSupabaseTable("items", user?.id);
+  const wishlistDb = useSupabaseTable("wishlist", user?.id);
+  const outfitsDb = useSupabaseTable("outfits", user?.id);
+  const lookbooksDb = useSupabaseTable("lookbooks", user?.id);
+  const moodboardsDb = useMoodboardsDb(user?.id);
 
   const [tab, setTabRaw] = useState(() => { try { return localStorage.getItem("wardrobe_active_tab") || "home"; } catch { return "home"; } });
   const setTab = (t) => { setTabRaw(t); try { localStorage.setItem("wardrobe_active_tab", t); } catch {} };
@@ -11689,6 +11958,16 @@ export default function App() {
   };
 
   const effectiveAccent = accentOverride || activeTheme.accent;
+
+  // ── Auth gates ──
+  if (authLoading) {
+    return (
+      <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", background: activeTheme.bg }}>
+        <div style={{ fontSize: 14, color: "#bbb", fontFamily: "'DM Sans', sans-serif", fontWeight: 600, letterSpacing: "0.04em" }}>Loading…</div>
+      </div>
+    );
+  }
+  if (!user) return <AuthScreen />;
 
   return (
     <div className={`density-${density}`} style={{ background: activeTheme.bg, minHeight: "100vh", color: activeTheme.text, fontSize: fontSize + "px" }}>
@@ -12459,6 +12738,8 @@ export default function App() {
                 monthlyBudget={monthlyBudget} setMonthlyBudget={setMonthlyBudget}
                 annualBudget={annualBudget} setAnnualBudget={setAnnualBudget}
                 homeCity={homeCity} setHomeCity={setHomeCity}
+                user={user}
+                onSignOut={async () => { await supabase.auth.signOut(); }}
                 restoreLookbook={async (lb) => {
                   try {
                     let { error } = await supabase.from("lookbooks").insert({ id: lb.id, data: lb });

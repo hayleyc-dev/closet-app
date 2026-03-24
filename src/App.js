@@ -8519,6 +8519,34 @@ function TagListsCard({ customCategories, setCustomCategories, customOccasions, 
   );
 }
 
+function SettingsCard({ children, style }) {
+  return <div style={{ background:"#fff", borderRadius:16, border:"1px solid #ece8e0", padding:"20px 22px", marginBottom:16, ...style }}>{children}</div>;
+}
+function SettingsSectionLabel({ children }) {
+  return <div style={{ fontSize:10, fontWeight:700, color:"#aaa", textTransform:"uppercase", letterSpacing:"0.08em", marginBottom:12 }}>{children}</div>;
+}
+function SettingsToggle({ value, onChange, label, sub }) {
+  return (
+    <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", padding:"10px 0", borderBottom:"1px solid #f5f3ef" }}>
+      <div>
+        <div style={{ fontSize:13, fontWeight:600, color:"#1a1a1a" }}>{label}</div>
+        {sub && <div style={{ fontSize:11, color:"#aaa", marginTop:2 }}>{sub}</div>}
+      </div>
+      <button onClick={() => onChange(!value)} style={{
+        width:44, height:24, borderRadius:12, border:"none", cursor:"pointer",
+        background: value ? "#1a1a1a" : "#e0dbd2",
+        position:"relative", transition:"background 0.2s", flexShrink:0
+      }}>
+        <div style={{
+          position:"absolute", top:3, left: value?20:3,
+          width:18, height:18, borderRadius:"50%", background:"#fff",
+          transition:"left 0.2s", boxShadow:"0 1px 4px rgba(0,0,0,0.2)"
+        }} />
+      </button>
+    </div>
+  );
+}
+
 function SettingsTab({
   itemsDb, activeTheme, setActiveTheme,
   showNavLabels, setShowNavLabels,
@@ -8694,31 +8722,9 @@ function SettingsTab({
     return d.toLocaleDateString("en-US", { month:"short", day:"numeric", hour:"2-digit", minute:"2-digit" });
   };
 
-  const Card = ({ children, style={} }) => (
-    <div style={{ background:"#fff", borderRadius:16, border:"1px solid #ece8e0", padding:"20px 22px", marginBottom:16, ...style }}>{children}</div>
-  );
-  const SectionLabel = ({ children }) => (
-    <div style={{ fontSize:10, fontWeight:700, color:"#aaa", textTransform:"uppercase", letterSpacing:"0.08em", marginBottom:12 }}>{children}</div>
-  );
-  const Toggle = ({ value, onChange, label, sub }) => (
-    <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", padding:"10px 0", borderBottom:"1px solid #f5f3ef" }}>
-      <div>
-        <div style={{ fontSize:13, fontWeight:600, color:"#1a1a1a" }}>{label}</div>
-        {sub && <div style={{ fontSize:11, color:"#aaa", marginTop:2 }}>{sub}</div>}
-      </div>
-      <button onClick={() => onChange(!value)} style={{
-        width:44, height:24, borderRadius:12, border:"none", cursor:"pointer",
-        background: value ? "#1a1a1a" : "#e0dbd2",
-        position:"relative", transition:"background 0.2s", flexShrink:0
-      }}>
-        <div style={{
-          position:"absolute", top:3, left: value?20:3,
-          width:18, height:18, borderRadius:"50%", background:"#fff",
-          transition:"left 0.2s", boxShadow:"0 1px 4px rgba(0,0,0,0.2)"
-        }} />
-      </button>
-    </div>
-  );
+  const Card = SettingsCard;
+  const SectionLabel = SettingsSectionLabel;
+  const Toggle = SettingsToggle;
 
   const [resetConfirmText, setResetConfirmText] = useState("");
   const [showResetConfirm, setShowResetConfirm] = useState(false);

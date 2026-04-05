@@ -154,7 +154,7 @@ const globalStyles = `
   .product-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; padding: 12px; overflow-y: auto; }
   .product-thumb { border-radius: 10px; overflow: hidden; cursor: pointer; border: 1.5px solid transparent; background: #f7f5f2; aspect-ratio: 1; display: flex; align-items: center; justify-content: center; transition: border-color 0.15s; position: relative; }
   .product-thumb.selected { border-color: #1a1a1a; }
-  .product-thumb img { width: 100%; height: 100%; object-fit: cover; }
+  .product-thumb img { width: 100%; height: 100%; object-fit: contain; padding: 4px; }
   .product-thumb .check { position: absolute; bottom: 6px; right: 6px; width: 20px; height: 20px; border-radius: 50%; background: #1a1a1a; display: flex; align-items: center; justify-content: center; color: #fff; font-size: 11px; font-weight: 700; }
   .selected-strip { display: flex; gap: 8px; padding: 10px 12px; overflow-x: auto; scrollbar-width: none; align-items: center; }
   .no-scrollbar { scrollbar-width: none; -ms-overflow-style: none; }
@@ -4835,25 +4835,28 @@ function OutfitBuilder({ itemsDb, wishlistDb, onSave, onClose, initial, seedItem
         <button onClick={onClose} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 22, color: "#888", lineHeight: 1, padding: 0 }}><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
         <span style={{ fontWeight: 700, fontSize: 15, color: "#1a1a1a" }}>{name || "Build a Look"}</span>
         <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
-          <button onClick={() => setShowDraftPanel(p => !p)} title="Drafts" style={{ ...btnBase, padding: "7px 10px", fontSize: 12, background: showDraftPanel ? "#f0f0f0" : "#f5f3ef", color: "#555", position: "relative", display: "flex", alignItems: "center", gap: 6 }}>
-            <SvgFolder size={14} color="#888" />
-            {outfitDrafts.length > 0 && <span style={{ background: "#1a1a1a", color: "#fff", borderRadius: 10, padding: "1px 6px", fontSize: 10, fontWeight: 800 }}>{outfitDrafts.length}</span>}
+          <button onClick={() => setShowDraftPanel(p => !p)} title="Drafts" style={{ width: 34, height: 34, borderRadius: "50%", background: showDraftPanel ? "#e8e4dc" : "#f5f3ef", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, position: "relative" }}>
+            <SvgFolder size={15} color="#555" />
+            {outfitDrafts.length > 0 && <span style={{ position: "absolute", top: -3, right: -3, background: "#1a1a1a", color: "#fff", borderRadius: 10, padding: "1px 5px", fontSize: 9, fontWeight: 800, lineHeight: 1.4 }}>{outfitDrafts.length}</span>}
           </button>
-          <button onClick={saveOutfitDraft} style={{ ...btnBase, padding: "7px 14px", fontSize: 12, background: draftSaved ? "#f0faf4" : "#f5f3ef", color: draftSaved ? "#2d6a3f" : "#555" }}>
+          <button onClick={saveOutfitDraft} style={{ ...btnBase, padding: "7px 14px", fontSize: 12, background: draftSaved ? "#f0faf4" : "#f5f3ef", color: draftSaved ? "#2d6a3f" : "#555", borderRadius: 100 }}>
             {draftSaved ? "✓ Saved" : "Save Draft"}
           </button>
-          {lookbooks && lookbooks.length > 0 && (
-            <button onClick={() => handleSave(true)} disabled={!name || layers.length === 0} style={{
-              ...btnBase, padding: "8px 16px", fontSize: 13,
-              background: (!name || layers.length === 0) ? "#ccc" : "#f5f2ed",
-              color: (!name || layers.length === 0) ? "#fff" : "#555", cursor: (!name || layers.length === 0) ? "not-allowed" : "pointer"
-            }}>+ Lookbook</button>
-          )}
-          <button onClick={() => handleSave(false)} disabled={!name || layers.length === 0} style={{
-            ...btnBase, padding: "8px 20px", fontSize: 13,
-            background: (!name || layers.length === 0) ? "#ccc" : "#2d6a3f",
-            color: "#fff", cursor: (!name || layers.length === 0) ? "not-allowed" : "pointer"
-          }}>Save Look</button>
+          <div style={{ display: "flex", borderRadius: 100, overflow: "hidden", border: `1px solid ${(!name || layers.length === 0) ? "#e0dbd2" : "#c8c2ba"}` }}>
+            {lookbooks && lookbooks.length > 0 && (
+              <button onClick={() => handleSave(true)} disabled={!name || layers.length === 0} style={{
+                ...btnBase, padding: "8px 14px", fontSize: 12, borderRadius: 0,
+                background: "#fff", color: (!name || layers.length === 0) ? "#bbb" : "#555",
+                cursor: (!name || layers.length === 0) ? "not-allowed" : "pointer",
+                borderRight: "1px solid #e0dbd2"
+              }}>+ Lookbook</button>
+            )}
+            <button onClick={() => handleSave(false)} disabled={!name || layers.length === 0} style={{
+              ...btnBase, padding: "8px 18px", fontSize: 12, borderRadius: 0,
+              background: "#fff", color: (!name || layers.length === 0) ? "#bbb" : "#1a1a1a",
+              cursor: (!name || layers.length === 0) ? "not-allowed" : "pointer", fontWeight: 800
+            }}>Save Look</button>
+          </div>
         </div>
       </div>
 
@@ -4889,13 +4892,12 @@ function OutfitBuilder({ itemsDb, wishlistDb, onSave, onClose, initial, seedItem
             <label style={labelStyle}>Occasion</label>
             <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
               {OCCASIONS.map(tag => {
-                const oc = OCCASION_COLORS[tag] || { bg: "#f5f3ef", color: "#888" };
                 const sel = tags.includes(tag);
                 return (
                   <button key={tag} onClick={() => setTags(ts => ts.includes(tag) ? ts.filter(x => x !== tag) : [...ts, tag])} style={{
                     ...btnBase, padding: "5px 12px", borderRadius: 16, fontSize: 12,
-                    border: sel ? `1.5px solid ${oc.color}` : "1.5px solid #e8e4dc",
-                    background: sel ? oc.bg : "#fafaf8", color: sel ? oc.color : "#aaa"
+                    border: sel ? "1.5px solid #e8a0b4" : "1.5px solid #e8e4dc",
+                    background: sel ? "#fdf0f4" : "#fafaf8", color: sel ? "#c0607a" : "#aaa"
                   }}>{tag}</button>
                 );
               })}
@@ -4951,7 +4953,7 @@ function OutfitBuilder({ itemsDb, wishlistDb, onSave, onClose, initial, seedItem
                   const isSelected = selectedIds.has(id);
                   const isTop = zIndex === layers.length - 1;
                   const isBottom = zIndex === 0;
-                  const outlineColor = lockedIds.has(id) ? "#f0c040" : isSelected ? "#2bafd4" : "#2d6a3f";
+                  const outlineColor = lockedIds.has(id) ? "#f0c040" : "rgba(0,0,0,0.28)";
                   const showOutline = isActive || isSelected;
                   return (
                     <div key={id} className="canvas-item" style={{ left: x, top: y, width: w, zIndex: zIndex + 1 }}
@@ -4965,43 +4967,10 @@ function OutfitBuilder({ itemsDb, wishlistDb, onSave, onClose, initial, seedItem
                         {isActive && (
                           <div onMouseDown={e => onResizeMouseDown(e, id)} style={{
                             position: "absolute", bottom: -6, right: -6, width: 16, height: 16, borderRadius: "50%",
-                            background: "#2d6a3f", border: "2px solid #fff", cursor: "nwse-resize", zIndex: 10, boxShadow: "0 2px 6px rgba(0,0,0,0.3)"
+                            background: "#555", border: "2px solid #fff", cursor: "nwse-resize", zIndex: 10, boxShadow: "0 2px 6px rgba(0,0,0,0.25)"
                           }} />
                         )}
                       </div>
-                      {isActive && (
-                        <div onClick={e => e.stopPropagation()} style={{
-                          position: "absolute", top: -46, left: "50%", transform: "translateX(-50%)",
-                          display: "flex", alignItems: "center", gap: 2,
-                          background: "rgba(20,20,20,0.95)", borderRadius: 22, padding: "5px 8px",
-                          boxShadow: "0 6px 20px rgba(0,0,0,0.4)", whiteSpace: "nowrap", zIndex: 9999,
-                          backdropFilter: "blur(6px)"
-                        }}>
-                          {!lockedIds.has(id) && (<>
-                            <button onClick={() => moveLayerUp(id)} disabled={isTop} title="Bring Forward" style={{ background: isTop ? "none" : "rgba(255,255,255,0.08)", border: "none", color: isTop ? "#555" : "#fff", cursor: isTop ? "default" : "pointer", padding: "4px 9px", fontSize: 11, fontFamily: "'Manrope', sans-serif", fontWeight: 700, borderRadius: 14, display: "flex", alignItems: "center", gap: 4 }}>
-                              <SvgArrowUp size={10} color="currentColor" /> Fwd
-                            </button>
-                            <button onClick={() => moveLayerDown(id)} disabled={isBottom} title="Send Backward" style={{ background: isBottom ? "none" : "rgba(255,255,255,0.08)", border: "none", color: isBottom ? "#555" : "#fff", cursor: isBottom ? "default" : "pointer", padding: "4px 9px", fontSize: 11, fontFamily: "'Manrope', sans-serif", fontWeight: 700, borderRadius: 14, display: "flex", alignItems: "center", gap: 4 }}>
-                              <SvgArrowDn size={10} color="currentColor" /> Back
-                            </button>
-                            <div style={{ width: 1, background: "#444", margin: "3px 2px", height: 16 }} />
-                          </>)}
-                          <button onClick={() => flipItem(id)} title="Flip horizontal" style={{ background: flipped[id] ? "rgba(43,175,212,0.15)" : "rgba(255,255,255,0.08)", border: "none", color: flipped[id] ? "#2bafd4" : "#ccc", cursor: "pointer", padding: "4px 9px", fontSize: 11, fontFamily: "'Manrope', sans-serif", fontWeight: 700, borderRadius: 14, display: "flex", alignItems: "center", gap: 4 }}>
-                            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M8 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h3"/><path d="M16 3h3a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-3"/><line x1="12" y1="20" x2="12" y2="4"/></svg>
-                            Flip
-                          </button>
-                          <button onClick={() => toggleLock(id)} title={lockedIds.has(id) ? "Unlock" : "Lock"} style={{ background: lockedIds.has(id) ? "rgba(240,192,64,0.15)" : "rgba(255,255,255,0.08)", border: "none", color: lockedIds.has(id) ? "#f0c040" : "#aaa", cursor: "pointer", padding: "4px 9px", fontSize: 11, fontFamily: "'Manrope', sans-serif", fontWeight: 700, borderRadius: 14, display: "flex", alignItems: "center", gap: 4 }}>
-                            {lockedIds.has(id) ? <SvgLock size={11} color="#f0c040" /> : <SvgUnlock size={11} color="#aaa" />}
-                            {lockedIds.has(id) ? "Locked" : "Lock"}
-                          </button>
-                          {!lockedIds.has(id) && (<>
-                            <div style={{ width: 1, background: "#444", margin: "3px 2px", height: 16 }} />
-                            <button onClick={() => toggleItem(id)} title="Remove" style={{ background: "rgba(255,107,107,0.15)", border: "none", color: "#ff6b6b", cursor: "pointer", padding: "4px 9px", fontSize: 11, fontFamily: "'Manrope', sans-serif", fontWeight: 700, borderRadius: 14, display: "flex", alignItems: "center", gap: 4 }}>
-                              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg> Remove
-                            </button>
-                          </>)}
-                        </div>
-                      )}
                     </div>
                   );
                 })}
@@ -5009,12 +4978,40 @@ function OutfitBuilder({ itemsDb, wishlistDb, onSave, onClose, initial, seedItem
             )}
           </BoardSizer>
           {/* Canvas bottom toolbar */}
-          <div style={{ position: "absolute", bottom: 14, left: "50%", transform: "translateX(-50%)", display: "flex", gap: 4, background: "rgba(26,26,26,0.88)", borderRadius: 20, padding: "5px 8px", boxShadow: "0 4px 16px rgba(0,0,0,0.25)", zIndex: 200, backdropFilter: "blur(8px)", whiteSpace: "nowrap" }}>
+          <div style={{ position: "absolute", bottom: 14, left: "50%", transform: "translateX(-50%)", display: "flex", gap: 4, background: "rgba(26,26,26,0.88)", borderRadius: 20, padding: "5px 8px", boxShadow: "0 4px 16px rgba(0,0,0,0.25)", zIndex: 200, backdropFilter: "blur(8px)", whiteSpace: "nowrap", alignItems: "center" }}>
             <button onClick={undo} disabled={!canUndo} title="Undo (⌘Z)" style={{ background: "none", border: "none", color: canUndo ? "#fff" : "#555", cursor: canUndo ? "pointer" : "default", padding: "4px 10px", fontSize: 12, fontFamily: "'Manrope', sans-serif", fontWeight: 700, borderRadius: 12, display: "flex", alignItems: "center", gap: 5 }}>↩ Undo</button>
             <button onClick={redo} disabled={!canRedo} title="Redo (⌘Y)" style={{ background: "none", border: "none", color: canRedo ? "#fff" : "#555", cursor: canRedo ? "pointer" : "default", padding: "4px 10px", fontSize: 12, fontFamily: "'Manrope', sans-serif", fontWeight: 700, borderRadius: 12, display: "flex", alignItems: "center", gap: 5 }}>↪ Redo</button>
-            <div style={{ width: 1, background: "#444", margin: "4px 2px" }} />
+            <div style={{ width: 1, background: "#444", margin: "4px 2px", alignSelf: "stretch" }} />
             <button onClick={autoArrange} disabled={layers.length === 0} title="Auto-arrange" style={{ background: "none", border: "none", color: layers.length > 0 ? "#fff" : "#555", cursor: layers.length > 0 ? "pointer" : "default", padding: "4px 10px", fontSize: 12, fontFamily: "'Manrope', sans-serif", fontWeight: 700, borderRadius: 12, display: "flex", alignItems: "center", gap: 5 }}>⊹ Arrange</button>
-            <div style={{ width: 1, background: "#444", margin: "4px 2px" }} />
+            {activeId && (() => {
+              const aid = activeId;
+              const aidx = layers.indexOf(aid);
+              const isTop = aidx === layers.length - 1;
+              const isBot = aidx === 0;
+              const isLocked = lockedIds.has(aid);
+              const btnS = { background: "none", border: "none", cursor: "pointer", padding: "4px 9px", fontSize: 11, fontFamily: "'Manrope', sans-serif", fontWeight: 700, borderRadius: 14, display: "flex", alignItems: "center", gap: 4 };
+              return (<>
+                <div style={{ width: 1, background: "#444", margin: "4px 2px", alignSelf: "stretch" }} />
+                {!isLocked && <>
+                  <button onClick={() => moveLayerUp(aid)} disabled={isTop} style={{ ...btnS, color: isTop ? "#555" : "#fff", cursor: isTop ? "default" : "pointer" }}><SvgArrowUp size={10} color="currentColor" /> Fwd</button>
+                  <button onClick={() => moveLayerDown(aid)} disabled={isBot} style={{ ...btnS, color: isBot ? "#555" : "#fff", cursor: isBot ? "default" : "pointer" }}><SvgArrowDn size={10} color="currentColor" /> Back</button>
+                  <div style={{ width: 1, background: "#444", margin: "4px 2px", alignSelf: "stretch" }} />
+                </>}
+                <button onClick={() => flipItem(aid)} style={{ ...btnS, color: flipped[aid] ? "#2bafd4" : "#ccc", background: flipped[aid] ? "rgba(43,175,212,0.15)" : "none" }}>
+                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M8 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h3"/><path d="M16 3h3a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-3"/><line x1="12" y1="20" x2="12" y2="4"/></svg> Flip
+                </button>
+                <button onClick={() => toggleLock(aid)} style={{ ...btnS, color: isLocked ? "#f0c040" : "#aaa", background: isLocked ? "rgba(240,192,64,0.15)" : "none" }}>
+                  {isLocked ? <SvgLock size={11} color="#f0c040" /> : <SvgUnlock size={11} color="#aaa" />} {isLocked ? "Locked" : "Lock"}
+                </button>
+                {!isLocked && <>
+                  <div style={{ width: 1, background: "#444", margin: "4px 2px", alignSelf: "stretch" }} />
+                  <button onClick={() => toggleItem(aid)} style={{ ...btnS, color: "#ff6b6b", background: "rgba(255,107,107,0.15)" }}>
+                    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg> Remove
+                  </button>
+                </>}
+              </>);
+            })()}
+            <div style={{ width: 1, background: "#444", margin: "4px 2px", alignSelf: "stretch" }} />
             <button onClick={() => setShowShortcuts(s => !s)} title="Keyboard shortcuts" style={{ background: showShortcuts ? "rgba(255,255,255,0.15)" : "none", border: "none", color: "#aaa", cursor: "pointer", padding: "4px 10px", fontSize: 12, fontFamily: "'Manrope', sans-serif", fontWeight: 700, borderRadius: 12 }}>?</button>
           </div>
           {showShortcuts && (
@@ -5034,12 +5031,12 @@ function OutfitBuilder({ itemsDb, wishlistDb, onSave, onClose, initial, seedItem
         <div className="builder-right">
           <div style={{ padding: "10px 12px 8px", borderBottom: "1.5px solid #e8e4dc", flexShrink: 0 }}>
             {/* Tab toggle */}
-            <div style={{ display: "flex", background: "#f5f2ed", borderRadius: 10, padding: 3, gap: 2, marginBottom: 8 }}>
+            <div style={{ display: "flex", background: "#f5f2ed", borderRadius: 100, padding: 3, gap: 2, marginBottom: 8 }}>
               {[{ id: "closet", label: "Closet" }, { id: "wishlist", label: "Wishlist" }, { id: "capsule", label: "Capsule" }].map(t => (
                 <button key={t.id} onClick={() => setPanelTab(t.id)} style={{
-                  flex: 1, padding: "6px 0", border: "none", borderRadius: 8,
+                  flex: 1, padding: "6px 0", border: "none", borderRadius: 100,
                   background: panelTab === t.id ? "#fff" : "transparent",
-                  color: panelTab === t.id ? "#1a1a1a" : "#aaa",
+                  color: panelTab === t.id ? "#1a1a1a" : "#666",
                   fontFamily: "'Manrope', sans-serif", fontSize: 11, fontWeight: 700, cursor: "pointer",
                   boxShadow: panelTab === t.id ? "0 1px 4px rgba(0,0,0,0.1)" : "none", transition: "all 0.15s"
                 }}>{t.label}</button>
@@ -5067,8 +5064,8 @@ function OutfitBuilder({ itemsDb, wishlistDb, onSave, onClose, initial, seedItem
             {panelTab !== "capsule" && (<>
               <button onClick={() => setShowFilters(f => !f)} style={{
                 ...btnBase, width: "100%", padding: "6px", marginBottom: showFilters ? 8 : 0,
-                background: activeFilterCount > 0 ? "#f0faf4" : "#f5f3ef",
-                color: activeFilterCount > 0 ? "#2d6a3f" : "#888", fontSize: 12
+                background: "#f5f3ef", borderRadius: 100,
+                color: "#555", fontSize: 12
               }}>
                 {activeFilterCount > 0 ? `${activeFilterCount} filter${activeFilterCount > 1 ? "s" : ""} active` : "Filters"}
               </button>
@@ -5103,8 +5100,8 @@ function OutfitBuilder({ itemsDb, wishlistDb, onSave, onClose, initial, seedItem
               )}
 
               <div style={{ display: "flex", gap: 6, marginTop: 10 }}>
-                <button onClick={() => setItemPopup({ mode: "add" })} style={{ ...btnBase, flex: 1, padding: "7px 0", background: "#2d6a3f", color: "#fff", fontSize: 12 }}>+ Add</button>
-                <button onClick={() => activeDb.refresh()} style={{ ...btnBase, flex: 1, padding: "7px 0", background: "#f5f2ed", color: "#555", fontSize: 12 }}>↻ Fetch</button>
+                <button onClick={() => setItemPopup({ mode: "add" })} style={{ ...btnBase, flex: 1, padding: "7px 0", background: "#fff", border: "1px solid #e0dbd2", borderRadius: 100, color: "#555", fontSize: 12, display: "flex", alignItems: "center", justifyContent: "center", gap: 4 }}><SvgPlus size={12} color="#555" /> Add</button>
+                <button onClick={() => activeDb.refresh()} style={{ ...btnBase, flex: 1, padding: "7px 0", background: "#fff", border: "1px solid #e0dbd2", borderRadius: 100, color: "#555", fontSize: 12, display: "flex", alignItems: "center", justifyContent: "center", gap: 4 }}><SvgArrowR size={12} color="#555" /> Fetch</button>
               </div>
             </>)}
           </div>

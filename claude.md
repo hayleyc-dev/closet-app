@@ -36,7 +36,7 @@ create policy "Allow all" on moodboards for all using (true) with check (true);
 ---
 
 ## Fonts
-- **Body:** DM Sans
+- **Body:** Manrope
 - **Display:** Cormorant Garamond (light italic)
 
 ---

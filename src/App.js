@@ -179,11 +179,12 @@ const globalStyles = `
   .app-top-nav {
     position: sticky; top: 0; z-index: 100;
     display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 16px;
-    padding: 16px 0 14px; margin-bottom: 12px;
+    padding: 10px 0 10px; margin-bottom: 12px;
   }
   .nav-tabs {
     display: flex; align-items: center; gap: 2px;
-    background: #f0ede9; border-radius: 100px; padding: 3px;
+    background: #fff; border-radius: 100px; padding: 3px;
+    border: 1px solid #ece8e0;
     overflow-x: auto; scrollbar-width: none; flex-shrink: 1; min-width: 0;
   }
   .nav-tabs::-webkit-scrollbar { display: none; }
@@ -194,8 +195,8 @@ const globalStyles = `
     background: transparent; color: #666;
     transition: background 0.12s, color 0.12s; white-space: nowrap; flex-shrink: 0;
   }
-  .nav-tab-btn:hover { background: #e8e5e1; color: #1a1a1a; }
-  .nav-tab-btn.active { background: #fff; color: #1a1a1a; font-weight: 700; box-shadow: 0 1px 3px rgba(0,0,0,0.10); }
+  .nav-tab-btn:hover { background: #f0ede9; color: #1a1a1a; }
+  .nav-tab-btn.active { background: #f0ede9; color: #1a1a1a; font-weight: 700; }
   .nav-actions { display: flex; gap: 8px; align-items: center; justify-content: flex-end; flex-shrink: 0; }
   /* Density modes */
   .density-compact .item-card { padding: 8px !important; }
@@ -206,7 +207,7 @@ const globalStyles = `
   .pill-select { padding: 7px 44px 7px 14px !important; border-radius: 100px; border: 1px solid #e0dbd2; font-family: 'Manrope', sans-serif; font-size: 12px; font-weight: 600; background: #fff; color: #444; cursor: pointer; appearance: none; -webkit-appearance: none; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%23888' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 14px center; }
 
   .app-body { margin-left: 0; flex: 1; display: flex; min-height: 100vh; }
-  .app-main-area { flex: 1; min-width: 0; padding: 28px 32px; }
+  .app-main-area { flex: 1; min-width: 0; padding: 14px 32px 28px; }
   .app-right-rail { width: 272px; flex-shrink: 0; padding: 32px 18px 32px 0; position: sticky; top: 0; height: 100vh; overflow-y: auto; display: flex; flex-direction: column; gap: 12px; }
 
   /* Page hero — editorial serif */

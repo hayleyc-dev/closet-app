@@ -9,7 +9,7 @@ import {
   Star, CastleTurret, GridFour, Cube, Folder, ShoppingBag, CalendarBlank,
   Suitcase, Lock, Gear as PhGear, LockOpen, PushPin, Palette, Dress, Sparkle, ShoppingCart,
   Stack, Plus, Sun, Flag, Archive, BookOpen, Tote, ArrowCounterClockwise, ArrowClockwise,
-  ArrowsOutCardinal
+  ArrowsOutCardinal, Crop
 } from "@phosphor-icons/react";
 
 const iconStyle = { display: "inline-block", flexShrink: 0, verticalAlign: "middle" };
@@ -58,6 +58,7 @@ const SvgBookOpen = P(BookOpen, 13);
 const SvgUndo     = P(ArrowCounterClockwise, 14);
 const SvgRedo     = P(ArrowClockwise, 14);
 const SvgArrange  = P(ArrowsOutCardinal, 14);
+const SvgCrop     = P(Crop, 14);
 
 
 const SUPABASE_URL = "https://gucqffnjwvbvycfqvtcw.supabase.co";
@@ -6315,6 +6316,75 @@ function BoardSizer({ boardRef: _ignored, children }) {
   );
 }
 
+// ── Canvas Crop Modal ────────────────────────────────────────────────────────
+function CanvasCropModal({ src, existingCrop, onApply, onReset, onCancel }) {
+  const containerRef = useRef(null);
+  const dragRef = useRef(null);
+  const [box, setBox] = useState(existingCrop || null);
+
+  const toPercent = (e) => {
+    const r = containerRef.current.getBoundingClientRect();
+    return { x: Math.max(0, Math.min(1, (e.clientX - r.left) / r.width)), y: Math.max(0, Math.min(1, (e.clientY - r.top) / r.height)) };
+  };
+
+  const onDown = (e) => {
+    e.preventDefault();
+    const p = toPercent(e);
+    dragRef.current = p;
+    setBox({ x: p.x, y: p.y, w: 0, h: 0 });
+    const onMove = (ev) => {
+      if (!dragRef.current) return;
+      const start = dragRef.current;
+      const q = toPercent(ev);
+      setBox({ x: Math.min(start.x, q.x), y: Math.min(start.y, q.y), w: Math.abs(q.x - start.x), h: Math.abs(q.y - start.y) });
+    };
+    const onUp = () => {
+      dragRef.current = null;
+      window.removeEventListener("mousemove", onMove);
+      window.removeEventListener("mouseup", onUp);
+    };
+    window.addEventListener("mousemove", onMove);
+    window.addEventListener("mouseup", onUp);
+  };
+
+  const canApply = box && box.w > 0.02 && box.h > 0.02;
+
+  return createPortal(
+    <div style={{ position: "fixed", inset: 0, zIndex: 9000, background: "rgba(0,0,0,0.75)", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: 24 }}
+      onClick={(e) => { if (e.target === e.currentTarget) onCancel(); }}>
+      <div style={{ background: "#fff", borderRadius: 20, overflow: "hidden", maxWidth: 560, width: "100%", boxShadow: "0 30px 80px rgba(0,0,0,0.4)" }}
+        onClick={e => e.stopPropagation()}>
+        <div style={{ padding: "14px 18px", borderBottom: "1px solid #e8e4dc", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <span style={{ fontSize: 14, fontWeight: 700, color: "#1a1a1a", fontFamily: "'Manrope', sans-serif" }}>Crop Image</span>
+          <span style={{ fontSize: 12, color: "#aaa", fontFamily: "'Manrope', sans-serif" }}>Click and drag to select area</span>
+        </div>
+        <div ref={containerRef} onMouseDown={onDown}
+          style={{ position: "relative", cursor: "crosshair", userSelect: "none", background: "repeating-conic-gradient(#e0dbd0 0% 25%, #fff 0% 50%) 0 0 / 16px 16px" }}>
+          <img src={src} alt="crop" style={{ display: "block", width: "100%", maxHeight: "60vh", objectFit: "contain", pointerEvents: "none" }} />
+          {box && box.w > 0 && (<>
+            <div style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,0.45)", pointerEvents: "none" }} />
+            <div style={{ position: "absolute", pointerEvents: "none", left: `${box.x*100}%`, top: `${box.y*100}%`, width: `${box.w*100}%`, height: `${box.h*100}%`, boxSizing: "border-box", boxShadow: "0 0 0 9999px rgba(0,0,0,0.45)", border: "2px solid #fff", background: "transparent" }} />
+          </>)}
+        </div>
+        <div style={{ padding: "14px 18px", display: "flex", gap: 10, justifyContent: "space-between", alignItems: "center" }}>
+          <div>
+            {existingCrop && (
+              <button onClick={onReset}
+                style={{ padding: "9px 18px", background: "none", border: "1.5px solid #e8e4dc", borderRadius: 12, cursor: "pointer", color: "#888", fontFamily: "'Manrope', sans-serif", fontSize: 13, fontWeight: 600 }}>Reset Crop</button>
+            )}
+          </div>
+          <div style={{ display: "flex", gap: 10 }}>
+            <button onClick={onCancel} style={{ padding: "9px 18px", background: "none", border: "none", cursor: "pointer", color: "#aaa", fontFamily: "'Manrope', sans-serif", fontSize: 13, fontWeight: 600 }}>Cancel</button>
+            <button onClick={() => { if (canApply) onApply(box); }} disabled={!canApply}
+              style={{ padding: "9px 20px", background: canApply ? "#1a1a1a" : "#f5f3ef", border: "none", borderRadius: 12, cursor: canApply ? "pointer" : "default", fontFamily: "'Manrope', sans-serif", fontSize: 13, fontWeight: 700, color: canApply ? "#fff" : "#bbb" }}>Apply Crop</button>
+          </div>
+        </div>
+      </div>
+    </div>,
+    document.body
+  );
+}
+
 // ── Outfit Builder ───────────────────────────────────────────────────────────
 function OutfitBuilder({ itemsDb, wishlistDb, onSave, onClose, initial, seedItem, capsules, lookbooks, onSaveToLookbook, embeddedInLookbook, onNewOutfit }) {
   const [name, setName] = useState(initial?.name || "");
@@ -6361,6 +6431,9 @@ function OutfitBuilder({ itemsDb, wishlistDb, onSave, onClose, initial, seedItem
   const [saveLbModal, setSaveLbModal] = useState(false);
   const [savedOutfitData, setSavedOutfitData] = useState(null);
   const [ghostDrag, setGhostDrag] = useState(null);
+  const [pastedImages, setPastedImages] = useState(() => initial?.pastedImages || {});
+  const [crops, setCrops] = useState(() => initial?.crops || {});
+  const [cropEditId, setCropEditId] = useState(null);
   const history = useRef([]);
   const historyIdx = useRef(-1);
   const dragging = useRef(null);
@@ -6398,8 +6471,8 @@ function OutfitBuilder({ itemsDb, wishlistDb, onSave, onClose, initial, seedItem
   // Auto-save draft
   useEffect(() => {
     if (!name && layers.length === 0) return;
-    try { localStorage.setItem("wardrobe_builder_draft", JSON.stringify({ name, notes, tags, seasons, layers, positions, savedAt: Date.now() })); } catch(e) {}
-  }, [name, notes, tags, seasons, layers, positions]);
+    try { localStorage.setItem("wardrobe_builder_draft", JSON.stringify({ name, notes, tags, seasons, layers, positions, pastedImages, crops, savedAt: Date.now() })); } catch(e) {}
+  }, [name, notes, tags, seasons, layers, positions, pastedImages, crops]);
 
   // Restore draft on mount if no initial
   useEffect(() => {
@@ -6410,7 +6483,7 @@ function OutfitBuilder({ itemsDb, wishlistDb, onSave, onClose, initial, seedItem
       const d = JSON.parse(raw);
       if (d.name && (Date.now() - d.savedAt) < 7 * 24 * 60 * 60 * 1000) {
         setName(d.name); setNotes(d.notes || ""); setTags(d.tags || []);
-        setSeasons(d.seasons || []); setLayers(d.layers || []); setPositions(d.positions || {});
+        setSeasons(d.seasons || []); setLayers(d.layers || []); setPositions(d.positions || {}); setPastedImages(d.pastedImages || {}); setCrops(d.crops || {});
       }
     } catch(e) {}
   }, []);
@@ -6433,8 +6506,57 @@ function OutfitBuilder({ itemsDb, wishlistDb, onSave, onClose, initial, seedItem
     return () => window.removeEventListener("keydown", handler);
   }, [onClose, showShortcuts]);
 
+  // Paste image onto canvas
+  const addPastedImage = (file) => {
+    const placeOnCanvas = (src) => {
+      const img = new Image();
+      img.onload = () => {
+        const id = "paste_" + uid();
+        const maxW = 180, maxH = 220;
+        let w = img.naturalWidth, h = img.naturalHeight;
+        if (w > maxW) { h = h * maxW / w; w = maxW; }
+        if (h > maxH) { w = w * maxH / h; h = maxH; }
+        const board = boardRef.current;
+        const cw = board?.offsetWidth || 400;
+        const ch = board?.offsetHeight || 500;
+        setPastedImages(prev => ({ ...prev, [id]: { id, image: src, name: "Pasted image", _pasted: true } }));
+        const newPos = { ...stateRef.current.positions, [id]: { x: 40 + Math.random() * (cw - w - 40), y: 30 + Math.random() * (ch - h - 30), w: Math.round(w), h: Math.round(h) } };
+        const newLayers = [...stateRef.current.layers, id];
+        setLayers(newLayers); setPositions(newPos); pushHistory(newLayers, newPos); setActiveId(id);
+      };
+      img.src = src;
+    };
+    uploadToCloudinary(file).then(placeOnCanvas).catch(() => {
+      const reader = new FileReader();
+      reader.onload = (e) => placeOnCanvas(e.target.result);
+      reader.readAsDataURL(file);
+    });
+  };
+  const addPastedImageRef = useRef(addPastedImage);
+  addPastedImageRef.current = addPastedImage;
+
+  useEffect(() => {
+    const handlePaste = (e) => {
+      // Skip only if focus is in a text field inside the builder's own canvas area
+      const ae = document.activeElement;
+      if (ae && (ae.tagName === "INPUT" || ae.tagName === "TEXTAREA" || ae.tagName === "SELECT")) {
+        if (canvasRef.current && canvasRef.current.contains(ae)) return;
+      }
+      const clipItems = e.clipboardData?.items;
+      if (!clipItems) return;
+      const imageItem = Array.from(clipItems).find(item => item.type.startsWith("image/"));
+      if (!imageItem) return;
+      e.preventDefault();
+      const file = imageItem.getAsFile();
+      if (!file) return;
+      addPastedImageRef.current(file);
+    };
+    document.addEventListener("paste", handlePaste);
+    return () => document.removeEventListener("paste", handlePaste);
+  }, []);
+
   const activeDb = panelTab === "wishlist" ? wishlistDb : itemsDb;
-  const allItems = [...itemsDb.rows, ...wishlistDb.rows];
+  const allItems = [...itemsDb.rows, ...wishlistDb.rows, ...Object.values(pastedImages)];
   const activeFilterCount = (filterCat !== "All" ? 1 : 0) + (filterColor ? 1 : 0) + (filterSeason ? 1 : 0);
 
   const [activeCapsuleId, setActiveCapsuleId] = useState(null);
@@ -6480,6 +6602,8 @@ function OutfitBuilder({ itemsDb, wishlistDb, onSave, onClose, initial, seedItem
 
   const toggleLock = (id) => setLockedIds(prev => { const next = new Set(prev); next.has(id) ? next.delete(id) : next.add(id); return next; });
   const flipItem = (id) => setFlipped(f => ({ ...f, [id]: !f[id] }));
+  const applyCrop = (id, cropData) => setCrops(c => ({ ...c, [id]: cropData }));
+  const resetCrop = (id) => setCrops(c => { const next = { ...c }; delete next[id]; return next; });
 
   const autoArrange = () => {
     const board = boardRef.current;
@@ -6583,7 +6707,7 @@ function OutfitBuilder({ itemsDb, wishlistDb, onSave, onClose, initial, seedItem
       _draftId: initial?._draftId || ("od_" + Date.now()),
       _savedAt: Date.now(),
       name: name || "Untitled Look",
-      notes, tags, seasons, layers, positions
+      notes, tags, seasons, layers, positions, pastedImages, crops
     };
     const existing = loadOutfitDrafts().filter(d => d._draftId !== draft._draftId);
     const updated = [draft, ...existing].slice(0, 20);
@@ -6600,6 +6724,8 @@ function OutfitBuilder({ itemsDb, wishlistDb, onSave, onClose, initial, seedItem
     setSeasons(draft.seasons || []);
     setLayers(draft.layers || []);
     setPositions(draft.positions || {});
+    setPastedImages(draft.pastedImages || {});
+    setCrops(draft.crops || {});
     setShowDraftPanel(false);
   };
 
@@ -6671,11 +6797,25 @@ function OutfitBuilder({ itemsDb, wishlistDb, onSave, onClose, initial, seedItem
           const { img, pos, id } = entry;
           const dx = pos.x * scale, dy = pos.y * scale;
           const dw = pos.w * scale, dh = pos.h * scale;
+          const crop = crops[id];
           if (flipped[id]) {
             ctx.save(); ctx.translate(dx + dw, dy); ctx.scale(-1, 1);
-            ctx.drawImage(img, 0, 0, dw, dh); ctx.restore();
+            if (crop) {
+              const sx = crop.x * img.naturalWidth, sy = crop.y * img.naturalHeight;
+              const sw = crop.w * img.naturalWidth, sh = crop.h * img.naturalHeight;
+              ctx.drawImage(img, sx, sy, sw, sh, 0, 0, dw, dh);
+            } else {
+              ctx.drawImage(img, 0, 0, dw, dh);
+            }
+            ctx.restore();
           } else {
-            ctx.drawImage(img, dx, dy, dw, dh);
+            if (crop) {
+              const sx = crop.x * img.naturalWidth, sy = crop.y * img.naturalHeight;
+              const sw = crop.w * img.naturalWidth, sh = crop.h * img.naturalHeight;
+              ctx.drawImage(img, sx, sy, sw, sh, dx, dy, dw, dh);
+            } else {
+              ctx.drawImage(img, dx, dy, dw, dh);
+            }
           }
         });
         resolve(canvas.toDataURL("image/jpeg", 0.85));
@@ -6687,7 +6827,7 @@ function OutfitBuilder({ itemsDb, wishlistDb, onSave, onClose, initial, seedItem
     if (!name || layers.length === 0) return;
     const previewImage = await capturePreview();
     try { localStorage.removeItem("wardrobe_builder_draft"); } catch(e) {}
-    const data = { name, notes, tags, seasons, itemIds: layers, layers, positions, previewImage };
+    const data = { name, notes, tags, seasons, itemIds: layers, layers, positions, previewImage, pastedImages, crops };
     if (saveLookbook && lookbooks && lookbooks.length > 0) {
       setSavedOutfitData(data); setSaveLbModal(true);
     } else {
@@ -6886,7 +7026,17 @@ function OutfitBuilder({ itemsDb, wishlistDb, onSave, onClose, initial, seedItem
                       onMouseDown={e => onMouseDown(e, id)} onClick={e => e.stopPropagation()}>
                       <div style={{ position: "relative", display: "inline-block" }}>
                         {item.image
-                          ? <img src={item.image} alt={item.name} style={{ width: w, height: h, objectFit: "contain", borderRadius: 4, display: "block", pointerEvents: "none", outline: showOutline ? `1px solid ${outlineColor}` : "none", outlineOffset: 2, transform: flipped[id] ? "scaleX(-1)" : "none" }} />
+                          ? crops[id] ? (
+                            <div style={{ width: w, height: h, overflow: "hidden", borderRadius: 4, position: "relative", outline: showOutline ? `1px solid ${outlineColor}` : "none", outlineOffset: 2 }}>
+                              <img src={item.image} alt={item.name} style={{
+                                position: "absolute",
+                                width: `${100 / crops[id].w}%`, height: `${100 / crops[id].h}%`,
+                                left: `${-crops[id].x * 100 / crops[id].w}%`, top: `${-crops[id].y * 100 / crops[id].h}%`,
+                                objectFit: "contain", display: "block", pointerEvents: "none", maxWidth: "none",
+                                transform: flipped[id] ? "scaleX(-1)" : "none"
+                              }} />
+                            </div>
+                          ) : <img src={item.image} alt={item.name} style={{ width: w, height: h, objectFit: "contain", borderRadius: 4, display: "block", pointerEvents: "none", outline: showOutline ? `1px solid ${outlineColor}` : "none", outlineOffset: 2, transform: flipped[id] ? "scaleX(-1)" : "none" }} />
                           : <div style={{ width: w, height: h, background: "#f0ece4", borderRadius: 4, display: "flex", alignItems: "center", justifyContent: "center", outline: showOutline ? `1px solid ${outlineColor}` : "none" }}><HangerIcon size={32} color="#ccc" /></div>
                         }
                         {lockedIds.has(id) && <div style={{ position: "absolute", top: 4, left: 4, background: "rgba(0,0,0,0.5)", borderRadius: 6, padding: "2px 4px", pointerEvents: "none", display: "flex" }}><SvgLock size={12} color="#fff" /></div>}
@@ -6931,6 +7081,7 @@ function OutfitBuilder({ itemsDb, wishlistDb, onSave, onClose, initial, seedItem
                 {aid && (<>
                   <div style={{ width: 1, background: "#e4dfd6", alignSelf: "stretch", margin: "4px 0" }} />
                   {tbBtn(() => flipItem(aid), c => <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M8 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h3"/><path d="M16 3h3a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-3"/><line x1="12" y1="20" x2="12" y2="4"/></svg>, "Flip horizontal")}
+                  {(() => { const itm = allItems.find(i => i.id === aid); return itm?.image && !isLocked ? tbBtn(() => setCropEditId(aid), c => <SvgCrop size={15} color={c} />, "Crop") : null; })()}
                   {tbBtn(() => toggleLock(aid), c => isLocked ? <SvgLock size={15} color={c} /> : <SvgUnlock size={15} color={c} />, isLocked ? "Unlock" : "Lock")}
                   {!isLocked && tbBtn(() => toggleItem(aid), c => <SvgTrash size={15} color={c} />, "Remove")}
                 </>)}
@@ -6943,7 +7094,7 @@ function OutfitBuilder({ itemsDb, wishlistDb, onSave, onClose, initial, seedItem
           {showShortcuts && (
             <div style={{ position: "absolute", bottom: 60, left: "50%", transform: "translateX(-50%)", background: "rgba(20,20,20,0.96)", borderRadius: 14, padding: "14px 18px", zIndex: 300, backdropFilter: "blur(8px)", boxShadow: "0 8px 32px rgba(0,0,0,0.4)", minWidth: 240 }}>
               <div style={{ fontSize: 11, fontWeight: 800, color: "#fff", textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 10 }}>Keyboard Shortcuts</div>
-              {[["Delete / Backspace","Remove selected item"],["⌘Z / Ctrl+Z","Undo"],["⌘Y / Ctrl+Y","Redo"],["Shift+Click","Multi-select items"],["Escape","Close builder"]].map(([key, desc]) => (
+              {[["⌘V / Ctrl+V","Paste image onto canvas"],["Delete / Backspace","Remove selected item"],["⌘Z / Ctrl+Z","Undo"],["⌘Y / Ctrl+Y","Redo"],["Shift+Click","Multi-select items"],["Escape","Close builder"]].map(([key, desc]) => (
                 <div key={key} style={{ display: "flex", justifyContent: "space-between", gap: 16, marginBottom: 6, alignItems: "center" }}>
                   <span style={{ background: "rgba(255,255,255,0.1)", color: "#fff", borderRadius: 6, padding: "2px 8px", fontSize: 11, fontFamily: "monospace", whiteSpace: "nowrap" }}>{key}</span>
                   <span style={{ fontSize: 11, color: "#aaa" }}>{desc}</span>
@@ -6951,6 +7102,7 @@ function OutfitBuilder({ itemsDb, wishlistDb, onSave, onClose, initial, seedItem
               ))}
             </div>
           )}
+          {cropEditId && (() => { const ci = allItems.find(i => i.id === cropEditId); return ci?.image ? <CanvasCropModal src={ci.image} existingCrop={crops[cropEditId] || null} onApply={(box) => { applyCrop(cropEditId, box); setCropEditId(null); }} onReset={() => { resetCrop(cropEditId); setCropEditId(null); }} onCancel={() => setCropEditId(null)} /> : null; })()}
         </div>
 
         {/* RIGHT PANEL */}

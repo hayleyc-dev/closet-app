@@ -1,6 +1,21 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { createPortal } from "react-dom";
 import { createClient } from "@supabase/supabase-js";
+import { removeBackground as imglyRemoveBackground } from "@imgly/background-removal";
+
+// ML-based background removal (runs fully in-browser via WASM).
+// Falls back to canvas flood-fill if the model fails to load / run.
+async function removeBgML(dataUrl) {
+  const blob = await imglyRemoveBackground(dataUrl, {
+    output: { format: "image/png", quality: 0.9 },
+  });
+  return await new Promise((resolve, reject) => {
+    const r = new FileReader();
+    r.onload = () => resolve(r.result);
+    r.onerror = reject;
+    r.readAsDataURL(blob);
+  });
+}
 
 // ── Phosphor Icons ───────────────────────────────────────────────────────────
 import {
@@ -1353,7 +1368,13 @@ function ImageUploadField({ value, onChange, style: outerStyle }) {
     setRemoving(true);
     try {
       const src = value.startsWith("data:") ? value : await fetchImageAsDataUrl(value);
-      const result = await removeBgCanvas(src);
+      let result;
+      try {
+        result = await removeBgML(src);
+      } catch (e) {
+        console.warn("ML bg removal failed, falling back to canvas:", e);
+        result = await removeBgCanvas(src);
+      }
       const cdnUrl = await uploadToCloudinary(result);
       onChange(cdnUrl);
     } catch {

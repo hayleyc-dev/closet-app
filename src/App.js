@@ -5,9 +5,12 @@ import { removeBackground as imglyRemoveBackground } from "@imgly/background-rem
 
 // ML-based background removal (runs fully in-browser via WASM).
 // Falls back to canvas flood-fill if the model fails to load / run.
-async function removeBgML(dataUrl) {
+async function removeBgML(dataUrl, onProgress) {
   const blob = await imglyRemoveBackground(dataUrl, {
     output: { format: "image/png", quality: 0.9 },
+    progress: (key, current, total) => {
+      if (onProgress && total) onProgress(key, current, total);
+    },
   });
   return await new Promise((resolve, reject) => {
     const r = new FileReader();
@@ -1332,6 +1335,7 @@ function ImageUploadField({ value, onChange, style: outerStyle }) {
   const [urlInput, setUrlInput] = useState("");
   const [fetching, setFetching] = useState(false);
   const [removing, setRemoving] = useState(false);
+  const [removeProgress, setRemoveProgress] = useState("");
   const [autoCropping, setAutoCropping] = useState(false);
   const [fetchError, setFetchError] = useState("");
   const [showCropTool, setShowCropTool] = useState(false);
@@ -1370,9 +1374,16 @@ function ImageUploadField({ value, onChange, style: outerStyle }) {
       const src = value.startsWith("data:") ? value : await fetchImageAsDataUrl(value);
       let result;
       try {
-        result = await removeBgML(src);
+        setRemoveProgress("Loading model…");
+        result = await removeBgML(src, (key, current, total) => {
+          const pct = Math.round((current / total) * 100);
+          if (key.startsWith("fetch")) setRemoveProgress(`Downloading ${pct}%`);
+          else if (key.startsWith("compute")) setRemoveProgress(`Processing ${pct}%`);
+          else setRemoveProgress(`${pct}%`);
+        });
       } catch (e) {
         console.warn("ML bg removal failed, falling back to canvas:", e);
+        setRemoveProgress("");
         result = await removeBgCanvas(src);
       }
       const cdnUrl = await uploadToCloudinary(result);
@@ -1381,6 +1392,7 @@ function ImageUploadField({ value, onChange, style: outerStyle }) {
       alert("Background removal failed — try a cleaner image.");
     } finally {
       setRemoving(false);
+      setRemoveProgress("");
     }
   };
 
@@ -1495,7 +1507,7 @@ function ImageUploadField({ value, onChange, style: outerStyle }) {
               display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
               fontSize: 12, fontWeight: 700, color: "#fff", opacity: removing || autoCropping ? 0.5 : 1
             }}>
-              <span><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><circle cx="12" cy="12" r="9"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/></svg></span><span>{removing ? "Working…" : "Remove BG"}</span>
+              <span><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><circle cx="12" cy="12" r="9"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/></svg></span><span>{removing ? (removeProgress || "Working…") : "Remove BG"}</span>
             </button>
             <button onClick={() => setShowMaskEditor(true)} disabled={removing || autoCropping} style={{
               padding: "9px 4px", background: "#f0ece4", border: "none", borderRadius: 10,

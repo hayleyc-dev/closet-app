@@ -3,6 +3,28 @@ import { createPortal } from "react-dom";
 import { createClient } from "@supabase/supabase-js";
 import { removeBackground as imglyRemoveBackground } from "@imgly/background-removal";
 
+// Photoroom API — highest quality, ~1-3s per image. Requires REACT_APP_PHOTOROOM_KEY.
+async function removeBgPhotoroom(dataUrl) {
+  const key = process.env.REACT_APP_PHOTOROOM_KEY;
+  if (!key) throw new Error("No Photoroom key");
+  const blob = await (await fetch(dataUrl)).blob();
+  const form = new FormData();
+  form.append("image_file", blob);
+  const res = await fetch("https://sdk.photoroom.com/v1/segment", {
+    method: "POST",
+    headers: { "x-api-key": key },
+    body: form,
+  });
+  if (!res.ok) throw new Error(`Photoroom ${res.status}`);
+  const outBlob = await res.blob();
+  return await new Promise((resolve, reject) => {
+    const r = new FileReader();
+    r.onload = () => resolve(r.result);
+    r.onerror = reject;
+    r.readAsDataURL(outBlob);
+  });
+}
+
 // ML-based background removal (runs fully in-browser via WASM).
 // Falls back to canvas flood-fill if the model fails to load / run.
 async function removeBgML(dataUrl, onProgress) {
@@ -1374,17 +1396,23 @@ function ImageUploadField({ value, onChange, style: outerStyle }) {
       const src = value.startsWith("data:") ? value : await fetchImageAsDataUrl(value);
       let result;
       try {
-        setRemoveProgress("Loading model…");
-        result = await removeBgML(src, (key, current, total) => {
-          const pct = Math.round((current / total) * 100);
-          if (key.startsWith("fetch")) setRemoveProgress(`Downloading ${pct}%`);
-          else if (key.startsWith("compute")) setRemoveProgress(`Processing ${pct}%`);
-          else setRemoveProgress(`${pct}%`);
-        });
-      } catch (e) {
-        console.warn("ML bg removal failed, falling back to canvas:", e);
-        setRemoveProgress("");
-        result = await removeBgCanvas(src);
+        setRemoveProgress("Removing background…");
+        result = await removeBgPhotoroom(src);
+      } catch (e1) {
+        console.warn("Photoroom failed, trying ML fallback:", e1);
+        try {
+          setRemoveProgress("Loading model…");
+          result = await removeBgML(src, (key, current, total) => {
+            const pct = Math.round((current / total) * 100);
+            if (key.startsWith("fetch")) setRemoveProgress(`Downloading ${pct}%`);
+            else if (key.startsWith("compute")) setRemoveProgress(`Processing ${pct}%`);
+            else setRemoveProgress(`${pct}%`);
+          });
+        } catch (e2) {
+          console.warn("ML bg removal failed, falling back to canvas:", e2);
+          setRemoveProgress("");
+          result = await removeBgCanvas(src);
+        }
       }
       const cdnUrl = await uploadToCloudinary(result);
       onChange(cdnUrl);

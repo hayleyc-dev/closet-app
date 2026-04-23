@@ -3,6 +3,24 @@ import { createPortal } from "react-dom";
 import { createClient } from "@supabase/supabase-js";
 import { removeBackground as imglyRemoveBackground } from "@imgly/background-removal";
 
+// Decode any image (incl. AVIF, WebP) and re-encode as PNG dataURL.
+// Photoroom and @imgly don't accept AVIF; browsers decode it natively via <img>.
+async function toPngDataUrl(dataUrl) {
+  return await new Promise((resolve, reject) => {
+    const img = new Image();
+    img.crossOrigin = "anonymous";
+    img.onload = () => {
+      const c = document.createElement("canvas");
+      c.width = img.naturalWidth;
+      c.height = img.naturalHeight;
+      c.getContext("2d").drawImage(img, 0, 0);
+      resolve(c.toDataURL("image/png"));
+    };
+    img.onerror = reject;
+    img.src = dataUrl;
+  });
+}
+
 // Photoroom API — highest quality, ~1-3s per image. Requires REACT_APP_PHOTOROOM_KEY.
 async function removeBgPhotoroom(dataUrl) {
   const key = process.env.REACT_APP_PHOTOROOM_KEY;
@@ -1393,7 +1411,9 @@ function ImageUploadField({ value, onChange, style: outerStyle }) {
     if (!value) return;
     setRemoving(true);
     try {
-      const src = value.startsWith("data:") ? value : await fetchImageAsDataUrl(value);
+      const rawSrc = value.startsWith("data:") ? value : await fetchImageAsDataUrl(value);
+      setRemoveProgress("Preparing image…");
+      const src = await toPngDataUrl(rawSrc);
       let result;
       try {
         setRemoveProgress("Removing background…");

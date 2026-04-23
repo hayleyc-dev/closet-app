@@ -4,6 +4,7 @@ const SUPABASE_URL = "https://gucqffnjwvbvycfqvtcw.supabase.co";
 const SUPABASE_ANON_KEY =
   "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imd1Y3FmZm5qd3ZidnljZnF2dGN3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI1MDAyMTQsImV4cCI6MjA4ODA3NjIxNH0.rXbJ1E2BKmn5T_3pm2zK1TFqeE5yogDjDjQyqNcepd4";
 const STORAGE_BUCKET = "item-images";
+const PHOTOROOM_API_KEY = ""; // paste your Photoroom key here
 const COLORS = ["Black","Blue","Brown","Clear","Cream","Gold","Green","Grey","Orange","Pink","Purple","Red","Silver","Tan","White","Yellow"];
 
 // ── Canvas image tools (no external API needed) ────────────────────────────
@@ -267,7 +268,45 @@ document.getElementById("f-wishlist-select").addEventListener("change", (e) => {
   document.getElementById("new-list-wrap").classList.toggle("visible", e.target.value === "__new__");
 });
 
-// ── Background removal (canvas-based, no API key needed) ──────────────────
+// Decode any image (AVIF/WebP/etc) and re-encode as PNG before sending to APIs.
+async function toPngDataUrl(dataUrl) {
+  return await new Promise((resolve, reject) => {
+    const img = new Image();
+    img.crossOrigin = "anonymous";
+    img.onload = () => {
+      const c = document.createElement("canvas");
+      c.width = img.naturalWidth;
+      c.height = img.naturalHeight;
+      c.getContext("2d").drawImage(img, 0, 0);
+      resolve(c.toDataURL("image/png"));
+    };
+    img.onerror = reject;
+    img.src = dataUrl;
+  });
+}
+
+// ── Photoroom API background removal ──────────────────────────────────────
+async function removeBgPhotoroom(dataUrl) {
+  if (!PHOTOROOM_API_KEY) throw new Error("No Photoroom key");
+  const blob = await (await fetch(dataUrl)).blob();
+  const form = new FormData();
+  form.append("image_file", blob);
+  const res = await fetch("https://sdk.photoroom.com/v1/segment", {
+    method: "POST",
+    headers: { "x-api-key": PHOTOROOM_API_KEY },
+    body: form,
+  });
+  if (!res.ok) throw new Error(`Photoroom ${res.status}`);
+  const outBlob = await res.blob();
+  return await new Promise((resolve, reject) => {
+    const r = new FileReader();
+    r.onload = () => resolve(r.result);
+    r.onerror = reject;
+    r.readAsDataURL(outBlob);
+  });
+}
+
+// ── Background removal (Photoroom primary, canvas fallback) ───────────────
 async function removeBackground() {
   if (!selectedImageUrl) return;
 
@@ -278,8 +317,15 @@ async function removeBackground() {
   setImageProcessing(true);
 
   try {
-    const dataUrl = selectedImageIsData ? selectedImageUrl : await fetchAsDataUrl(selectedImageUrl);
-    const result = await removeBgCanvas(dataUrl);
+    const rawDataUrl = selectedImageIsData ? selectedImageUrl : await fetchAsDataUrl(selectedImageUrl);
+    const dataUrl = await toPngDataUrl(rawDataUrl);
+    let result;
+    try {
+      result = await removeBgPhotoroom(dataUrl);
+    } catch (e) {
+      console.warn("Photoroom failed, falling back to canvas:", e);
+      result = await removeBgCanvas(dataUrl);
+    }
     selectedImageUrl = result;
     selectedImageIsData = true;
     setImagePreview(result);

@@ -2,6 +2,17 @@ import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { createPortal } from "react-dom";
 import { createClient } from "@supabase/supabase-js";
 import { removeBackground as imglyRemoveBackground } from "@imgly/background-removal";
+import {
+  Trash, Tag, Camera, Link, CoatHanger, Heart, MagnifyingGlass, Download,
+  PencilSimple, Copy, ArrowUp, ArrowDown, ArrowLeft, ArrowRight, Check,
+  Star, CastleTurret, GridFour, Cube, Folder, ShoppingBag, CalendarBlank,
+  Suitcase, Lock, Gear as PhGear, LockOpen, PushPin, Palette, Dress, Sparkle, ShoppingCart,
+  Stack, Plus, Sun, Flag, Archive, BookOpen, Tote, ArrowCounterClockwise, ArrowClockwise,
+  ArrowsOutCardinal, Crop
+} from "@phosphor-icons/react";
+
+// Active closet predicate: item is part of the wardrobe (not listed and not sold).
+const isInActiveCloset = (i) => !i.forSale && i.saleStatus !== "sold";
 
 // Decode any image (incl. AVIF, WebP) and re-encode as PNG dataURL.
 // Photoroom and @imgly don't accept AVIF; browsers decode it natively via <img>.
@@ -61,14 +72,6 @@ async function removeBgML(dataUrl, onProgress) {
 }
 
 // ── Phosphor Icons ───────────────────────────────────────────────────────────
-import {
-  Trash, Tag, Camera, Link, CoatHanger, Heart, MagnifyingGlass, Download,
-  PencilSimple, Copy, ArrowUp, ArrowDown, ArrowLeft, ArrowRight, Check,
-  Star, CastleTurret, GridFour, Cube, Folder, ShoppingBag, CalendarBlank,
-  Suitcase, Lock, Gear as PhGear, LockOpen, PushPin, Palette, Dress, Sparkle, ShoppingCart,
-  Stack, Plus, Sun, Flag, Archive, BookOpen, Tote, ArrowCounterClockwise, ArrowClockwise,
-  ArrowsOutCardinal, Crop
-} from "@phosphor-icons/react";
 
 const iconStyle = { display: "inline-block", flexShrink: 0, verticalAlign: "middle" };
 const P = (Icon, defaultSize = 14) => ({ size = defaultSize, color = "currentColor", weight = "regular", style }) =>
@@ -6507,6 +6510,7 @@ function OutfitBuilder({ itemsDb, wishlistDb, onSave, onClose, initial, seedItem
   const [canUndo, setCanUndo] = useState(false);
   const [canRedo, setCanRedo] = useState(false);
   const [selectedIds, setSelectedIds] = useState(new Set());
+  const [marquee, setMarquee] = useState(null);
   const [flipped, setFlipped] = useState({});
   const [showShortcuts, setShowShortcuts] = useState(false);
   const [saveLbModal, setSaveLbModal] = useState(false);
@@ -6582,6 +6586,11 @@ function OutfitBuilder({ itemsDb, wishlistDb, onSave, onClose, initial, seedItem
       }
       if ((e.metaKey || e.ctrlKey) && !e.shiftKey && e.key === "z") { e.preventDefault(); undo(); }
       if ((e.metaKey || e.ctrlKey) && (e.key === "y" || (e.shiftKey && e.key === "z"))) { e.preventDefault(); redo(); }
+      if ((e.metaKey || e.ctrlKey) && e.key === "a" && !e.target.matches("input,textarea,select")) {
+        e.preventDefault();
+        const { layers: ls } = stateRef.current;
+        if (ls.length > 0) { setSelectedIds(new Set(ls)); setActiveId(ls[ls.length - 1]); }
+      }
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
@@ -6647,12 +6656,13 @@ function OutfitBuilder({ itemsDb, wishlistDb, onSave, onClose, initial, seedItem
     if (panelTab === "capsule") {
       if (!activeCapsule) return [];
       const ids = new Set(activeCapsule.itemIds || []);
-      return itemsDb.rows.filter(i => ids.has(i.id)).filter(i => {
+      return itemsDb.rows.filter(i => ids.has(i.id) && isInActiveCloset(i)).filter(i => {
         const matchSearch = !search || i.name.toLowerCase().includes(search.toLowerCase()) || (i.brand || "").toLowerCase().includes(search.toLowerCase());
         return matchSearch;
       });
     }
-    return activeDb.rows.filter(i => {
+    const baseRows = activeDb === itemsDb ? activeDb.rows.filter(isInActiveCloset) : activeDb.rows;
+    return baseRows.filter(i => {
       const matchSearch = i.name.toLowerCase().includes(search.toLowerCase()) || (i.brand || "").toLowerCase().includes(search.toLowerCase());
       const matchCat = filterCat === "All" || i.category === filterCat;
       const matchColor = !filterColor || i.color === filterColor;
@@ -6670,20 +6680,48 @@ function OutfitBuilder({ itemsDb, wishlistDb, onSave, onClose, initial, seedItem
       pushHistory(newLayers, newPos);
       if (activeId === id) setActiveId(null);
     } else {
+      const item = allItems.find(i => i.id === id);
       const board = boardRef.current;
       const cw = board?.offsetWidth || 400;
       const ch = board?.offsetHeight || 500;
-      const newPos = { ...positions, [id]: { x: 40 + Math.random() * (cw - 200), y: 30 + Math.random() * (ch - 200), w: 140, h: 160 } };
-      const newLayers = [...layers, id];
-      setLayers(newLayers); setPositions(newPos);
-      pushHistory(newLayers, newPos);
-      setActiveId(id);
+      const TARGET_W = 140;
+      const placeAt = (w, h) => {
+        const newPos = { ...stateRef.current.positions, [id]: { x: 40 + Math.random() * Math.max(0, cw - w - 80), y: 30 + Math.random() * Math.max(0, ch - h - 80), w, h } };
+        const newLayers = [...stateRef.current.layers, id];
+        setLayers(newLayers); setPositions(newPos);
+        pushHistory(newLayers, newPos);
+        setActiveId(id);
+      };
+      if (item?.image) {
+        const img = new Image();
+        img.onload = () => {
+          const ratio = img.naturalHeight / img.naturalWidth;
+          placeAt(TARGET_W, Math.max(60, Math.round(TARGET_W * ratio)));
+        };
+        img.onerror = () => placeAt(TARGET_W, 160);
+        img.src = item.image;
+      } else {
+        placeAt(TARGET_W, 160);
+      }
     }
   };
 
   const toggleLock = (id) => setLockedIds(prev => { const next = new Set(prev); next.has(id) ? next.delete(id) : next.add(id); return next; });
   const flipItem = (id) => setFlipped(f => ({ ...f, [id]: !f[id] }));
-  const applyCrop = (id, cropData) => setCrops(c => ({ ...c, [id]: cropData }));
+  const applyCrop = (id, cropData) => {
+    setCrops(c => ({ ...c, [id]: cropData }));
+    const item = allItems.find(i => i.id === id);
+    if (item?.image) {
+      const img = new Image();
+      img.onload = () => {
+        const cropPxW = Math.max(1, cropData.w * img.naturalWidth);
+        const cropPxH = Math.max(1, cropData.h * img.naturalHeight);
+        const cropRatio = cropPxH / cropPxW;
+        setPositions(p => p[id] ? { ...p, [id]: { ...p[id], h: Math.max(60, Math.round(p[id].w * cropRatio)) } } : p);
+      };
+      img.src = item.image;
+    }
+  };
   const resetCrop = (id) => setCrops(c => { const next = { ...c }; delete next[id]; return next; });
 
   const autoArrange = () => {
@@ -6765,14 +6803,103 @@ function OutfitBuilder({ itemsDb, wishlistDb, onSave, onClose, initial, seedItem
 
   const onResizeMouseDown = (e, id) => {
     e.preventDefault(); e.stopPropagation();
-    const { startX, startY, startW, startH } = { startX: e.clientX, startY: e.clientY, startW: positions[id].w, startH: positions[id].h };
-    resizing.current = { id, startX, startY, startW, startH };
+    const sel = stateRef.current.selectedIds;
+    const isGroup = sel && sel.size > 1 && sel.has(id);
+    const ids = isGroup ? Array.from(sel) : [id];
+    const pos = stateRef.current.positions;
+    // Group bounding box at start
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    const startPositions = {};
+    ids.forEach(mid => {
+      const p = pos[mid]; if (!p) return;
+      startPositions[mid] = { ...p };
+      if (p.x < minX) minX = p.x;
+      if (p.y < minY) minY = p.y;
+      if (p.x + p.w > maxX) maxX = p.x + p.w;
+      if (p.y + p.h > maxY) maxY = p.y + p.h;
+    });
+    const startW = Math.max(1, maxX - minX);
+    const startH = Math.max(1, maxY - minY);
+    const ratio = startH / startW;
+    resizing.current = { ids, startX: e.clientX, startY: e.clientY, startW, startH, ratio, startPositions, anchorX: minX, anchorY: minY };
     const onMove = (ev) => {
       if (!resizing.current) return;
       const r = resizing.current;
-      setPositions(p => ({ ...p, [r.id]: { ...p[r.id], w: Math.max(60, r.startW + ev.clientX - r.startX), h: Math.max(60, r.startH + ev.clientY - r.startY) } }));
+      const dx = ev.clientX - r.startX;
+      const dy = ev.clientY - r.startY;
+      const scaleX = (r.startW + dx) / r.startW;
+      const scaleY = (r.startH + dy) / r.startH;
+      let scale = Math.max(scaleX, scaleY);
+      if (scale < 0.01) scale = 0.01;
+      setPositions(p => {
+        const np = { ...p };
+        r.ids.forEach(mid => {
+          const sp = r.startPositions[mid]; if (!sp) return;
+          const newW = sp.w * scale;
+          const newH = sp.h * scale;
+          const newX = r.anchorX + (sp.x - r.anchorX) * scale;
+          const newY = r.anchorY + (sp.y - r.anchorY) * scale;
+          np[mid] = { ...np[mid], x: newX, y: newY, w: newW, h: newH };
+        });
+        return np;
+      });
     };
-    const onUp = () => { resizing.current = null; window.removeEventListener("mousemove", onMove); window.removeEventListener("mouseup", onUp); };
+    const onUp = () => {
+      if (resizing.current) pushHistory(stateRef.current.layers, stateRef.current.positions);
+      resizing.current = null;
+      window.removeEventListener("mousemove", onMove);
+      window.removeEventListener("mouseup", onUp);
+    };
+    window.addEventListener("mousemove", onMove);
+    window.addEventListener("mouseup", onUp);
+  };
+
+  const onBoardMouseDown = (e) => {
+    if (e.button !== 0) return;
+    // Ignore if click originated on an item, the resize handle, or any other interactive descendant
+    if (e.target && e.target.closest && e.target.closest(".canvas-item")) return;
+    const board = boardRef.current;
+    if (!board) return;
+    const rect = board.getBoundingClientRect();
+    const startX = e.clientX - rect.left;
+    const startY = e.clientY - rect.top;
+    const additive = e.shiftKey;
+    let moved = false;
+    const onMove = (ev) => {
+      const x = Math.max(0, Math.min(rect.width, ev.clientX - rect.left));
+      const y = Math.max(0, Math.min(rect.height, ev.clientY - rect.top));
+      const dx = x - startX, dy = y - startY;
+      if (!moved && (Math.abs(dx) > 2 || Math.abs(dy) > 2)) moved = true;
+      if (moved) {
+        setMarquee({ x: Math.min(startX, x), y: Math.min(startY, y), w: Math.abs(dx), h: Math.abs(dy) });
+      }
+    };
+    const onUp = (ev) => {
+      window.removeEventListener("mousemove", onMove);
+      window.removeEventListener("mouseup", onUp);
+      if (!moved) {
+        setActiveId(null);
+        setSelectedIds(new Set());
+        setMarquee(null);
+        return;
+      }
+      const endX = Math.max(0, Math.min(rect.width, ev.clientX - rect.left));
+      const endY = Math.max(0, Math.min(rect.height, ev.clientY - rect.top));
+      const mx1 = Math.min(startX, endX), my1 = Math.min(startY, endY);
+      const mx2 = Math.max(startX, endX), my2 = Math.max(startY, endY);
+      const { layers: ls, positions: pos } = stateRef.current;
+      const hits = ls.filter(id => {
+        const p = pos[id]; if (!p) return false;
+        return mx1 < p.x + p.w && mx2 > p.x && my1 < p.y + p.h && my2 > p.y;
+      });
+      setSelectedIds(prev => {
+        const next = additive ? new Set(prev) : new Set();
+        hits.forEach(id => next.add(id));
+        return next;
+      });
+      setActiveId(hits.length > 0 ? hits[hits.length - 1] : null);
+      setMarquee(null);
+    };
     window.addEventListener("mousemove", onMove);
     window.addEventListener("mouseup", onUp);
   };
@@ -6818,21 +6945,32 @@ function OutfitBuilder({ itemsDb, wishlistDb, onSave, onClose, initial, seedItem
 
   const loadCapsule = (capsule) => {
     const ids = capsule.itemIds || [];
-    const board = boardRef.current;
-    const cw = board?.offsetWidth || 400;
-    const ch = board?.offsetHeight || 500;
     const newPos = { ...positions };
     const newLayers = [...layers];
+    const TARGET_W = 120;
     ids.forEach((id, i) => {
       if (!newLayers.includes(id)) {
         newLayers.push(id);
-        newPos[id] = { x: 30 + (i % 4) * 140, y: 30 + Math.floor(i / 4) * 160, w: 120, h: 140 };
+        newPos[id] = { x: 30 + (i % 4) * 140, y: 30 + Math.floor(i / 4) * 160, w: TARGET_W, h: 140 };
       }
     });
     setLayers(newLayers);
     setPositions(newPos);
     pushHistory(newLayers, newPos);
     setCapsulePickerOpen(false);
+    // Snap each newly-added item to its image's natural aspect ratio
+    ids.forEach((id) => {
+      const item = allItems.find(it => it.id === id);
+      if (!item?.image) return;
+      if (layers.includes(id)) return; // already on canvas; preserve user-set size
+      const img = new Image();
+      img.onload = () => {
+        const ratio = img.naturalHeight / img.naturalWidth;
+        const h = Math.max(60, Math.round(TARGET_W * ratio));
+        setPositions(p => p[id] ? { ...p, [id]: { ...p[id], h } } : p);
+      };
+      img.src = item.image;
+    });
   };
 
 
@@ -6879,24 +7017,28 @@ function OutfitBuilder({ itemsDb, wishlistDb, onSave, onClose, initial, seedItem
           const dx = pos.x * scale, dy = pos.y * scale;
           const dw = pos.w * scale, dh = pos.h * scale;
           const crop = crops[id];
+          // Source rect (in the image's natural pixel space)
+          const sx = crop ? crop.x * img.naturalWidth : 0;
+          const sy = crop ? crop.y * img.naturalHeight : 0;
+          const sw = crop ? crop.w * img.naturalWidth : img.naturalWidth;
+          const sh = crop ? crop.h * img.naturalHeight : img.naturalHeight;
+          if (sw <= 0 || sh <= 0) return;
+          // Letterbox source into destination rect (object-fit: contain)
+          const sourceRatio = sw / sh;
+          const destRatio = dw / dh;
+          let drawW, drawH;
+          if (sourceRatio > destRatio) { drawW = dw; drawH = dw / sourceRatio; }
+          else { drawH = dh; drawW = dh * sourceRatio; }
+          const ox = dx + (dw - drawW) / 2;
+          const oy = dy + (dh - drawH) / 2;
           if (flipped[id]) {
-            ctx.save(); ctx.translate(dx + dw, dy); ctx.scale(-1, 1);
-            if (crop) {
-              const sx = crop.x * img.naturalWidth, sy = crop.y * img.naturalHeight;
-              const sw = crop.w * img.naturalWidth, sh = crop.h * img.naturalHeight;
-              ctx.drawImage(img, sx, sy, sw, sh, 0, 0, dw, dh);
-            } else {
-              ctx.drawImage(img, 0, 0, dw, dh);
-            }
+            ctx.save();
+            ctx.translate(ox + drawW, oy);
+            ctx.scale(-1, 1);
+            ctx.drawImage(img, sx, sy, sw, sh, 0, 0, drawW, drawH);
             ctx.restore();
           } else {
-            if (crop) {
-              const sx = crop.x * img.naturalWidth, sy = crop.y * img.naturalHeight;
-              const sw = crop.w * img.naturalWidth, sh = crop.h * img.naturalHeight;
-              ctx.drawImage(img, sx, sy, sw, sh, dx, dy, dw, dh);
-            } else {
-              ctx.drawImage(img, dx, dy, dw, dh);
-            }
+            ctx.drawImage(img, sx, sy, sw, sh, ox, oy, drawW, drawH);
           }
         });
         resolve(canvas.toDataURL("image/jpeg", 0.85));
@@ -7063,7 +7205,7 @@ function OutfitBuilder({ itemsDb, wishlistDb, onSave, onClose, initial, seedItem
         </div>}
 
         {/* CANVAS — centered white 4:5 board */}
-        <div className="builder-canvas" ref={canvasRef} onClick={() => setActiveId(null)} style={embeddedInLookbook ? { flexDirection: "column", alignItems: "stretch", justifyContent: "flex-start" } : undefined}>
+        <div className="builder-canvas" ref={canvasRef} onClick={e => { if (e.target === e.currentTarget) { setActiveId(null); setSelectedIds(new Set()); } }} style={embeddedInLookbook ? { flexDirection: "column", alignItems: "stretch", justifyContent: "flex-start" } : undefined}>
           {embeddedInLookbook && (
             <div style={{ padding: "8px 14px", background: "#fff", borderBottom: "1px solid #e8e4dc", display: "flex", alignItems: "center", gap: 8, flexShrink: 0, zIndex: 10 }} onClick={e => e.stopPropagation()}>
               {onNewOutfit && (
@@ -7084,7 +7226,7 @@ function OutfitBuilder({ itemsDb, wishlistDb, onSave, onClose, initial, seedItem
                 ref={boardRef}
                 className="outfit-board"
                 style={{ width: boardW, height: boardH }}
-                onClick={() => setActiveId(null)}
+                onMouseDown={onBoardMouseDown}
               >
                 {layers.length === 0 && (
                   <div style={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", color: "#ccc", pointerEvents: "none" }}>
@@ -7131,6 +7273,16 @@ function OutfitBuilder({ itemsDb, wishlistDb, onSave, onClose, initial, seedItem
                     </div>
                   );
                 })}
+                {marquee && (
+                  <div style={{
+                    position: "absolute",
+                    left: marquee.x, top: marquee.y, width: marquee.w, height: marquee.h,
+                    border: "1.5px dashed #1a1a1a",
+                    background: "rgba(26,26,26,0.06)",
+                    pointerEvents: "none",
+                    zIndex: 9999,
+                  }} />
+                )}
               </div>
             )}
           </BoardSizer>
@@ -7175,7 +7327,7 @@ function OutfitBuilder({ itemsDb, wishlistDb, onSave, onClose, initial, seedItem
           {showShortcuts && (
             <div style={{ position: "absolute", bottom: 60, left: "50%", transform: "translateX(-50%)", background: "rgba(20,20,20,0.96)", borderRadius: 14, padding: "14px 18px", zIndex: 300, backdropFilter: "blur(8px)", boxShadow: "0 8px 32px rgba(0,0,0,0.4)", minWidth: 240 }}>
               <div style={{ fontSize: 11, fontWeight: 800, color: "#fff", textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 10 }}>Keyboard Shortcuts</div>
-              {[["⌘V / Ctrl+V","Paste image onto canvas"],["Delete / Backspace","Remove selected item"],["⌘Z / Ctrl+Z","Undo"],["⌘Y / Ctrl+Y","Redo"],["Shift+Click","Multi-select items"],["Escape","Close builder"]].map(([key, desc]) => (
+              {[["⌘V / Ctrl+V","Paste image onto canvas"],["Delete / Backspace","Remove selected item"],["⌘Z / Ctrl+Z","Undo"],["⌘Y / Ctrl+Y","Redo"],["Shift+Click","Multi-select items"],["⌘A / Ctrl+A","Select all items"],["Escape","Close builder"]].map(([key, desc]) => (
                 <div key={key} style={{ display: "flex", justifyContent: "space-between", gap: 16, marginBottom: 6, alignItems: "center" }}>
                   <span style={{ background: "rgba(255,255,255,0.1)", color: "#fff", borderRadius: 6, padding: "2px 8px", fontSize: 11, fontFamily: "monospace", whiteSpace: "nowrap" }}>{key}</span>
                   <span style={{ fontSize: 11, color: "#aaa" }}>{desc}</span>
@@ -7436,7 +7588,7 @@ function OutfitBuilder({ itemsDb, wishlistDb, onSave, onClose, initial, seedItem
 
 // ── Stats Tab ─────────────────────────────────────────────────────────────────
 function StatsTab({ itemsDb, outfitsDb, lookbooksDb, wishlistDb, outfitCalendar, onViewItem, monthlyBudget, annualBudget }) {
-  const items = itemsDb.rows.filter(i => !i.forSale);
+  const items = itemsDb.rows.filter(isInActiveCloset);
   const outfits = outfitsDb.rows || [];
   const wishItems = (wishlistDb && wishlistDb.rows) || [];
   const now = new Date();
@@ -9147,7 +9299,9 @@ function SellerDashboard({ itemsDb, allClosetItems, onViewItem }) {
     const shipNum = parseFloat(soldShipping || 0) || 0;
     const feeCalc = PLATFORM_FEE_CALC[soldPlatform];
     const platformFee = feeCalc ? feeCalc(spNum) : 0;
-    updateItem(soldConfirmItem, { saleStatus: "sold", soldDate, salePrice: soldPrice, salePlatform: soldPlatform, shippingCost: soldShipping, netRevenue: String(spNum - shipNum - platformFee), ...(soldRemoveFromCloset ? { forSale: false } : {}) });
+    // Sold items are excluded from the active closet via isInActiveCloset (saleStatus === "sold").
+    // We intentionally don't flip forSale: false on sold items so they remain visible in the seller dashboard as sale history.
+    updateItem(soldConfirmItem, { saleStatus: "sold", soldDate, salePrice: soldPrice, salePlatform: soldPlatform, shippingCost: soldShipping, netRevenue: String(spNum - shipNum - platformFee) });
     setSoldConfirmItem(null);
   };
   const startEdit = (item) => {
@@ -9184,7 +9338,7 @@ function SellerDashboard({ itemsDb, allClosetItems, onViewItem }) {
   })();
 
   const PLATFORMS = ["Depop", "Poshmark", "eBay", "Mercari", "ThredUp", "Facebook", "Instagram", "Vinted", "Other"];
-  const closetOnlyItems = (allClosetItems || itemsDb.rows).filter(i => !i.forSale);
+  const closetOnlyItems = (allClosetItems || itemsDb.rows).filter(isInActiveCloset);
   const bulkFiltered = closetOnlyItems.filter(i => !bulkSearch || i.name.toLowerCase().includes(bulkSearch.toLowerCase()));
   const applyBulkList = () => {
     if (bulkSelected.size === 0) return;
@@ -11962,7 +12116,7 @@ function HomeTab({
   const cardStyle = { background: "#fff", borderRadius: 22, border: "1px solid #e7dfd4", overflow: "hidden", boxShadow: "0 12px 30px rgba(48,33,19,0.06)" };
 
   const allItems = itemsDb.rows;
-  const closetItems = allItems.filter(i => !i.forSale);
+  const closetItems = allItems.filter(isInActiveCloset);
   const allLookbooks = lookbooksDb.rows;
   const rawIds = outfitCalendar[todayKey] || [];
   const todayIds = Array.isArray(rawIds) ? rawIds : rawIds ? [rawIds] : [];
@@ -14463,7 +14617,7 @@ export default function App() {
   const globalResults = (() => {
     const q = globalSearch.trim().toLowerCase();
     if (!q) return [];
-    const items = itemsDb.rows.filter(i => !i.forSale && (i.name.toLowerCase().includes(q) || (i.brand||"").toLowerCase().includes(q)));
+    const items = itemsDb.rows.filter(i => isInActiveCloset(i) && (i.name.toLowerCase().includes(q) || (i.brand||"").toLowerCase().includes(q)));
     const outfits = outfitsDb.rows.filter(o => (o.name||"").toLowerCase().includes(q));
     const lbs = lookbooksDb.rows.filter(lb => (lb.name||"").toLowerCase().includes(q));
     return [
@@ -15307,10 +15461,10 @@ export default function App() {
             {tab === "stats" && <StatsTab itemsDb={itemsDb} outfitsDb={outfitsDb} lookbooksDb={lookbooksDb} wishlistDb={wishlistDb} outfitCalendar={outfitCalendar} onViewItem={item => setItemDetail(item)} monthlyBudget={monthlyBudget} annualBudget={annualBudget} />}
 
             {/* SELLER DASHBOARD */}
-            {tab === "seller" && <SellerDashboard itemsDb={itemsDb} allClosetItems={itemsDb.rows.filter(i => !i.forSale)} onViewItem={(item) => setItemDetail(item)} />}
+            {tab === "seller" && <SellerDashboard itemsDb={itemsDb} allClosetItems={itemsDb.rows.filter(isInActiveCloset)} onViewItem={(item) => setItemDetail(item)} />}
 
             {/* MOODBOARD */}
-            {tab === "moodboard" && <Moodboard closetItems={itemsDb.rows.filter(i => !i.forSale)} activeIdx={moodboardActiveIdx} setActiveIdx={setMoodboardActiveIdx} boards={moodboardsDb.boards} updateBoards={moodboardsDb.updateBoards} removeBoardById={moodboardsDb.removeBoardById} mbView={moodboardView} setMbView={setMoodboardView} mbSearch={moodboardSearch} mbTagFilter={moodboardTagFilter}
+            {tab === "moodboard" && <Moodboard closetItems={itemsDb.rows.filter(isInActiveCloset)} activeIdx={moodboardActiveIdx} setActiveIdx={setMoodboardActiveIdx} boards={moodboardsDb.boards} updateBoards={moodboardsDb.updateBoards} removeBoardById={moodboardsDb.removeBoardById} mbView={moodboardView} setMbView={setMoodboardView} mbSearch={moodboardSearch} mbTagFilter={moodboardTagFilter}
               onGoToLookbook={(lb) => { const fresh = lookbooksDb.rows.find(r=>r.id===lb.id)||lb; setActiveLookbookView("editorial"); setTab("lookbooks"); setActiveLookbook(fresh); }} />}
 
             {/* SETTINGS */}
@@ -15400,7 +15554,7 @@ export default function App() {
           {tab === "moodboard" && <MoodboardInfoPanel
             activeIdx={moodboardActiveIdx} setActiveIdx={setMoodboardActiveIdx}
             boards={moodboardsDb.boards} updateBoards={moodboardsDb.updateBoards} updateBoardById={moodboardsDb.updateBoardById} removeBoardById={moodboardsDb.removeBoardById}
-            closetItems={itemsDb.rows.filter(i => !i.forSale)}
+            closetItems={itemsDb.rows.filter(isInActiveCloset)}
             lookbooksDb={lookbooksDb.rows}
             createLookbook={async ({id: newId, name, moodboardId}) => {
               const lbId = newId || uid();
@@ -15488,7 +15642,7 @@ export default function App() {
 
           {/* Capsules right card — closet tab only */}
           {tab === "closet" && (() => {
-            const allClosetColors = [...new Set(itemsDb.rows.filter(i => !i.forSale && i.color).map(i => i.color))].sort((a,b) => a.localeCompare(b));
+            const allClosetColors = [...new Set(itemsDb.rows.filter(i => isInActiveCloset(i) && i.color).map(i => i.color))].sort((a,b) => a.localeCompare(b));
             // getColorSwatch is defined at module level
             return (<>
             {[
@@ -15963,7 +16117,7 @@ export default function App() {
           const [capColF, setCapColF] = useState("All");
           const [capSeaF, setCapSeaF] = useState("All");
           const allColors = [...new Set(itemsDb.rows.flatMap(i => i.colors || (i.color ? [i.color] : [])).filter(Boolean))].sort();
-          const visItems = itemsDb.rows.filter(i => !i.forSale
+          const visItems = itemsDb.rows.filter(i => isInActiveCloset(i)
             && (capCatF === "All" || i.category === capCatF)
             && (capColF === "All" || (i.colors || [i.color]).includes(capColF))
             && (capSeaF === "All" || (i.season || []).includes(capSeaF))
@@ -16025,7 +16179,7 @@ export default function App() {
                 </div>
                 <div style={{ fontSize: 11, fontWeight: 700, color: "#aaa", textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: 8 }}>
                   {selIds.size > 0 ? selIds.size + " selected" : "Select items"}
-                  {visItems.length !== itemsDb.rows.filter(i => !i.forSale).length && " (filtered: " + visItems.length + ")"}
+                  {visItems.length !== itemsDb.rows.filter(isInActiveCloset).length && " (filtered: " + visItems.length + ")"}
                 </div>
                 <div style={{ overflowY: "auto", flex: 1, display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(82px, 1fr))", gap: 8, marginBottom: 14 }}>
                   {visItems.map(item => {
